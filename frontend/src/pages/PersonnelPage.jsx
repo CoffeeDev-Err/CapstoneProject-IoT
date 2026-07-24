@@ -28,12 +28,12 @@ function PersonnelPage() {
 
   return (
     <div className="page-container fade-in p-3 p-md-4">
-      <div className="page-header mb-4">
-        <h2 className="page-title mb-0 fw-bold">Personnel</h2>
-        <p className="page-subtitle text-body-secondary mb-0">Registered officers and current deployment status</p>
-      </div>
+      <header className="page-header mb-4">
+        <h2 className="page-title">Personnel</h2>
+        <p className="page-subtitle">Registered officers and current deployment status</p>
+      </header>
 
-      <div className="widget-card slide-up p-3 overflow-auto no-scrollbar">
+      <div className="widget-card slide-up overflow-auto no-scrollbar">
         <table className="personnel-table table align-middle mb-0">
           <thead>
             <tr>

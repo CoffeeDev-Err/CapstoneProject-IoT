@@ -20,6 +20,7 @@ import AppLayout from '../components/AppLayout'
 import AnalyticsPage from '../pages/AnalyticsPage'
 import AssignAreaPage from '../pages/AssignAreaPage'
 import DashboardPage from '../pages/DashboardPage'
+import LoginPage from '../pages/LoginPage'
 import MonitoringPage from '../pages/MonitoringPage'
 import PersonnelPage from '../pages/PersonnelPage'
 import ReportsPage from '../pages/ReportsPage'
@@ -42,6 +43,8 @@ function AppRoutes() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
+
+      <Route path="/login" element={<LoginPage />} />
 
       {/* Redirect any unrecognised path back to the dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />

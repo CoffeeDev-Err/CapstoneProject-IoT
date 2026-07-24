@@ -22,11 +22,24 @@ import { usePersonnelContext } from '../context/usePersonnelContext'
 
 function MonitoringPage() {
   // Pull live officer data and status from the shared context
-  const { personnel, personnelCount, statusMessage, outOfBoundaryPersonnel } = usePersonnelContext()
+  const {
+    personnel,
+    personnelCount,
+    statusMessage,
+    outOfBoundaryPersonnel,
+    deployments,
+  } = usePersonnelContext()
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnel, setSelectedPersonnel] = useState(null)
   const [focusTarget, setFocusTarget] = useState(null)
+  const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false)
+  const [mapLayoutVersion, setMapLayoutVersion] = useState(0)
+
+  const handleToggleSidePanel = () => {
+    setIsSidePanelCollapsed((prev) => !prev)
+    setMapLayoutVersion((prev) => prev + 1)
+  }
 
   const handleLocatePersonnel = (member) => {
     if (!member) {
@@ -49,18 +62,35 @@ function MonitoringPage() {
 
   return (
     <div className="monitoring-shell">
-      <main className="dashboard-grid">
-        <SidePanel
-          personnel={personnel}
-          personnelCount={personnelCount}
-          statusMessage={statusMessage}
-          outOfBoundaryPersonnelCount={outOfBoundaryPersonnel.length}
-          onSelectPersonnel={setSelectedPersonnel}
-        />
+      <main className={`dashboard-grid${isSidePanelCollapsed ? ' dashboard-grid--panel-collapsed' : ''}`}>
+        <aside className={`side-panel-shell${isSidePanelCollapsed ? ' is-collapsed' : ''}`}>
+          <button
+            type="button"
+            className={`side-panel-collapse-btn${isSidePanelCollapsed ? ' is-collapsed' : ''}`}
+            onClick={handleToggleSidePanel}
+            aria-label={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
+            title={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
+          >
+            <svg className="side-panel-collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
+              <path d="M9 6.7v10.6" />
+            </svg>
+          </button>
+
+          <SidePanel
+            personnel={personnel}
+            personnelCount={personnelCount}
+            statusMessage={statusMessage}
+            outOfBoundaryPersonnelCount={outOfBoundaryPersonnel.length}
+            onSelectPersonnel={setSelectedPersonnel}
+          />
+        </aside>
         <PersonnelMap
           personnel={personnel}
+          deployments={deployments}
           onSelectPersonnel={setSelectedPersonnel}
           focusTarget={focusTarget}
+          layoutVersion={mapLayoutVersion}
         />
       </main>
 

@@ -16,7 +16,7 @@ function ConfirmModal({
 
   return createPortal(
     <div
-      className="modal-backdrop d-flex align-items-center justify-content-center p-3"
+      className="modal-backdrop"
       role="presentation"
       onClick={onCancel}
     >

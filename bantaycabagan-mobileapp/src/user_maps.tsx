@@ -1,7 +1,7 @@
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Pressable } from 'react-native';
 import React, { useState, useRef } from 'react';
 import { WebView } from 'react-native-webview';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 
 export default function UserMaps({ navigation }: any) {
@@ -34,10 +34,10 @@ export default function UserMaps({ navigation }: any) {
     return (
 
 
-      
+
       <View style={styles.container}>
 
-        
+
 
         {/* 🌍 LEAFLET MAP */}
         <WebView
@@ -151,7 +151,7 @@ export default function UserMaps({ navigation }: any) {
 
       .popup-role {
     font-size: 14px;
-    color: #8755b6; 
+    color: #8755b6;
     margin-bottom: 10px;
     font-weight: 600;
   }
@@ -364,7 +364,7 @@ export default function UserMaps({ navigation }: any) {
 
       {taskModalVisible && (
         <Pressable style={styles.taskOverlay} onPress={closeTaskModal}>
-          
+
           <Animated.View
             style={[
               styles.taskModal,
@@ -544,7 +544,7 @@ onPress={() => navigation.navigate('UserProfile')}
 </View>
 
       </View>
-    );    
+    );
   }
 
   const styles = StyleSheet.create({
@@ -555,9 +555,9 @@ onPress={() => navigation.navigate('UserProfile')}
 
     alertTextDuty: {
   color: '#6b28f1',
-  fontSize: 25,        
+  fontSize: 25,
   fontWeight: 'bold',
-  marginBottom: 8,     
+  marginBottom: 8,
 },
 
 
@@ -590,7 +590,7 @@ taskHeader: {
 
 
 statusBadge: {
- 
+
   paddingHorizontal: 10,
   paddingVertical: 3,
   borderRadius: 10,
@@ -623,7 +623,7 @@ alertText: {
   color: '#ff4d4d',
   fontSize: 25,        // 🔥 bigger
   fontWeight: 'bold',
-  marginBottom: 8,     
+  marginBottom: 8,
 },
 
 timeText: {

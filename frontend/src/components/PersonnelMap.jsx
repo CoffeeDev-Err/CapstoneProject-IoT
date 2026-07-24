@@ -15,8 +15,8 @@
  *   Tile source: OpenStreetMap — free, no API key required
  *   Marker:      Custom L.divIcon so the pulsing CSS animation applies correctly
  */
-import { MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap } from 'react-leaflet'
-import { useEffect } from 'react'
+import { Circle, MapContainer, Polygon, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import { CABAGAN_BOUNDARY_COORDS, CABAGAN_CENTER } from '../utils/cabaganGeofence'
 
@@ -28,23 +28,24 @@ const OUTER_MASK_BOUNDS = [
 ]
 
 const OUTSIDE_MASK_STYLE = {
-  fillColor: '#dc2626',
+  fillColor: '#d97706',
   fillOpacity: 0.12,
   stroke: false,
   fillRule: 'evenodd',
 }
 
 const GEOFENCE_BORDER_STYLE = {
-  color: '#dc2626',
+  color: '#d97706',
   weight: 2,
   fillOpacity: 0,
   dashArray: '8 7',
 }
 
+const LIVE_MAP_DEFAULT_CENTER = CABAGAN_CENTER
+const LIVE_MAP_DEFAULT_ZOOM = 11.8
+
 const focusCabaganView = (map, animate = false) => {
-  map.fitBounds(CABAGAN_BOUNDARY_COORDS, {
-    padding: [18, 18],
-    maxZoom: 19,
+  map.setView(LIVE_MAP_DEFAULT_CENTER, LIVE_MAP_DEFAULT_ZOOM, {
     animate,
   })
 }
@@ -55,7 +56,10 @@ function FocusCabaganOnLoad() {
   useEffect(() => {
     focusCabaganView(map)
 
-    const handleFocusLiveMap = () => focusCabaganView(map, true)
+    const handleFocusLiveMap = () => {
+      map.invalidateSize()
+      focusCabaganView(map, true)
+    }
 
     window.addEventListener('focus-live-map', handleFocusLiveMap)
 
@@ -63,6 +67,52 @@ function FocusCabaganOnLoad() {
       window.removeEventListener('focus-live-map', handleFocusLiveMap)
     }
   }, [map])
+
+  return null
+}
+
+function FocusCabaganOnLayoutChange({ layoutVersion }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined
+    }
+
+    const mapContainer = map.getContainer()
+    let resizeFrame = 0
+    const resizeObserver = new ResizeObserver(() => {
+      window.cancelAnimationFrame(resizeFrame)
+      resizeFrame = window.requestAnimationFrame(() => {
+        map.invalidateSize({
+          debounceMoveend: true,
+          pan: false,
+        })
+      })
+    })
+
+    resizeObserver.observe(mapContainer)
+
+    return () => {
+      window.cancelAnimationFrame(resizeFrame)
+      resizeObserver.disconnect()
+    }
+  }, [map])
+
+  useEffect(() => {
+    if (!layoutVersion) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      map.invalidateSize({ pan: false })
+      focusCabaganView(map)
+    }, 280)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [layoutVersion, map])
 
   return null
 }
@@ -147,22 +197,131 @@ const createPoliceMarkerIcon = (member) => {
         </div>
       </div>
     `,
-    iconSize: [54, 66],
-    iconAnchor: [27, 60],
-    popupAnchor: [0, -54],
+    iconSize: [40, 48],
+    iconAnchor: [20, 44],
+    popupAnchor: [0, -40],
   })
 }
 
-function PersonnelMap({ personnel, onSelectPersonnel, focusTarget }) {
+/**
+ * SmoothMarker
+ * Creates a Leaflet marker imperatively and animates it between GPS updates
+ * using requestAnimationFrame + ease-out interpolation instead of teleporting.
+ * Must be rendered inside a <MapContainer> so useMap() is available.
+ */
+function SmoothMarker({ member, onSelect }) {
+  const map = useMap()
+  const markerRef = useRef(null)
+  const animFrameRef = useRef(null)
+  const currentPosRef = useRef([member.latitude, member.longitude])
+
+  // Rebuild icon only when visually relevant fields change, not every GPS tick
+  const icon = useMemo(
+    () => createPoliceMarkerIcon(member),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [member.status, member.isInsideCabagan, member.photoUrl, member.name],
+  )
+
+  // Mount: create the raw Leaflet marker once and add it to the map
+  useEffect(() => {
+    const marker = L.marker(currentPosRef.current, { icon })
+    marker.addTo(map)
+    markerRef.current = marker
+
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+      marker.remove()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Intentionally runs once on mount only
+
+  // Sync icon when status or boundary flag changes
+  useEffect(() => {
+    markerRef.current?.setIcon(icon)
+  }, [icon])
+
+  // Keep the click handler pointing at the latest member object
+  useEffect(() => {
+    const marker = markerRef.current
+    if (!marker) return
+    marker.off('click')
+    marker.on('click', () => onSelect(member))
+  }, [member, onSelect])
+
+  // Animate smoothly to the new GPS coordinates on every position update
+  useEffect(() => {
+    const marker = markerRef.current
+    if (!marker) return
+
+    const from = currentPosRef.current.slice()
+    const to = [member.latitude, member.longitude]
+
+    // No movement — skip animation
+    if (from[0] === to[0] && from[1] === to[1]) return
+
+    // Duration is slightly under the 1.5 s server broadcast interval so the
+    // marker is always visibly moving and reaches the target before the next update
+    const DURATION = 1400
+
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+    const startTime = performance.now()
+
+    const tick = (now) => {
+      const t = Math.min((now - startTime) / DURATION, 1)
+      const ease = 1 - (1 - t) ** 3 // ease-out cubic — fast start, smooth finish
+      const lat = from[0] + (to[0] - from[0]) * ease
+      const lng = from[1] + (to[1] - from[1]) * ease
+      currentPosRef.current = [lat, lng]
+      marker.setLatLng([lat, lng])
+      if (t < 1) {
+        animFrameRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    animFrameRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+    }
+  }, [member.latitude, member.longitude])
+
+  return null
+}
+
+function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTarget, layoutVersion = 0 }) {
+  const deploymentGroups = useMemo(() => {
+    const groups = new Map()
+
+    deployments.forEach((assignment) => {
+      const latitude = Number(assignment.latitude)
+      const longitude = Number(assignment.longitude)
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
+
+      const key = assignment.groupId || assignment.patrolArea
+      const group = groups.get(key) || {
+        key,
+        patrolArea: assignment.patrolArea,
+        latitude,
+        longitude,
+        personnelNames: [],
+      }
+      group.personnelNames.push(assignment.personnelName)
+      groups.set(key, group)
+    })
+
+    return [...groups.values()]
+  }, [deployments])
+
   return (
-    <section className="map-panel h-100 p-2">
+    <section className="map-panel h-100">
       {/*
         MapContainer is mounted once and never re-mounts — Leaflet manages
         its own internal state. Markers are updated by React re-rendering
         the <Marker> components with new position props.
       */}
-      <MapContainer center={CABAGAN_CENTER} zoom={14} scrollWheelZoom className="map-view h-100 w-100 rounded-3">
+      <MapContainer center={CABAGAN_CENTER} zoom={14} scrollWheelZoom className="map-view">
         <FocusCabaganOnLoad />
+        <FocusCabaganOnLayoutChange layoutVersion={layoutVersion} />
         <FocusPersonnelOnLocate focusTarget={focusTarget} />
 
         {/* OpenStreetMap tile layer — loads the map imagery */}
@@ -181,16 +340,33 @@ function PersonnelMap({ personnel, onSelectPersonnel, focusTarget }) {
           </Tooltip>
         </Polygon>
 
-        {/* Render one marker per officer; position updates every 4 seconds */}
-        {personnel.map((member) => (
-          <Marker
-            key={member.id}
-            icon={createPoliceMarkerIcon(member)}
-            position={[member.latitude, member.longitude]}
-            eventHandlers={{
-              // Clicking a marker opens the ProfileModal for that officer
-              click: () => onSelectPersonnel(member),
+        {deploymentGroups.map((group) => (
+          <Circle
+            key={group.key}
+            center={[group.latitude, group.longitude]}
+            radius={320}
+            pathOptions={{
+              color: '#2563eb',
+              weight: 2,
+              fillColor: '#2563eb',
+              fillOpacity: 0.1,
+              dashArray: '7 6',
             }}
+          >
+            <Tooltip permanent direction="top">
+              <strong>{group.patrolArea}</strong>
+              <br />
+              {group.personnelNames.join(', ')}
+            </Tooltip>
+          </Circle>
+        ))}
+
+        {/* SmoothMarker animates each officer between GPS updates via rAF */}
+        {personnel.map((member) => (
+          <SmoothMarker
+            key={member.id}
+            member={member}
+            onSelect={onSelectPersonnel}
           />
         ))}
       </MapContainer>

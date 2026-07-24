@@ -1,0 +1,14 @@
+node_modules/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Generated output
+dist/
+coverage/
+
+# Local tooling
+.DS_Store
+*.log

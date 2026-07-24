@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import policePersonnel1 from '../assets/policepersonnel1.jpg'
 import policePersonnel2 from '../assets/policepersonnel2.png'
 import policePersonnel3 from '../assets/policepersonnel3.jpg'
+import { REPORT_RECORDS } from '../data/reportRecords'
 import { socket } from '../services/socket'
 import { isInsideCabagan } from '../utils/cabaganGeofence'
 
@@ -116,6 +117,10 @@ export const usePersonnelRealtime = () => {
 
   // Shared top-bar notifications for geofence, emergency, and system events
   const [notifications, setNotifications] = useState([])
+
+  // Report records stay available app-wide so mobile status events update analytics immediately.
+  const [reports, setReports] = useState(REPORT_RECORDS)
+  const [deployments, setDeployments] = useState([])
 
   // Tracks which personnel are currently outside Cabagan to avoid repeated alerts
   const outsidePersonnelIdsRef = useRef(new Set())
@@ -289,6 +294,82 @@ export const usePersonnelRealtime = () => {
       })
     }
 
+    const mergeReportUpdates = (updates) => {
+      if (!Array.isArray(updates) || updates.length === 0) return
+
+      setReports((previousReports) => {
+        const reportsById = new Map(previousReports.map((report) => [report.id, report]))
+
+        updates.forEach((update) => {
+          const reportId = update.report_id || update.id
+          if (!reportId) return
+
+          reportsById.set(reportId, {
+            ...(reportsById.get(reportId) || {}),
+            ...update,
+            id: reportId,
+          })
+        })
+
+        return [...reportsById.values()]
+      })
+    }
+
+    const onReportsBootstrap = (payload) => {
+      mergeReportUpdates(payload)
+    }
+
+    const onReportSubmitted = (payload) => {
+      mergeReportUpdates([payload])
+      addNotification({
+        type: 'info',
+        title: 'New Police Report',
+        message: `${payload.officer || 'An officer'} submitted ${payload.id}.`,
+        timestamp: payload.date_time,
+      })
+    }
+
+    const onReportResolved = (payload) => {
+      const reportId = payload?.report_id || payload?.id
+      if (!reportId) return
+
+      mergeReportUpdates([{
+        ...payload,
+        report_id: reportId,
+        case_status: 'resolved',
+        resolved_at: payload.resolved_at || new Date().toISOString(),
+      }])
+      addNotification({
+        type: 'success',
+        title: 'Case Resolved',
+        message: `${reportId} was marked resolved from the mobile app.`,
+        timestamp: payload.resolved_at,
+      })
+    }
+
+    const onDeploymentsBootstrap = (payload) => {
+      if (Array.isArray(payload)) setDeployments(payload)
+    }
+
+    const onDeploymentsUpdated = (payload) => {
+      if (!Array.isArray(payload)) return
+      setDeployments(payload)
+      addNotification({
+        type: 'info',
+        title: 'Deployment Updated',
+        message: `${payload.length} active personnel assignment${payload.length === 1 ? '' : 's'} synced.`,
+      })
+    }
+
+    const onTaskCreated = (payload) => {
+      addNotification({
+        type: 'emergency',
+        title: payload.type === 'backup' ? 'Backup Request' : 'Urgent Task',
+        message: `${payload.title} at ${payload.location}.`,
+        timestamp: payload.created_at,
+      })
+    }
+
     // ── Register listeners on the shared socket instance ────────────────────
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
@@ -296,6 +377,12 @@ export const usePersonnelRealtime = () => {
     socket.on('personnel:update', onUpdate)
     socket.on('emergency:status', onEmergencyStatus)
     socket.on('emergency:alert', onEmergencyAlert)
+    socket.on('reports:bootstrap', onReportsBootstrap)
+    socket.on('report:submitted', onReportSubmitted)
+    socket.on('report:resolved', onReportResolved)
+    socket.on('deployments:bootstrap', onDeploymentsBootstrap)
+    socket.on('deployments:updated', onDeploymentsUpdated)
+    socket.on('task:created', onTaskCreated)
 
     // ── Cleanup on unmount ───────────────────────────────────────────────────
     // Removes all listeners when the PersonnelProvider unmounts to prevent
@@ -307,6 +394,12 @@ export const usePersonnelRealtime = () => {
       socket.off('personnel:update', onUpdate)
       socket.off('emergency:status', onEmergencyStatus)
       socket.off('emergency:alert', onEmergencyAlert)
+      socket.off('reports:bootstrap', onReportsBootstrap)
+      socket.off('report:submitted', onReportSubmitted)
+      socket.off('report:resolved', onReportResolved)
+      socket.off('deployments:bootstrap', onDeploymentsBootstrap)
+      socket.off('deployments:updated', onDeploymentsUpdated)
+      socket.off('task:created', onTaskCreated)
     }
   }, [addNotification]) // Subscribe once and keep notification handler current
 
@@ -323,6 +416,8 @@ export const usePersonnelRealtime = () => {
 
   return {
     personnel,
+    reports,
+    deployments,
     personnelCount,
     outOfBoundaryPersonnel,
     isConnected,

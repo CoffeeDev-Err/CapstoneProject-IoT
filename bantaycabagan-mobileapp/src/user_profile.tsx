@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, TextInput, View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 export default function UserProfile({ navigation }: any) {
   // Modal Visibility States
@@ -65,7 +65,7 @@ export default function UserProfile({ navigation }: any) {
 
         {/* MAIN ACTION BUTTONS */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.alertBtn}
             onPress={() => setAlertModalVisible(true)}
           >
@@ -101,11 +101,11 @@ export default function UserProfile({ navigation }: any) {
             <TextInput style={styles.input} value={event} onChangeText={setEvent} />
 
             <Text style={styles.fieldLabel}>Description</Text>
-            <TextInput 
-              style={[styles.input, { height: 80 }]} 
-              multiline 
-              value={description} 
-              onChangeText={setDescription} 
+            <TextInput
+              style={[styles.input, { height: 80 }]}
+              multiline
+              value={description}
+              onChangeText={setDescription}
             />
 
             <TouchableOpacity style={styles.submitBtn} onPress={() => setReportModalVisible(false)}>
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end', // ✅ Push to the right
   },
 
-  
+
 
     submitBtnalert: {
     backgroundColor: '#ff0000',

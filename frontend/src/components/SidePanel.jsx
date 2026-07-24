@@ -17,17 +17,17 @@
  */
 function SidePanel({ personnel, personnelCount, statusMessage, outOfBoundaryPersonnelCount, onSelectPersonnel }) {
   return (
-    <section className="side-panel d-grid gap-3 h-100">
+    <section className="side-panel h-100">
 
       {/* ── Metric Card: how many officers are currently on the map ── */}
-      <article className="metric-card p-3">
+      <article className="metric-card">
         <h2 className="mb-0 text-uppercase fw-bold small">Personnel on Field</h2>
         <strong className="d-block mt-2">{personnelCount}</strong>
         <small className="text-body-secondary">Units tracked in real-time</small>
       </article>
 
       {/* ── Status Card: last socket event or connection message ── */}
-      <article className="status-card p-3">
+      <article className="status-card">
         <h2 className="mb-0 text-uppercase fw-bold small">System Status</h2>
         <p className="mt-2 mb-0 text-body-secondary">{statusMessage}</p>
         {outOfBoundaryPersonnelCount > 0 && (
@@ -38,7 +38,7 @@ function SidePanel({ personnel, personnelCount, statusMessage, outOfBoundaryPers
       </article>
 
       {/* ── List Card: clickable roster of active officers ── */}
-      <article className="list-card p-3 d-flex flex-column min-vh-0">
+      <article className="list-card d-flex flex-column min-vh-0">
         <h2 className="mb-0 text-uppercase fw-bold small">Active Personnel</h2>
         <ul className="mt-3 mb-0 ps-0 list-unstyled d-grid gap-2 overflow-auto">
           {personnel.map((member) => (
@@ -49,7 +49,7 @@ function SidePanel({ personnel, personnelCount, statusMessage, outOfBoundaryPers
               */}
               <button
                 type="button"
-                className="list-item-btn d-flex align-items-center text-start w-100"
+                className="list-item-btn"
                 onClick={() => onSelectPersonnel(member)}
               >
                 {/* Small circular photo on the left */}

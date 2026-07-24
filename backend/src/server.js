@@ -17,6 +17,12 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
+const connectDB = require('./config/db');
+const createOperationalStore = require('./operationalStore');
+require('dotenv').config();
+
+// Connect to MongoDB
+connectDB();
 
 // Port is read from the environment so it can be overridden in production
 const PORT = process.env.PORT || 4000;
@@ -81,6 +87,8 @@ const personnel = [
 	},
 ];
 
+const operationalStore = createOperationalStore({ app, io, personnel });
+
 /**
  * randomDrift
  * Returns a small random offset (±0.0009°) to simulate GPS movement.
@@ -106,6 +114,7 @@ io.on('connection', (socket) => {
 	// Send the full officer list immediately so the new client's map
 	// populates without waiting for the next 4-second broadcast cycle
 	socket.emit('personnel:bootstrap', personnel);
+	operationalStore.registerSocket(socket);
 
 	/**
 	 * emergency:request
@@ -136,6 +145,17 @@ io.on('connection', (socket) => {
 			timestamp: new Date().toISOString(),
 			message: `${member.rank} ${member.name} requested backup.`,
 		});
+		operationalStore.createTask({
+			type: 'backup',
+			requested_by: member.id,
+			requester_name: member.name,
+			title: `Backup requested by ${member.name}`,
+			description: 'Responders are needed at the officer current location.',
+			location: member.locationName,
+			latitude: member.latitude,
+			longitude: member.longitude,
+			required_responders: 3,
+		});
 
 		// Ack back to the requesting client so the UI can confirm success
 		socket.emit('emergency:status', {
@@ -146,14 +166,16 @@ io.on('connection', (socket) => {
 });
 
 /**
- * GPS broadcast interval — runs every 4 000 ms (4 seconds).
+ * GPS broadcast interval — runs every 1 500 ms.
  * Updates simulated positions then pushes the full personnel array
  * to every connected client so all map markers move in real time.
+ * The SmoothMarker on the frontend animates over ~1 400 ms so markers
+ * are always visibly moving and reach the target before the next tick.
  */
 setInterval(() => {
 	updatePersonnelPositions();
 	io.emit('personnel:update', personnel);
-}, 2000);
+}, 1500);
 
 // Start the HTTP + Socket.IO server
 server.listen(PORT, () => {

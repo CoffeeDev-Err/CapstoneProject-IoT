@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import { usePersonnelContext } from '../context/usePersonnelContext'
+import { replaceDeployments } from '../services/operations'
 
 const patrolAreas = [
   'Barangay Aggub',
@@ -62,6 +63,7 @@ const createEmptyAssignmentForm = () => ({
   personnelIds: [],
   patrolArea: patrolAreas[0],
   shiftStart: '',
+  shiftEnd: '',
   notes: '',
 })
 
@@ -91,7 +93,7 @@ const toDateTimeLocalValue = (value) => {
 const resolveGroupId = (assignment) => assignment.groupId || `${assignment.patrolArea}__${assignment.assignedAt || 'none'}`
 
 function AssignAreaPage() {
-  const { personnel = [] } = usePersonnelContext()
+  const { personnel = [], deployments = [] } = usePersonnelContext()
 
   const personnelOptions = useMemo(() => {
     if (Array.isArray(personnel) && personnel.length > 0) {
@@ -120,6 +122,19 @@ function AssignAreaPage() {
   const nextAssignmentIdRef = useRef(1)
   const patrolAreaPickerRef = useRef(null)
   const patrolAreaSearchInputRef = useRef(null)
+
+  useEffect(() => {
+    setAssignments(deployments)
+  }, [deployments])
+
+  const commitAssignments = (nextAssignments, successMessage) => {
+    setAssignments(nextAssignments)
+    setAssignMessage('Saving deployment changes...')
+
+    replaceDeployments(nextAssignments)
+      .then(() => setAssignMessage(successMessage))
+      .catch((error) => setAssignMessage(error.message))
+  }
 
   const activePersonnelIds = assignmentForm.personnelIds.filter((id) =>
     personnelOptions.some((item) => item.id === id)
@@ -288,7 +303,6 @@ function AssignAreaPage() {
         return
       }
 
-      const selectedMemberIds = new Set(selectedPersonnelMembers.map((member) => member.id))
       let nextAssignmentNumber = nextAssignmentIdRef.current
 
       const nextGroupAssignments = selectedPersonnelMembers.map((member) => {
@@ -299,6 +313,7 @@ function AssignAreaPage() {
             ...existingAssignment,
             patrolArea: assignmentForm.patrolArea.trim(),
             shiftStart: assignmentForm.shiftStart,
+            shiftEnd: assignmentForm.shiftEnd,
             notes: assignmentForm.notes.trim(),
           }
         }
@@ -311,6 +326,7 @@ function AssignAreaPage() {
           rank: member.rank,
           patrolArea: assignmentForm.patrolArea.trim(),
           shiftStart: assignmentForm.shiftStart,
+          shiftEnd: assignmentForm.shiftEnd,
           notes: assignmentForm.notes.trim(),
           assignedAt: new Date().toISOString(),
         }
@@ -321,12 +337,9 @@ function AssignAreaPage() {
 
       nextAssignmentIdRef.current = nextAssignmentNumber
 
-      setAssignments((prev) => {
-        const nonGroupAssignments = prev.filter((item) => resolveGroupId(item) !== editingGroupId)
-        return [...nextGroupAssignments, ...nonGroupAssignments]
-      })
-
-      setAssignMessage(
+      const nonGroupAssignments = assignments.filter((item) => resolveGroupId(item) !== editingGroupId)
+      commitAssignments(
+        [...nextGroupAssignments, ...nonGroupAssignments],
         `${nextGroupAssignments.length} personnel reassigned to ${assignmentForm.patrolArea.trim()}.`
       )
       setEditingGroupId(null)
@@ -343,7 +356,7 @@ function AssignAreaPage() {
 
       const selectedMember = selectedPersonnelMembers[0]
 
-      setAssignments((prev) => prev.map((item) => {
+      const nextAssignments = assignments.map((item) => {
         if (item.id !== editingAssignmentId) {
           return item
         }
@@ -355,11 +368,15 @@ function AssignAreaPage() {
           rank: selectedMember.rank,
           patrolArea: assignmentForm.patrolArea.trim(),
           shiftStart: assignmentForm.shiftStart,
+          shiftEnd: assignmentForm.shiftEnd,
           notes: assignmentForm.notes.trim(),
         }
-      }))
+      })
 
-      setAssignMessage(`${selectedMember.name} reassigned to ${assignmentForm.patrolArea.trim()}.`)
+      commitAssignments(
+        nextAssignments,
+        `${selectedMember.name} reassigned to ${assignmentForm.patrolArea.trim()}.`
+      )
       setEditingAssignmentId(null)
       setEditingGroupId(null)
       resetAssignmentForm()
@@ -368,7 +385,7 @@ function AssignAreaPage() {
 
     const assignedAt = new Date().toISOString()
     const assignmentBatchSeed = nextAssignmentIdRef.current
-    const groupId = `GRP-${Date.now()}-${assignmentBatchSeed}`
+    const groupId = `GRP-${assignedAt.replace(/[-:.TZ]/g, '')}-${assignmentBatchSeed}`
     const newAssignments = selectedPersonnelMembers.map((member, index) => ({
       id: `ASG-${assignmentBatchSeed + index}`,
       groupId,
@@ -377,19 +394,18 @@ function AssignAreaPage() {
       rank: member.rank,
       patrolArea: assignmentForm.patrolArea.trim(),
       shiftStart: assignmentForm.shiftStart,
+      shiftEnd: assignmentForm.shiftEnd,
       notes: assignmentForm.notes.trim(),
       assignedAt,
     }))
 
     nextAssignmentIdRef.current += newAssignments.length
 
-    setAssignments((prev) => [...newAssignments, ...prev])
-
     const feedback = newAssignments.length === 1
       ? `${newAssignments[0].personnelName} assigned to ${newAssignments[0].patrolArea}.`
       : `${newAssignments.length} personnel assigned to ${newAssignments[0].patrolArea}.`
 
-    setAssignMessage(feedback)
+    commitAssignments([...newAssignments, ...assignments], feedback)
     resetAssignmentForm()
   }
 
@@ -442,7 +458,10 @@ function AssignAreaPage() {
   const handleDeleteAssignment = (assignmentId) => {
     const assignmentToDelete = assignments.find((item) => item.id === assignmentId)
 
-    setAssignments((prev) => prev.filter((item) => item.id !== assignmentId))
+    commitAssignments(
+      assignments.filter((item) => item.id !== assignmentId),
+      `${assignmentId} deleted from deployment assignments.`
+    )
 
     if (editingAssignmentId === assignmentId) {
       setEditingAssignmentId(null)
@@ -454,7 +473,6 @@ function AssignAreaPage() {
       resetAssignmentForm()
     }
 
-    setAssignMessage(`${assignmentId} deleted from deployment assignments.`)
   }
 
   const handleRequestDeleteGroup = (group) => {
@@ -473,7 +491,10 @@ function AssignAreaPage() {
       return
     }
 
-    setAssignments((prev) => prev.filter((assignment) => resolveGroupId(assignment) !== groupId))
+    commitAssignments(
+      assignments.filter((assignment) => resolveGroupId(assignment) !== groupId),
+      `${groupAssignments.length} assignment(s) removed from ${groupAssignments[0].patrolArea}.`
+    )
 
     if (editingGroupId === groupId) {
       setEditingGroupId(null)
@@ -485,7 +506,6 @@ function AssignAreaPage() {
       resetAssignmentForm()
     }
 
-    setAssignMessage(`${groupAssignments.length} assignment(s) removed from ${groupAssignments[0].patrolArea}.`)
   }
 
   const handleRequestDeleteAssignment = (assignment) => {
@@ -527,14 +547,14 @@ function AssignAreaPage() {
 
   return (
     <div className="page-container fade-in p-3 p-md-4">
-      <div className="page-header mb-4">
+      <header className="page-header mb-4">
         <div>
-          <h2 className="page-title mb-0 fw-bold">Assign Area</h2>
-          <p className="page-subtitle text-body-secondary mb-0">Assign patrol areas and manage deployment assignments</p>
+          <h2 className="page-title">Assign Area</h2>
+          <p className="page-subtitle">Assign patrol areas and manage deployment assignments</p>
         </div>
-      </div>
+      </header>
 
-      <div className="widget-card slide-up p-3 mb-3">
+      <div className="widget-card slide-up mb-3">
         <h3 className="widget-title mb-3">Supervisor Deployment Assignment</h3>
 
         <form className="assignment-form" onSubmit={handleAssignPersonnel}>
@@ -641,6 +661,16 @@ function AssignAreaPage() {
               />
             </label>
 
+            <label className="assignment-field">
+              <span>Shift End (Optional)</span>
+              <input
+                type="datetime-local"
+                className="settings-input w-100"
+                value={assignmentForm.shiftEnd}
+                onChange={handleFormChange('shiftEnd')}
+              />
+            </label>
+
             <label className="assignment-field assignment-field--notes">
               <span>Notes</span>
               <textarea
@@ -671,7 +701,7 @@ function AssignAreaPage() {
         </form>
       </div>
 
-      <div className="widget-card slide-up p-3 overflow-auto no-scrollbar">
+      <div className="widget-card slide-up overflow-auto no-scrollbar">
         <div className="assignment-list-header mb-3">
           <h3 className="widget-title mb-0">Assigned Deployment List</h3>
           <input
