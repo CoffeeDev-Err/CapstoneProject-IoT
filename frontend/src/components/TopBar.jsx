@@ -22,6 +22,38 @@ const SUPERVISOR = {
   photoUrl: 'https://randomuser.me/api/portraits/men/56.jpg',
 }
 
+const NOTIFICATION_HISTORY_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'today', label: 'Today' },
+  { value: '7-days', label: '7 days' },
+  { value: '30-days', label: '30 days' },
+]
+
+const isNotificationInHistoryRange = (notification, range) => {
+  if (range === 'all') {
+    return true
+  }
+
+  const notificationDate = new Date(notification.timestamp)
+  if (Number.isNaN(notificationDate.getTime())) {
+    return false
+  }
+
+  const now = new Date()
+
+  if (range === 'today') {
+    return notificationDate.getFullYear() === now.getFullYear()
+      && notificationDate.getMonth() === now.getMonth()
+      && notificationDate.getDate() === now.getDate()
+  }
+
+  const rangeInDays = range === '7-days' ? 7 : 30
+  const rangeStart = new Date(now)
+  rangeStart.setDate(rangeStart.getDate() - rangeInDays)
+
+  return notificationDate >= rangeStart && notificationDate <= now
+}
+
 const getNotificationTypeLabel = (type) => {
   switch (type) {
     case 'geofence':
@@ -78,18 +110,23 @@ function TopBar({
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [notificationSearch, setNotificationSearch] = useState('')
+  const [notificationHistoryRange, setNotificationHistoryRange] = useState('all')
   const dropdownRef = useRef(null)
   const notificationRef = useRef(null)
 
   const filteredNotifications = useMemo(() => {
     const searchQuery = notificationSearch.trim().toLowerCase()
-    if (!searchQuery) {
-      return notifications
-    }
-
     const searchTokens = searchQuery.split(/\s+/).filter(Boolean)
 
     return notifications.filter((notification) => {
+      if (!isNotificationInHistoryRange(notification, notificationHistoryRange)) {
+        return false
+      }
+
+      if (searchTokens.length === 0) {
+        return true
+      }
+
       const typeAliases = []
       if (notification.type === 'emergency') {
         typeAliases.push('backup', 'request', 'backup request', 'emergency')
@@ -111,7 +148,7 @@ function TopBar({
 
       return searchTokens.every((token) => searchableText.includes(token))
     })
-  }, [notificationSearch, notifications])
+  }, [notificationHistoryRange, notificationSearch, notifications])
 
   // Close open top-bar popovers whenever user clicks outside of them
   useEffect(() => {
@@ -156,11 +193,11 @@ function TopBar({
   }
 
   return (
-    <header className="top-bar d-flex align-items-center justify-content-between">
+    <header className="top-bar">
       {/* ── Left: system branding ── */}
       <div className="topbar-left">
-        <h1 className="m-0 fs-4 fw-bold">BantayCabagan</h1>
-        <p className="mb-0 mt-1 text-secondary small">IoT-Based Real-Time GPS Monitoring for Police Personnel</p>
+        <h1>BantayCabagan</h1>
+        <p>IoT-Based Real-Time GPS Monitoring for Police Personnel</p>
       </div>
 
       {/* ── Right: status pill + theme + notifications + supervisor profile ── */}
@@ -240,6 +277,23 @@ function TopBar({
                 />
               </div>
 
+              <div className="notification-history-filter" aria-label="Notification history">
+                <span>History</span>
+                <div className="notification-history-filter__options">
+                  {NOTIFICATION_HISTORY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={notificationHistoryRange === option.value ? 'is-active' : ''}
+                      onClick={() => setNotificationHistoryRange(option.value)}
+                      aria-pressed={notificationHistoryRange === option.value}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {notifications.length === 0 ? (
                 <div className="notification-empty-state">
                   <strong>No notifications yet</strong>
@@ -248,7 +302,7 @@ function TopBar({
               ) : filteredNotifications.length === 0 ? (
                 <div className="notification-empty-state">
                   <strong>No matched notifications</strong>
-                  <p className="mb-0">Try searching a different keyword, personnel name, or date.</p>
+                  <p className="mb-0">Try another keyword or expand the history range.</p>
                 </div>
               ) : (
                 <ul className="notification-list">

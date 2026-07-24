@@ -25,7 +25,7 @@ function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
 
   return createPortal(
     // Semi-transparent backdrop — clicking outside the card dismisses the modal
-    <div className="modal-backdrop d-flex align-items-center justify-content-center p-3" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
 
       {/*
         The card itself — stopPropagation prevents backdrop's onClick
@@ -65,7 +65,7 @@ function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
         </div>
 
         {/* Action buttons */}
-        <div className="modal-actions d-flex justify-content-end gap-2 mt-3">
+        <div className="modal-actions">
           <button type="button" className="locate-btn" onClick={onLocate}>
             Locate
           </button>

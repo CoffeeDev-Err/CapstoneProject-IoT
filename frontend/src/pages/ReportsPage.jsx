@@ -1,57 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import ReportDetailDrawer from '../components/ReportDetailDrawer'
+import { usePersonnelContext } from '../context/usePersonnelContext'
 
-const reports = [
-  {
-    personnel_id: 'pcpl-001',
-    officer: 'Mon Maguas',
-    date_time: '2026-04-09T09:15:00',
-    assigned_area: 'Cabagan Public Market Zone',
-    report_type: 'incident',
-    title: 'Minor Traffic Accident',
-    description: 'A minor two-vehicle collision was recorded near the market entrance. No casualties were reported and traffic flow was normalized after initial response.',
-    location: 'Near Cabagan Public Market Main Gate',
-  },
-  {
-    personnel_id: 'psms-002',
-    officer: 'GerryBoy Aggabao',
-    date_time: '2026-04-09T10:45:00',
-    assigned_area: 'Municipal Hall Perimeter',
-    report_type: 'checkpoint',
-    title: 'Vehicle Inspection Checkpoint',
-    description: 'Routine checkpoint operations were completed and standard document checks were conducted for passing motorists.',
-    location: 'Municipal Hall Front Checkpoint',
-  },
-  {
-    personnel_id: 'pltc-003',
-    officer: 'Romel Manzano',
-    date_time: '2026-04-09T11:30:00',
-    assigned_area: 'Barangay Centro Route',
-    report_type: 'patrol',
-    title: 'Public Visibility Patrol',
-    description: 'Foot and mobile patrols were conducted around business zones and school vicinity to maintain visibility and deter petty incidents.',
-    location: 'Barangay Centro Covered Court Vicinity',
-  },
-  {
-    personnel_id: 'pcpl-001',
-    officer: 'Mon Maguas',
-    date_time: '2026-04-08T22:20:00',
-    assigned_area: 'Highway Checkpoint North',
-    report_type: 'backup',
-    title: 'Backup Request During Disturbance',
-    description: 'Backup assistance was requested for crowd control after a roadside disturbance. Situation was resolved without escalation.',
-    location: 'Maharlika Highway North, KM 412 Checkpoint',
-  },
-  {
-    personnel_id: 'psms-002',
-    officer: 'GerryBoy Aggabao',
-    date_time: '2026-04-08T19:10:00',
-    assigned_area: 'School Safety Patrol Route',
-    report_type: 'others',
-    title: 'Community Coordination Update',
-    description: 'Coordinated with barangay officials regarding evening traffic rerouting and safety reminders for parents and students.',
-    location: 'San Juan Access Road Near School Zone',
-  },
-]
+const REPORTS_PER_PAGE = 10
 
 const formatDateTime = (isoValue) => {
   if (!isoValue) {
@@ -69,95 +20,312 @@ const formatDateTime = (isoValue) => {
 
 const toCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
 
+const getInitials = (name) => name
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0])
+  .join('')
+  .toUpperCase()
+
+const downloadCsv = (rows, fileName) => {
+  const csvContent = rows
+    .map((row) => (row.length === 0 ? '' : row.map(toCsvValue).join(',')))
+    .join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const downloadAnchor = document.createElement('a')
+
+  downloadAnchor.href = url
+  downloadAnchor.download = fileName
+  document.body.appendChild(downloadAnchor)
+  downloadAnchor.click()
+  document.body.removeChild(downloadAnchor)
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+const getReportCsvRows = (report) => [
+  ['Report ID', report.id],
+  ['Personnel ID', report.personnel_id],
+  ['Officer', report.officer],
+  ['Submitted At', report.date_time],
+  ['Occurred At', report.occurred_at],
+  ['Assigned Area', report.assigned_area],
+  ['Barangay', report.barangay],
+  ['Report Type', report.report_type],
+  ['Severity', report.severity],
+  ['Validation Status', report.validation_status],
+  ['Case Status', report.case_status || 'not_applicable'],
+  ['Resolved At', report.resolved_at || ''],
+  ['Resolution Notes', report.resolution_notes || ''],
+  ['Title', report.title],
+  ['Description', report.description],
+  ['Location', report.location],
+]
+
 function ReportsPage() {
+  const { reports: realtimeReports } = usePersonnelContext()
   const [reportMessage, setReportMessage] = useState('')
+  const [selectedReportId, setSelectedReportId] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [reportTypeFilter, setReportTypeFilter] = useState('all')
+  const [caseStatusFilter, setCaseStatusFilter] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const reports = useMemo(
+    () => [...realtimeReports].sort(
+      (firstReport, secondReport) => new Date(secondReport.date_time) - new Date(firstReport.date_time)
+    ),
+    [realtimeReports],
+  )
+  const reportTypes = useMemo(
+    () => [...new Set(reports.map((report) => report.report_type))].sort(),
+    [reports],
+  )
+  const filteredReports = useMemo(() => {
+    const normalizedSearchTerm = searchTerm.trim().toLowerCase()
 
-  const handleGenerateReport = () => {
-    const generatedAtIso = new Date().toISOString()
-
-    const csvRows = [
-      ['Generated At', formatDateTime(generatedAtIso)],
-      ['Generated By', 'Supervisor'],
-      [],
-      ['Police Reports'],
-      ['personnel_id', 'officer', 'date_time', 'assigned_area', 'report_type', 'title', 'description', 'location'],
-      ...reports.map((report) => [
+    return reports.filter((report) => {
+      const matchesSearch = !normalizedSearchTerm || [
+        report.id,
         report.personnel_id,
         report.officer,
-        report.date_time,
         report.assigned_area,
-        report.report_type,
+        report.barangay,
         report.title,
-        report.description,
         report.location,
-      ]),
-    ]
+      ].some((value) => String(value || '').toLowerCase().includes(normalizedSearchTerm))
+      const matchesType = reportTypeFilter === 'all' || report.report_type === reportTypeFilter
+      const matchesStatus = caseStatusFilter === 'all'
+        || (caseStatusFilter === 'open' && report.is_incident && report.case_status !== 'resolved')
+        || (caseStatusFilter === 'resolved' && report.is_incident && report.case_status === 'resolved')
 
-    const csvContent = csvRows
-      .map((row) => (row.length === 0 ? '' : row.map(toCsvValue).join(',')))
-      .join('\n')
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [caseStatusFilter, reportTypeFilter, reports, searchTerm])
+  const totalPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE))
+  const activePage = Math.min(currentPage, totalPages)
+  const pageStartIndex = (activePage - 1) * REPORTS_PER_PAGE
+  const paginatedReports = filteredReports.slice(pageStartIndex, pageStartIndex + REPORTS_PER_PAGE)
+  const firstVisibleReport = filteredReports.length === 0 ? 0 : pageStartIndex + 1
+  const lastVisibleReport = Math.min(pageStartIndex + REPORTS_PER_PAGE, filteredReports.length)
+  const visiblePageNumbers = Array.from(
+    { length: Math.min(5, totalPages) },
+    (_, index) => {
+      const firstPage = Math.min(
+        Math.max(1, activePage - 2),
+        Math.max(1, totalPages - 4),
+      )
+      return firstPage + index
+    },
+  )
+  const selectedReport = reports.find((report) => report.id === selectedReportId) || null
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const downloadAnchor = document.createElement('a')
-    const fileStamp = generatedAtIso.replace(/[-:TZ]/g, '').slice(0, 14)
+  const handleCloseReport = useCallback(() => {
+    setSelectedReportId(null)
+  }, [])
 
-    downloadAnchor.href = url
-    downloadAnchor.download = `bantaycabagan-report-${fileStamp}.csv`
-    document.body.appendChild(downloadAnchor)
-    downloadAnchor.click()
-    document.body.removeChild(downloadAnchor)
-    URL.revokeObjectURL(url)
+  const handleDownloadReport = useCallback((report) => {
+    downloadCsv(getReportCsvRows(report), `${report.id.toLowerCase()}.csv`)
+    setReportMessage(`${report.id} downloaded successfully.`)
+  }, [])
 
-    setReportMessage('Report generated and downloaded successfully.')
+  const updateSearchTerm = (value) => {
+    setSearchTerm(value)
+    setCurrentPage(1)
+  }
+
+  const updateReportTypeFilter = (value) => {
+    setReportTypeFilter(value)
+    setCurrentPage(1)
+  }
+
+  const updateCaseStatusFilter = (value) => {
+    setCaseStatusFilter(value)
+    setCurrentPage(1)
   }
 
   return (
     <div className="page-container fade-in p-3 p-md-4">
-      <div className="page-header mb-4 reports-header">
+      <header className="page-header mb-3 reports-header">
         <div>
-          <h2 className="page-title mb-0 fw-bold">Reports</h2>
-          <p className="page-subtitle text-body-secondary mb-0">Police incident and patrol report records</p>
+          <h2 className="page-title">Reports</h2>
+          <p className="page-subtitle">Police incident and patrol report records</p>
         </div>
-        <button type="button" className="report-generate-btn" onClick={handleGenerateReport}>
-          Generate Report
-        </button>
-      </div>
+      </header>
 
-      {reportMessage && <small className="report-feedback d-block mb-3">{reportMessage}</small>}
+      <div className="widget-card slide-up report-list-panel">
+        <div className="report-list-panel__header">
+          <div>
+            <h3 className="widget-title mb-0">Submitted reports</h3>
+            <p>{filteredReports.length} of {reports.length} reports shown</p>
+          </div>
+        </div>
 
-      <div className="widget-card slide-up p-3 overflow-auto no-scrollbar">
-        <h3 className="widget-title mb-3">Police Reports</h3>
+        <div className="report-list-controls">
+          <label className="report-search">
+            <span className="visually-hidden">Search reports</span>
+            <svg className="report-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-4-4" />
+            </svg>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => updateSearchTerm(event.target.value)}
+              placeholder="Search officer, area, barangay, or report ID"
+            />
+          </label>
 
-        <table className="personnel-table table align-middle mb-0">
-          <thead>
-            <tr>
-              <th>personnel_id</th>
-              <th>officer</th>
-              <th>date_time</th>
-              <th>assigned_area</th>
-              <th>report_type</th>
-              <th>title</th>
-              <th>description</th>
-              <th>location</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((report) => (
-              <tr key={`${report.personnel_id}-${report.date_time}`} className="personnel-row">
-                <td>{report.personnel_id}</td>
-                <td>{report.officer}</td>
-                <td>{formatDateTime(report.date_time)}</td>
-                <td>{report.assigned_area}</td>
-                <td>{report.report_type}</td>
-                <td>{report.title}</td>
-                <td>{report.description}</td>
-                <td>{report.location}</td>
-              </tr>
+          <label className="report-filter">
+            <span>Report type</span>
+            <select
+              value={reportTypeFilter}
+              onChange={(event) => updateReportTypeFilter(event.target.value)}
+            >
+              <option value="all">All types</option>
+              {reportTypes.map((reportType) => (
+                <option key={reportType} value={reportType}>
+                  {reportType}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="report-filter">
+            <span>Case status</span>
+            <select
+              value={caseStatusFilter}
+              onChange={(event) => updateCaseStatusFilter(event.target.value)}
+            >
+              <option value="all">All statuses</option>
+              <option value="open">Open incidents</option>
+              <option value="resolved">Resolved incidents</option>
+            </select>
+          </label>
+        </div>
+
+        {reportMessage && (
+          <div className="report-feedback-slot" aria-live="polite">
+            <small className="report-feedback">{reportMessage}</small>
+          </div>
+        )}
+
+        <div className="report-list" role="table" aria-label="Submitted police reports">
+          <div className="report-list__header" role="row">
+            <span role="columnheader">Officer</span>
+            <span role="columnheader">Submitted</span>
+            <span role="columnheader">Assigned area</span>
+            <span role="columnheader" className="report-list__actions-heading">Actions</span>
+          </div>
+
+          {paginatedReports.map((report) => (
+            <article className="report-list__row" role="row" key={report.id}>
+              <div className="report-list__officer" role="cell">
+                <span className="report-list__avatar" aria-hidden="true">{getInitials(report.officer)}</span>
+                <div>
+                  <strong>{report.officer}</strong>
+                  <small>{report.personnel_id}</small>
+                </div>
+              </div>
+              <div className="report-list__submitted" role="cell">
+                <span className="report-list__mobile-label">Submitted</span>
+                <time dateTime={report.date_time}>{formatDateTime(report.date_time)}</time>
+              </div>
+              <div className="report-list__area" role="cell">
+                <span className="report-list__mobile-label">Assigned area</span>
+                <span>{report.assigned_area}</span>
+              </div>
+              <div className="report-list__actions" role="cell">
+                <button
+                  type="button"
+                  className="report-action-btn report-action-btn--secondary"
+                  onClick={() => handleDownloadReport(report)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="M7 10l5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  Download
+                </button>
+                <button
+                  type="button"
+                  className="report-action-btn report-action-btn--primary"
+                  onClick={() => setSelectedReportId(report.id)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
+                    <circle cx="12" cy="12" r="2.5" />
+                  </svg>
+                  View report
+                </button>
+              </div>
+            </article>
+          ))}
+
+          {paginatedReports.length === 0 && (
+            <div className="report-list-empty" role="row">
+              <strong>No matching reports</strong>
+              <span>Try a different search term or filter.</span>
+            </div>
+          )}
+        </div>
+
+        <nav className="report-pagination" aria-label="Report list pagination">
+          <span className="report-pagination__summary">
+            Showing {firstVisibleReport}-{lastVisibleReport} of {filteredReports.length}
+          </span>
+
+          <div className="report-pagination__controls">
+            <button
+              type="button"
+              className="report-page-btn"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={activePage === 1}
+              aria-label="Previous page"
+              title="Previous page"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+
+            {visiblePageNumbers.map((pageNumber) => (
+              <button
+                key={pageNumber}
+                type="button"
+                className={`report-page-btn ${activePage === pageNumber ? 'is-active' : ''}`}
+                onClick={() => setCurrentPage(pageNumber)}
+                aria-label={`Page ${pageNumber}`}
+                aria-current={activePage === pageNumber ? 'page' : undefined}
+              >
+                {pageNumber}
+              </button>
             ))}
-          </tbody>
-        </table>
+
+            <button
+              type="button"
+              className="report-page-btn"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={activePage === totalPages}
+              aria-label="Next page"
+              title="Next page"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+        </nav>
       </div>
+
+      <ReportDetailDrawer
+        report={selectedReport}
+        formatDateTime={formatDateTime}
+        onClose={handleCloseReport}
+        onDownload={handleDownloadReport}
+      />
     </div>
   )
 }

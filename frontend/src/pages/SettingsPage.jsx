@@ -37,7 +37,6 @@ const initialCreatedAccounts = [
     gpsUpdateIntervalSec: '5',
     emergencyContactName: 'Liza Maguas',
     emergencyContactNumber: '09179998888',
-    notes: '',
     forcePasswordReset: true,
     createdAt: '2026-03-21T08:30:00.000Z',
   },
@@ -57,7 +56,6 @@ const initialCreatedAccounts = [
     gpsUpdateIntervalSec: '5',
     emergencyContactName: 'Maria Aggabao',
     emergencyContactNumber: '09173334444',
-    notes: '',
     forcePasswordReset: true,
     createdAt: '2026-03-22T09:15:00.000Z',
   },
@@ -89,7 +87,6 @@ const initialFormState = {
   gpsUpdateIntervalSec: '5',
   emergencyContactName: '',
   emergencyContactNumber: '',
-  notes: '',
   forcePasswordReset: true,
 }
 
@@ -288,7 +285,7 @@ function SettingsPage() {
       gpsUpdateIntervalSec: account.gpsUpdateIntervalSec ?? '5',
       emergencyContactName: account.emergencyContactName ?? '',
       emergencyContactNumber: account.emergencyContactNumber ?? '',
-      notes: account.notes ?? '',
+
       forcePasswordReset: account.forcePasswordReset ?? true,
     })
     setFormErrors({})
@@ -356,7 +353,6 @@ function SettingsPage() {
       gpsUpdateIntervalSec: accountForm.gpsUpdateIntervalSec,
       emergencyContactName: accountForm.emergencyContactName.trim(),
       emergencyContactNumber: accountForm.emergencyContactNumber.trim(),
-      notes: accountForm.notes.trim(),
       forcePasswordReset: accountForm.forcePasswordReset,
     }
 
@@ -403,14 +399,14 @@ function SettingsPage() {
 
   return (
     <div className="page-container page-container--settings fade-in p-3 p-md-4">
-      <div className="page-header mb-4">
-        <h2 className="page-title mb-0 fw-bold">Account Management</h2>
-        <p className="page-subtitle text-body-secondary mb-0">Create and manage officer mobile accounts</p>
-      </div>
+      <header className="page-header mb-4">
+        <h2 className="page-title">Account Management</h2>
+        <p className="page-subtitle">Create and manage officer mobile accounts</p>
+      </header>
 
       <div className="settings-grid row g-3 mx-0">
         <div className="col-12">
-          <div className="widget-card slide-up p-3 account-management-card">
+          <div className="widget-card slide-up account-management-card">
             <div className="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
               <div>
                 <h3 className="widget-title mb-1">Account Management (Supervisor Only)</h3>
@@ -627,17 +623,6 @@ function SettingsPage() {
                   {formErrors.emergencyContactNumber && (
                     <small className="field-error">{formErrors.emergencyContactNumber}</small>
                   )}
-                </label>
-
-                <label className="account-field account-field--full">
-                  <span>Notes / Restrictions</span>
-                  <textarea
-                    className="settings-input w-100"
-                    rows={3}
-                    value={accountForm.notes}
-                    onChange={handleFieldChange('notes')}
-                    placeholder="Optional notes: restricted zones, temporary deployment, watchlist flags"
-                  />
                 </label>
                   </div>
 
