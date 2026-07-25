@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { io } from 'socket.io-client';
 import { CURRENT_OFFICER } from '../constants/officer';
 import type {
@@ -7,9 +6,9 @@ import type {
   PoliceReport,
   SubmitReportInput,
 } from '../types/operations';
+import { API_URL } from './apiConfig';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL
-  || (Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000');
+export { API_URL } from './apiConfig';
 
 export const operationsSocket = io(API_URL, {
   transports: ['websocket', 'polling'],

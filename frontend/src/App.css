@@ -2975,7 +2975,7 @@ small,
   white-space: nowrap;
 }
 
-.account-action-btn:hover {
+.account-action-btn:hover:not(:disabled) {
   background: #eff6ff;
   border-color: var(--color-primary-light);
   color: var(--color-primary);
@@ -2990,11 +2990,19 @@ small,
   box-shadow: var(--shadow-sm);
 }
 
-.account-submit-btn:hover {
+.account-submit-btn:hover:not(:disabled) {
   border-color: var(--color-primary-dark);
   background: var(--color-primary-dark);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.account-action-btn:disabled,
+.account-submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  transform: none;
+  box-shadow: none;
 }
 
 .account-feedback {

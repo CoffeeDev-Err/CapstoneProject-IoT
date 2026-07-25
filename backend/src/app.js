@@ -1,36 +1,15 @@
-/**
- * app.js — Express Application Setup
- *
- * Creates and configures the Express HTTP application.
- * The Socket.IO realtime server is attached on top of this app in server.js.
- *
- * Middleware registered:
- *   cors()         — Allows cross-origin requests from the React frontend
- *                    (safe for development; restrict allowed origins in production)
- *   express.json() — Parses incoming JSON request bodies automatically
- *
- * REST endpoints:
- *   GET /api/health — Quick liveness check for deployment health probes
- */
-const express = require('express');
-const cors = require('cors');
+const cors = require('cors')
+const express = require('express')
+const createSystemController = require('./controllers/systemController')
+const createSystemRoutes = require('./routes/systemRoutes')
+const flespiService = require('./services/flespiService')
 
-const app = express();
+const app = express()
 
-// Allow requests from any origin during development
-// In production: replace with cors({ origin: 'https://your-domain.com' })
-app.use(cors());
+app.use(cors())
+app.use(express.json())
 
-// Parse JSON bodies in incoming POST / PUT / PATCH requests
-app.use(express.json());
+const systemController = createSystemController(flespiService)
+app.use('/api', createSystemRoutes(systemController))
 
-/**
- * GET /api/health
- * Simple liveness probe — returns 200 with a JSON payload.
- * Useful for confirming the service is running without touching the database.
- */
-app.get('/api/health', (_req, res) => {
-	res.json({ status: 'ok', service: 'BantayCabagan backend' });
-});
-
-module.exports = app;
+module.exports = app
