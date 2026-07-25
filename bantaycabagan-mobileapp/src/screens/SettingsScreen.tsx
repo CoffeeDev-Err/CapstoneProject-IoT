@@ -10,17 +10,17 @@ export const SettingsScreen = ({ onReload }: SettingsScreenProps) => {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.title}>Development Settings</Text>
-      <Text style={styles.subtitle}>Use this while wiring real APIs and background sync.</Text>
+      <Text style={styles.subtitle}>Connection and data refresh controls.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.itemTitle}>Mock API Mode</Text>
+        <Text style={styles.itemTitle}>Shared API</Text>
         <Text style={styles.itemDescription}>
-          Current build uses local sample data from personnelService.
+          Personnel and operations are loaded from the BantayCabagan server.
         </Text>
       </View>
 
       <Pressable style={styles.button} onPress={onReload}>
-        <Text style={styles.buttonText}>Reload Sample Data</Text>
+        <Text style={styles.buttonText}>Refresh Data</Text>
       </Pressable>
     </View>
   );

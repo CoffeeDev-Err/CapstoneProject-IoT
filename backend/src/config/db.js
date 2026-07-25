@@ -1,15 +1,16 @@
-const mongoose = require('mongoose');
-require('dotenv').config();
+const mongoose = require('mongoose')
+require('dotenv').config()
 
 const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('MongoDB connected successfully');
-  } catch (error) {
-    console.warn('MongoDB connection failed — running without database.');
-    console.warn('GPS simulation and Socket.IO will still work.');
-    console.warn('Start MongoDB or set MONGO_URI in .env to enable persistence.');
-  }
-};
+	if (!process.env.MONGO_URI) {
+		throw new Error('MONGO_URI is required. The API cannot start without persistent storage.')
+	}
 
-module.exports = connectDB;
+	await mongoose.connect(process.env.MONGO_URI, {
+		serverSelectionTimeoutMS: 10_000,
+	})
+	console.log('MongoDB connected successfully')
+	return mongoose.connection
+}
+
+module.exports = connectDB

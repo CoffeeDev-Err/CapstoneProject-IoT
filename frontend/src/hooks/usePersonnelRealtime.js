@@ -25,7 +25,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import policePersonnel1 from '../assets/policepersonnel1.jpg'
 import policePersonnel2 from '../assets/policepersonnel2.png'
 import policePersonnel3 from '../assets/policepersonnel3.jpg'
-import { REPORT_RECORDS } from '../data/reportRecords'
+import {
+  deleteNotifications,
+  getNotifications,
+  readAllNotifications,
+  readNotification,
+} from '../services/notifications'
 import { socket } from '../services/socket'
 import { isInsideCabagan } from '../utils/cabaganGeofence'
 
@@ -119,7 +124,7 @@ export const usePersonnelRealtime = () => {
   const [notifications, setNotifications] = useState([])
 
   // Report records stay available app-wide so mobile status events update analytics immediately.
-  const [reports, setReports] = useState(REPORT_RECORDS)
+  const [reports, setReports] = useState([])
   const [deployments, setDeployments] = useState([])
 
   // Tracks which personnel are currently outside Cabagan to avoid repeated alerts
@@ -149,14 +154,17 @@ export const usePersonnelRealtime = () => {
         ? { ...notification, isRead: true }
         : notification
     )))
+    readNotification(notificationId).catch(() => {})
   }, [])
 
   const markAllNotificationsRead = useCallback(() => {
     setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
+    readAllNotifications().catch(() => {})
   }, [])
 
   const clearNotifications = useCallback(() => {
     setNotifications([])
+    deleteNotifications().catch(() => {})
   }, [])
 
   const evaluateGeofence = (list) => {
@@ -173,6 +181,12 @@ export const usePersonnelRealtime = () => {
       hasRecovered,
     }
   }
+
+  useEffect(() => {
+    getNotifications()
+      .then((history) => setNotifications(history.slice(0, MAX_NOTIFICATIONS)))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     // ── Event handlers ──────────────────────────────────────────────────────

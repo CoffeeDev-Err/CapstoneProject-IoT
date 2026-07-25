@@ -5,60 +5,22 @@
  * Includes a supervisor-only account provisioning form so mobile users
  * do not need an in-app signup flow.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
+import {
+  createAccount,
+  deactivateAccount,
+  getAccounts,
+  updateAccount,
+} from '../services/accounts'
+import { getRegisteredFlespiDevices } from '../services/flespiDevices'
 
-const roles = ['Officer', 'Supervisor', 'Dispatcher']
-const trackingModes = ['On-duty only', 'Always on', 'Manual enable']
-const statusOptions = ['Active', 'Inactive']
 const rankOptions = [
   'Police Officer I',
   'Police Officer II',
   'Police Corporal',
   'Police Staff Sergeant',
   'Police Lieutenant',
-]
-const unitOptions = ['Cabagan Municipal Station', 'Barangay Patrol Unit', 'Checkpoint Unit']
-
-const initialCreatedAccounts = [
-  {
-    id: 'ACC-0001',
-    fullName: 'Mon Maguas',
-    badgeNumber: 'PC-001',
-    imei: '356938035643809',
-    rank: 'Police Corporal',
-    role: 'Officer',
-    unit: 'Cabagan Municipal Station',
-    loginId: 'mon.maguas',
-    temporaryPassword: 'Tmp@Mon001!',
-    mobileNumber: '09171234567',
-    accountStatus: 'Active',
-    trackingMode: 'On-duty only',
-    gpsUpdateIntervalSec: '5',
-    emergencyContactName: 'Liza Maguas',
-    emergencyContactNumber: '09179998888',
-    forcePasswordReset: true,
-    createdAt: '2026-03-21T08:30:00.000Z',
-  },
-  {
-    id: 'ACC-0002',
-    fullName: 'GerryBoy Aggabao',
-    badgeNumber: 'PSS-002',
-    imei: '352099001761481',
-    rank: 'Police Staff Sergeant',
-    role: 'Officer',
-    unit: 'Cabagan Municipal Station',
-    loginId: 'gerryboy.aggabao',
-    temporaryPassword: 'Tmp@Gerry002!',
-    mobileNumber: '09175556666',
-    accountStatus: 'Active',
-    trackingMode: 'On-duty only',
-    gpsUpdateIntervalSec: '5',
-    emergencyContactName: 'Maria Aggabao',
-    emergencyContactNumber: '09173334444',
-    forcePasswordReset: true,
-    createdAt: '2026-03-22T09:15:00.000Z',
-  },
 ]
 
 const createTempPassword = (length = 12) => {
@@ -76,18 +38,12 @@ const initialFormState = {
   fullName: '',
   badgeNumber: '',
   imei: '',
+  flespiDeviceId: '',
+  flespiDeviceName: '',
   rank: rankOptions[0],
-  role: 'Officer',
-  unit: unitOptions[0],
   loginId: '',
   temporaryPassword: createTempPassword(),
   mobileNumber: '',
-  accountStatus: 'Active',
-  trackingMode: trackingModes[0],
-  gpsUpdateIntervalSec: '5',
-  emergencyContactName: '',
-  emergencyContactNumber: '',
-  forcePasswordReset: true,
 }
 
 const formatDateTime = (isoValue) => {
@@ -106,7 +62,7 @@ const formatDateTime = (isoValue) => {
 
 function SettingsPage() {
   const [accountForm, setAccountForm] = useState(initialFormState)
-  const [createdAccounts, setCreatedAccounts] = useState(initialCreatedAccounts)
+  const [createdAccounts, setCreatedAccounts] = useState([])
   const [accountSearch, setAccountSearch] = useState('')
   const [editingAccountId, setEditingAccountId] = useState(null)
   const [activeAccountView, setActiveAccountView] = useState('create')
@@ -114,6 +70,50 @@ function SettingsPage() {
   const [formErrors, setFormErrors] = useState({})
   const [formMessage, setFormMessage] = useState('')
   const [formMessageKind, setFormMessageKind] = useState('success')
+  const [flespiDevices, setFlespiDevices] = useState([])
+  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [devicesError, setDevicesError] = useState('')
+  const [devicesSetupPending, setDevicesSetupPending] = useState(false)
+  const [accountsLoading, setAccountsLoading] = useState(true)
+  const [accountRequestPending, setAccountRequestPending] = useState(false)
+
+  const loadAccounts = async () => {
+    setAccountsLoading(true)
+
+    try {
+      setCreatedAccounts(await getAccounts())
+    } catch {
+      setFormMessage('Accounts could not be loaded from the database. Check the backend connection.')
+      setFormMessageKind('error')
+    } finally {
+      setAccountsLoading(false)
+    }
+  }
+
+  const loadFlespiDevices = async ({ refresh = false } = {}) => {
+    setDevicesLoading(true)
+    setDevicesError('')
+    setDevicesSetupPending(false)
+
+    try {
+      const devices = await getRegisteredFlespiDevices({ refresh })
+      setFlespiDevices(devices)
+    } catch (error) {
+      setFlespiDevices([])
+      if (error.code === 'FLESPI_NOT_CONFIGURED') {
+        setDevicesSetupPending(true)
+      } else {
+        setDevicesError('GPS devices could not be loaded. Check the connection, then refresh.')
+      }
+    } finally {
+      setDevicesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadFlespiDevices()
+    loadAccounts()
+  }, [])
 
   const filteredAccounts = useMemo(() => {
     const query = accountSearch.trim().toLowerCase()
@@ -130,10 +130,9 @@ function SettingsPage() {
         account.rank,
         account.badgeNumber,
         account.imei,
-        account.role,
+        account.flespiDeviceName,
         account.loginId,
         account.accountStatus,
-        account.unit,
         account.mobileNumber,
       ]
         .join(' ')
@@ -142,6 +141,11 @@ function SettingsPage() {
       return tokens.every((token) => searchableText.includes(token))
     })
   }, [accountSearch, createdAccounts])
+
+  const assignedImeiToAccount = useMemo(
+    () => new Map(createdAccounts.map((account) => [account.imei, account])),
+    [createdAccounts]
+  )
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
@@ -162,6 +166,25 @@ function SettingsPage() {
     })
   }
 
+  const handleDeviceChange = (event) => {
+    const imei = event.target.value
+    const device = flespiDevices.find((item) => item.imei === imei)
+
+    setAccountForm((prev) => ({
+      ...prev,
+      imei,
+      flespiDeviceId: device?.id || '',
+      flespiDeviceName: device?.name || '',
+    }))
+
+    setFormErrors((prev) => {
+      if (!prev.imei) return prev
+      const nextErrors = { ...prev }
+      delete nextErrors.imei
+      return nextErrors
+    })
+  }
+
   const validateAccountForm = () => {
     const errors = {}
 
@@ -175,8 +198,8 @@ function SettingsPage() {
 
     if (!accountForm.imei.trim()) {
       errors.imei = 'GPS IMEI is required.'
-    } else if (!/^\d{15}$/.test(accountForm.imei.trim())) {
-      errors.imei = 'IMEI must be exactly 15 digits.'
+    } else if (!flespiDevices.some((device) => device.imei === accountForm.imei)) {
+      errors.imei = 'Select an IMEI registered in Flespi.'
     }
 
     const duplicateBadge = createdAccounts.some(
@@ -218,21 +241,12 @@ function SettingsPage() {
       && /\d/.test(passwordValue)
       && /[^A-Za-z0-9]/.test(passwordValue)
 
-    if (!passwordRulesPassed) {
+    if ((!editingAccountId || passwordValue) && !passwordRulesPassed) {
       errors.temporaryPassword = 'Use at least 10 chars with upper, lower, number, and symbol.'
-    }
-
-    const gpsInterval = Number(accountForm.gpsUpdateIntervalSec)
-    if (!Number.isFinite(gpsInterval) || gpsInterval < 3 || gpsInterval > 60) {
-      errors.gpsUpdateIntervalSec = 'GPS interval must be between 3 and 60 seconds.'
     }
 
     if (accountForm.mobileNumber.trim() && !/^\+?\d{10,14}$/.test(accountForm.mobileNumber.trim())) {
       errors.mobileNumber = 'Use 10-14 digits, optional + prefix.'
-    }
-
-    if (accountForm.emergencyContactNumber.trim() && !/^\+?\d{10,14}$/.test(accountForm.emergencyContactNumber.trim())) {
-      errors.emergencyContactNumber = 'Use 10-14 digits, optional + prefix.'
     }
 
     return errors
@@ -251,12 +265,6 @@ function SettingsPage() {
       ...initialFormState,
       temporaryPassword: createTempPassword(),
       rank: accountForm.rank,
-      unit: accountForm.unit,
-      role: accountForm.role,
-      accountStatus: accountForm.accountStatus,
-      trackingMode: accountForm.trackingMode,
-      gpsUpdateIntervalSec: accountForm.gpsUpdateIntervalSec,
-      forcePasswordReset: accountForm.forcePasswordReset,
     })
     setFormErrors({})
   }
@@ -274,19 +282,12 @@ function SettingsPage() {
       fullName: account.fullName ?? '',
       badgeNumber: account.badgeNumber ?? '',
       imei: account.imei ?? '',
+      flespiDeviceId: account.flespiDeviceId ?? '',
+      flespiDeviceName: account.flespiDeviceName ?? '',
       rank: account.rank ?? rankOptions[0],
-      role: account.role ?? 'Officer',
-      unit: account.unit ?? unitOptions[0],
       loginId: account.loginId ?? '',
-      temporaryPassword: account.temporaryPassword ?? createTempPassword(),
+      temporaryPassword: '',
       mobileNumber: account.mobileNumber ?? '',
-      accountStatus: account.accountStatus ?? 'Active',
-      trackingMode: account.trackingMode ?? trackingModes[0],
-      gpsUpdateIntervalSec: account.gpsUpdateIntervalSec ?? '5',
-      emergencyContactName: account.emergencyContactName ?? '',
-      emergencyContactNumber: account.emergencyContactNumber ?? '',
-
-      forcePasswordReset: account.forcePasswordReset ?? true,
     })
     setFormErrors({})
     setFormMessage(`Editing ${account.fullName}. Update details then click Save Changes.`)
@@ -303,29 +304,42 @@ function SettingsPage() {
     setPendingDeleteAccount(account)
   }
 
-  const handleConfirmDeleteAccount = () => {
+  const handleConfirmDeleteAccount = async () => {
     if (!pendingDeleteAccount) {
       return
     }
 
     const account = pendingDeleteAccount
     setPendingDeleteAccount(null)
+    setAccountRequestPending(true)
 
-    setCreatedAccounts((prev) => prev.filter((item) => item.id !== account.id))
+    try {
+      await deactivateAccount(account.id)
+      setCreatedAccounts((prev) => prev.map((item) => (
+        item.id === account.id
+          ? { ...item, accountStatus: 'Inactive', imei: '', flespiDeviceId: '', flespiDeviceName: '' }
+          : item
+      )))
 
-    if (editingAccountId === account.id) {
-      resetFormToCreate()
+      if (editingAccountId === account.id) {
+        resetFormToCreate()
+      }
+
+      setFormMessage(`${account.fullName} account deactivated and its GPS device was released.`)
+      setFormMessageKind('success')
+    } catch (error) {
+      setFormMessage(error.message)
+      setFormMessageKind('error')
+    } finally {
+      setAccountRequestPending(false)
     }
-
-    setFormMessage(`${account.fullName} account deleted.`)
-    setFormMessageKind('success')
   }
 
   const handleCancelDeleteAccount = () => {
     setPendingDeleteAccount(null)
   }
 
-  const handleSubmitAccount = (event) => {
+  const handleSubmitAccount = async (event) => {
     event.preventDefault()
 
     const errors = validateAccountForm()
@@ -337,64 +351,56 @@ function SettingsPage() {
       return
     }
 
-    const timestamp = new Date().toISOString()
     const normalizedPayload = {
       fullName: accountForm.fullName.trim(),
       badgeNumber: accountForm.badgeNumber.trim(),
       imei: accountForm.imei.trim(),
+      flespiDeviceId: accountForm.flespiDeviceId,
+      flespiDeviceName: accountForm.flespiDeviceName,
       rank: accountForm.rank,
-      role: accountForm.role,
-      unit: accountForm.unit,
+      role: 'Officer',
       loginId: accountForm.loginId.trim(),
       temporaryPassword: accountForm.temporaryPassword,
       mobileNumber: accountForm.mobileNumber.trim(),
-      accountStatus: accountForm.accountStatus,
-      trackingMode: accountForm.trackingMode,
-      gpsUpdateIntervalSec: accountForm.gpsUpdateIntervalSec,
-      emergencyContactName: accountForm.emergencyContactName.trim(),
-      emergencyContactNumber: accountForm.emergencyContactNumber.trim(),
-      forcePasswordReset: accountForm.forcePasswordReset,
+      accountStatus: 'Active',
+      forcePasswordReset: true,
     }
 
-    if (editingAccountId) {
-      setCreatedAccounts((prev) => prev.map((account) => {
-        if (account.id !== editingAccountId) {
-          return account
-        }
+    setAccountRequestPending(true)
 
-        return {
-          ...account,
-          ...normalizedPayload,
-          updatedAt: timestamp,
-        }
-      }))
-      setFormMessage(`${normalizedPayload.fullName} account updated successfully.`)
-      setFormMessageKind('success')
-    } else {
-      const nextNumericId = createdAccounts.reduce((maxValue, account) => {
-        const matched = /^ACC-(\d+)$/.exec(account.id)
-        if (!matched) {
-          return maxValue
-        }
-
-        return Math.max(maxValue, Number(matched[1]))
-      }, 0) + 1
-
-      const newAccount = {
-        id: `ACC-${String(nextNumericId).padStart(4, '0')}`,
-        ...normalizedPayload,
-        createdAt: timestamp,
+    try {
+      if (editingAccountId) {
+        const updatedAccount = await updateAccount(editingAccountId, normalizedPayload)
+        setCreatedAccounts((prev) => prev.map((account) => (
+          account.id === editingAccountId ? updatedAccount : account
+        )))
+        setFormMessage(`${normalizedPayload.fullName} account updated successfully.`)
+      } else {
+        const newAccount = await createAccount(normalizedPayload)
+        setCreatedAccounts((prev) => [newAccount, ...prev])
+        setFormMessage(
+          `${newAccount.fullName} account created successfully. Temporary password issued for first login.`
+        )
       }
-
-      setCreatedAccounts((prev) => [newAccount, ...prev])
-      setFormMessage(
-        `${newAccount.fullName} account created successfully. Temporary password issued for first login.`
-      )
       setFormMessageKind('success')
+      resetFormToCreate()
+      setActiveAccountView('manage')
+    } catch (error) {
+      if (error.field) {
+        const fieldMap = {
+          username: 'loginId',
+          badgeNumber: 'badgeNumber',
+          imei: 'imei',
+          personnelId: 'badgeNumber',
+        }
+        const formField = fieldMap[error.field]
+        if (formField) setFormErrors((prev) => ({ ...prev, [formField]: error.message }))
+      }
+      setFormMessage(error.message)
+      setFormMessageKind('error')
+    } finally {
+      setAccountRequestPending(false)
     }
-
-    resetFormToCreate()
-    setActiveAccountView('manage')
   }
 
   return (
@@ -472,18 +478,59 @@ function SettingsPage() {
                   {formErrors.badgeNumber && <small className="field-error">{formErrors.badgeNumber}</small>}
                 </label>
 
-                    <label className="account-field">
-                      <span>GPS Device IMEI *</span>
-                      <input
-                        className={`settings-input w-100 ${formErrors.imei ? 'settings-input--error' : ''}`}
-                        value={accountForm.imei}
-                        onChange={handleFieldChange('imei')}
-                        placeholder="15-digit device IMEI"
-                        inputMode="numeric"
-                        maxLength={15}
-                      />
-                      {formErrors.imei && <small className="field-error">{formErrors.imei}</small>}
-                    </label>
+                <div className="account-field account-field--wide">
+                  <span>Registered GPS Device *</span>
+                  <div className="account-password-row">
+                    <select
+                      className={`settings-input w-100 ${formErrors.imei ? 'settings-input--error' : ''}`}
+                      value={accountForm.imei}
+                      onChange={handleDeviceChange}
+                      disabled={devicesLoading}
+                    >
+                      <option value="">
+                        {devicesLoading
+                          ? 'Loading registered GPS devices...'
+                          : flespiDevices.length === 0
+                            ? 'No GPS device registered'
+                            : 'Select a registered IMEI'}
+                      </option>
+                      {accountForm.imei && !flespiDevices.some((device) => device.imei === accountForm.imei) && (
+                        <option value={accountForm.imei}>
+                          {accountForm.flespiDeviceName || 'Assigned device'} - {accountForm.imei}
+                        </option>
+                      )}
+                      {flespiDevices.map((device) => {
+                        const assignedAccount = assignedImeiToAccount.get(device.imei)
+                        const assignedElsewhere = assignedAccount && assignedAccount.id !== editingAccountId
+
+                        return (
+                          <option key={device.id} value={device.imei} disabled={assignedElsewhere}>
+                            {device.name} - {device.imei}
+                            {device.connected ? ' (Online)' : ' (Offline)'}
+                            {assignedElsewhere ? ` - Assigned to ${assignedAccount.fullName}` : ''}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    <button
+                      type="button"
+                      className="account-action-btn"
+                      onClick={() => loadFlespiDevices({ refresh: true })}
+                      disabled={devicesLoading}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  {devicesError && <small className="field-error">{devicesError}</small>}
+                  {!devicesLoading && !devicesError && flespiDevices.length === 0 && (
+                    <small className="settings-hint">
+                      {devicesSetupPending
+                        ? 'Register the GPS tracker in Flespi after its SIM is active, then refresh this list to continue.'
+                        : 'No registered GPS device is available. Register a device in Flespi, then refresh this list.'}
+                    </small>
+                  )}
+                  {formErrors.imei && <small className="field-error">{formErrors.imei}</small>}
+                </div>
 
                 <label className="account-field">
                   <span>Rank *</span>
@@ -491,43 +538,6 @@ function SettingsPage() {
                     {rankOptions.map((rank) => (
                       <option key={rank} value={rank}>
                         {rank}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="account-field">
-                  <span>Role *</span>
-                  <select className="settings-input w-100" value={accountForm.role} onChange={handleFieldChange('role')}>
-                    {roles.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="account-field">
-                  <span>Unit / Station *</span>
-                  <select className="settings-input w-100" value={accountForm.unit} onChange={handleFieldChange('unit')}>
-                    {unitOptions.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="account-field">
-                  <span>Account Status *</span>
-                  <select
-                    className="settings-input w-100"
-                    value={accountForm.accountStatus}
-                    onChange={handleFieldChange('accountStatus')}
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
                       </option>
                     ))}
                   </select>
@@ -545,12 +555,13 @@ function SettingsPage() {
                 </label>
 
                 <div className="account-field">
-                  <span>Temporary Password *</span>
+                  <span>{editingAccountId ? 'New Temporary Password' : 'Temporary Password *'}</span>
                   <div className="account-password-row">
                     <input
                       className={`settings-input w-100 ${formErrors.temporaryPassword ? 'settings-input--error' : ''}`}
                       value={accountForm.temporaryPassword}
                       onChange={handleFieldChange('temporaryPassword')}
+                      placeholder={editingAccountId ? 'Leave blank to keep the current password' : ''}
                     />
                     <button type="button" className="account-action-btn" onClick={handleGenerateTemporaryPassword}>
                       Regenerate
@@ -571,73 +582,18 @@ function SettingsPage() {
                   />
                   {formErrors.mobileNumber && <small className="field-error">{formErrors.mobileNumber}</small>}
                 </label>
-
-                <label className="account-field">
-                  <span>Tracking Mode</span>
-                  <select
-                    className="settings-input w-100"
-                    value={accountForm.trackingMode}
-                    onChange={handleFieldChange('trackingMode')}
-                  >
-                    {trackingModes.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {mode}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="account-field">
-                  <span>GPS Update Interval (sec) *</span>
-                  <input
-                    type="number"
-                    min="3"
-                    max="60"
-                    className={`settings-input w-100 ${formErrors.gpsUpdateIntervalSec ? 'settings-input--error' : ''}`}
-                    value={accountForm.gpsUpdateIntervalSec}
-                    onChange={handleFieldChange('gpsUpdateIntervalSec')}
-                  />
-                  {formErrors.gpsUpdateIntervalSec && (
-                    <small className="field-error">{formErrors.gpsUpdateIntervalSec}</small>
-                  )}
-                </label>
-
-                <label className="account-field">
-                  <span>Emergency Contact Name</span>
-                  <input
-                    className="settings-input w-100"
-                    value={accountForm.emergencyContactName}
-                    onChange={handleFieldChange('emergencyContactName')}
-                    placeholder="Name of contact person"
-                  />
-                </label>
-
-                <label className="account-field">
-                  <span>Emergency Contact Number</span>
-                  <input
-                    className={`settings-input w-100 ${formErrors.emergencyContactNumber ? 'settings-input--error' : ''}`}
-                    value={accountForm.emergencyContactNumber}
-                    onChange={handleFieldChange('emergencyContactNumber')}
-                    placeholder="09XXXXXXXXX or +639XXXXXXXXX"
-                  />
-                  {formErrors.emergencyContactNumber && (
-                    <small className="field-error">{formErrors.emergencyContactNumber}</small>
-                  )}
-                </label>
                   </div>
 
-                  <label className="account-checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={accountForm.forcePasswordReset}
-                      onChange={handleFieldChange('forcePasswordReset')}
-                    />
-                    <span>Force password reset on first mobile login</span>
-                  </label>
-
                   <div className="account-form-actions">
-                    <button type="submit" className="account-submit-btn">
-                      {editingAccountId ? 'Save Changes' : 'Create Account'}
+                    <button
+                      type="submit"
+                      className="account-submit-btn"
+                      disabled={devicesLoading || accountRequestPending || flespiDevices.length === 0}
+                      title={flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
+                    >
+                      {accountRequestPending
+                        ? 'Saving...'
+                        : editingAccountId ? 'Save Changes' : 'Create Account'}
                     </button>
                     {editingAccountId && (
                       <button
@@ -665,7 +621,7 @@ function SettingsPage() {
                     className="settings-input account-table-search"
                     value={accountSearch}
                     onChange={(event) => setAccountSearch(event.target.value)}
-                    placeholder="Search name, rank, badge, IMEI, role, or login"
+                    placeholder="Search name, rank, badge, IMEI, or login"
                     aria-label="Search provisioned accounts"
                   />
                 </div>
@@ -677,8 +633,7 @@ function SettingsPage() {
                         <th>Name</th>
                         <th>Rank</th>
                         <th>Badge</th>
-                        <th>IMEI</th>
-                        <th>Role</th>
+                        <th>GPS Device</th>
                         <th>Login ID</th>
                         <th>Status</th>
                         <th>Created</th>
@@ -686,9 +641,15 @@ function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredAccounts.length === 0 ? (
+                      {accountsLoading ? (
                         <tr className="personnel-row">
-                          <td colSpan={9} className="text-body-secondary small">
+                          <td colSpan={8} className="text-body-secondary small">
+                            Loading accounts from MongoDB...
+                          </td>
+                        </tr>
+                      ) : filteredAccounts.length === 0 ? (
+                        <tr className="personnel-row">
+                          <td colSpan={8} className="text-body-secondary small">
                             No account matched your search.
                           </td>
                         </tr>
@@ -698,8 +659,10 @@ function SettingsPage() {
                             <td>{account.fullName}</td>
                             <td>{account.rank}</td>
                             <td className="personnel-badge">{account.badgeNumber}</td>
-                            <td className="personnel-badge">{account.imei}</td>
-                            <td>{account.role}</td>
+                            <td>
+                              <span>{account.flespiDeviceName || 'Registered GPS'}</span>
+                              <small className="d-block text-body-secondary">{account.imei}</small>
+                            </td>
                             <td>{account.loginId}</td>
                             <td>
                               <span
@@ -715,6 +678,7 @@ function SettingsPage() {
                                 type="button"
                                 className="account-table-btn account-table-btn--edit"
                                 onClick={() => handleEditAccount(account.id)}
+                                disabled={accountRequestPending}
                               >
                                 Edit
                               </button>
@@ -722,6 +686,7 @@ function SettingsPage() {
                                 type="button"
                                 className="account-table-btn account-table-btn--delete"
                                 onClick={() => handleDeleteAccount(account.id)}
+                                disabled={accountRequestPending || account.accountStatus === 'Inactive'}
                               >
                                 Delete
                               </button>
@@ -740,11 +705,11 @@ function SettingsPage() {
 
       <ConfirmModal
         open={Boolean(pendingDeleteAccount)}
-        title="Delete Account?"
+        title="Deactivate Account?"
         message={pendingDeleteAccount
-          ? `Delete account for ${pendingDeleteAccount.fullName}? This action cannot be undone.`
+          ? `Deactivate ${pendingDeleteAccount.fullName}? Mobile access will stop and the GPS device will be released for reassignment.`
           : ''}
-        confirmLabel="Delete"
+        confirmLabel="Deactivate"
         cancelLabel="Cancel"
         onConfirm={handleConfirmDeleteAccount}
         onCancel={handleCancelDeleteAccount}
