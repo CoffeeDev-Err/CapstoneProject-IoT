@@ -25,10 +25,20 @@ const emptyForm = {
   location: '',
   barangay: '',
   severity: 2,
+  occurred_at: '',
+  assigned_area: '',
+  latitude: undefined as number | undefined,
+  longitude: undefined as number | undefined,
+};
+
+const getBarangayFromArea = (area?: string) => {
+  const value = (area || '').trim();
+  if (!value) return '';
+  return value.replace(/^barangay\s+/i, '').split(/public|market|zone|route|road|checkpoint|perimeter/i)[0].trim() || value;
 };
 
 export default function ReportsScreen() {
-  const { reports, submitReport, resolveReport } = useOperationalContext();
+  const { reports, deployments, submitReport, resolveReport } = useOperationalContext();
   const [filter, setFilter] = useState<'all' | 'incident' | 'routine'>('all');
   const [formVisible, setFormVisible] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -42,6 +52,22 @@ export default function ReportsScreen() {
     if (filter === 'routine') return !report.is_incident;
     return true;
   }), [filter, reports]);
+
+  const currentDeployment = deployments[0];
+
+  const openSubmitForm = () => {
+    const assignedArea = currentDeployment?.patrolArea || '';
+    setForm({
+      ...emptyForm,
+      occurred_at: new Date().toISOString(),
+      assigned_area: assignedArea,
+      barangay: getBarangayFromArea(assignedArea),
+      location: assignedArea,
+      latitude: currentDeployment?.latitude,
+      longitude: currentDeployment?.longitude,
+    });
+    setFormVisible(true);
+  };
 
   const updateForm = (field: keyof typeof emptyForm, value: string | number) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -144,7 +170,7 @@ export default function ReportsScreen() {
           <Text style={styles.title}>Reports</Text>
           <Text style={styles.subtitle}>Your submitted report history</Text>
         </View>
-        <TouchableOpacity style={styles.submitButton} onPress={() => setFormVisible(true)}>
+        <TouchableOpacity style={styles.submitButton} onPress={openSubmitForm}>
           <Icon name="add" size={19} color="#ffffff" />
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
@@ -207,10 +233,39 @@ export default function ReportsScreen() {
             <Text style={styles.fieldLabel}>TITLE</Text>
             <TextInput style={styles.input} value={form.title} onChangeText={(value) => updateForm('title', value)} placeholder="Short report title" />
 
-            <Text style={styles.fieldLabel}>BARANGAY</Text>
-            <TextInput style={styles.input} value={form.barangay} onChangeText={(value) => updateForm('barangay', value)} placeholder="Barangay name" />
+            <Text style={styles.fieldLabel}>TIME</Text>
+            <View style={styles.autoField}>
+              <Icon name="schedule" size={18} color={mobileTheme.purple} />
+              <Text style={styles.autoFieldText}>
+                {form.occurred_at
+                  ? new Date(form.occurred_at).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                  : 'Auto-filled on submit'}
+              </Text>
+            </View>
 
-            <Text style={styles.fieldLabel}>LOCATION</Text>
+            <Text style={styles.fieldLabel}>ASSIGNED AREA</Text>
+            <View style={styles.autoField}>
+              <Icon name="assignment-ind" size={18} color={mobileTheme.purple} />
+              <Text style={styles.autoFieldText}>
+                {form.assigned_area || 'No active deployment assigned'}
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>BARANGAY</Text>
+            <View style={styles.autoField}>
+              <Icon name="map" size={18} color={mobileTheme.purple} />
+              <Text style={styles.autoFieldText}>
+                {form.barangay || 'Detected from assigned area'}
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>INCIDENT OR ACTIVITY AREA</Text>
             <TextInput style={styles.input} value={form.location} onChangeText={(value) => updateForm('location', value)} placeholder="Exact incident or activity location" />
 
             <Text style={styles.fieldLabel}>DESCRIPTION</Text>
@@ -410,6 +465,8 @@ const styles = StyleSheet.create({
   typeOptionText: { color: mobileTheme.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   typeOptionTextActive: { color: mobileTheme.purple },
   input: { minHeight: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface, color: mobileTheme.text, fontSize: 13 },
+  autoField: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  autoFieldText: { flex: 1, color: mobileTheme.text, fontSize: 13, lineHeight: 18 },
   textArea: { minHeight: 110, paddingTop: 12 },
   severityOptions: { flexDirection: 'row', gap: 8 },
   severityButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 21, backgroundColor: mobileTheme.surface },

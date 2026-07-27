@@ -46,6 +46,23 @@ const initialFormState = {
   mobileNumber: '',
 }
 
+const getDeviceCode = (device, index = 0) => {
+  const source = `${device?.deviceCode || ''} ${device?.name || ''} ${device?.flespiDeviceName || ''}`
+  const match = source.match(/\bGPS[-\s]?\d{1,4}\b/i)
+
+  if (match) {
+    const digits = match[0].match(/\d+/)?.[0] || String(index + 1)
+    return `GPS-${digits.padStart(3, '0')}`
+  }
+
+  return `GPS-${String(index + 1).padStart(3, '0')}`
+}
+
+const formatGpsOptionLabel = ({ device, index, assignedAccount }) => {
+  const statusLabel = assignedAccount ? `Assigned to ${assignedAccount.fullName}` : 'Available'
+  return `${getDeviceCode(device, index)} | IMEI: ${device.imei} | ${statusLabel}`
+}
+
 const formatDateTime = (isoValue) => {
   if (!isoValue) {
     return '-'
@@ -492,22 +509,21 @@ function SettingsPage() {
                           ? 'Loading registered GPS devices...'
                           : flespiDevices.length === 0
                             ? 'No GPS device registered'
-                            : 'Select a registered IMEI'}
+                            : 'Select a registered GPS device'}
                       </option>
                       {accountForm.imei && !flespiDevices.some((device) => device.imei === accountForm.imei) && (
                         <option value={accountForm.imei}>
-                          {accountForm.flespiDeviceName || 'Assigned device'} - {accountForm.imei}
+                          {accountForm.flespiDeviceName || 'Assigned GPS'} | IMEI: {accountForm.imei}
                         </option>
                       )}
-                      {flespiDevices.map((device) => {
+                      {flespiDevices.map((device, index) => {
                         const assignedAccount = assignedImeiToAccount.get(device.imei)
                         const assignedElsewhere = assignedAccount && assignedAccount.id !== editingAccountId
 
                         return (
                           <option key={device.id} value={device.imei} disabled={assignedElsewhere}>
-                            {device.name} - {device.imei}
-                            {device.connected ? ' (Online)' : ' (Offline)'}
-                            {assignedElsewhere ? ` - Assigned to ${assignedAccount.fullName}` : ''}
+                            {formatGpsOptionLabel({ device, index, assignedAccount: assignedElsewhere ? assignedAccount : null })}
+                            {device.connected ? ' | Online' : ' | Offline'}
                           </option>
                         )
                       })}
@@ -654,13 +670,13 @@ function SettingsPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredAccounts.map((account) => (
+                        filteredAccounts.map((account, index) => (
                           <tr key={account.id} className="personnel-row">
                             <td>{account.fullName}</td>
                             <td>{account.rank}</td>
                             <td className="personnel-badge">{account.badgeNumber}</td>
                             <td>
-                              <span>{account.flespiDeviceName || 'Registered GPS'}</span>
+                              <span>{getDeviceCode(account, index)} | {account.flespiDeviceName || 'Registered GPS'}</span>
                               <small className="d-block text-body-secondary">{account.imei}</small>
                             </td>
                             <td>{account.loginId}</td>

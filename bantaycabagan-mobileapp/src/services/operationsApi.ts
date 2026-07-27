@@ -73,9 +73,10 @@ export const submitPoliceReport = (
     ...input,
     personnel_id: CURRENT_OFFICER.id,
     officer: CURRENT_OFFICER.name,
-    assigned_area: deployment?.patrolArea || CURRENT_OFFICER.station,
-    latitude: deployment?.latitude,
-    longitude: deployment?.longitude,
+    assigned_area: input.assigned_area || deployment?.patrolArea || CURRENT_OFFICER.station,
+    occurred_at: input.occurred_at,
+    latitude: input.latitude ?? deployment?.latitude,
+    longitude: input.longitude ?? deployment?.longitude,
   }),
 });
 

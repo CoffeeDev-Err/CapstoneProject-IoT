@@ -72,4 +72,8 @@ export type SubmitReportInput = {
   location: string;
   barangay: string;
   severity: number;
+  occurred_at?: string;
+  assigned_area?: string;
+  latitude?: number;
+  longitude?: number;
 };
