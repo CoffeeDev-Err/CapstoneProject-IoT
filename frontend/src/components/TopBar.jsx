@@ -12,10 +12,13 @@
  *   onToggleDark {Function} — called to flip the dark mode flag
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/useAuth'
 import ConfirmModal from './ConfirmModal'
+import PasswordChangeModal from './PasswordChangeModal'
 
 /** Hardcoded supervisor — replace with an auth context in production */
-const SUPERVISOR = {
+const SUPERVISOR_FALLBACK = {
   name: 'Sgt. Leo Gannad',
   rank: 'Police Sergeant',
   role: 'Supervisor',
@@ -109,10 +112,33 @@ function TopBar({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [notificationSearch, setNotificationSearch] = useState('')
   const [notificationHistoryRange, setNotificationHistoryRange] = useState('all')
   const dropdownRef = useRef(null)
   const notificationRef = useRef(null)
+  const navigate = useNavigate()
+  const { clearSession, logout, token, user } = useAuth()
+  const supervisor = {
+    name: user?.profile?.fullName || user?.username || SUPERVISOR_FALLBACK.name,
+    rank: user?.profile?.rank || SUPERVISOR_FALLBACK.rank,
+    role: user?.role === 'supervisor' ? 'Supervisor' : 'Officer',
+    photoUrl: user?.profile?.photoUrl || SUPERVISOR_FALLBACK.photoUrl,
+  }
+
+  const handleLogout = async () => {
+    setDropdownOpen(false)
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
+  const handlePasswordChanged = () => {
+    clearSession()
+    navigate('/login', {
+      replace: true,
+      state: { passwordChanged: true },
+    })
+  }
 
   const filteredNotifications = useMemo(() => {
     const searchQuery = notificationSearch.trim().toLowerCase()
@@ -343,16 +369,16 @@ function TopBar({
             aria-haspopup="true"
           >
             <img
-              src={SUPERVISOR.photoUrl}
-              alt={SUPERVISOR.name}
+              src={supervisor.photoUrl}
+              alt={supervisor.name}
               className="supervisor-avatar"
               onError={(e) => {
-                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(SUPERVISOR.name)}&background=1d4ed8&color=fff&size=64`
+                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(supervisor.name)}&background=1d4ed8&color=fff&size=64`
               }}
             />
             <div className="supervisor-info d-flex flex-column align-items-start">
-              <span className="supervisor-name">{SUPERVISOR.name}</span>
-              <span className="supervisor-role">{SUPERVISOR.role}</span>
+              <span className="supervisor-name">{supervisor.name}</span>
+              <span className="supervisor-role">{supervisor.role}</span>
             </div>
             <svg className="supervisor-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="6 9 12 15 18 9" />
@@ -365,28 +391,42 @@ function TopBar({
               {/* Header row with larger photo + name + rank */}
               <div className="dropdown-profile-header d-flex align-items-center">
                 <img
-                  src={SUPERVISOR.photoUrl}
-                  alt={SUPERVISOR.name}
+                  src={supervisor.photoUrl}
+                  alt={supervisor.name}
                   className="dropdown-avatar"
                   onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(SUPERVISOR.name)}&background=1d4ed8&color=fff&size=64`
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(supervisor.name)}&background=1d4ed8&color=fff&size=64`
                   }}
                 />
                 <div>
-                  <strong className="dropdown-name">{SUPERVISOR.name}</strong>
-                  <span className="dropdown-rank mt-2">{SUPERVISOR.rank}</span>
+                  <strong className="dropdown-name">{supervisor.name}</strong>
+                  <span className="dropdown-rank mt-2">{supervisor.rank}</span>
                 </div>
               </div>
 
               <div className="dropdown-divider" />
 
-              <button type="button" className="dropdown-item">
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setDropdownOpen(false)
+                  setPasswordModalOpen(true)
+                }}
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
                 </svg>
-                My Profile
+                Change Password
               </button>
-              <button type="button" className="dropdown-item">
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setDropdownOpen(false)
+                  navigate('/settings')
+                }}
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="3" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
                 </svg>
@@ -395,7 +435,7 @@ function TopBar({
 
               <div className="dropdown-divider" />
 
-              <button type="button" className="dropdown-item dropdown-item--logout">
+              <button type="button" className="dropdown-item dropdown-item--logout" onClick={handleLogout}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
@@ -415,6 +455,12 @@ function TopBar({
         onConfirm={handleConfirmClearNotifications}
         onCancel={handleCancelClearNotifications}
         variant="primary"
+      />
+      <PasswordChangeModal
+        open={passwordModalOpen}
+        token={token}
+        onClose={() => setPasswordModalOpen(false)}
+        onChanged={handlePasswordChanged}
       />
     </header>
   )

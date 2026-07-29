@@ -1,0 +1,364 @@
+/*SETTINGS PAGE*/
+
+.settings-label {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: none;
+}
+
+.settings-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.settings-input {
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  outline: none;
+  transition: all var(--transition-base);
+  min-width: 160px;
+  font-weight: 500;
+}
+
+.settings-input:hover:not(:disabled) {
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-xs);
+}
+
+.settings-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--bg-primary);
+}
+
+.settings-input--error {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.16);
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.account-view-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xs);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.account-view-tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.844rem;
+  font-weight: 700;
+  border-radius: 9px;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.account-view-tab:hover {
+  background: var(--border-color-light);
+  color: var(--text-primary);
+}
+
+.account-view-tab--active {
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-xs);
+}
+
+.account-create-section {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.page-container--settings {
+  height: calc(100vh - var(--top-bar-h));
+  overflow: hidden;
+}
+
+.page-container--settings .settings-grid {
+  height: 100%;
+}
+
+.account-management-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.account-form--fixed {
+  flex-shrink: 0;
+}
+
+.account-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.account-field .settings-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  font-weight: 500;
+}
+
+.account-field select.settings-input {
+  cursor: pointer;
+}
+
+.account-field textarea.settings-input {
+  min-height: 110px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.account-field span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.account-field--wide {
+  grid-column: span 2;
+}
+
+.account-field--full {
+  grid-column: 1 / -1;
+}
+
+.account-password-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field-error {
+  color: var(--color-danger-dark);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.account-action-btn,
+.account-submit-btn {
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  font-size: 0.813rem;
+  font-weight: 700;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.account-action-btn {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.account-action-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.account-submit-btn {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.account-submit-btn:hover:not(:disabled) {
+  border-color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.account-action-btn:disabled,
+.account-submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  transform: none;
+  box-shadow: none;
+}
+
+.account-feedback {
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.844rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.account-feedback--inline {
+  max-width: 860px;
+}
+
+.account-feedback--error {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-strong);
+}
+
+.account-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.account-table-search {
+  margin-left: auto;
+  max-width: 420px;
+  min-width: 260px;
+}
+
+.account-table-meta {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.account-table-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-table-section--standalone {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.account-table-wrap {
+  flex: 1;
+  min-height: 0;
+  height: clamp(260px, 38vh, 460px);
+  max-height: 460px;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.account-table-wrap .personnel-table {
+  margin-bottom: 0;
+}
+
+.account-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.account-table-actions {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.account-table-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  min-width: 100px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.813rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  letter-spacing: 0.01em;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+}
+
+.account-table-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.account-table-btn:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: 2px;
+}
+
+.account-table-btn--edit {
+  border-color: var(--color-primary-light);
+  background: #eff6ff;
+  color: var(--color-primary-dark);
+}
+
+.account-table-btn--edit:hover {
+  background: #dbeafe;
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+  box-shadow: var(--shadow-md);
+}
+
+.account-table-btn--delete {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+}
+
+.account-table-btn--delete:hover {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 18%, #ffffff 82%);
+  color: var(--color-danger-strong);
+  box-shadow: var(--shadow-md);
+}

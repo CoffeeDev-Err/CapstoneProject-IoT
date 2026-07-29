@@ -18,6 +18,7 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import 'leaflet/dist/leaflet.css' // Required global CSS for Leaflet map tiles and controls
 import './index.css'               // Global CSS resets, base font, and body layout
 import App from './App.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
 import { PersonnelProvider } from './context/PersonnelContext.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -28,9 +29,11 @@ createRoot(document.getElementById('root')).render(
         top of the tree so ALL pages share one Socket.IO connection and one
         copy of the personnel state — no duplicate connections or data.
       */}
-      <PersonnelProvider>
-        <App />
-      </PersonnelProvider>
+      <AuthProvider>
+        <PersonnelProvider>
+          <App />
+        </PersonnelProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

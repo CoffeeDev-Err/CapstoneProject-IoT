@@ -1,13 +1,17 @@
+import { mobileTheme } from './mobileTheme';
+
+// Backward-compatible semantic palette for the older shared components.
+// New mobile UI should import mobileTheme directly.
 export const COLORS = {
-  background: '#F5F7FB',
-  surface: '#FFFFFF',
-  textPrimary: '#0F172A',
-  textSecondary: '#475569',
-  brand: '#0D9488',
-  brandDark: '#0F766E',
-  border: '#E2E8F0',
-  online: '#16A34A',
-  idle: '#2563EB',
-  offline: '#94A3B8',
-  danger: '#DC2626',
+  background: mobileTheme.background,
+  surface: mobileTheme.surface,
+  textPrimary: mobileTheme.text,
+  textSecondary: mobileTheme.textMuted,
+  brand: mobileTheme.blue,
+  brandDark: mobileTheme.navySoft,
+  border: mobileTheme.border,
+  online: mobileTheme.success,
+  idle: mobileTheme.blue,
+  offline: mobileTheme.offline,
+  danger: mobileTheme.danger,
 };

@@ -1,0 +1,228 @@
+.assignment-personnel-name {
+  color: #0f172a;
+}
+
+.assignment-personnel-rank {
+  color: #64748b;
+}
+
+.assignment-inline-btn {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.assignment-inline-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.assignment-inline-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.assignment-inline-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assignment-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.assignment-list-search {
+  width: min(22rem, 100%);
+}
+
+.assignment-table-actions {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.assignment-group-row td {
+  border-bottom: 1px solid #334155;
+  background: #1b2a42;
+}
+
+.assignment-group-cell {
+  padding: 0.6rem 0.85rem;
+}
+
+.assignment-group-content {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.assignment-group-label {
+  display: block;
+  color: #dbeafe;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.assignment-group-meta {
+  color: #93c5fd;
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+
+.assignment-group-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.assignment-group-menu {
+  position: relative;
+}
+
+.assignment-group-menu-trigger {
+  border: 1px solid var(--color-primary-light);
+  background: #eff6ff;
+  color: var(--color-primary-dark);
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.assignment-group-menu-trigger:hover {
+  background: #dbeafe;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-xs);
+  transform: translateY(-1px);
+}
+
+.assignment-group-menu-dropdown {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.34rem);
+  z-index: 20;
+  display: grid;
+  gap: 0.4rem;
+  min-width: 10.6rem;
+  padding: 0.45rem;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.95);
+}
+
+.assignment-group-menu-dropdown .assignment-group-edit-btn,
+.assignment-group-menu-dropdown .assignment-group-delete-btn {
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.assignment-group-actions-cell {
+  padding: 0.75rem 0.9rem;
+  min-width: 0;
+}
+
+.assignment-group-edit-btn,
+.assignment-group-delete-btn {
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.assignment-group-edit-btn {
+  border-color: var(--color-primary-light);
+  background: #eff6ff;
+  color: var(--color-primary-dark);
+}
+
+.assignment-group-edit-btn:hover {
+  background: #dbeafe;
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.assignment-group-delete-btn {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+}
+
+.assignment-group-delete-btn:hover {
+  background: color-mix(in srgb, var(--color-danger) 16%, #ffffff 84%);
+  border-color: var(--color-danger);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.assignment-edit-btn {
+  border: 1px solid var(--color-primary-light);
+  background: #eff6ff;
+  color: var(--color-primary-dark);
+  border-radius: 8px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.assignment-edit-btn:hover {
+  background: #dbeafe;
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.assignment-delete-btn,
+.assignment-remove-btn {
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+  border-radius: 8px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.assignment-delete-btn:hover,
+.assignment-remove-btn:hover {
+  background: color-mix(in srgb, var(--color-danger) 16%, #ffffff 84%);
+  border-color: var(--color-danger);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}

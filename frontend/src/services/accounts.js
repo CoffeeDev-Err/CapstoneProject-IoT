@@ -1,10 +1,12 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { AUTH_TOKEN_KEY } from './auth'
 
 const request = async (path, options) => {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem(AUTH_TOKEN_KEY) || ''}`,
       ...options?.headers,
     },
   })

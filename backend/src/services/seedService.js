@@ -5,7 +5,9 @@ const {
 	Personnel,
 	Report,
 	Task,
+	User,
 } = require('../models')
+const { hashPassword } = require('../utils/password')
 
 const point = (longitude, latitude) => ({
 	type: 'Point',
@@ -65,6 +67,47 @@ const initializeCollections = async (models) => {
 
 const seedDatabase = async (models) => {
 	await initializeCollections(models)
+
+	const supervisorLoginId = String(process.env.SUPERVISOR_LOGIN_ID || '').trim().toLowerCase()
+	const supervisorEmail = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase()
+	const supervisorPassword = String(process.env.SUPERVISOR_TEMP_PASSWORD || '')
+	if (supervisorLoginId && supervisorEmail && supervisorPassword) {
+		const existingSupervisor = await User.findOne({ username: supervisorLoginId })
+		if (!existingSupervisor) {
+			await User.create({
+				username: supervisorLoginId,
+				email: supervisorEmail,
+				passwordHash: await hashPassword(supervisorPassword),
+				role: 'supervisor',
+				status: 'active',
+				forcePasswordReset: true,
+			})
+			console.log(`Created initial supervisor account: ${supervisorLoginId}`)
+		} else if (!existingSupervisor.email) {
+			existingSupervisor.email = supervisorEmail
+			await existingSupervisor.save()
+		}
+	}
+
+	const officerLoginId = String(process.env.DEMO_OFFICER_LOGIN_ID || '').trim().toLowerCase()
+	const officerEmail = String(process.env.DEMO_OFFICER_EMAIL || '').trim().toLowerCase()
+	const officerPassword = String(process.env.DEMO_OFFICER_TEMP_PASSWORD || '')
+	const officerPersonnelId = String(process.env.DEMO_OFFICER_PERSONNEL_ID || '').trim()
+	if (officerLoginId && officerEmail && officerPassword && officerPersonnelId) {
+		const existingOfficer = await User.findOne({ username: officerLoginId })
+		if (!existingOfficer) {
+			await User.create({
+				username: officerLoginId,
+				email: officerEmail,
+				passwordHash: await hashPassword(officerPassword),
+				role: 'officer',
+				personnelId: officerPersonnelId,
+				status: 'active',
+				forcePasswordReset: true,
+			})
+			console.log(`Created demo officer account: ${officerLoginId}`)
+		}
+	}
 
 	await Promise.all(seedPersonnel.map((profile) => (
 		Personnel.updateOne(

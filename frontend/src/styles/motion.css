@@ -1,0 +1,49 @@
+/* ANIMATION KEYFRAMES*/
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes growBar {
+  from { height: 0; }
+  to   { height: var(--h); }
+}
+
+@keyframes growWidth {
+  from { width: 0; }
+  to   { width: var(--pct); }
+}
+
+.fade-in {
+  animation: fadeIn 0.35s ease both;
+}
+
+.slide-up {
+  animation: slideUp 0.4s ease both;
+}
+
+/* Stagger children */
+.stats-grid > *:nth-child(1)  { animation-delay: 0.05s; }
+.stats-grid > *:nth-child(2)  { animation-delay: 0.1s; }
+.stats-grid > *:nth-child(3)  { animation-delay: 0.15s; }
+.stats-grid > *:nth-child(4)  { animation-delay: 0.2s; }
+.dashboard-widgets > *:nth-child(1) { animation-delay: 0.15s; }
+.dashboard-widgets > *:nth-child(2) { animation-delay: 0.25s; }
+.settings-grid > *:nth-child(1) { animation-delay: 0.1s; }
+.settings-grid > *:nth-child(2) { animation-delay: 0.2s; }

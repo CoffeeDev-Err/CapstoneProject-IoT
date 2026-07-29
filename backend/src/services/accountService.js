@@ -28,6 +28,8 @@ const serializeAccount = (user, profile, device) => ({
 	rank: profile?.rank || '',
 	mobileNumber: profile?.mobileNumber || '',
 	loginId: user.username,
+	officialEmail: user.email || '',
+	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role === 'officer' ? 'Officer' : 'Supervisor',
 	accountStatus: user.status === 'active' ? 'Active' : 'Inactive',
 	forcePasswordReset: user.forcePasswordReset,
@@ -44,6 +46,7 @@ const validateAccountPayload = (payload, { requirePassword = true } = {}) => {
 		['badgeNumber', 'Badge number'],
 		['rank', 'Rank'],
 		['loginId', 'Login ID'],
+		['officialEmail', 'Official email'],
 		['imei', 'GPS IMEI'],
 		['flespiDeviceId', 'Flespi device'],
 	]
@@ -69,6 +72,11 @@ const validateAccountPayload = (payload, { requirePassword = true } = {}) => {
 		throw createHttpError(
 			'Mobile number must use 10-14 digits with an optional + prefix.',
 		)
+	}
+
+	const officialEmail = String(payload.officialEmail || '').trim().toLowerCase()
+	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail)) {
+		throw createHttpError('Enter a valid official email address.')
 	}
 }
 
@@ -148,6 +156,7 @@ const createAccountService = ({ io }) => {
 			})
 			const user = await User.create({
 				username: String(payload.loginId).trim().toLowerCase(),
+				email: String(payload.officialEmail).trim().toLowerCase(),
 				passwordHash: await hashPassword(payload.temporaryPassword),
 				role: 'officer',
 				personnelId,
@@ -234,6 +243,11 @@ const createAccountService = ({ io }) => {
 		profile.status = normalizeStatus(payload.accountStatus)
 
 		user.username = String(payload.loginId).trim().toLowerCase()
+		const nextEmail = String(payload.officialEmail).trim().toLowerCase()
+		if (user.email !== nextEmail) {
+			user.email = nextEmail
+			user.emailVerifiedAt = null
+		}
 		user.status = normalizeStatus(payload.accountStatus)
 		if (payload.temporaryPassword) {
 			user.passwordHash = await hashPassword(payload.temporaryPassword)

@@ -4,9 +4,9 @@ import { COLORS } from '../constants/theme';
 
 type StatCardProps = {
   label: string;
-  value: number;
+  value: number
   accent: string;
-};
+}
 
 export const StatCard = ({ label, value, accent }: StatCardProps) => {
   return (

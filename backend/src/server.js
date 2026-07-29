@@ -67,7 +67,10 @@ const notificationController = createNotificationController(notificationService)
 const personnelController = createPersonnelController({ io, personnelService })
 
 app.use('/api', createOperationalRoutes(operationalController))
-app.use('/api/accounts', createAccountRoutes(accountController))
+app.use('/api/accounts', createAccountRoutes({
+	authService,
+	controller: accountController,
+}))
 app.use('/api/analytics', createAnalyticsRoutes(analyticsController))
 app.use('/api/audit-logs', createAuditRoutes(auditController))
 app.use('/api/auth', createAuthRoutes({ authService, controller: authController }))

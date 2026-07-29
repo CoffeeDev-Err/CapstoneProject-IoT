@@ -17,6 +17,7 @@
  */
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
+import ProtectedRoute from '../components/ProtectedRoute'
 import AnalyticsPage from '../pages/AnalyticsPage'
 import AssignAreaPage from '../pages/AssignAreaPage'
 import DashboardPage from '../pages/DashboardPage'
@@ -34,14 +35,16 @@ function AppRoutes() {
         Every route nested inside it gets the sidebar + top-bar for free.
         The matched page component is rendered into AppLayout's <Outlet />.
       */}
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<MonitoringPage />} />
-        <Route path="/monitoring" element={<DashboardPage/>} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/assign-area" element={<AssignAreaPage />} />
-        <Route path="/personnel" element={<PersonnelPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<MonitoringPage />} />
+          <Route path="/monitoring" element={<DashboardPage/>} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/assign-area" element={<AssignAreaPage />} />
+          <Route path="/personnel" element={<PersonnelPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
       </Route>
 
       <Route path="/login" element={<LoginPage />} />

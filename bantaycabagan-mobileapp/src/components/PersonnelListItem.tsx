@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '../constants/theme';
-import { Personnel } from '../types/personnel';
+import {Personnel} from '../types/personnel';
 import { formatTimestamp } from '../utils/dateTime';
 import { StatusChip } from './StatusChip';
 

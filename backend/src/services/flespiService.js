@@ -62,6 +62,7 @@ const fetchRegisteredDevices = async ({ forceRefresh = false } = {}) => {
 		});
 		const payload = await response.json().catch(() => ({}));
 
+
 		if (!response.ok) {
 			const message = payload?.errors?.[0]?.reason
 				|| payload?.message

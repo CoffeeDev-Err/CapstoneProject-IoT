@@ -1,0 +1,77 @@
+/* Shared design tokens for the BantayCabagan web application. */
+
+:root {
+  --font-body: 'Manrope', 'Segoe UI', Tahoma, sans-serif;
+  --font-display: 'Manrope', 'Segoe UI', Tahoma, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 60px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --sidebar-active-bg: #1e3a5f;
+  --sidebar-active-color: #93c5fd;
+  --top-bar-h: 68px;
+
+  --color-primary: #2563eb;
+  --color-primary-light: #93c5fd;
+  --color-primary-dark: #1d4ed8;
+  --color-info: #0284c7;
+  --color-accent: #d97706;
+  --color-success: #15803d;
+  --color-success-soft: #f0fdf4;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-dark: #b91c1c;
+  --color-danger-strong: #991b1b;
+  --color-danger-soft: #fef2f2;
+  --color-danger-border: #fecaca;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-muted: #94a3b8;
+
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f7fb;
+  --bg-tertiary: #eef2f7;
+  --bg-dark: #111827;
+
+  --border-color: #d7e0eb;
+  --border-color-light: #e5ebf2;
+  --focus-ring: rgba(37, 99, 235, 0.22);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --control-height: 42px;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 14px 30px rgba(15, 23, 42, 0.11);
+  --shadow-lg: 0 20px 44px rgba(15, 23, 42, 0.15);
+  --shadow-xl: 0 26px 56px rgba(15, 23, 42, 0.2);
+
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  --transition-fast: 0.14s ease;
+  --transition-base: 0.22s ease;
+  --transition-slow: 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+html {
+  font-size: 14px;
+}
+
+small,
+.small {
+  font-size: 0.875rem !important;
+}
