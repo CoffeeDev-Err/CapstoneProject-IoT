@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -12,22 +11,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { CURRENT_OFFICER } from '../constants/officer';
 import { mobileTheme } from '../constants/mobileTheme';
+import ChangePasswordModal from '../components/ChangePasswordModal';
+import { useAuth } from '../context/AuthContext';
 import { useOperationalContext } from '../context/OperationalContext';
 
-export default function OfficerProfileScreen({ navigation }: { navigation: any }) {
+export default function OfficerProfileScreen() {
   const { deployments, isConnected } = useOperationalContext();
+  const { clearSession, logout, token, user } = useAuth();
+  const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const assignment = deployments[0];
+  const profile = user?.profile;
+  const officer = {
+    name: profile?.fullName || CURRENT_OFFICER.name,
+    rank: profile?.rank || CURRENT_OFFICER.rank,
+    badge: profile?.badgeNumber || user?.personnelId || CURRENT_OFFICER.badge,
+    station: CURRENT_OFFICER.station,
+    contact: profile?.mobileNumber || CURRENT_OFFICER.contact,
+    photoUrl: profile?.photoUrl || CURRENT_OFFICER.photoUrl,
+  };
 
   const shift = assignment?.shiftStart
     ? `${new Date(assignment.shiftStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${assignment.shiftEnd ? ` - ${new Date(assignment.shiftEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}`
     : 'Not scheduled';
-
-  const handleLogout = () => {
-    navigation.getParent()?.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -39,14 +44,14 @@ export default function OfficerProfileScreen({ navigation }: { navigation: any }
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.profileCard}>
-          <Image source={{ uri: CURRENT_OFFICER.photoUrl }} style={styles.avatar} />
-          <Text style={styles.name}>{CURRENT_OFFICER.name}</Text>
-          <Text style={styles.rank}>{CURRENT_OFFICER.rank}</Text>
+          <Image source={{ uri: officer.photoUrl }} style={styles.avatar} />
+          <Text style={styles.name}>{officer.name}</Text>
+          <Text style={styles.rank}>{officer.rank}</Text>
 
           <View style={styles.divider} />
-          <ProfileRow label="Personnel ID" value={CURRENT_OFFICER.badge} />
+          <ProfileRow label="Personnel ID" value={officer.badge} />
           <View style={styles.divider} />
-          <ProfileRow label="Station" value={CURRENT_OFFICER.station} />
+          <ProfileRow label="Station" value={officer.station} />
           <View style={styles.divider} />
           <ProfileRow
             label="Status"
@@ -63,7 +68,7 @@ export default function OfficerProfileScreen({ navigation }: { navigation: any }
           <View style={styles.divider} />
           <ProfileRow label="Shift" value={shift} />
           <View style={styles.divider} />
-          <ProfileRow label="Contact" value={CURRENT_OFFICER.contact} />
+          <ProfileRow label="Contact" value={officer.contact} />
           {assignment?.notes && (
             <>
               <View style={styles.divider} />
@@ -78,18 +83,29 @@ export default function OfficerProfileScreen({ navigation }: { navigation: any }
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.changePasswordButton}
-            onPress={() => Alert.alert('Change password', 'Password management will open after account authentication is connected.')}
+            onPress={() => setPasswordModalOpen(true)}
           >
             <Icon name="lock-outline" size={19} color="#ffffff" />
             <Text style={styles.actionText}>Change Password</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Icon name="logout" size={19} color="#ffffff" />
             <Text style={styles.actionText}>Logout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+      {token && (
+        <ChangePasswordModal
+          visible={passwordModalOpen}
+          token={token}
+          onClose={() => setPasswordModalOpen(false)}
+          onChanged={() => {
+            setPasswordModalOpen(false);
+            clearSession();
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }

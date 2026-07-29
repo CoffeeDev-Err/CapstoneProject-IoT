@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
 * {
   box-sizing: border-box;
@@ -17,7 +17,7 @@ body {
   min-width: 320px;
   font-family: var(--font-body, 'Manrope', 'Segoe UI', Tahoma, sans-serif);
   line-height: 1.55;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   background: var(--bg-secondary, #f6f7fb);
   color: var(--text-primary, #0f172a);
   text-rendering: optimizeLegibility;
@@ -29,4 +29,25 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--focus-ring, rgba(37, 99, 235, 0.22));
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #dbeafe;
+  color: #172554;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,0 +1,21 @@
+/*CARD & WIDGET SHARED */
+
+.metric-card,
+.status-card,
+.list-card,
+.stat-card,
+.widget-card,
+.map-panel {
+  background: var(--bg-primary);
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
+}
+
+.stat-card:hover,
+.widget-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+  border-color: var(--color-primary-light);
+}

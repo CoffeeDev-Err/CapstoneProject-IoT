@@ -4,10 +4,19 @@
   "scripts": {
     "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "check": "npm run check:backend && npm run check:frontend && npm run check:mobile",
+    "check:backend": "npm run check --prefix backend",
+    "check:frontend": "npm run check --prefix frontend",
+    "check:mobile": "npm run check --prefix bantaycabagan-mobileapp",
+    "debug": "concurrently --names \"BACKEND-CHECK,WEB-CHECK,MOBILE-CHECK\" --prefix-colors \"cyan,magenta,yellow\" \"npm run debug:backend\" \"npm run debug:frontend\" \"npm run debug:mobile\"",
+    "debug:backend": "nodemon --watch backend/src --watch backend/eslint.config.js --ext js,json --exec \"npm run check:backend\"",
+    "debug:frontend": "nodemon --watch frontend/src --watch frontend/vite.config.js --watch frontend/eslint.config.js --ext js,jsx,css,json --exec \"npm run check:frontend\"",
+    "debug:mobile": "nodemon --watch bantaycabagan-mobileapp/App.tsx --watch bantaycabagan-mobileapp/index.ts --watch bantaycabagan-mobileapp/src --watch bantaycabagan-mobileapp/tsconfig.json --ext ts,tsx,json --exec \"npm run check:mobile\""
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.14"
   },
   "dependencies": {
     "mongoose": "^9.4.1"

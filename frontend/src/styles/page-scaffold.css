@@ -1,0 +1,23 @@
+/* PAGE SCAFFOLDING */
+
+.page-container {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.page-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.15rem + 1vw, 1.85rem);
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0;
+  font-family: var(--font-display);
+}
+
+.page-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}

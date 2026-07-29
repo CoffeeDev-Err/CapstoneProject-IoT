@@ -54,6 +54,7 @@ const initialFormState = {
   flespiDeviceName: '',
   rank: rankOptions[0],
   loginId: '',
+  officialEmail: '',
   temporaryPassword: createTempPassword(),
   mobileNumber: '',
 }
@@ -161,6 +162,7 @@ function SettingsPage() {
         account.imei,
         account.flespiDeviceName,
         account.loginId,
+        account.officialEmail,
         account.accountStatus,
         account.mobileNumber,
       ]
@@ -249,7 +251,7 @@ function SettingsPage() {
     }
 
     if (!accountForm.loginId.trim()) {
-      errors.loginId = 'Username or official email is required.'
+      errors.loginId = 'Login ID is required.'
     }
 
     const duplicateLogin = createdAccounts.some(
@@ -259,7 +261,24 @@ function SettingsPage() {
       )
     )
     if (duplicateLogin) {
-      errors.loginId = 'Username or official email already exists.'
+      errors.loginId = 'Login ID already exists.'
+    }
+
+    const normalizedEmail = accountForm.officialEmail.trim().toLowerCase()
+    if (!normalizedEmail) {
+      errors.officialEmail = 'Official email is required for verification.'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      errors.officialEmail = 'Enter a valid email address.'
+    }
+
+    const duplicateEmail = createdAccounts.some(
+      (account) => (
+        account.id !== editingAccountId
+        && account.officialEmail?.toLowerCase() === normalizedEmail
+      )
+    )
+    if (duplicateEmail) {
+      errors.officialEmail = 'Official email already belongs to another account.'
     }
 
     const passwordValue = accountForm.temporaryPassword
@@ -315,6 +334,7 @@ function SettingsPage() {
       flespiDeviceName: account.flespiDeviceName ?? '',
       rank: account.rank ?? rankOptions[0],
       loginId: account.loginId ?? '',
+      officialEmail: account.officialEmail ?? '',
       temporaryPassword: '',
       mobileNumber: account.mobileNumber ?? '',
     })
@@ -389,6 +409,7 @@ function SettingsPage() {
       rank: accountForm.rank,
       role: 'Officer',
       loginId: accountForm.loginId.trim(),
+      officialEmail: accountForm.officialEmail.trim().toLowerCase(),
       temporaryPassword: accountForm.temporaryPassword,
       mobileNumber: accountForm.mobileNumber.trim(),
       accountStatus: 'Active',
@@ -418,6 +439,7 @@ function SettingsPage() {
       if (error.field) {
         const fieldMap = {
           username: 'loginId',
+          email: 'officialEmail',
           badgeNumber: 'badgeNumber',
           imei: 'imei',
           personnelId: 'badgeNumber',
@@ -571,15 +593,27 @@ function SettingsPage() {
                   </select>
                 </label>
 
-                <label className="account-field account-field--wide">
-                  <span>Username or Official Email *</span>
+                <label className="account-field">
+                  <span>Login ID *</span>
                   <input
                     className={`settings-input w-100 ${formErrors.loginId ? 'settings-input--error' : ''}`}
                     value={accountForm.loginId}
                     onChange={handleFieldChange('loginId')}
-                    placeholder="e.g., juan.delacruz or juan.delacruz@pnp.gov.ph"
+                    placeholder="e.g., juan.delacruz"
                   />
                   {formErrors.loginId && <small className="field-error">{formErrors.loginId}</small>}
+                </label>
+
+                <label className="account-field">
+                  <span>Official Email *</span>
+                  <input
+                    type="email"
+                    className={`settings-input w-100 ${formErrors.officialEmail ? 'settings-input--error' : ''}`}
+                    value={accountForm.officialEmail}
+                    onChange={handleFieldChange('officialEmail')}
+                    placeholder="e.g., juan.delacruz@pnp.gov.ph"
+                  />
+                  {formErrors.officialEmail && <small className="field-error">{formErrors.officialEmail}</small>}
                 </label>
 
                 <div className="account-field">
@@ -649,7 +683,7 @@ function SettingsPage() {
                     className="settings-input account-table-search"
                     value={accountSearch}
                     onChange={(event) => setAccountSearch(event.target.value)}
-                    placeholder="Search name, rank, badge, IMEI, or login"
+                    placeholder="Search name, badge, email, IMEI, or login"
                     aria-label="Search provisioned accounts"
                   />
                 </div>
@@ -663,6 +697,7 @@ function SettingsPage() {
                         <th>Badge</th>
                         <th>GPS Device</th>
                         <th>Login ID</th>
+                        <th>Official Email</th>
                         <th>Status</th>
                         <th>Created</th>
                         <th>Actions</th>
@@ -671,13 +706,13 @@ function SettingsPage() {
                     <tbody>
                       {accountsLoading ? (
                         <tr className="personnel-row">
-                          <td colSpan={8} className="text-body-secondary small">
+                          <td colSpan={9} className="text-body-secondary small">
                             Loading accounts from MongoDB...
                           </td>
                         </tr>
                       ) : filteredAccounts.length === 0 ? (
                         <tr className="personnel-row">
-                          <td colSpan={8} className="text-body-secondary small">
+                          <td colSpan={9} className="text-body-secondary small">
                             No account matched your search.
                           </td>
                         </tr>
@@ -692,6 +727,12 @@ function SettingsPage() {
                               <small className="d-block text-body-secondary">{account.imei}</small>
                             </td>
                             <td>{account.loginId}</td>
+                            <td>
+                              <span>{account.officialEmail || '-'}</span>
+                              <small className="d-block text-body-secondary">
+                                {account.emailVerified ? 'Verified' : 'Verification pending'}
+                              </small>
+                            </td>
                             <td>
                               <span
                                 className="status-badge"

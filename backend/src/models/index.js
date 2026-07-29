@@ -24,6 +24,8 @@ const pointSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
 	username: { type: String, required: true, trim: true, lowercase: true },
+	email: { type: String, trim: true, lowercase: true },
+	emailVerifiedAt: Date,
 	passwordHash: { type: String, required: true, select: false },
 	role: { type: String, enum: ['supervisor', 'officer'], default: 'officer' },
 	personnelId: { type: String, trim: true },
@@ -35,6 +37,10 @@ const userSchema = new mongoose.Schema({
 	timestamps: true,
 })
 userSchema.index({ username: 1 }, { unique: true })
+userSchema.index(
+	{ email: 1 },
+	{ unique: true, partialFilterExpression: { email: { $type: 'string' } } },
+)
 userSchema.index({ personnelId: 1 })
 userSchema.index({ status: 1 })
 
@@ -258,6 +264,28 @@ const authSessionSchema = new mongoose.Schema({
 authSessionSchema.index({ userId: 1, expiresAt: -1 })
 authSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
 
+const emailVerificationSchema = new mongoose.Schema({
+	userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+	email: { type: String, required: true, trim: true, lowercase: true },
+	purpose: {
+		type: String,
+		enum: ['verify_email', 'login', 'reset_password', 'change_password'],
+		required: true,
+	},
+	otpHash: { type: String, required: true, select: false },
+	attempts: { type: Number, default: 0 },
+	maxAttempts: { type: Number, default: 5 },
+	expiresAt: { type: Date, required: true },
+	consumedAt: Date,
+	requestIp: String,
+	deviceName: String,
+}, {
+	collection: 'email_verifications',
+	timestamps: true,
+})
+emailVerificationSchema.index({ userId: 1, purpose: 1, createdAt: -1 })
+emailVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+
 const auditLogSchema = new mongoose.Schema({
 	actorUserId: { type: String, default: 'supervisor' },
 	action: { type: String, required: true },
@@ -286,6 +314,7 @@ const models = {
 	Task: model('Task', taskSchema),
 	Notification: model('Notification', notificationSchema),
 	AuthSession: model('AuthSession', authSessionSchema),
+	EmailVerification: model('EmailVerification', emailVerificationSchema),
 	AuditLog: model('AuditLog', auditLogSchema),
 }
 

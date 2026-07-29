@@ -1,0 +1,57 @@
+.personnel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.personnel-table.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: #334155;
+  --bs-table-border-color: #e2e8f0;
+  --bs-table-hover-bg: #f8fafc;
+  margin-bottom: 0;
+}
+
+.personnel-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  border-bottom: 2px solid var(--border-color-light);
+  background: var(--bg-secondary);
+}
+
+.personnel-row {
+  transition: background var(--transition-base);
+}
+
+.personnel-row:hover {
+  background: #f8fafc;
+}
+
+.personnel-row td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.personnel-badge {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #1e293b;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--status-color) 12%, transparent);
+  color: var(--status-color);
+  border: 1px solid color-mix(in srgb, var(--status-color) 24%, transparent);
+}

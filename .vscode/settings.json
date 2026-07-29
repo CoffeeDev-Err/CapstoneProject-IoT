@@ -1,0 +1,14 @@
+{
+  "eslint.workingDirectories": [
+    {
+      "directory": "frontend",
+      "changeProcessCWD": true
+    },
+    {
+      "directory": "backend",
+      "changeProcessCWD": true
+    }
+  ],
+  "typescript.tsdk": "bantaycabagan-mobileapp/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
