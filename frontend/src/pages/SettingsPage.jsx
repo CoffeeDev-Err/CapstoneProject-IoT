@@ -16,11 +16,23 @@ import {
 import { getRegisteredFlespiDevices } from '../services/flespiDevices'
 
 const rankOptions = [
-  'Police Officer I',
-  'Police Officer II',
+  'Patrolman',
+  'Patrolwoman',
   'Police Corporal',
   'Police Staff Sergeant',
+  'Police Master Sergeant',
+  'Police Senior Master Sergeant',
+  'Police Chief Master Sergeant',
+  'Police Executive Master Sergeant',
   'Police Lieutenant',
+  'Police Captain',
+  'Police Major',
+  'Police Lieutenant Colonel',
+  'Police Colonel',
+  'Police Brigadier General',
+  'Police Major General',
+  'Police Lieutenant General',
+  'Police General'   
 ]
 
 const createTempPassword = (length = 12) => {
