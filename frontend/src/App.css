@@ -628,9 +628,10 @@ small,
 .hero-circle {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.08));
-  filter: blur(16px);
+  background: radial-gradient(circle at top left, rgba(11, 33, 68, 0.821), rgba(30, 90, 209, 0.76));
+  filter: blur(7px);
   animation: heroFloat 18s infinite ease-in-out;
+  z-index: 1;
 }
 
 .circle-1 {
@@ -639,6 +640,7 @@ small,
   top: 8%;
   left: 6%;
   animation-duration: 22s;
+
 }
 
 .circle-2 {

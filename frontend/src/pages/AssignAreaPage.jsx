@@ -59,10 +59,21 @@ const formatDateTime = (isoValue) => {
   }).format(new Date(isoValue))
 }
 
+const getCurrentDateTimeLocalValue = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
 const createEmptyAssignmentForm = () => ({
   personnelIds: [],
   patrolArea: patrolAreas[0],
-  shiftStart: '',
+  shiftStart: getCurrentDateTimeLocalValue(),
   shiftEnd: '',
   notes: '',
 })
@@ -424,7 +435,8 @@ function AssignAreaPage() {
     setAssignmentForm({
       personnelIds: [assignment.personnelId],
       patrolArea: assignment.patrolArea || patrolAreas[0],
-      shiftStart: toDateTimeLocalValue(assignment.shiftStart),
+      shiftStart: toDateTimeLocalValue(assignment.shiftStart) || getCurrentDateTimeLocalValue(),
+      shiftEnd: toDateTimeLocalValue(assignment.shiftEnd),
       notes: assignment.notes || '',
     })
     setPersonnelSearch('')
@@ -445,7 +457,8 @@ function AssignAreaPage() {
     setAssignmentForm({
       personnelIds: groupAssignments.map((assignment) => assignment.personnelId),
       patrolArea: firstAssignment.patrolArea || patrolAreas[0],
-      shiftStart: toDateTimeLocalValue(firstAssignment.shiftStart),
+      shiftStart: toDateTimeLocalValue(firstAssignment.shiftStart) || getCurrentDateTimeLocalValue(),
+      shiftEnd: toDateTimeLocalValue(firstAssignment.shiftEnd),
       notes: firstAssignment.notes || '',
     })
     setPersonnelSearch('')
