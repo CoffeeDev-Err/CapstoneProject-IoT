@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getDashboardSummary } from '../services/dashboard'
+import { socket } from '../services/socket'
 
 const initialSummary = {
   totalPersonnel: 0,
@@ -24,12 +25,44 @@ function DashboardPage() {
   const [loadMessage, setLoadMessage] = useState('Loading live operational summary...')
 
   useEffect(() => {
-    getDashboardSummary()
+    let refreshTimer
+    let active = true
+
+    const loadSummary = () => getDashboardSummary()
       .then((payload) => {
+        if (!active) return
         setSummary({ ...initialSummary, ...payload })
         setLoadMessage('')
       })
-      .catch((error) => setLoadMessage(error.message))
+      .catch((error) => {
+        if (active) setLoadMessage(error.message)
+      })
+
+    const scheduleRefresh = () => {
+      clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(loadSummary, 120)
+    }
+
+    const refreshEvents = [
+      'dashboard:updated',
+      'accounts:updated',
+      'personnel:update',
+      'task:created',
+      'task:updated',
+      'report:submitted',
+      'report:resolved',
+      'report:updated',
+      'deployments:updated',
+    ]
+
+    loadSummary()
+    refreshEvents.forEach((eventName) => socket.on(eventName, scheduleRefresh))
+
+    return () => {
+      active = false
+      clearTimeout(refreshTimer)
+      refreshEvents.forEach((eventName) => socket.off(eventName, scheduleRefresh))
+    }
   }, [])
 
   const stats = useMemo(() => [

@@ -352,13 +352,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
               fillOpacity: 0.1,
               dashArray: '7 6',
             }}
-          >
-            <Tooltip permanent direction="top">
-              <strong>{group.patrolArea}</strong>
-              <br />
-              {group.personnelNames.join(', ')}
-            </Tooltip>
-          </Circle>
+          />
         ))}
 
         {/* SmoothMarker animates each officer between GPS updates via rAF */}

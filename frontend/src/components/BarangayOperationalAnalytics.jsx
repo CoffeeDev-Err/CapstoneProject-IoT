@@ -36,20 +36,22 @@ const SCORE_BREAKDOWN_ITEMS = [
   },
 ]
 
-const getMetricValue = (barangay, metric) => (
-  metric === 'incidents' ? barangay.validatedIncidentCount : barangay.reportCount
-)
+const getMetricValue = (barangay, metric) => Number(
+  metric === 'incidents' ? barangay.validatedIncidentCount : barangay.reportCount,
+) || 0
 
 function BarangayOperationalAnalytics({ analytics, period }) {
   const [metric, setMetric] = useState('reports')
-  const [selectedBarangayName, setSelectedBarangayName] = useState('Cubag')
+  const [selectedBarangayName, setSelectedBarangayName] = useState('')
 
   const metricRanking = useMemo(
-    () => [...analytics.barangays].sort((first, second) => (
-      getMetricValue(second, metric) - getMetricValue(first, metric)
-      || second.priorityScore - first.priorityScore
-      || first.barangay.localeCompare(second.barangay)
-    )),
+    () => analytics.barangays
+      .filter((barangay) => getMetricValue(barangay, metric) > 0)
+      .sort((first, second) => (
+        getMetricValue(second, metric) - getMetricValue(first, metric)
+        || second.priorityScore - first.priorityScore
+        || first.barangay.localeCompare(second.barangay)
+      )),
     [analytics.barangays, metric],
   )
   const maximumMetricValue = Math.max(0, ...metricRanking.map((barangay) => getMetricValue(barangay, metric)))
@@ -110,6 +112,11 @@ function BarangayOperationalAnalytics({ analytics, period }) {
           </div>
 
           <div key={`${period}-${metric}`} className="barangay-bar-list">
+            {metricRanking.length === 0 && (
+              <div className="barangay-analytics__empty">
+                No {metric === 'incidents' ? 'validated incidents' : 'submitted reports'} for this period.
+              </div>
+            )}
             {metricRanking.map((barangay) => {
               const value = getMetricValue(barangay, metric)
               const width = maximumMetricValue > 0 ? (value / maximumMetricValue) * 100 : 0
@@ -142,6 +149,11 @@ function BarangayOperationalAnalytics({ analytics, period }) {
           </div>
 
           <div className="barangay-priority-list">
+            {analytics.barangays.length === 0 && (
+              <div className="barangay-analytics__empty">
+                No barangay report activity for this period.
+              </div>
+            )}
             {analytics.barangays.map((barangay, index) => (
               <button
                 key={barangay.barangay}

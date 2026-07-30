@@ -4,6 +4,7 @@ const {
 	Report,
 	Task,
 } = require('../models')
+const { isCabaganBarangayCode } = require('../constants/cabaganBarangays')
 const { barangayNameFromCode } = require('../utils/geo')
 
 const PERIODS = new Set(['weekly', 'monthly', 'yearly'])
@@ -51,6 +52,7 @@ const buildOperationalAnalytics = async ({ period: requestedPeriod } = {}) => {
 	)
 	const deploymentCoverage = new Map()
 	for (const deployment of deployments) {
+		if (!isCabaganBarangayCode(deployment.barangayCode)) continue
 		const coverage = deploymentCoverage.get(deployment.barangayCode) || {
 			assigned: 0,
 			available: 0,
@@ -73,7 +75,10 @@ const buildOperationalAnalytics = async ({ period: requestedPeriod } = {}) => {
 			timeWindows: new Map(),
 		})
 	}
-	for (const report of reports) {
+	const scopedReports = reports.filter(
+		(report) => isCabaganBarangayCode(report.barangayCode),
+	)
+	for (const report of scopedReports) {
 		const code = report.barangayCode || 'UNSPECIFIED'
 		if (!byBarangay.has(code)) {
 			byBarangay.set(code, {
@@ -158,14 +163,15 @@ const buildOperationalAnalytics = async ({ period: requestedPeriod } = {}) => {
 			to: end.toISOString(),
 		},
 		summary: {
-			totalReports: reports.length,
-			totalIncidentReports: reports.filter((report) => report.isIncident).length,
-			totalValidatedIncidents: reports.filter(
+			totalReports: scopedReports.length,
+			totalIncidentReports: scopedReports.filter((report) => report.isIncident).length,
+			totalValidatedIncidents: scopedReports.filter(
 				(report) => report.isIncident && report.validationStatus === 'validated',
 			).length,
-			totalResolvedCases: reports.filter(
+			totalResolvedCases: scopedReports.filter(
 				(report) => report.isIncident && report.caseStatus === 'resolved',
 			).length,
+			excludedOutsideCabaganReports: reports.length - scopedReports.length,
 			highPriorityBarangays: barangays.filter(
 				(barangay) => barangay.priorityLevel === 'high',
 			).length,
@@ -187,6 +193,7 @@ const getDashboardSummary = async () => {
 		recentReports,
 		recentTasks,
 		analytics,
+		personnelProfiles,
 	] = await Promise.all([
 		Personnel.countDocuments({ status: 'active' }),
 		Personnel.countDocuments({
@@ -199,20 +206,26 @@ const getDashboardSummary = async () => {
 		Report.find().sort({ submittedAt: -1 }).limit(5).lean(),
 		Task.find().sort({ createdAt: -1 }).limit(5).lean(),
 		buildOperationalAnalytics({ period: 'weekly' }),
+		Personnel.find({ status: 'active' })
+			.select('personnelId fullName')
+			.lean(),
 	])
+	const personnelNames = new Map(
+		personnelProfiles.map((profile) => [profile.personnelId, profile.fullName]),
+	)
 
 	const recentActivity = [
 		...recentReports.map((report) => ({
 			id: report.reportNumber,
 			type: 'report',
 			timestamp: report.submittedAt.toISOString(),
-			text: `${report.officerName} submitted ${report.reportType} report ${report.reportNumber}.`,
+			text: `${personnelNames.get(report.submittedBy) || report.officerName} submitted ${report.reportType} report ${report.reportNumber}.`,
 		})),
 		...recentTasks.map((task) => ({
 			id: task.taskId,
 			type: 'task',
 			timestamp: task.createdAt.toISOString(),
-			text: `${task.requesterName} created ${task.type} task at ${task.locationName}.`,
+			text: `${personnelNames.get(task.requestedBy) || task.requesterName} created ${task.type} task at ${task.locationName}.`,
 		})),
 	]
 		.sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp))

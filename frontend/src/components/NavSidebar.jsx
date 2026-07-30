@@ -120,7 +120,7 @@ function NavSidebar({ collapsed, onToggle }) {
         {!collapsed && <span className="nav-sidebar__brand-name">BantayCabagan</span>}
       </div>
 
-      <nav className="nav-sidebar__nav">
+      <nav className="nav-sidebar__nav mt-4">
         {navSections.map((section) => (
           <div className="nav-sidebar__section" key={section.title}>
             {!collapsed && <span className="nav-sidebar__section-title">{section.title}</span>}

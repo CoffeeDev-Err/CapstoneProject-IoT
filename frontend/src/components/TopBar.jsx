@@ -120,7 +120,7 @@ function TopBar({
   const navigate = useNavigate()
   const { clearSession, logout, token, user } = useAuth()
   const supervisor = {
-    name: user?.profile?.fullName || user?.username || SUPERVISOR_FALLBACK.name,
+    name: user?.profile?.name || user?.name || SUPERVISOR_FALLBACK.name,
     rank: user?.profile?.rank || SUPERVISOR_FALLBACK.rank,
     role: user?.role === 'supervisor' ? 'Supervisor' : 'Officer',
     photoUrl: user?.profile?.photoUrl || SUPERVISOR_FALLBACK.photoUrl,
@@ -378,7 +378,7 @@ function TopBar({
             />
             <div className="supervisor-info d-flex flex-column align-items-start">
               <span className="supervisor-name">{supervisor.name}</span>
-              <span className="supervisor-role">{supervisor.role}</span>
+              <span className="supervisor-role mt-1">{supervisor.role}</span>
             </div>
             <svg className="supervisor-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="6 9 12 15 18 9" />
@@ -400,7 +400,7 @@ function TopBar({
                 />
                 <div>
                   <strong className="dropdown-name">{supervisor.name}</strong>
-                  <span className="dropdown-rank mt-2">{supervisor.rank}</span>
+                  <span className="dropdown-rank mt-1">{supervisor.rank}</span>
                 </div>
               </div>
 

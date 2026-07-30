@@ -1,19 +1,43 @@
 const express = require('express')
 const asyncHandler = require('../middleware/asyncHandler')
+const createAuthenticateSession = require('../middleware/authenticateSession')
 
-const createOperationalRoutes = (controller) => {
+const createOperationalRoutes = ({ authService, controller }) => {
 	const router = express.Router()
+	const authenticate = createAuthenticateSession(authService)
+	const requireOfficer = (req, res, next) => {
+		if (req.auth.user.role !== 'officer' || !req.auth.user.personnelId) {
+			return res.status(403).json({
+				success: false,
+				message: 'A GPS-linked police mobile account is required.',
+			})
+		}
+		return next()
+	}
+	const officerOnly = [authenticate, requireOfficer]
 
-	router.get('/operations/bootstrap', asyncHandler(controller.getBootstrap))
+	router.get(
+		'/operations/bootstrap',
+		...officerOnly,
+		asyncHandler(controller.getBootstrap),
+	)
 	router.get('/tasks', asyncHandler(controller.getTasks))
-	router.post('/tasks', asyncHandler(controller.createTask))
+	router.post('/tasks', ...officerOnly, asyncHandler(controller.createTask))
 	router.get('/tasks/:taskId', asyncHandler(controller.getTask))
-	router.post('/tasks/:taskId/accept', asyncHandler(controller.acceptTask))
+	router.post(
+		'/tasks/:taskId/accept',
+		...officerOnly,
+		asyncHandler(controller.acceptTask),
+	)
 	router.patch('/tasks/:taskId/complete', asyncHandler(controller.completeTask))
 	router.get('/reports', asyncHandler(controller.getReports))
-	router.post('/reports', asyncHandler(controller.submitReport))
+	router.post('/reports', ...officerOnly, asyncHandler(controller.submitReport))
 	router.get('/reports/:reportId', asyncHandler(controller.getReport))
-	router.patch('/reports/:reportId/resolve', asyncHandler(controller.resolveReport))
+	router.patch(
+		'/reports/:reportId/resolve',
+		...officerOnly,
+		asyncHandler(controller.resolveReport),
+	)
 	router.patch('/reports/:reportId/validation', asyncHandler(controller.updateReportValidation))
 	router.get('/deployments', asyncHandler(controller.getDeployments))
 	router.put('/deployments', asyncHandler(controller.replaceDeployments))

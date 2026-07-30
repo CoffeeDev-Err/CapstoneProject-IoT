@@ -12,6 +12,7 @@ const createGpsDeviceController = require('./controllers/gpsDeviceController')
 const createNotificationController = require('./controllers/notificationController')
 const createOperationalController = require('./controllers/operationalController')
 const createPersonnelController = require('./controllers/personnelController')
+const createSystemController = require('./controllers/systemController')
 const errorHandler = require('./middleware/errorHandler')
 const models = require('./models')
 const createAccountRoutes = require('./routes/accountRoutes')
@@ -25,11 +26,14 @@ const createLocationRoutes = require('./routes/locationRoutes')
 const createNotificationRoutes = require('./routes/notificationRoutes')
 const createOperationalRoutes = require('./routes/operationalRoutes')
 const createPersonnelRoutes = require('./routes/personnelRoutes')
+const createSystemRoutes = require('./routes/systemRoutes')
 const createAccountService = require('./services/accountService')
 const analyticsService = require('./services/analyticsService')
 const auditService = require('./services/auditService')
 const authService = require('./services/authService')
 const barangayService = require('./services/barangayService')
+const flespiService = require('./services/flespiService')
+const createFlespiSyncService = require('./services/flespiSyncService')
 const gpsDeviceService = require('./services/gpsDeviceService')
 const notificationService = require('./services/notificationService')
 const createOperationalService = require('./services/operationalService')
@@ -44,6 +48,10 @@ require('dotenv').config()
 
 const PORT = process.env.PORT || 4000
 const GPS_UPDATE_INTERVAL_MS = 2500
+const FLESPI_SYNC_INTERVAL_MS = Math.max(
+	2000,
+	Number(process.env.FLESPI_SYNC_INTERVAL_MS) || 3000,
+)
 const HISTORY_SAMPLE_INTERVAL_MS = 30_000
 
 const server = http.createServer(app)
@@ -55,7 +63,11 @@ const io = new Server(server, {
 })
 
 const operationalService = createOperationalService({ io })
-const accountService = createAccountService({ io })
+const accountService = createAccountService({ io, personnelService })
+const flespiSyncService = createFlespiSyncService({
+	flespiService,
+	personnelService,
+})
 const operationalController = createOperationalController(operationalService)
 const accountController = createAccountController(accountService)
 const analyticsController = createAnalyticsController(analyticsService)
@@ -65,8 +77,12 @@ const barangayController = createBarangayController(barangayService)
 const gpsDeviceController = createGpsDeviceController(gpsDeviceService)
 const notificationController = createNotificationController(notificationService)
 const personnelController = createPersonnelController({ io, personnelService })
+const systemController = createSystemController(flespiService)
 
-app.use('/api', createOperationalRoutes(operationalController))
+app.use('/api', createOperationalRoutes({
+	authService,
+	controller: operationalController,
+}))
 app.use('/api/accounts', createAccountRoutes({
 	authService,
 	controller: accountController,
@@ -80,6 +96,7 @@ app.use('/api/gps-devices', createGpsDeviceRoutes(gpsDeviceController))
 app.use('/api/locations', createLocationRoutes(personnelController))
 app.use('/api/notifications', createNotificationRoutes(notificationController))
 app.use('/api/personnel', createPersonnelRoutes(personnelController))
+app.use('/api', createSystemRoutes(systemController))
 app.use(errorHandler)
 
 io.on('connection', async (socket) => {
@@ -139,6 +156,7 @@ io.on('connection', async (socket) => {
 
 let locationUpdateRunning = false
 let lastHistorySampleAt = 0
+let flespiSyncRunning = false
 
 const broadcastMockLocations = async () => {
 	if (locationUpdateRunning || mongoose.connection.readyState !== 1) return
@@ -157,6 +175,22 @@ const broadcastMockLocations = async () => {
 	}
 }
 
+const broadcastFlespiLocations = async () => {
+	if (flespiSyncRunning || mongoose.connection.readyState !== 1) return
+	flespiSyncRunning = true
+
+	try {
+		const result = await flespiSyncService.syncAssignedLocations()
+		if (result.accepted > 0) {
+			io.emit('personnel:update', await getPersonnelWithLocations())
+		}
+	} catch (error) {
+		console.error('Flespi GPS sync failed:', error.message)
+	} finally {
+		flespiSyncRunning = false
+	}
+}
+
 const start = async () => {
 	try {
 		await connectDB()
@@ -167,6 +201,13 @@ const start = async () => {
 			console.log(`BantayCabagan backend server running on port ${PORT}`)
 		})
 		setInterval(broadcastMockLocations, GPS_UPDATE_INTERVAL_MS)
+		if (process.env.FLESPI_TOKEN) {
+			console.log(`Flespi GPS sync enabled (${FLESPI_SYNC_INTERVAL_MS}ms interval)`)
+			setTimeout(broadcastFlespiLocations, 1000)
+			setInterval(broadcastFlespiLocations, FLESPI_SYNC_INTERVAL_MS)
+		} else {
+			console.log('Flespi GPS sync disabled: FLESPI_TOKEN is not configured')
+		}
 	} catch (error) {
 		console.error('Backend startup failed:', error)
 		process.exitCode = 1

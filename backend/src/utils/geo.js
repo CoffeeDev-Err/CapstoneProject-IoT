@@ -6,7 +6,6 @@ const AREA_COORDINATES = {
 	'Barangay Cubag': { latitude: 17.4272, longitude: 121.7658 },
 	'Barangay Garita': { latitude: 17.4148, longitude: 121.7762 },
 	'Barangay San Juan': { latitude: 17.4192, longitude: 121.7546 },
-	'Barangay Santa Maria': { latitude: 17.4843, longitude: 121.7574 },
 	'Cabagan Public Market Zone': { latitude: 17.4272, longitude: 121.7658 },
 	'Municipal Hall Perimeter': { latitude: 17.4239, longitude: 121.7681 },
 	'Barangay Centro Route': { latitude: 17.4248, longitude: 121.7669 },

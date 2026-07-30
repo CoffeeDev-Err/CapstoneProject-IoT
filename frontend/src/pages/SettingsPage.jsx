@@ -73,7 +73,7 @@ const getDeviceCode = (device, index = 0) => {
 
 const formatGpsOptionLabel = ({ device, index, assignedAccount }) => {
   const statusLabel = assignedAccount ? `Assigned to ${assignedAccount.fullName}` : 'Available'
-  return `${getDeviceCode(device, index)} | IMEI: ${device.imei} | ${statusLabel}`
+  return `${getDeviceCode(device, index)} | Device ID: ${device.imei} | ${statusLabel}`
 }
 
 const formatDateTime = (isoValue) => {
@@ -228,9 +228,9 @@ function SettingsPage() {
     }
 
     if (!accountForm.imei.trim()) {
-      errors.imei = 'GPS IMEI is required.'
+      errors.imei = 'GPS device ID is required.'
     } else if (!flespiDevices.some((device) => device.imei === accountForm.imei)) {
-      errors.imei = 'Select an IMEI registered in Flespi.'
+      errors.imei = 'Select a device ID registered in Flespi.'
     }
 
     const duplicateBadge = createdAccounts.some(
@@ -247,7 +247,7 @@ function SettingsPage() {
       (account) => account.id !== editingAccountId && account.imei === accountForm.imei.trim()
     )
     if (duplicateImei) {
-      errors.imei = 'IMEI is already assigned to another personnel account.'
+      errors.imei = 'Device ID is already assigned to another personnel account.'
     }
 
     if (!accountForm.loginId.trim()) {
@@ -547,7 +547,7 @@ function SettingsPage() {
                       </option>
                       {accountForm.imei && !flespiDevices.some((device) => device.imei === accountForm.imei) && (
                         <option value={accountForm.imei}>
-                          {accountForm.flespiDeviceName || 'Assigned GPS'} | IMEI: {accountForm.imei}
+                          {accountForm.flespiDeviceName || 'Assigned GPS'} | Device ID: {accountForm.imei}
                         </option>
                       )}
                       {flespiDevices.map((device, index) => {
@@ -683,7 +683,7 @@ function SettingsPage() {
                     className="settings-input account-table-search"
                     value={accountSearch}
                     onChange={(event) => setAccountSearch(event.target.value)}
-                    placeholder="Search name, badge, email, IMEI, or login"
+                    placeholder="Search name, badge, email, device ID, or login"
                     aria-label="Search provisioned accounts"
                   />
                 </div>

@@ -6,9 +6,6 @@ import { useMemo, useState } from 'react'
 import BarangayOperationalAnalytics from '../components/BarangayOperationalAnalytics'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import {
-  BARANGAY_DEPLOYMENT_COVERAGE,
-} from '../data/reportRecords'
-import {
   BARANGAY_ANALYTICS_PERIODS,
   buildBarangayAnalytics,
 } from '../utils/barangayAnalytics'
@@ -27,16 +24,44 @@ const formatDateTime = (isoValue) => {
   }).format(new Date(isoValue))
 }
 
+const barangayFromArea = (area = '') => {
+  const firstPart = String(area).split(',')[0].trim()
+  return firstPart
+    .replace(/^barangay\s+/i, '')
+    .split(/public|market|zone|route|road|checkpoint|perimeter/i)[0]
+    .trim() || firstPart || 'Unspecified'
+}
+
 function AnalyticsPage() {
   const [barangayPeriod, setBarangayPeriod] = useState('weekly')
-  const { reports } = usePersonnelContext()
+  const { deployments, personnel, reports } = usePersonnelContext()
+  const deploymentCoverage = useMemo(() => {
+    const personnelById = new Map(personnel.map((member) => [member.id, member]))
+    const coverageByBarangay = new Map()
+
+    deployments.forEach((deployment) => {
+      const barangay = barangayFromArea(deployment.patrolArea)
+      const current = coverageByBarangay.get(barangay) || {
+        barangay,
+        assignedPersonnel: 0,
+        availablePersonnel: 0,
+        requiredPersonnel: 2,
+      }
+      const member = personnelById.get(deployment.personnelId)
+      current.assignedPersonnel += 1
+      if (member && member.status !== 'Off Duty') current.availablePersonnel += 1
+      coverageByBarangay.set(barangay, current)
+    })
+
+    return [...coverageByBarangay.values()]
+  }, [deployments, personnel])
   const barangayAnalytics = useMemo(
     () => buildBarangayAnalytics({
       reports,
-      deploymentCoverage: BARANGAY_DEPLOYMENT_COVERAGE,
+      deploymentCoverage,
       period: barangayPeriod,
     }),
-    [barangayPeriod, reports],
+    [barangayPeriod, deploymentCoverage, reports],
   )
   const highestPriorityBarangay = barangayAnalytics.barangays[0]
   const operationalStats = [

@@ -1,8 +1,11 @@
 const { randomUUID } = require('crypto')
 const {
 	AuditLog,
+	Deployment,
 	GpsDeviceAssignment,
 	Personnel,
+	Report,
+	Task,
 	User,
 } = require('../models')
 const { hashPassword, isStrongPassword } = require('../utils/password')
@@ -47,7 +50,7 @@ const validateAccountPayload = (payload, { requirePassword = true } = {}) => {
 		['rank', 'Rank'],
 		['loginId', 'Login ID'],
 		['officialEmail', 'Official email'],
-		['imei', 'GPS IMEI'],
+		['imei', 'GPS device ID'],
 		['flespiDeviceId', 'Flespi device'],
 	]
 
@@ -97,7 +100,21 @@ const validateRegisteredDevice = async ({ imei, flespiDeviceId }) => {
 	return device
 }
 
-const createAccountService = ({ io }) => {
+const createAccountService = ({ io, personnelService }) => {
+	const broadcastAccountData = async (identity) => {
+		io.emit('accounts:updated')
+		if (identity?.personnelId) {
+			io.emit('personnel:identity-updated', identity)
+		}
+		if (personnelService) {
+			io.emit(
+				'personnel:update',
+				await personnelService.getPersonnelWithLocations(),
+			)
+		}
+		io.emit('dashboard:updated')
+	}
+
 	const loadAccounts = async () => {
 		const users = await User.find().sort({ createdAt: -1 }).lean()
 		const personnelIds = users.map((user) => user.personnelId).filter(Boolean)
@@ -184,7 +201,7 @@ const createAccountService = ({ io }) => {
 				}),
 			])
 
-			io.emit('accounts:updated')
+			await broadcastAccountData()
 			return serializeAccount(user, profile, assignment)
 		} catch (error) {
 			if (profileCreated) {
@@ -254,7 +271,27 @@ const createAccountService = ({ io }) => {
 			user.forcePasswordReset = true
 		}
 
-		await Promise.all([profile.save(), user.save()])
+		await Promise.all([
+			profile.save(),
+			user.save(),
+			Deployment.updateMany(
+				{ personnelId: user.personnelId },
+				{
+					$set: {
+						personnelName: profile.fullName,
+						rank: profile.rank,
+					},
+				},
+			),
+			Task.updateMany(
+				{ requestedBy: user.personnelId },
+				{ $set: { requesterName: profile.fullName } },
+			),
+			Report.updateMany(
+				{ submittedBy: user.personnelId },
+				{ $set: { officerName: profile.fullName } },
+			),
+		])
 		await AuditLog.create({
 			action: 'account.updated',
 			entityType: 'user',
@@ -266,7 +303,11 @@ const createAccountService = ({ io }) => {
 			ipAddress,
 		})
 
-		io.emit('accounts:updated')
+		await broadcastAccountData({
+			personnelId: user.personnelId,
+			name: profile.fullName,
+			rank: profile.rank,
+		})
 		return serializeAccount(user, profile, assignment)
 	}
 
@@ -295,7 +336,7 @@ const createAccountService = ({ io }) => {
 			ipAddress,
 		})
 
-		io.emit('accounts:updated')
+		await broadcastAccountData()
 		return {
 			message: 'Account deactivated and GPS assignment released.',
 		}

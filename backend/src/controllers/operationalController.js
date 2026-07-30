@@ -12,7 +12,7 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	getBootstrap: async (req, res) => {
-		const personnelId = String(req.query.personnel_id || '')
+		const personnelId = req.auth.user.personnelId
 		const [tasks, reports, deployments] = await Promise.all([
 			operationalService.loadTasks(),
 			operationalService.loadReports(personnelId),
@@ -22,14 +22,17 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	createTask: async (req, res) => {
-		const task = await operationalService.createTask(req.body)
+		const task = await operationalService.createTask({
+			...req.body,
+			requested_by: req.auth.user.personnelId,
+		})
 		res.status(201).json({ success: true, task })
 	},
 
 	acceptTask: async (req, res) => {
 		const result = await operationalService.acceptTask(
 			req.params.taskId,
-			req.body?.personnel_id,
+			req.auth.user.personnelId,
 		)
 		res.status(result.status).json(result.body)
 	},
@@ -52,14 +55,20 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	submitReport: async (req, res) => {
-		const report = await operationalService.submitReport(req.body)
+		const report = await operationalService.submitReport({
+			...req.body,
+			personnel_id: req.auth.user.personnelId,
+		})
 		res.status(201).json({ success: true, report })
 	},
 
 	resolveReport: async (req, res) => {
 		const result = await operationalService.resolveReport(
 			req.params.reportId,
-			req.body,
+			{
+				...req.body,
+				resolved_by: req.auth.user.personnelId,
+			},
 		)
 		res.status(result.status).json(result.body)
 	},

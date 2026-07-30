@@ -14,7 +14,7 @@
  *   PersonnelContext → hook → this page → props down to child components
  *   User clicks marker/name → setSelectedPersonnel → modal opens
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ProfileModal from '../components/ProfileModal'
 import PersonnelMap from '../components/PersonnelMap'
 import SidePanel from '../components/SidePanel'
@@ -31,10 +31,18 @@ function MonitoringPage() {
   } = usePersonnelContext()
 
   // Track which officer's profile modal is open (null = modal hidden)
-  const [selectedPersonnel, setSelectedPersonnel] = useState(null)
+  const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
   const [focusTarget, setFocusTarget] = useState(null)
   const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false)
   const [mapLayoutVersion, setMapLayoutVersion] = useState(0)
+  const selectedPersonnel = useMemo(
+    () => personnel.find((member) => member.id === selectedPersonnelId) || null,
+    [personnel, selectedPersonnelId]
+  )
+
+  const handleSelectPersonnel = (member) => {
+    setSelectedPersonnelId(member?.id || null)
+  }
 
   const handleToggleSidePanel = () => {
     setIsSidePanelCollapsed((prev) => !prev)
@@ -57,7 +65,7 @@ function MonitoringPage() {
       })
 
     // Close the modal so the supervisor can immediately see the map focus result.
-    setSelectedPersonnel(null)
+    setSelectedPersonnelId(null)
   }
 
   return (
@@ -82,13 +90,13 @@ function MonitoringPage() {
             personnelCount={personnelCount}
             statusMessage={statusMessage}
             outOfBoundaryPersonnelCount={outOfBoundaryPersonnel.length}
-            onSelectPersonnel={setSelectedPersonnel}
+            onSelectPersonnel={handleSelectPersonnel}
           />
         </aside>
         <PersonnelMap
           personnel={personnel}
           deployments={deployments}
-          onSelectPersonnel={setSelectedPersonnel}
+          onSelectPersonnel={handleSelectPersonnel}
           focusTarget={focusTarget}
           layoutVersion={mapLayoutVersion}
         />
@@ -96,7 +104,7 @@ function MonitoringPage() {
 
       <ProfileModal
         selectedPersonnel={selectedPersonnel}
-        onClose={() => setSelectedPersonnel(null)}
+        onClose={() => setSelectedPersonnelId(null)}
         onLocate={() => handleLocatePersonnel(selectedPersonnel)}
       />
     </div>

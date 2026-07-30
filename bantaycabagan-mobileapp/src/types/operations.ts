@@ -30,8 +30,14 @@ export type PoliceReport = {
   title: string;
   description: string;
   location: string;
-  latitude: number;
-  longitude: number;
+  location_source?: 'gps' | 'manual';
+  is_within_cabagan?: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  submitted_from?: {
+    latitude: number;
+    longitude: number;
+  };
   resolved_at?: string;
   resolved_by?: string;
   resolution_notes?: string;
@@ -63,6 +69,8 @@ export type LivePersonnel = {
   status: string;
   photoUrl: string;
   lastUpdated: string;
+  source?: string;
+  isSimulated?: boolean;
 };
 
 export type SubmitReportInput = {
@@ -74,6 +82,7 @@ export type SubmitReportInput = {
   severity: number;
   occurred_at?: string;
   assigned_area?: string;
+  location_source?: 'gps' | 'manual';
   latitude?: number;
   longitude?: number;
 };
