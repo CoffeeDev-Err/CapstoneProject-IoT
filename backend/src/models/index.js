@@ -132,6 +132,7 @@ const polygonSchema = new mongoose.Schema({
 
 const barangaySchema = new mongoose.Schema({
 	code: { type: String, required: true, trim: true, uppercase: true },
+	psgcCode: { type: String, trim: true },
 	name: { type: String, required: true, trim: true },
 	municipality: { type: String, default: 'Cabagan', trim: true },
 	center: { type: pointSchema, required: true },
@@ -189,7 +190,13 @@ const reportSchema = new mongoose.Schema({
 	title: { type: String, required: true },
 	description: { type: String, default: '' },
 	locationName: { type: String, required: true },
-	location: { type: pointSchema, required: true },
+	location: pointSchema,
+	locationSource: {
+		type: String,
+		enum: ['gps', 'manual'],
+		default: 'manual',
+	},
+	submittedFrom: pointSchema,
 	incidentAt: { type: Date, required: true },
 	submittedAt: { type: Date, required: true, default: Date.now },
 	resolution: resolutionSchema,

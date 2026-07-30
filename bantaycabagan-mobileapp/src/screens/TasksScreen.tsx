@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { CURRENT_OFFICER } from '../constants/officer';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import type { OperationalTask } from '../types/operations';
@@ -25,15 +24,15 @@ export default function TasksScreen({
   presentation = 'screen',
   onClose,
 }: TasksScreenProps) {
-  const { tasks, acceptTask, isLoading } = useOperationalContext();
+  const { tasks, acceptTask, currentPersonnelId, isLoading } = useOperationalContext();
   const [filter, setFilter] = useState<(typeof filters)[number]>('All');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const filteredTasks = useMemo(() => tasks.filter((task) => {
     if (filter === 'Open') return task.status === 'open';
-    if (filter === 'Accepted') return task.accepted_by.includes(CURRENT_OFFICER.id);
+    if (filter === 'Accepted') return task.accepted_by.includes(currentPersonnelId);
     return true;
-  }), [filter, tasks]);
+  }), [currentPersonnelId, filter, tasks]);
 
   const handleAccept = async (task: OperationalTask) => {
     setAcceptingId(task.id);
@@ -47,9 +46,9 @@ export default function TasksScreen({
   };
 
   const renderTask = ({ item }: { item: OperationalTask }) => {
-    const accepted = item.accepted_by.includes(CURRENT_OFFICER.id);
+    const accepted = item.accepted_by.includes(currentPersonnelId);
     const full = item.accepted_by.length >= item.required_responders || item.status === 'full';
-    const ownRequest = item.type === 'backup' && item.requested_by === CURRENT_OFFICER.id;
+    const ownRequest = item.type === 'backup' && item.requested_by === currentPersonnelId;
     const remaining = Math.max(0, item.required_responders - item.accepted_by.length);
 
     return (

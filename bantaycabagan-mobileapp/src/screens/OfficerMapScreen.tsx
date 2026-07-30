@@ -20,9 +20,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { WebView } from 'react-native-webview';
 import type { WebViewMessageEvent } from 'react-native-webview';
-import { CURRENT_OFFICER } from '../constants/officer';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import type { LivePersonnel } from '../types/operations';
@@ -31,9 +31,12 @@ type MapPersonnel = LivePersonnel & {
   emergencyActive?: boolean;
 };
 
+type MapMode = 'street' | 'satellite';
+
 type MapCommand =
   | { type: 'update-personnel'; personnel: MapPersonnel[] }
-  | { type: 'focus-officer'; officerId: string };
+  | { type: 'focus-officer'; officerId: string }
+  | { type: 'set-map-mode'; mode: MapMode };
 
 const webSearchInputReset = Platform.OS === 'web'
   ? ({
@@ -74,6 +77,8 @@ export default function OfficerMapScreen() {
     personnel,
     tasks,
     createBackupRequest,
+    currentOfficer,
+    currentPersonnelId,
     isConnected,
   } = useOperationalContext();
   const nativeMapRef = useRef<WebView>(null);
@@ -82,24 +87,24 @@ export default function OfficerMapScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
+  const [mapMode, setMapMode] = useState<MapMode>('street');
+  const [acknowledgedAssignmentKey, setAcknowledgedAssignmentKey] = useState('');
+  const [assignmentAcknowledgementReady, setAssignmentAcknowledgementReady] = useState(false);
   const assignment = deployments[0];
+  const assignmentKey = assignment
+    ? `${assignment.id}:${assignment.assignedAt || ''}`
+    : '';
+  const assignmentStorageKey = `deployment-acknowledgement:${currentPersonnelId || 'anonymous'}`;
+  const deploymentPromptVisible = Boolean(
+    assignment
+      && assignmentAcknowledgementReady
+      && acknowledgedAssignmentKey !== assignmentKey,
+  );
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => {
     if (personnel.length) return personnel;
-
-    return [{
-      id: CURRENT_OFFICER.id,
-      badge: CURRENT_OFFICER.badge,
-      name: CURRENT_OFFICER.name,
-      rank: CURRENT_OFFICER.rank,
-      locationName: assignment?.patrolArea || CURRENT_OFFICER.station,
-      latitude: assignment?.latitude || 17.4239,
-      longitude: assignment?.longitude || 121.7681,
-      status: 'On Patrol',
-      photoUrl: CURRENT_OFFICER.photoUrl,
-      lastUpdated: new Date().toISOString(),
-    }];
-  }, [assignment, personnel]);
+    return currentPersonnelId ? [currentOfficer] : [];
+  }, [currentOfficer, currentPersonnelId, personnel]);
 
   const emergencyPersonnelIds = useMemo(() => {
     const ids = new Set<string>();
@@ -119,7 +124,7 @@ export default function OfficerMapScreen() {
     }))
   ), [emergencyPersonnelIds, visiblePersonnel]);
 
-  const currentOfficerHasActiveBackup = emergencyPersonnelIds.has(CURRENT_OFFICER.id);
+  const currentOfficerHasActiveBackup = emergencyPersonnelIds.has(currentPersonnelId);
   const hasEmergencyParticipants = emergencyPersonnelIds.size > 0;
 
   const selectedOfficer = selectedOfficerId
@@ -129,6 +134,37 @@ export default function OfficerMapScreen() {
     ? emergencyPersonnelIds.has(selectedOfficer.id)
     : false;
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
+
+  useEffect(() => {
+    let cancelled = false;
+    setAssignmentAcknowledgementReady(false);
+
+    const loadAcknowledgement = async () => {
+      if (!assignmentKey) {
+        if (!cancelled) {
+          setAcknowledgedAssignmentKey('');
+          setAssignmentAcknowledgementReady(true);
+        }
+        return;
+      }
+
+      try {
+        const savedKey = Platform.OS === 'web'
+          ? window.localStorage.getItem(assignmentStorageKey)
+          : await SecureStore.getItemAsync(assignmentStorageKey);
+        if (!cancelled) setAcknowledgedAssignmentKey(savedKey || '');
+      } catch {
+        if (!cancelled) setAcknowledgedAssignmentKey('');
+      } finally {
+        if (!cancelled) setAssignmentAcknowledgementReady(true);
+      }
+    };
+
+    loadAcknowledgement();
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentKey, assignmentStorageKey]);
 
   useEffect(() => {
     if (!hasEmergencyParticipants) {
@@ -161,7 +197,7 @@ export default function OfficerMapScreen() {
     const latitude = assignment?.latitude || 17.4239;
     const longitude = assignment?.longitude || 121.7681;
     const patrolArea = JSON.stringify(assignment?.patrolArea || 'Cabagan Police Station');
-    const currentOfficerId = JSON.stringify(CURRENT_OFFICER.id);
+    const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
 
     return `
@@ -207,10 +243,20 @@ export default function OfficerMapScreen() {
               dragging:true,
               zoomAnimation:true
             }).setView([${latitude},${longitude}],15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+            const streetLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
               maxZoom:19,
               attribution:'&copy; OpenStreetMap'
-            }).addTo(map);
+            });
+            const satelliteLayer=L.tileLayer(
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+              {
+                maxZoom:19,
+                attribution:'Tiles &copy; Esri'
+              }
+            );
+            const baseLayers={street:streetLayer,satellite:satelliteLayer};
+            let activeBaseLayer=streetLayer;
+            activeBaseLayer.addTo(map);
             L.control.zoom({position:'topright'}).addTo(map);
             L.circle([${latitude},${longitude}],{
               radius:320,
@@ -299,10 +345,20 @@ export default function OfficerMapScreen() {
               map.flyTo([Number(member.latitude),Number(member.longitude)],18,{duration:.8});
             };
 
+            window.setMapMode=(mode)=>{
+              const nextLayer=baseLayers[mode]||streetLayer;
+              if(nextLayer===activeBaseLayer)return;
+              map.removeLayer(activeBaseLayer);
+              activeBaseLayer=nextLayer;
+              activeBaseLayer.addTo(map);
+              activeBaseLayer.bringToBack();
+            };
+
             window.handleMapCommand=(command)=>{
               if(!command)return;
               if(command.type==='update-personnel')window.updatePersonnel(command.personnel);
               if(command.type==='focus-officer')window.focusOfficer(command.officerId);
+              if(command.type==='set-map-mode')window.setMapMode(command.mode);
             };
 
             window.addEventListener('message',(event)=>{
@@ -317,7 +373,7 @@ export default function OfficerMapScreen() {
         </body>
       </html>
     `;
-  }, [assignment, personnelRosterKey]);
+  }, [assignment, currentPersonnelId, personnelRosterKey]);
 
   const sendMapCommand = useCallback((command: MapCommand) => {
     if (Platform.OS === 'web') {
@@ -337,10 +393,19 @@ export default function OfficerMapScreen() {
     sendMapCommand({ type: 'update-personnel', personnel: mapPersonnel });
   }, [mapPersonnel, sendMapCommand]);
 
+  const handleMapLoad = useCallback(() => {
+    syncPersonnel();
+    sendMapCommand({ type: 'set-map-mode', mode: mapMode });
+  }, [mapMode, sendMapCommand, syncPersonnel]);
+
   useEffect(() => {
     const timer = setTimeout(syncPersonnel, 120);
     return () => clearTimeout(timer);
   }, [syncPersonnel]);
+
+  useEffect(() => {
+    sendMapCommand({ type: 'set-map-mode', mode: mapMode });
+  }, [mapMode, sendMapCommand]);
 
   const handleMapEvent = useCallback((payload: MapEvent) => {
     if (payload.type === 'officer-selected' && payload.officerId) {
@@ -401,10 +466,25 @@ export default function OfficerMapScreen() {
     focusOfficer(selectedOfficer.id);
   };
 
+  const handleConfirmAssignment = async () => {
+    if (!assignmentKey) return;
+    setAcknowledgedAssignmentKey(assignmentKey);
+
+    try {
+      if (Platform.OS === 'web') {
+        window.localStorage.setItem(assignmentStorageKey, assignmentKey);
+      } else {
+        await SecureStore.setItemAsync(assignmentStorageKey, assignmentKey);
+      }
+    } catch {
+      // The acknowledgement still applies for the current app session.
+    }
+  };
+
   const handleBackupRequest = () => {
     Alert.alert(
       'Request backup?',
-      `Request up to 3 responders at ${assignment?.patrolArea || CURRENT_OFFICER.station}?`,
+      `Request up to 3 responders at ${assignment?.patrolArea || currentOfficer.locationName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -454,7 +534,7 @@ export default function OfficerMapScreen() {
       })}
       <View style={styles.mapWrap}>
         {Platform.OS === 'web' ? (
-          <WebMapFrame ref={webMapRef} html={mapHtml} onLoad={syncPersonnel} />
+          <WebMapFrame ref={webMapRef} html={mapHtml} onLoad={handleMapLoad} />
         ) : (
           <WebView
             ref={nativeMapRef}
@@ -463,7 +543,7 @@ export default function OfficerMapScreen() {
             javaScriptEnabled
             domStorageEnabled
             originWhitelist={['*']}
-            onLoad={syncPersonnel}
+            onLoad={handleMapLoad}
             onMessage={handleNativeMessage}
           />
         )}
@@ -496,21 +576,52 @@ export default function OfficerMapScreen() {
           <View style={[styles.connectionDot, !isConnected && styles.connectionDotOffline]} />
         </View>
 
-        <View style={styles.deploymentPill}>
-          <Icon name="place" size={17} color={mobileTheme.purple} />
-          <View style={styles.deploymentText}>
-            <Text style={styles.deploymentLabel}>CURRENT DEPLOYMENT</Text>
-            <Text style={styles.deploymentArea} numberOfLines={1}>
-              {assignment?.patrolArea || 'No active assignment'}
-            </Text>
+        <View style={styles.topUtilityRow}>
+          {deploymentPromptVisible && (
+            <View style={styles.deploymentPill}>
+              <Icon name="place" size={17} color={mobileTheme.purple} />
+              <View style={styles.deploymentText}>
+                <Text style={styles.deploymentLabel}>CURRENT DEPLOYMENT</Text>
+                <Text style={styles.deploymentArea} numberOfLines={1}>
+                  {assignment?.patrolArea || 'No active assignment'}
+                </Text>
+              </View>
+              <Text style={[styles.liveText, !isConnected && styles.offlineText]}>
+                {isConnected ? 'LIVE' : 'OFFLINE'}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.mapModeControl}>
+            <TouchableOpacity
+              accessibilityLabel="Use normal map"
+              accessibilityState={{ selected: mapMode === 'street' }}
+              style={[styles.mapModeButton, mapMode === 'street' && styles.mapModeButtonActive]}
+              onPress={() => setMapMode('street')}
+            >
+              <Icon
+                name="map"
+                size={20}
+                color={mapMode === 'street' ? '#ffffff' : mobileTheme.textMuted}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel="Use satellite map"
+              accessibilityState={{ selected: mapMode === 'satellite' }}
+              style={[styles.mapModeButton, mapMode === 'satellite' && styles.mapModeButtonActive]}
+              onPress={() => setMapMode('satellite')}
+            >
+              <Icon
+                name="satellite-alt"
+                size={20}
+                color={mapMode === 'satellite' ? '#ffffff' : mobileTheme.textMuted}
+              />
+            </TouchableOpacity>
           </View>
-          <Text style={[styles.liveText, !isConnected && styles.offlineText]}>
-            {isConnected ? 'LIVE' : 'OFFLINE'}
-          </Text>
         </View>
       </SafeAreaView>
 
-      {assignment && !selectedOfficer && (
+      {deploymentPromptVisible && !selectedOfficer && (
         <View style={styles.assignmentCard}>
           <View style={styles.assignmentIcon}>
             <Icon name="place" size={23} color={mobileTheme.purple} />
@@ -521,6 +632,13 @@ export default function OfficerMapScreen() {
               {assignment.notes || 'Maintain visibility within the assigned area.'}
             </Text>
           </View>
+          <TouchableOpacity
+            accessibilityLabel="Confirm deployment assignment"
+            style={styles.assignmentConfirmButton}
+            onPress={handleConfirmAssignment}
+          >
+            <Icon name="check" size={22} color="#ffffff" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -580,7 +698,7 @@ export default function OfficerMapScreen() {
             <Text style={styles.locationText} numberOfLines={2}>
               {selectedOfficer.locationName}
             </Text>
-            {selectedOfficer.id !== CURRENT_OFFICER.id && (
+            {selectedOfficer.id !== currentPersonnelId && (
               <TouchableOpacity style={styles.locateButton} onPress={handleLocateOfficer}>
                 <Icon name="my-location" size={18} color="#ffffff" />
                 <Text style={styles.locateButtonText}>Locate</Text>
@@ -603,8 +721,8 @@ const styles = StyleSheet.create({
   },
   overlay: { ...StyleSheet.absoluteFillObject, paddingHorizontal: 20 },
   searchContainer: {
-    height: 56,
-    marginTop: 14,
+    height: 54,
+    marginTop: 2,
     paddingHorizontal: 17,
     flexDirection: 'row',
     alignItems: 'center',
@@ -634,14 +752,22 @@ const styles = StyleSheet.create({
   },
   connectionDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#27c93f' },
   connectionDotOffline: { backgroundColor: mobileTheme.warning },
+  topUtilityRow: {
+    minHeight: 44,
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    gap: 8,
+  },
   deploymentPill: {
-    minHeight: 54,
-    marginTop: 10,
-    paddingHorizontal: 13,
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: 11,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderRadius: 15,
+    gap: 7,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
     shadowColor: '#1c1c4d',
     shadowOffset: { width: 0, height: 4 },
@@ -654,6 +780,29 @@ const styles = StyleSheet.create({
   deploymentArea: { marginTop: 2, color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
   liveText: { color: mobileTheme.success, fontSize: 10, fontWeight: '800' },
   offlineText: { color: mobileTheme.warning },
+  mapModeControl: {
+    width: 88,
+    height: 44,
+    padding: 3,
+    flexDirection: 'row',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    shadowColor: '#1c1c4d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  mapModeButton: {
+    width: 41,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+  },
+  mapModeButtonActive: {
+    backgroundColor: mobileTheme.purple,
+  },
   assignmentCard: {
     position: 'absolute',
     right: 20,
@@ -685,6 +834,15 @@ const styles = StyleSheet.create({
   assignmentBody: { flex: 1 },
   assignmentTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
   assignmentNotes: { marginTop: 4, color: mobileTheme.textMuted, fontSize: 11, lineHeight: 16 },
+  assignmentConfirmButton: {
+    width: 42,
+    height: 42,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
+    backgroundColor: mobileTheme.success,
+  },
   backupButton: {
     position: 'absolute',
     right: 30,

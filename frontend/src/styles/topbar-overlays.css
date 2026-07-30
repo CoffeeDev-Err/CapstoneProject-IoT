@@ -22,7 +22,7 @@
   border-radius: 50%;
 }
 .icon-btn svg {
-  width: 24px; height: 24px;
+  width: 21px; height: 21px;
    align-items: center;
    justify-content: center;
    display: flex;
@@ -39,8 +39,8 @@
 }
 
 .notification-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
 }
 
 .notification-dot {

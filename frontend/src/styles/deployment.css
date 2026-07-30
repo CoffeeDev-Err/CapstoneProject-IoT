@@ -67,7 +67,7 @@
 
 .assignment-group-content {
   display: grid;
-  gap: 0.18rem;
+  gap: .18rem;
 }
 
 .assignment-group-label {

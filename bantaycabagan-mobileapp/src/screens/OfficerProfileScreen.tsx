@@ -9,25 +9,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { CURRENT_OFFICER } from '../constants/officer';
 import { mobileTheme } from '../constants/mobileTheme';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { useAuth } from '../context/AuthContext';
 import { useOperationalContext } from '../context/OperationalContext';
 
 export default function OfficerProfileScreen() {
-  const { deployments, isConnected } = useOperationalContext();
+  const { currentOfficer, deployments } = useOperationalContext();
   const { clearSession, logout, token, user } = useAuth();
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const assignment = deployments[0];
   const profile = user?.profile;
   const officer = {
-    name: profile?.fullName || CURRENT_OFFICER.name,
-    rank: profile?.rank || CURRENT_OFFICER.rank,
-    badge: profile?.badgeNumber || user?.personnelId || CURRENT_OFFICER.badge,
-    station: CURRENT_OFFICER.station,
-    contact: profile?.mobileNumber || CURRENT_OFFICER.contact,
-    photoUrl: profile?.photoUrl || CURRENT_OFFICER.photoUrl,
+    name: currentOfficer.name,
+    rank: currentOfficer.rank,
+    badge: currentOfficer.badge || profile?.badgeNumber || user?.personnelId || '-',
+    station: 'Cabagan Police Station',
+    contact: profile?.mobileNumber || 'Not provided',
+    photoUrl: currentOfficer.photoUrl,
   };
 
   const shift = assignment?.shiftStart
@@ -55,8 +54,10 @@ export default function OfficerProfileScreen() {
           <View style={styles.divider} />
           <ProfileRow
             label="Status"
-            value={isConnected ? 'On Duty' : 'Offline'}
-            valueStyle={isConnected ? styles.statusOnDuty : styles.statusOffline}
+            value={currentOfficer.status}
+            valueStyle={currentOfficer.status === 'Off Duty'
+              ? styles.statusOffline
+              : styles.statusOnDuty}
           />
           <View style={styles.divider} />
           <View style={styles.infoRow}>

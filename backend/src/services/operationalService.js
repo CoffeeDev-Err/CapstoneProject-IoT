@@ -1,6 +1,7 @@
 const { randomUUID } = require('crypto')
 const {
 	Deployment,
+	Personnel,
 	Report,
 	Task,
 } = require('../models')
@@ -11,6 +12,10 @@ const {
 	point,
 	readCoordinates,
 } = require('../utils/geo')
+const {
+	findCabaganBarangay,
+	isCabaganBarangayCode,
+} = require('../constants/cabaganBarangays')
 const {
 	buildDateRange,
 	createPaginationMeta,
@@ -31,7 +36,7 @@ const optionalDate = (value) => {
 	return Number.isNaN(date.getTime()) ? undefined : date
 }
 
-const serializeTask = (task) => ({
+const serializeTask = (task, personnelById = new Map()) => ({
 	id: task.taskId,
 	type: task.type,
 	title: task.title,
@@ -39,7 +44,7 @@ const serializeTask = (task) => ({
 	location: task.locationName,
 	...readCoordinates(task.location),
 	requested_by: task.requestedBy,
-	requester_name: task.requesterName,
+	requester_name: personnelById.get(task.requestedBy)?.fullName || task.requesterName,
 	required_responders: task.requiredResponders,
 	accepted_by: (task.responders || []).map((responder) => responder.personnelId),
 	status: task.status,
@@ -48,10 +53,10 @@ const serializeTask = (task) => ({
 	completed_at: task.completedAt?.toISOString(),
 })
 
-const serializeReport = (report) => ({
+const serializeReport = (report, personnelById = new Map()) => ({
 	id: report.reportNumber,
 	personnel_id: report.submittedBy,
-	officer: report.officerName,
+	officer: personnelById.get(report.submittedBy)?.fullName || report.officerName,
 	date_time: report.submittedAt?.toISOString(),
 	occurred_at: report.incidentAt?.toISOString(),
 	assigned_area: report.assignedArea,
@@ -64,7 +69,14 @@ const serializeReport = (report) => ({
 	title: report.title,
 	description: report.description,
 	location: report.locationName,
-	...readCoordinates(report.location),
+	location_source: report.locationSource || 'manual',
+	is_within_cabagan: isCabaganBarangayCode(report.barangayCode),
+	...(report.location?.coordinates?.length === 2
+		? readCoordinates(report.location)
+		: { latitude: null, longitude: null }),
+	...(report.submittedFrom && {
+		submitted_from: readCoordinates(report.submittedFrom),
+	}),
 	...(report.resolution?.resolvedAt && {
 		resolved_at: report.resolution.resolvedAt.toISOString(),
 		resolved_by: report.resolution.resolvedBy,
@@ -72,12 +84,13 @@ const serializeReport = (report) => ({
 	}),
 })
 
-const serializeDeployment = (deployment) => ({
+const serializeDeployment = (deployment, personnelById = new Map()) => ({
 	id: deployment.assignmentId,
 	groupId: deployment.groupId,
 	personnelId: deployment.personnelId,
-	personnelName: deployment.personnelName,
-	rank: deployment.rank,
+	personnelName: personnelById.get(deployment.personnelId)?.fullName
+		|| deployment.personnelName,
+	rank: personnelById.get(deployment.personnelId)?.rank || deployment.rank,
 	patrolArea: deployment.patrolArea,
 	shiftStart: deployment.shiftStart?.toISOString(),
 	shiftEnd: deployment.shiftEnd?.toISOString(),
@@ -92,15 +105,34 @@ const createNotFoundResult = (resource) => ({
 	body: { success: false, message: `${resource} not found.` },
 })
 
+const loadPersonnelMap = async (personnelIds = []) => {
+	const uniqueIds = [...new Set(personnelIds.filter(Boolean))]
+	if (uniqueIds.length === 0) return new Map()
+
+	const profiles = await Personnel.find({
+		personnelId: { $in: uniqueIds },
+	}).select('personnelId fullName rank').lean()
+	return new Map(profiles.map((profile) => [profile.personnelId, profile]))
+}
+
 const createOperationalService = ({ io }) => {
-	const loadTasks = async () => (
-		(await Task.find().sort({ createdAt: -1 }).lean()).map(serializeTask)
-	)
+	const loadTasks = async () => {
+		const tasks = await Task.find().sort({ createdAt: -1 }).lean()
+		const personnelById = await loadPersonnelMap(
+			tasks.map((task) => task.requestedBy),
+		)
+		return tasks.map((task) => serializeTask(task, personnelById))
+	}
 
 	const loadReports = async (personnelId) => {
 		const query = personnelId ? { submittedBy: personnelId } : {}
-		return (await Report.find(query).sort({ submittedAt: -1, _id: -1 }).lean())
-			.map(serializeReport)
+		const reports = await Report.find(query)
+			.sort({ submittedAt: -1, _id: -1 })
+			.lean()
+		const personnelById = await loadPersonnelMap(
+			reports.map((report) => report.submittedBy),
+		)
+		return reports.map((report) => serializeReport(report, personnelById))
 	}
 
 	const loadDeployments = async (personnelId) => {
@@ -108,8 +140,13 @@ const createOperationalService = ({ io }) => {
 			status: 'active',
 			...(personnelId ? { personnelId } : {}),
 		}
-		return (await Deployment.find(query).sort({ assignedAt: -1 }).lean())
-			.map(serializeDeployment)
+		const deployments = await Deployment.find(query).sort({ assignedAt: -1 }).lean()
+		const personnelById = await loadPersonnelMap(
+			deployments.map((deployment) => deployment.personnelId),
+		)
+		return deployments.map((deployment) => (
+			serializeDeployment(deployment, personnelById)
+		))
 	}
 
 	const listTasks = async (query = {}) => {
@@ -145,15 +182,20 @@ const createOperationalService = ({ io }) => {
 				.lean(),
 			Task.countDocuments(filter),
 		])
+		const personnelById = await loadPersonnelMap(
+			documents.map((task) => task.requestedBy),
+		)
 		return {
-			data: documents.map(serializeTask),
+			data: documents.map((task) => serializeTask(task, personnelById)),
 			pagination: createPaginationMeta({ ...pagination, total }),
 		}
 	}
 
 	const getTask = async (taskId) => {
 		const task = await Task.findOne({ taskId }).lean()
-		return task ? serializeTask(task) : null
+		if (!task) return null
+		const personnelById = await loadPersonnelMap([task.requestedBy])
+		return serializeTask(task, personnelById)
 	}
 
 	const completeTask = async (taskId, payload = {}) => {
@@ -162,7 +204,8 @@ const createOperationalService = ({ io }) => {
 		task.status = 'completed'
 		task.completedAt = asDate(payload.completed_at)
 		await task.save()
-		const serialized = serializeTask(task)
+		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const serialized = serializeTask(task, personnelById)
 		io.emit('task:updated', serialized)
 		return { status: 200, body: { success: true, task: serialized } }
 	}
@@ -200,15 +243,20 @@ const createOperationalService = ({ io }) => {
 				.lean(),
 			Report.countDocuments(filter),
 		])
+		const personnelById = await loadPersonnelMap(
+			documents.map((report) => report.submittedBy),
+		)
 		return {
-			data: documents.map(serializeReport),
+			data: documents.map((report) => serializeReport(report, personnelById)),
 			pagination: createPaginationMeta({ ...pagination, total }),
 		}
 	}
 
 	const getReport = async (reportId) => {
 		const report = await Report.findOne({ reportNumber: reportId }).lean()
-		return report ? serializeReport(report) : null
+		if (!report) return null
+		const personnelById = await loadPersonnelMap([report.submittedBy])
+		return serializeReport(report, personnelById)
 	}
 
 	const updateReportValidation = async (reportId, payload = {}) => {
@@ -226,7 +274,8 @@ const createOperationalService = ({ io }) => {
 		if (!report) return createNotFoundResult('Report')
 		report.validationStatus = validationStatus
 		await report.save()
-		const serialized = serializeReport(report)
+		const personnelById = await loadPersonnelMap([report.submittedBy])
+		const serialized = serializeReport(report, personnelById)
 		io.emit('report:updated', serialized)
 		return { status: 200, body: { success: true, report: serialized } }
 	}
@@ -249,15 +298,22 @@ const createOperationalService = ({ io }) => {
 				.lean(),
 			Deployment.countDocuments(filter),
 		])
+		const personnelById = await loadPersonnelMap(
+			documents.map((deployment) => deployment.personnelId),
+		)
 		return {
-			data: documents.map(serializeDeployment),
+			data: documents.map((deployment) => (
+				serializeDeployment(deployment, personnelById)
+			)),
 			pagination: createPaginationMeta({ ...pagination, total }),
 		}
 	}
 
 	const getDeployment = async (assignmentId) => {
 		const deployment = await Deployment.findOne({ assignmentId }).lean()
-		return deployment ? serializeDeployment(deployment) : null
+		if (!deployment) return null
+		const personnelById = await loadPersonnelMap([deployment.personnelId])
+		return serializeDeployment(deployment, personnelById)
 	}
 
 	const updateDeploymentStatus = async (assignmentId, status) => {
@@ -274,10 +330,14 @@ const createOperationalService = ({ io }) => {
 		)
 		if (!deployment) return createNotFoundResult('Deployment')
 		const activeDeployments = await loadDeployments()
+		const personnelById = await loadPersonnelMap([deployment.personnelId])
 		io.emit('deployments:updated', activeDeployments)
 		return {
 			status: 200,
-			body: { success: true, deployment: serializeDeployment(deployment) },
+			body: {
+				success: true,
+				deployment: serializeDeployment(deployment, personnelById),
+			},
 		}
 	}
 
@@ -295,7 +355,7 @@ const createOperationalService = ({ io }) => {
 			title: payload.title || 'Backup requested',
 			description: payload.description || 'Additional personnel assistance requested.',
 			requestedBy: payload.requested_by || 'supervisor',
-			requesterName: payload.requester_name || requester?.name || 'Duty Supervisor',
+			requesterName: requester?.name || payload.requester_name || 'Duty Supervisor',
 			requiredResponders: Math.max(1, Math.min(5, Number(payload.required_responders) || 3)),
 			locationName: payload.location || requester?.locationName || 'Location unavailable',
 			location: point(coordinates.longitude, coordinates.latitude),
@@ -311,6 +371,7 @@ const createOperationalService = ({ io }) => {
 			referenceId: task.taskId,
 		})
 		io.emit('task:created', serialized)
+		io.emit('dashboard:updated')
 		return serialized
 	}
 
@@ -351,14 +412,19 @@ const createOperationalService = ({ io }) => {
 				}
 			}
 			if (task.responders.some((item) => item.personnelId === personnelId)) {
-				return { status: 200, body: { success: true, task: serializeTask(task) } }
+				const personnelById = await loadPersonnelMap([task.requestedBy])
+				return {
+					status: 200,
+					body: { success: true, task: serializeTask(task, personnelById) },
+				}
 			}
+			const personnelById = await loadPersonnelMap([task.requestedBy])
 			return {
 				status: 409,
 				body: {
 					success: false,
 					message: 'The response team is already full.',
-					task: serializeTask(task),
+					task: serializeTask(task, personnelById),
 				},
 			}
 		}
@@ -368,8 +434,10 @@ const createOperationalService = ({ io }) => {
 			await task.save()
 		}
 
-		const serialized = serializeTask(task)
+		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const serialized = serializeTask(task, personnelById)
 		io.emit('task:updated', serialized)
+		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
@@ -377,31 +445,75 @@ const createOperationalService = ({ io }) => {
 		const officer = payload.personnel_id
 			? await getPersonnelMember(payload.personnel_id)
 			: null
+		if (!officer) {
+			const error = new Error('An active, GPS-linked personnel account is required to submit a report.')
+			error.status = 400
+			throw error
+		}
 		const reportType = String(payload.report_type || 'incident').toLowerCase()
 		const isIncident = reportType === 'incident'
-		const fallback = getAreaCoordinates(payload.assigned_area)
+		const selectedBarangay = findCabaganBarangay(payload.barangay)
+		if (!selectedBarangay) {
+			const error = new Error(
+				'Select one of the 26 official Cabagan barangays before submitting.',
+			)
+			error.status = 400
+			throw error
+		}
+
+		const title = String(payload.title || '').trim()
+		const description = String(payload.description || '').trim()
+		const locationName = String(payload.location || '').trim()
+		if (!title || !description || !locationName) {
+			const error = new Error('Title, description, and exact incident location are required.')
+			error.status = 400
+			throw error
+		}
+
+		const locationSource = payload.location_source === 'gps' ? 'gps' : 'manual'
+		const hasLatitude = payload.latitude !== null
+			&& payload.latitude !== undefined
+			&& payload.latitude !== ''
+		const hasLongitude = payload.longitude !== null
+			&& payload.longitude !== undefined
+			&& payload.longitude !== ''
+		const suppliedLatitude = hasLatitude ? Number(payload.latitude) : NaN
+		const suppliedLongitude = hasLongitude ? Number(payload.longitude) : NaN
+		const hasSuppliedCoordinates = hasLatitude
+			&& hasLongitude
+			&& Number.isFinite(suppliedLatitude)
+			&& Number.isFinite(suppliedLongitude)
+		if (locationSource === 'gps' && !hasSuppliedCoordinates) {
+			const error = new Error(
+				'Current GPS coordinates are unavailable. Enter the incident location manually.',
+			)
+			error.status = 400
+			throw error
+		}
 		const report = await Report.create({
 			reportNumber: `RPT-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`,
-			submittedBy: payload.personnel_id || officer?.id || 'pcpl-001',
-			officerName: payload.officer || officer?.name || 'Police Personnel',
+			submittedBy: officer.id,
+			officerName: officer.name,
 			submittedAt: asDate(payload.date_time),
 			incidentAt: asDate(payload.occurred_at),
 			assignedArea: payload.assigned_area || 'Unassigned area',
-			barangayCode: normalizeBarangayCode(payload.barangay),
+			barangayCode: selectedBarangay.code,
 			reportType,
 			isIncident,
 			severity: Math.max(1, Math.min(5, Number(payload.severity) || (isIncident ? 2 : 1))),
 			validationStatus: 'pending',
 			caseStatus: isIncident ? 'open' : 'not_applicable',
-			title: payload.title || 'Submitted report',
-			description: payload.description || '',
-			locationName: payload.location || payload.assigned_area || 'Location unavailable',
-			location: point(
-				payload.longitude ?? fallback.longitude,
-				payload.latitude ?? fallback.latitude,
-			),
+			title,
+			description,
+			locationName,
+			locationSource,
+			...(locationSource === 'gps' && {
+				location: point(suppliedLongitude, suppliedLatitude),
+				submittedFrom: point(suppliedLongitude, suppliedLatitude),
+			}),
 		})
-		const serialized = serializeReport(report)
+		const personnelById = await loadPersonnelMap([report.submittedBy])
+		const serialized = serializeReport(report, personnelById)
 
 		await createNotification({
 			type: 'info',
@@ -411,6 +523,7 @@ const createOperationalService = ({ io }) => {
 			referenceId: report.reportNumber,
 		})
 		io.emit('report:submitted', serialized)
+		io.emit('dashboard:updated')
 		return serialized
 	}
 
@@ -423,6 +536,18 @@ const createOperationalService = ({ io }) => {
 			return {
 				status: 409,
 				body: { success: false, message: 'Only incident reports can be resolved.' },
+			}
+		}
+		if (
+			payload.resolved_by
+			&& report.submittedBy !== String(payload.resolved_by)
+		) {
+			return {
+				status: 403,
+				body: {
+					success: false,
+					message: 'Only the officer who submitted this incident can resolve it.',
+				},
 			}
 		}
 
@@ -443,6 +568,7 @@ const createOperationalService = ({ io }) => {
 			referenceId: report.reportNumber,
 		})
 		io.emit('report:resolved', serialized)
+		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, report: serialized } }
 	}
 
@@ -500,6 +626,7 @@ const createOperationalService = ({ io }) => {
 			referenceId: payload[0]?.groupId || 'active',
 		})
 		io.emit('deployments:updated', deployments)
+		io.emit('dashboard:updated')
 		return deployments
 	}
 

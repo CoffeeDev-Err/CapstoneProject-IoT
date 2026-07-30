@@ -2,23 +2,33 @@ const {
 	Barangay,
 	CurrentLocation,
 	Deployment,
+	GpsDeviceAssignment,
+	LocationHistory,
 	Personnel,
 	Report,
 	Task,
 	User,
 } = require('../models')
 const { hashPassword } = require('../utils/password')
+const { CABAGAN_BARANGAYS } = require('../constants/cabaganBarangays')
 
 const point = (longitude, latitude) => ({
 	type: 'Point',
 	coordinates: [longitude, latitude],
 })
 
+const gpsOfficerPersonnelId = String(
+	process.env.DEMO_OFFICER_PERSONNEL_ID || 'pcpl-001',
+).trim()
+const gpsOfficerFullName = String(
+	process.env.DEMO_OFFICER_FULL_NAME || 'GPS-Linked Officer',
+).trim()
+
 const seedPersonnel = [
 	{
-		personnelId: 'pcpl-001',
+		personnelId: gpsOfficerPersonnelId,
 		badgeNumber: 'P-1001',
-		fullName: 'Mon Maguas',
+		fullName: gpsOfficerFullName,
 		rank: 'Police Corporal',
 		dutyStatus: 'On Patrol',
 		defaultLocationName: 'Cabagan Public Market',
@@ -33,30 +43,20 @@ const seedPersonnel = [
 		defaultLocationName: 'Cabagan Municipal Hall',
 		photoUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
 	},
-	{
-		personnelId: 'pltc-003',
-		badgeNumber: 'P-1003',
-		fullName: 'Romel Manzano',
-		rank: 'Police Lieutenant',
-		dutyStatus: 'Responding',
-		defaultLocationName: 'Barangay Centro',
-		photoUrl: 'https://randomuser.me/api/portraits/men/18.jpg',
-	},
 ]
 
 const seedLocations = [
-	['pcpl-001', 'Cabagan Public Market', 121.7692, 17.4271],
 	['psms-002', 'Cabagan Municipal Hall', 121.7683, 17.4213],
-	['pltc-003', 'Barangay Centro', 121.7748, 17.4189],
 ]
 
-const seedBarangays = [
-	['CENTRO', 'Centro', 121.7681, 17.4239],
-	['CUBAG', 'Cubag', 121.7658, 17.4272],
-	['GARITA', 'Garita', 121.7762, 17.4148],
-	['SAN-JUAN', 'San Juan', 121.7546, 17.4192],
-	['SANTA-MARIA', 'Santa Maria', 121.7574, 17.4843],
-]
+const LEGACY_SEEDED_PERSONNEL_IDS = ['pltc-003']
+
+const KNOWN_BARANGAY_CENTERS = {
+	CENTRO: [121.7681, 17.4239],
+	CUBAG: [121.7658, 17.4272],
+	GARITA: [121.7762, 17.4148],
+	'SAN-JUAN': [121.7546, 17.4192],
+}
 
 const initializeCollections = async (models) => {
 	for (const model of Object.values(models)) {
@@ -65,14 +65,107 @@ const initializeCollections = async (models) => {
 	}
 }
 
+const findProvisionedUser = ({ username, email, personnelId }) => {
+	const identities = [
+		username && { username },
+		email && { email },
+		personnelId && { personnelId },
+	].filter(Boolean)
+
+	return identities.length
+		? User.findOne({ $or: identities })
+		: null
+}
+
+const removeLegacySeedData = async () => {
+	await Promise.all([
+		Personnel.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
+		CurrentLocation.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
+		LocationHistory.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
+		GpsDeviceAssignment.deleteMany({
+			personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS },
+		}),
+		Deployment.deleteMany({ assignmentId: 'ASG-DEMO-2' }),
+		Report.deleteMany({
+			reportNumber: { $in: ['RPT-MOB-001', 'RPT-MOB-002'] },
+		}),
+		Task.deleteMany({ taskId: { $in: ['TSK-001', 'TSK-002'] } }),
+		User.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
+		Task.updateMany(
+			{},
+			{
+				$pull: {
+					responders: {
+						personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS },
+					},
+				},
+			},
+		),
+	])
+}
+
+const configureDemoGpsAssignment = async (personnelId) => {
+	const flespiDeviceId = String(process.env.DEMO_GPS_FLESPI_DEVICE_ID || '').trim()
+	const deviceIdent = String(process.env.DEMO_GPS_DEVICE_IDENT || '').trim()
+	const deviceName = String(process.env.DEMO_GPS_DEVICE_NAME || 'GPS-001').trim()
+
+	if (!personnelId || !flespiDeviceId || !deviceIdent) return
+
+	const conflictingAssignment = await GpsDeviceAssignment.findOne({
+		status: 'active',
+		$or: [
+			{ personnelId },
+			{ flespiDeviceId },
+			{ imei: deviceIdent },
+		],
+	}).lean()
+
+	if (conflictingAssignment && conflictingAssignment.personnelId !== personnelId) {
+		console.warn(
+			`Demo GPS device is already assigned to ${conflictingAssignment.personnelId}; `
+			+ `skipping automatic assignment to ${personnelId}.`,
+		)
+		return
+	}
+
+	await GpsDeviceAssignment.updateOne(
+		{ assignmentId: conflictingAssignment?.assignmentId || 'GPS-DEMO-001' },
+		{
+			$set: {
+				personnelId,
+				flespiDeviceId,
+				imei: deviceIdent,
+				deviceName,
+				assignedBy: 'seed',
+				status: 'active',
+				unassignedAt: null,
+			},
+			$setOnInsert: {
+				assignmentId: 'GPS-DEMO-001',
+				assignedAt: new Date(),
+			},
+		},
+		{ upsert: true },
+	)
+
+	await Promise.all([
+		CurrentLocation.deleteMany({ personnelId, source: 'mock' }),
+		LocationHistory.deleteMany({ personnelId, source: 'mock' }),
+	])
+}
+
 const seedDatabase = async (models) => {
 	await initializeCollections(models)
+	await removeLegacySeedData()
 
 	const supervisorLoginId = String(process.env.SUPERVISOR_LOGIN_ID || '').trim().toLowerCase()
 	const supervisorEmail = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase()
 	const supervisorPassword = String(process.env.SUPERVISOR_TEMP_PASSWORD || '')
 	if (supervisorLoginId && supervisorEmail && supervisorPassword) {
-		const existingSupervisor = await User.findOne({ username: supervisorLoginId })
+		const existingSupervisor = await findProvisionedUser({
+			username: supervisorLoginId,
+			email: supervisorEmail,
+		})
 		if (!existingSupervisor) {
 			await User.create({
 				username: supervisorLoginId,
@@ -94,7 +187,11 @@ const seedDatabase = async (models) => {
 	const officerPassword = String(process.env.DEMO_OFFICER_TEMP_PASSWORD || '')
 	const officerPersonnelId = String(process.env.DEMO_OFFICER_PERSONNEL_ID || '').trim()
 	if (officerLoginId && officerEmail && officerPassword && officerPersonnelId) {
-		const existingOfficer = await User.findOne({ username: officerLoginId })
+		const existingOfficer = await findProvisionedUser({
+			username: officerLoginId,
+			email: officerEmail,
+			personnelId: officerPersonnelId,
+		})
 		if (!existingOfficer) {
 			await User.create({
 				username: officerLoginId,
@@ -106,6 +203,17 @@ const seedDatabase = async (models) => {
 				forcePasswordReset: true,
 			})
 			console.log(`Created demo officer account: ${officerLoginId}`)
+		} else {
+			let shouldSave = false
+			if (!existingOfficer.email) {
+				existingOfficer.email = officerEmail
+				shouldSave = true
+			}
+			if (!existingOfficer.personnelId) {
+				existingOfficer.personnelId = officerPersonnelId
+				shouldSave = true
+			}
+			if (shouldSave) await existingOfficer.save()
 		}
 	}
 
@@ -135,20 +243,38 @@ const seedDatabase = async (models) => {
 		)
 	)))
 
-	await Promise.all(seedBarangays.map(([code, name, longitude, latitude]) => (
-		Barangay.updateOne(
-			{ code },
-			{
-				$setOnInsert: {
-					code,
-					name,
-					municipality: 'Cabagan',
-					center: point(longitude, latitude),
+	await configureDemoGpsAssignment(officerPersonnelId)
+
+	await Barangay.updateMany(
+		{
+			municipality: 'Cabagan',
+			code: { $nin: CABAGAN_BARANGAYS.map(({ code }) => code) },
+		},
+		{ $set: { active: false } },
+	)
+
+	await Promise.all(CABAGAN_BARANGAYS.map(({ code, name, psgcCode }) => {
+		const [longitude, latitude] = KNOWN_BARANGAY_CENTERS[code]
+			|| [121.7681, 17.4239]
+		return (
+			Barangay.updateOne(
+				{ code },
+				{
+					$set: {
+						name,
+						psgcCode,
+						municipality: 'Cabagan',
+						active: true,
+					},
+					$setOnInsert: {
+						code,
+						center: point(longitude, latitude),
+					},
 				},
-			},
-			{ upsert: true },
+				{ upsert: true },
+			)
 		)
-	)))
+	}))
 
 	await Promise.all([
 		Deployment.updateOne(
@@ -157,8 +283,8 @@ const seedDatabase = async (models) => {
 				$setOnInsert: {
 					assignmentId: 'ASG-DEMO-1',
 					groupId: 'GRP-DEMO-CUBAG',
-					personnelId: 'pcpl-001',
-					personnelName: 'Mon Maguas',
+					personnelId: gpsOfficerPersonnelId,
+					personnelName: gpsOfficerFullName,
 					rank: 'Police Corporal',
 					barangayCode: 'CUBAG',
 					patrolArea: 'Barangay Cubag',
@@ -171,123 +297,8 @@ const seedDatabase = async (models) => {
 			},
 			{ upsert: true },
 		),
-		Deployment.updateOne(
-			{ assignmentId: 'ASG-DEMO-2' },
-			{
-				$setOnInsert: {
-					assignmentId: 'ASG-DEMO-2',
-					groupId: 'GRP-DEMO-CUBAG',
-					personnelId: 'pltc-003',
-					personnelName: 'Romel Manzano',
-					rank: 'Police Lieutenant',
-					barangayCode: 'CUBAG',
-					patrolArea: 'Barangay Cubag',
-					shiftStart: new Date('2026-07-25T08:00:00+08:00'),
-					shiftEnd: new Date('2026-07-25T20:00:00+08:00'),
-					instructions: 'Maintain visibility around the public market and highway approach.',
-					assignedAt: new Date('2026-07-25T07:30:00+08:00'),
-					location: point(121.7658, 17.4272),
-				},
-			},
-			{ upsert: true },
-		),
 	])
 
-	await Promise.all([
-		Report.updateOne(
-			{ reportNumber: 'RPT-MOB-001' },
-			{
-				$setOnInsert: {
-					reportNumber: 'RPT-MOB-001',
-					submittedBy: 'pcpl-001',
-					officerName: 'Mon Maguas',
-					submittedAt: new Date('2026-07-25T09:15:00+08:00'),
-					incidentAt: new Date('2026-07-25T08:45:00+08:00'),
-					assignedArea: 'Barangay Cubag',
-					barangayCode: 'CUBAG',
-					reportType: 'incident',
-					isIncident: true,
-					severity: 3,
-					validationStatus: 'pending',
-					caseStatus: 'open',
-					title: 'Roadside disturbance',
-					description: 'Several individuals were reported arguing near the market access road.',
-					locationName: 'Cubag Public Market Access Road',
-					location: point(121.7658, 17.4272),
-				},
-			},
-			{ upsert: true },
-		),
-		Report.updateOne(
-			{ reportNumber: 'RPT-MOB-002' },
-			{
-				$setOnInsert: {
-					reportNumber: 'RPT-MOB-002',
-					submittedBy: 'pcpl-001',
-					officerName: 'Mon Maguas',
-					submittedAt: new Date('2026-07-24T18:10:00+08:00'),
-					incidentAt: new Date('2026-07-24T17:30:00+08:00'),
-					assignedArea: 'Barangay Cubag',
-					barangayCode: 'CUBAG',
-					reportType: 'patrol',
-					isIncident: false,
-					severity: 1,
-					validationStatus: 'validated',
-					caseStatus: 'not_applicable',
-					title: 'Evening visibility patrol',
-					description: 'Completed routine visibility patrol around the public market.',
-					locationName: 'Cubag Public Market Zone',
-					location: point(121.7658, 17.4272),
-				},
-			},
-			{ upsert: true },
-		),
-	])
-
-	await Promise.all([
-		Task.updateOne(
-			{ taskId: 'TSK-001' },
-			{
-				$setOnInsert: {
-					taskId: 'TSK-001',
-					type: 'backup',
-					title: 'Backup requested',
-					description: 'Additional personnel needed for crowd control.',
-					requestedBy: 'psms-002',
-					requesterName: 'GerryBoy Aggabao',
-					requiredResponders: 3,
-					locationName: 'Municipal Transport Terminal',
-					location: point(121.7692, 17.4256),
-					status: 'open',
-					createdAt: new Date('2026-07-25T10:30:00+08:00'),
-				},
-			},
-			{ upsert: true, timestamps: false },
-		),
-		Task.updateOne(
-			{ taskId: 'TSK-002' },
-			{
-				$setOnInsert: {
-					taskId: 'TSK-002',
-					type: 'urgent',
-					title: 'Traffic assistance required',
-					description: 'Assist with traffic control while an obstruction is cleared.',
-					requestedBy: 'supervisor',
-					requesterName: 'Duty Supervisor',
-					requiredResponders: 2,
-					responders: [{
-						personnelId: 'psms-002',
-						acceptedAt: new Date('2026-07-25T10:46:00+08:00'),
-					}],
-					locationName: 'San Juan School Access Road',
-					location: point(121.7546, 17.4192),
-					status: 'open',
-					createdAt: new Date('2026-07-25T10:45:00+08:00'),
-				},
-			},
-			{ upsert: true, timestamps: false },
-		),
-	])
 }
 
 module.exports = seedDatabase

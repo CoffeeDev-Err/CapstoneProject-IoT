@@ -1,29 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
+import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { replaceDeployments } from '../services/operations'
 
 const patrolAreas = [
-  'Barangay Aggub',
-  'Barangay Anao',
-  'Barangay Calao East',
-  'Barangay Calao West',
-  'Barangay Catabayungan',
-  'Barangay Centro',
-  'Barangay Cubag',
-  'Barangay Garita',
-  'Barangay Luquilu',
-  'Barangay Magassi',
-  'Barangay Masipi East',
-  'Barangay Masipi West',
-  'Barangay Ngarag',
-  'Barangay Pilig Abajo',
-  'Barangay Pilig Alto',
-  'Barangay San Antonio',
-  'Barangay San Bernardo',
-  'Barangay San Juan',
-  'Barangay San Pablo',
-  'Barangay Santa Maria',
+  ...CABAGAN_BARANGAYS.map((barangay) => `Barangay ${barangay}`),
   'Cabagan Public Market Zone',
   'Municipal Hall Perimeter',
   'Barangay Centro Route',
@@ -37,12 +19,6 @@ const patrolAreas = [
   'Highway Checkpoint South',
   'School Safety Patrol Route',
   'Bridge Approach Patrol Zone',
-]
-
-const fallbackPersonnel = [
-  { id: 'pcpl-001', name: 'Mon Maguas', rank: 'Police Corporal' },
-  { id: 'psms-002', name: 'GerryBoy Aggabao', rank: 'Police Staff Sergeant' },
-  { id: 'pltc-003', name: 'Romel Manzano', rank: 'Police Lieutenant' },
 ]
 
 const formatDateTime = (isoValue) => {
@@ -115,7 +91,7 @@ function AssignAreaPage() {
       }))
     }
 
-    return fallbackPersonnel
+    return []
   }, [personnel])
 
   const [assignmentForm, setAssignmentForm] = useState(createEmptyAssignmentForm)
@@ -735,7 +711,7 @@ function AssignAreaPage() {
         ) : (
           <table className="personnel-table table align-middle mb-0">
             <thead>
-              <tr>
+              <tr className="assignment-group-table">
                 <th>Assignment ID</th>
                 <th>Personnel</th>
                 <th>Patrol Area</th>

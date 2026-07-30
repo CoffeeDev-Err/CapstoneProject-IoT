@@ -1,4 +1,12 @@
-import { SEVERITY_LEVELS } from '../data/reportRecords.js'
+import { isCabaganBarangay } from '../constants/cabaganBarangays.js'
+
+const SEVERITY_LEVELS = {
+  1: 'Informational',
+  2: 'Low',
+  3: 'Moderate',
+  4: 'High',
+  5: 'Critical',
+}
 
 export const BARANGAY_ANALYTICS_PERIODS = [
   { value: 'weekly', label: 'Weekly' },
@@ -178,13 +186,15 @@ export const buildBarangayAnalytics = ({
 }) => {
   const { start, end } = getAnalyticsPeriodRange(period, referenceDate)
   const periodLabel = formatPeriodLabel(period, start, end)
-  const periodReports = filterReportsForAnalyticsPeriod(reports, period, referenceDate)
+  const allPeriodReports = filterReportsForAnalyticsPeriod(reports, period, referenceDate)
+  const periodReports = allPeriodReports.filter(
+    (report) => isCabaganBarangay(report.barangay),
+  )
   const incidentReports = periodReports.filter((report) => report.is_incident)
   const resolvedCases = incidentReports.filter((report) => report.case_status === 'resolved')
-  const barangayNames = new Set([
-    ...deploymentCoverage.map((coverage) => coverage.barangay),
-    ...periodReports.map((report) => report.barangay).filter(Boolean),
-  ])
+  const barangayNames = new Set(
+    periodReports.map((report) => report.barangay).filter(Boolean),
+  )
 
   const validatedIncidentCounts = [...barangayNames].map((barangay) => periodReports.filter(
     (report) => report.barangay === barangay
@@ -288,6 +298,7 @@ export const buildBarangayAnalytics = ({
     highPriorityBarangays: barangays.filter(
       (barangay) => barangay.priorityLevel === 'High' || barangay.priorityLevel === 'Critical'
     ).length,
+    excludedOutsideCabaganReports: allPeriodReports.length - periodReports.length,
     barangays,
   }
 }

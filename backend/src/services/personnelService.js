@@ -16,9 +16,7 @@ const DEFAULT_COORDINATES = [121.7681, 17.4239]
 const HISTORY_SAMPLE_INTERVAL_MS = 30_000
 const MAX_MOCK_OFFSET = 0.002
 const mockAnchors = new Map([
-	['pcpl-001', [121.7692, 17.4271]],
 	['psms-002', [121.7683, 17.4213]],
-	['pltc-003', [121.7748, 17.4189]],
 ])
 
 const serializePersonnel = (profile, currentLocation) => {
@@ -198,8 +196,30 @@ const ingestLocation = async (payload = {}) => {
 		throw error
 	}
 
+	const source = payload.source === 'mock' ? 'mock' : 'gps'
 	const current = await CurrentLocation.findOne({ personnelId })
-	if (current?.recordedAt && recordedAt < current.recordedAt) {
+	if (
+		current?.recordedAt
+		&& current.source === source
+		&& recordedAt <= current.recordedAt
+	) {
+		const refreshedLocationName = String(payload.location_name || '').trim()
+		if (
+			source === 'gps'
+			&& refreshedLocationName
+			&& refreshedLocationName !== current.locationName
+		) {
+			current.locationName = refreshedLocationName
+			current.receivedAt = new Date()
+			await current.save()
+			return {
+				personnel: serializePersonnel(profile, current),
+				accepted: true,
+				reason: 'location_name_refreshed',
+				historySampled: false,
+			}
+		}
+
 		return {
 			personnel: serializePersonnel(profile, current),
 			accepted: false,
@@ -214,7 +234,6 @@ const ingestLocation = async (payload = {}) => {
 			status: 'active',
 		}).lean()
 	}
-	const source = payload.source === 'mock' ? 'mock' : 'gps'
 	const nextLocation = {
 		personnelId,
 		deviceAssignmentId: assignment?.assignmentId,
@@ -262,7 +281,15 @@ const ingestLocation = async (payload = {}) => {
 }
 
 const updateMockLocations = async ({ sampleHistory = false } = {}) => {
-	const locations = await CurrentLocation.find({ source: 'mock', isSimulated: true })
+	const assignedPersonnelIds = await GpsDeviceAssignment.distinct(
+		'personnelId',
+		{ status: 'active' },
+	)
+	const locations = await CurrentLocation.find({
+		source: 'mock',
+		isSimulated: true,
+		personnelId: { $nin: assignedPersonnelIds },
+	})
 	if (locations.length === 0) return getPersonnelWithLocations()
 
 	const now = new Date()

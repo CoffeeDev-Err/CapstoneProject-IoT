@@ -24,51 +24,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import policePersonnel1 from '../assets/policepersonnel1.jpg'
 import policePersonnel2 from '../assets/policepersonnel2.png'
-import policePersonnel3 from '../assets/policepersonnel3.jpg'
 import {
   deleteNotifications,
   getNotifications,
   readAllNotifications,
   readNotification,
 } from '../services/notifications'
+import { getDeployments, getReports } from '../services/operations'
+import { getPersonnel } from '../services/personnel'
 import { socket } from '../services/socket'
 import { isInsideCabagan } from '../utils/cabaganGeofence'
 
 const personnelPhotos = {
   'pcpl-001': policePersonnel1,
   'psms-002': policePersonnel2,
-  'pltc-003': policePersonnel3,
-}
-
-const personnelProfileById = {
-  'pcpl-001': {
-    badge: 'P-1001',
-    name: 'Mon Maguas',
-    rank: 'Police Corporal',
-  },
-  'psms-002': {
-    badge: 'P-1002',
-    name: 'GerryBoy Aggabao',
-    rank: 'Police Staff Sergeant',
-  },
-  'pltc-003': {
-    badge: 'P-1003',
-    name: 'Romel Manzano',
-    rank: 'Police Lieutenant',
-  },
 }
 
 const withPersonnelPhoto = (member) => ({
   ...member,
-  photoUrl: personnelPhotos[member.id] || member.photoUrl,
+  photoUrl: member.photoUrl || personnelPhotos[member.id],
 })
 
-const withCanonicalProfile = (member) => ({
-  ...member,
-  ...(personnelProfileById[member.id] || {}),
-})
-
-const normalizePersonnel = (member) => withCanonicalProfile(withPersonnelPhoto(member))
+const normalizePersonnel = (member) => withPersonnelPhoto(member)
 
 const withBoundaryStatus = (member) => ({
   ...member,
@@ -83,36 +60,9 @@ const MAX_NOTIFICATIONS = 25
  * Fallback data shown in the map before the first server message arrives.
  * Prevents an empty map flash on initial page load.
  */
-const defaultPersonnel = [
-  normalizeAndTagPersonnel({
-    id: 'pcpl-001',
-    locationName: 'Cabagan Public Market',
-    latitude: 17.4271,
-    longitude: 121.7692,
-    status: 'On Patrol',
-    lastUpdated: new Date().toISOString(),
-  }),
-  normalizeAndTagPersonnel({
-    id: 'psms-002',
-    locationName: 'Cabagan Municipal Hall',
-    latitude: 17.4213,
-    longitude: 121.7683,
-    status: 'Monitoring',
-    lastUpdated: new Date().toISOString(),
-  }),
-  normalizeAndTagPersonnel({
-    id: 'pltc-003',
-    locationName: 'Barangay Centro',
-    latitude: 17.4189,
-    longitude: 121.7748,
-    status: 'Responding',
-    lastUpdated: new Date().toISOString(),
-  }),
-]
-
 export const usePersonnelRealtime = () => {
   // Full live officer list — replaced every time the server emits an update
-  const [personnel, setPersonnel] = useState(defaultPersonnel)
+  const [personnel, setPersonnel] = useState([])
 
   // Mirrors the Socket.IO connected flag so the TopBar pill stays accurate
   const [isConnected, setIsConnected] = useState(socket.connected)
@@ -184,7 +134,22 @@ export const usePersonnelRealtime = () => {
 
   useEffect(() => {
     getNotifications()
-      .then((history) => setNotifications(history.slice(0, MAX_NOTIFICATIONS)))
+      .then((history) => {
+        setNotifications((current) => {
+          const notificationsById = new Map()
+          current.forEach((notification) => notificationsById.set(notification.id, notification))
+          history.forEach((notification) => {
+            if (!notificationsById.has(notification.id)) {
+              notificationsById.set(notification.id, notification)
+            }
+          })
+          return [...notificationsById.values()]
+            .sort((first, second) => (
+              new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime()
+            ))
+            .slice(0, MAX_NOTIFICATIONS)
+        })
+      })
       .catch(() => {})
   }, [])
 
@@ -217,14 +182,15 @@ export const usePersonnelRealtime = () => {
      * Replaces the default fallback with the real data from the server.
      */
     const onBootstrap = (payload) => {
-      if (Array.isArray(payload) && payload.length > 0) {
+      if (Array.isArray(payload)) {
         const normalized = payload.map(normalizeAndTagPersonnel)
         setPersonnel(normalized)
 
         const { outsidePersonnel } = evaluateGeofence(normalized)
         if (outsidePersonnel.length > 0) {
           const names = outsidePersonnel.map((member) => member.name).join(', ')
-          const message = `⚠️ Geofence Alert: ${names} outside Cabagan boundary.`
+          const verb = outsidePersonnel.length === 1 ? 'is' : 'are'
+          const message = `${names} ${verb} outside the Cabagan boundary.`
           setStatusMessage(message)
           addNotification({
             type: 'geofence',
@@ -234,11 +200,13 @@ export const usePersonnelRealtime = () => {
           return
         }
 
-        addNotification({
-          type: 'info',
-          title: 'Personnel Sync Complete',
-          message: 'Initial personnel locations were loaded successfully.',
-        })
+        if (normalized.length > 0) {
+          addNotification({
+            type: 'info',
+            title: 'Personnel Sync Complete',
+            message: 'Initial personnel locations were loaded successfully.',
+          })
+        }
       }
     }
 
@@ -248,7 +216,7 @@ export const usePersonnelRealtime = () => {
      * Replaces the entire personnel array so all map markers move smoothly.
      */
     const onUpdate = (payload) => {
-      if (Array.isArray(payload) && payload.length > 0) {
+      if (Array.isArray(payload)) {
         const normalized = payload.map(normalizeAndTagPersonnel)
         setPersonnel(normalized)
 
@@ -256,7 +224,8 @@ export const usePersonnelRealtime = () => {
 
         if (newlyOutside.length > 0) {
           const names = newlyOutside.map((member) => member.name).join(', ')
-          const message = `⚠️ Geofence Alert: ${names} outside Cabagan boundary.`
+          const verb = newlyOutside.length === 1 ? 'is' : 'are'
+          const message = `${names} ${verb} outside the Cabagan boundary.`
           setStatusMessage(message)
           addNotification({
             type: 'geofence',
@@ -267,7 +236,7 @@ export const usePersonnelRealtime = () => {
         }
 
         if (hasRecovered) {
-          const message = '✅ All tracked personnel are back inside Cabagan boundary.'
+          const message = 'All tracked personnel are back inside the Cabagan boundary.'
           setStatusMessage(message)
           addNotification({
             type: 'success',
@@ -384,11 +353,36 @@ export const usePersonnelRealtime = () => {
       })
     }
 
+    const onPersonnelIdentityUpdated = (payload) => {
+      if (!payload?.personnelId) return
+
+      setPersonnel((current) => current.map((member) => (
+        member.id === payload.personnelId
+          ? { ...member, name: payload.name || member.name, rank: payload.rank || member.rank }
+          : member
+      )))
+      setReports((current) => current.map((report) => (
+        report.personnel_id === payload.personnelId
+          ? { ...report, officer: payload.name || report.officer }
+          : report
+      )))
+      setDeployments((current) => current.map((deployment) => (
+        deployment.personnelId === payload.personnelId
+          ? {
+            ...deployment,
+            personnelName: payload.name || deployment.personnelName,
+            rank: payload.rank || deployment.rank,
+          }
+          : deployment
+      )))
+    }
+
     // ── Register listeners on the shared socket instance ────────────────────
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('personnel:bootstrap', onBootstrap)
     socket.on('personnel:update', onUpdate)
+    socket.on('personnel:identity-updated', onPersonnelIdentityUpdated)
     socket.on('emergency:status', onEmergencyStatus)
     socket.on('emergency:alert', onEmergencyAlert)
     socket.on('reports:bootstrap', onReportsBootstrap)
@@ -398,6 +392,18 @@ export const usePersonnelRealtime = () => {
     socket.on('deployments:updated', onDeploymentsUpdated)
     socket.on('task:created', onTaskCreated)
 
+    Promise.all([
+      getPersonnel(),
+      getReports(),
+      getDeployments(),
+    ])
+      .then(([personnelPayload, reportPayload, deploymentPayload]) => {
+        onBootstrap(personnelPayload)
+        onReportsBootstrap(reportPayload)
+        onDeploymentsBootstrap(deploymentPayload)
+      })
+      .catch(() => {})
+
     // ── Cleanup on unmount ───────────────────────────────────────────────────
     // Removes all listeners when the PersonnelProvider unmounts to prevent
     // stale handlers or memory leaks.
@@ -406,6 +412,7 @@ export const usePersonnelRealtime = () => {
       socket.off('disconnect', onDisconnect)
       socket.off('personnel:bootstrap', onBootstrap)
       socket.off('personnel:update', onUpdate)
+      socket.off('personnel:identity-updated', onPersonnelIdentityUpdated)
       socket.off('emergency:status', onEmergencyStatus)
       socket.off('emergency:alert', onEmergencyAlert)
       socket.off('reports:bootstrap', onReportsBootstrap)
