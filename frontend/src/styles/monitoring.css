@@ -219,8 +219,8 @@
 
 .police-marker {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
   filter: none;
@@ -231,8 +231,8 @@
   position: absolute;
   bottom: -4px;
   left: 50%;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   background: inherit;
   border-radius: 4px;
   transform: translateX(-50%) rotate(45deg);
@@ -242,8 +242,8 @@
 .police-marker__photo-frame {
   position: relative;
   z-index: 1;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   overflow: hidden;
   background: #ffffff;
@@ -315,6 +315,232 @@
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-xl);
   animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Compact officer details shown over the live map. */
+.profile-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(2, 6, 23, 0.46);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  pointer-events: auto;
+}
+
+.profile-map-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  width: min(380px, calc(100vw - 3rem));
+  padding: 1rem;
+  color: #e8eef8;
+  background: #111c31;
+  border: 1px solid #2b3b55;
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.4);
+  pointer-events: auto;
+  animation: profileCardIn 180ms ease-out both;
+}
+
+@keyframes profileCardIn {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.profile-map-card__close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #34445e;
+  border-radius: 8px;
+  color: #9eacc0;
+  background: #17243a;
+  cursor: pointer;
+}
+
+.profile-map-card__close:hover {
+  color: #ffffff;
+  border-color: #4c6080;
+  background: #1d2c45;
+}
+
+.profile-map-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-right: 2.5rem;
+}
+
+.profile-map-card__photo {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #22304a;
+}
+
+.profile-map-card__identity {
+  min-width: 0;
+}
+
+.profile-map-card__identity h3 {
+  margin: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-map-card__identity p {
+  margin: 0.12rem 0 0.28rem;
+  color: #7db1ff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.profile-map-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.profile-map-card__status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.profile-map-card__location {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #2c3b53;
+  border-bottom: 1px solid #2c3b53;
+  color: #8db5f3;
+}
+
+.profile-map-card__location > div {
+  min-width: 0;
+}
+
+.profile-map-card__location span,
+.profile-map-card__location small {
+  display: block;
+  color: #8f9db2;
+  font-size: 0.68rem;
+}
+
+.profile-map-card__location strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 0.08rem;
+  color: #e5edf8;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-map-card__location small {
+  margin-top: 0.12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-map-card__locate {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0 0.65rem;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-map-card__locate:hover {
+  background: #1d4ed8;
+}
+
+.profile-map-card__locate:disabled {
+  color: #7e8ba0;
+  background: #26344a;
+  cursor: not-allowed;
+}
+
+.profile-map-card__telemetry {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.profile-map-card__metric {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.4rem;
+  color: #7187a7;
+}
+
+.profile-map-card__metric span {
+  color: #8f9db2;
+  font-size: 0.67rem;
+}
+
+.profile-map-card__metric strong {
+  grid-column: 2;
+  overflow: hidden;
+  color: #dce6f3;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .profile-map-card {
+    width: calc(100vw - 1.5rem);
+  }
+
+  .profile-map-card__locate span {
+    display: none;
+  }
+
+  .profile-map-card__locate {
+    width: 34px;
+    padding: 0;
+  }
 }
 
 @keyframes scaleIn {

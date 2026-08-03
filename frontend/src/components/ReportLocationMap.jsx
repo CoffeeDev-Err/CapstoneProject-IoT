@@ -69,8 +69,9 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     () => incidentPosition ? [...routePositions, incidentPosition] : routePositions,
     [incidentPosition, routePositions],
   )
+  const mapCenter = incidentPosition || routePositions[routePositions.length - 1] || null
 
-  if (!incidentPosition) {
+  if (!mapCenter) {
     return (
       <div className="report-location-map__empty">
         No valid GPS coordinates were saved for this report.
@@ -81,7 +82,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
   return (
     <div className="report-location-map">
       <MapContainer
-        center={incidentPosition}
+        center={mapCenter}
         zoom={17}
         scrollWheelZoom
         className="report-location-map__canvas"
@@ -119,19 +120,23 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
           </CircleMarker>
         )}
 
-        <CircleMarker
-          center={incidentPosition}
-          radius={9}
-          pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#dc2626', fillOpacity: 1 }}
-        >
-          <Tooltip permanent direction="top">
-            {markerLabel}
-          </Tooltip>
-        </CircleMarker>
+        {incidentPosition && (
+          <CircleMarker
+            center={incidentPosition}
+            radius={9}
+            pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#dc2626', fillOpacity: 1 }}
+          >
+            <Tooltip permanent direction="top">
+              {markerLabel}
+            </Tooltip>
+          </CircleMarker>
+        )}
       </MapContainer>
 
       <div className="report-location-map__legend" aria-label="Map legend">
-        <span><i className="report-map-dot report-map-dot--incident" />{markerLabel}</span>
+        {incidentPosition && (
+          <span><i className="report-map-dot report-map-dot--incident" />{markerLabel}</span>
+        )}
         {routePositions.length > 0 && (
           <>
             <span><i className="report-map-dot report-map-dot--start" />Route start</span>

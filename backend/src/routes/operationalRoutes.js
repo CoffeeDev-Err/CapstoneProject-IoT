@@ -1,6 +1,7 @@
 const express = require('express')
 const asyncHandler = require('../middleware/asyncHandler')
 const createAuthenticateSession = require('../middleware/authenticateSession')
+const uploadReportEvidence = require('../middleware/reportEvidenceUpload')
 
 const createOperationalRoutes = ({ authService, controller }) => {
 	const router = express.Router()
@@ -15,6 +16,16 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		return next()
 	}
 	const officerOnly = [authenticate, requireOfficer]
+	const requireSupervisor = (req, res, next) => {
+		if (req.auth.user.role !== 'supervisor') {
+			return res.status(403).json({
+				success: false,
+				message: 'Supervisor access required.',
+			})
+		}
+		return next()
+	}
+	const supervisorOnly = [authenticate, requireSupervisor]
 
 	router.get(
 		'/operations/bootstrap',
@@ -29,19 +40,43 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		...officerOnly,
 		asyncHandler(controller.acceptTask),
 	)
+	router.patch(
+		'/tasks/:taskId/cancel',
+		...officerOnly,
+		asyncHandler(controller.cancelTask),
+	)
 	router.patch('/tasks/:taskId/complete', asyncHandler(controller.completeTask))
 	router.get('/reports', asyncHandler(controller.getReports))
-	router.post('/reports', ...officerOnly, asyncHandler(controller.submitReport))
+	router.post(
+		'/reports',
+		...officerOnly,
+		uploadReportEvidence,
+		asyncHandler(controller.submitReport),
+	)
+	router.get(
+		'/reports/:reportId/route',
+		...supervisorOnly,
+		asyncHandler(controller.getReportRoute),
+	)
 	router.get('/reports/:reportId', asyncHandler(controller.getReport))
 	router.patch(
 		'/reports/:reportId/resolve',
 		...officerOnly,
 		asyncHandler(controller.resolveReport),
 	)
-	router.patch('/reports/:reportId/validation', asyncHandler(controller.updateReportValidation))
+	router.patch(
+		'/reports/:reportId/validation',
+		...supervisorOnly,
+		asyncHandler(controller.updateReportValidation),
+	)
 	router.get('/deployments', asyncHandler(controller.getDeployments))
 	router.put('/deployments', asyncHandler(controller.replaceDeployments))
 	router.get('/deployments/:assignmentId', asyncHandler(controller.getDeployment))
+	router.patch(
+		'/deployments/:assignmentId/acknowledge',
+		...officerOnly,
+		asyncHandler(controller.acknowledgeDeployment),
+	)
 	router.patch('/deployments/:assignmentId/status', asyncHandler(controller.updateDeploymentStatus))
 
 	return router

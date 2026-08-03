@@ -28,7 +28,13 @@
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow GeoSentri to use the camera for police report evidence."
+        }
+      ]
     ]
   }
 }

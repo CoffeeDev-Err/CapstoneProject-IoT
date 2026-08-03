@@ -1,6 +1,7 @@
-const { randomUUID } = require('crypto')
+const { createHash, randomUUID } = require('crypto')
 const {
 	Deployment,
+	LocationHistory,
 	Personnel,
 	Report,
 	Task,
@@ -22,7 +23,7 @@ const {
 	escapeRegex,
 	parsePagination,
 } = require('../utils/query')
-const { getPersonnelMember } = require('./personnelService')
+const { getPersonnelMember, getPersonnelWithLocations } = require('./personnelService')
 const { createNotification } = require('./notificationService')
 
 const asDate = (value, fallback = new Date()) => {
@@ -35,6 +36,49 @@ const optionalDate = (value) => {
 	const date = new Date(value)
 	return Number.isNaN(date.getTime()) ? undefined : date
 }
+
+const REPORT_ROUTE_BEFORE_MS = 30 * 60 * 1000
+const REPORT_ROUTE_AFTER_MS = 15 * 60 * 1000
+
+const getReportRouteWindow = (report) => {
+	const incidentAt = asDate(report.incidentAt)
+	return {
+		from: new Date(incidentAt.getTime() - REPORT_ROUTE_BEFORE_MS),
+		to: new Date(incidentAt.getTime() + REPORT_ROUTE_AFTER_MS),
+	}
+}
+
+const serializeRoutePoint = (entry) => ({
+	latitude: entry.location.coordinates[1],
+	longitude: entry.location.coordinates[0],
+	accuracy: entry.accuracy ?? null,
+	speed: entry.speed ?? null,
+	heading: entry.heading ?? null,
+	source: entry.source || 'gps',
+	recorded_at: new Date(entry.recordedAt).toISOString(),
+})
+
+const activeShiftConditions = (now = new Date()) => ([
+	{ $or: [{ shiftStart: { $exists: false } }, { shiftStart: null }, { shiftStart: { $lte: now } }] },
+	{ $or: [{ shiftEnd: { $exists: false } }, { shiftEnd: null }, { shiftEnd: { $gt: now } }] },
+])
+
+const isDeploymentCurrent = (deployment, now = new Date()) => (
+	deployment.status === 'active'
+	&& (!deployment.shiftStart || new Date(deployment.shiftStart) <= now)
+	&& (!deployment.shiftEnd || new Date(deployment.shiftEnd) > now)
+)
+
+const deploymentSignature = (deployment) => createHash('sha256')
+	.update(JSON.stringify({
+		personnelId: deployment.personnelId,
+		patrolArea: deployment.patrolArea,
+		shiftStart: deployment.shiftStart ? new Date(deployment.shiftStart).toISOString() : null,
+		shiftEnd: deployment.shiftEnd ? new Date(deployment.shiftEnd).toISOString() : null,
+		instructions: deployment.instructions || '',
+		location: deployment.location?.coordinates || [],
+	}))
+	.digest('hex')
 
 const serializeTask = (task, personnelById = new Map()) => ({
 	id: task.taskId,
@@ -51,6 +95,7 @@ const serializeTask = (task, personnelById = new Map()) => ({
 	created_at: task.createdAt?.toISOString(),
 	updated_at: task.updatedAt?.toISOString(),
 	completed_at: task.completedAt?.toISOString(),
+	cancelled_at: task.cancelledAt?.toISOString(),
 })
 
 const serializeReport = (report, personnelById = new Map()) => ({
@@ -77,14 +122,32 @@ const serializeReport = (report, personnelById = new Map()) => ({
 	...(report.submittedFrom && {
 		submitted_from: readCoordinates(report.submittedFrom),
 	}),
+	...(report.evidencePhoto?.path && {
+		evidence_photo: {
+			url: report.evidencePhoto.path,
+			mime_type: report.evidencePhoto.mimeType,
+			size: report.evidencePhoto.size,
+			camera_facing: report.evidencePhoto.cameraFacing,
+			captured_at: report.evidencePhoto.capturedAt?.toISOString(),
+		},
+	}),
 	...(report.resolution?.resolvedAt && {
 		resolved_at: report.resolution.resolvedAt.toISOString(),
 		resolved_by: report.resolution.resolvedBy,
 		resolution_notes: report.resolution.notes,
 	}),
+	route_point_count: report.routeSnapshot?.length || 0,
+	route_captured_at: report.routeSnapshotCapturedAt?.toISOString(),
 })
 
-const serializeDeployment = (deployment, personnelById = new Map()) => ({
+const serializeDeployment = (deployment, personnelById = new Map()) => {
+	const signature = deploymentSignature(deployment)
+	const acknowledged = Boolean(
+		deployment.acknowledgedAt
+		&& deployment.acknowledgedSignature === signature,
+	)
+
+	return {
 	id: deployment.assignmentId,
 	groupId: deployment.groupId,
 	personnelId: deployment.personnelId,
@@ -97,13 +160,73 @@ const serializeDeployment = (deployment, personnelById = new Map()) => ({
 	notes: deployment.instructions,
 	assignedAt: deployment.assignedAt?.toISOString(),
 	status: deployment.status,
+	isCurrentShift: isDeploymentCurrent(deployment),
+	acknowledged,
+	acknowledgedAt: acknowledged ? deployment.acknowledgedAt?.toISOString() : undefined,
 	...readCoordinates(deployment.location),
-})
+	}
+}
 
 const createNotFoundResult = (resource) => ({
 	status: 404,
 	body: { success: false, message: `${resource} not found.` },
 })
+
+const appendFilterCondition = (filter, condition) => {
+	filter.$and = [...(filter.$and || []), condition]
+}
+
+const encodeCursor = (document, dateField) => Buffer.from(JSON.stringify({
+	date: document[dateField]?.toISOString(),
+	id: String(document._id),
+})).toString('base64url')
+
+const decodeCursor = (cursor) => {
+	if (!cursor) return null
+	try {
+		const payload = JSON.parse(Buffer.from(String(cursor), 'base64url').toString('utf8'))
+		const date = new Date(payload.date)
+		if (Number.isNaN(date.getTime()) || !/^[a-f\d]{24}$/i.test(payload.id)) return null
+		return { date, id: payload.id }
+	} catch {
+		return null
+	}
+}
+
+const findCursorPage = async ({ model, filter, dateField, limit, cursor }) => {
+	const decodedCursor = decodeCursor(cursor)
+	if (cursor && !decodedCursor) {
+		const error = new Error('Invalid pagination cursor.')
+		error.status = 400
+		throw error
+	}
+	if (decodedCursor) {
+		appendFilterCondition(filter, {
+			$or: [
+				{ [dateField]: { $lt: decodedCursor.date } },
+				{ [dateField]: decodedCursor.date, _id: { $lt: decodedCursor.id } },
+			],
+		})
+	}
+
+	const documents = await model.find(filter)
+		.sort({ [dateField]: -1, _id: -1 })
+		.limit(limit + 1)
+		.lean()
+	const hasNextPage = documents.length > limit
+	const data = hasNextPage ? documents.slice(0, limit) : documents
+
+	return {
+		data,
+		pagination: {
+			limit,
+			hasNextPage,
+			nextCursor: hasNextPage && data.length > 0
+				? encodeCursor(data[data.length - 1], dateField)
+				: null,
+		},
+	}
+}
 
 const loadPersonnelMap = async (personnelIds = []) => {
 	const uniqueIds = [...new Set(personnelIds.filter(Boolean))]
@@ -116,6 +239,40 @@ const loadPersonnelMap = async (personnelIds = []) => {
 }
 
 const createOperationalService = ({ io }) => {
+	const captureReportRouteSnapshot = async (report) => {
+		const { from, to } = getReportRouteWindow(report)
+		const history = await LocationHistory.find({
+			personnelId: report.submittedBy,
+			recordedAt: { $gte: from, $lte: to },
+			source: 'gps',
+		}).sort({ recordedAt: 1 }).lean()
+
+		const merged = new Map()
+		for (const entry of [...(report.routeSnapshot || []), ...history]) {
+			const coordinates = entry.location?.coordinates
+			const recordedAt = new Date(entry.recordedAt)
+			if (!Array.isArray(coordinates)
+				|| coordinates.length !== 2
+				|| Number.isNaN(recordedAt.getTime())) continue
+
+			const key = `${recordedAt.toISOString()}:${coordinates.join(',')}`
+			merged.set(key, {
+				location: entry.location,
+				accuracy: entry.accuracy,
+				speed: entry.speed,
+				heading: entry.heading,
+				source: entry.source || 'gps',
+				recordedAt,
+			})
+		}
+
+		report.routeSnapshot = [...merged.values()]
+			.sort((left, right) => left.recordedAt - right.recordedAt)
+		report.routeSnapshotCapturedAt = new Date()
+		await report.save()
+		return { from, to, points: report.routeSnapshot }
+	}
+
 	const loadTasks = async () => {
 		const tasks = await Task.find().sort({ createdAt: -1 }).lean()
 		const personnelById = await loadPersonnelMap(
@@ -138,7 +295,10 @@ const createOperationalService = ({ io }) => {
 	const loadDeployments = async (personnelId) => {
 		const query = {
 			status: 'active',
-			...(personnelId ? { personnelId } : {}),
+			...(personnelId ? {
+				personnelId,
+				$and: activeShiftConditions(new Date()),
+			} : {}),
 		}
 		const deployments = await Deployment.find(query).sort({ assignedAt: -1 }).lean()
 		const personnelById = await loadPersonnelMap(
@@ -149,14 +309,84 @@ const createOperationalService = ({ io }) => {
 		))
 	}
 
+	const reconcileDeploymentShifts = async ({ broadcast = true, now = new Date() } = {}) => {
+		const expired = await Deployment.updateMany(
+			{ status: 'active', shiftEnd: { $ne: null, $lte: now } },
+			{ $set: { status: 'completed' } },
+		)
+		const onDutyPersonnelIds = await Deployment.distinct('personnelId', {
+			status: 'active',
+			$and: activeShiftConditions(now),
+		})
+		const [onDutyUpdate, offDutyUpdate] = await Promise.all([
+			onDutyPersonnelIds.length > 0
+				? Personnel.updateMany(
+					{ status: 'active', personnelId: { $in: onDutyPersonnelIds }, dutyStatus: { $ne: 'On Duty' } },
+					{ $set: { dutyStatus: 'On Duty' } },
+				)
+				: Promise.resolve({ modifiedCount: 0 }),
+			Personnel.updateMany(
+				{ status: 'active', personnelId: { $nin: onDutyPersonnelIds }, dutyStatus: { $ne: 'Off Duty' } },
+				{ $set: { dutyStatus: 'Off Duty' } },
+			),
+		])
+		const changed = expired.modifiedCount > 0
+			|| onDutyUpdate.modifiedCount > 0
+			|| offDutyUpdate.modifiedCount > 0
+
+		if (broadcast && changed) {
+			const [deployments, personnel] = await Promise.all([
+				loadDeployments(),
+				getPersonnelWithLocations(),
+			])
+			io.emit('deployments:updated', deployments)
+			io.emit('personnel:update', personnel)
+			io.emit('dashboard:updated')
+		}
+
+		return { changed, onDutyPersonnelIds }
+	}
+
+	const acknowledgeDeployment = async (assignmentId, personnelId) => {
+		const deployment = await Deployment.findOne({ assignmentId, status: 'active' })
+		if (!deployment) return createNotFoundResult('Active deployment')
+		if (deployment.personnelId !== personnelId) {
+			return {
+				status: 403,
+				body: { success: false, message: 'You can only confirm your own assignment.' },
+			}
+		}
+		if (!isDeploymentCurrent(deployment)) {
+			return {
+				status: 409,
+				body: { success: false, message: 'This assignment is outside its active shift.' },
+			}
+		}
+
+		deployment.acknowledgedSignature = deploymentSignature(deployment)
+		deployment.acknowledgedAt = new Date()
+		await deployment.save()
+		const personnelById = await loadPersonnelMap([personnelId])
+		const serialized = serializeDeployment(deployment, personnelById)
+		io.emit('deployment:acknowledged', serialized)
+		return { status: 200, body: { success: true, deployment: serialized } }
+	}
+
 	const listTasks = async (query = {}) => {
 		const pagination = parsePagination(query)
 		const filter = {}
-		if (['open', 'full', 'completed'].includes(query.status)) {
+		if (query.view === 'active') {
+			filter.status = { $in: ['open', 'full'] }
+		} else if (query.view === 'history') {
+			filter.status = { $in: ['completed', 'cancelled'] }
+		} else if (query.view === 'accepted' && query.personnel_id) {
+			filter.status = { $in: ['open', 'full'] }
+			filter['responders.personnelId'] = String(query.personnel_id)
+		} else if (['open', 'full', 'completed', 'cancelled'].includes(query.status)) {
 			filter.status = query.status
 		}
 		if (['backup', 'urgent'].includes(query.type)) filter.type = query.type
-		if (query.personnel_id) {
+		if (query.personnel_id && query.view !== 'accepted') {
 			filter.$or = [
 				{ requestedBy: String(query.personnel_id) },
 				{ 'responders.personnelId': String(query.personnel_id) },
@@ -164,14 +394,31 @@ const createOperationalService = ({ io }) => {
 		}
 		if (query.search) {
 			const pattern = new RegExp(escapeRegex(query.search), 'i')
-			filter.$and = [{
+			appendFilterCondition(filter, {
 				$or: [
 					{ taskId: pattern },
 					{ title: pattern },
 					{ locationName: pattern },
 					{ requesterName: pattern },
 				],
-			}]
+			})
+		}
+
+		if (query.pagination === 'cursor') {
+			const cursorPage = await findCursorPage({
+				model: Task,
+				filter,
+				dateField: 'createdAt',
+				limit: Math.min(pagination.limit, 50),
+				cursor: query.cursor,
+			})
+			const personnelById = await loadPersonnelMap(
+				cursorPage.data.map((task) => task.requestedBy),
+			)
+			return {
+				data: cursorPage.data.map((task) => serializeTask(task, personnelById)),
+				pagination: cursorPage.pagination,
+			}
 		}
 
 		const [documents, total] = await Promise.all([
@@ -201,6 +448,12 @@ const createOperationalService = ({ io }) => {
 	const completeTask = async (taskId, payload = {}) => {
 		const task = await Task.findOne({ taskId })
 		if (!task) return createNotFoundResult('Task')
+		if (task.status === 'cancelled') {
+			return {
+				status: 409,
+				body: { success: false, message: 'A cancelled task cannot be completed.' },
+			}
+		}
 		task.status = 'completed'
 		task.completedAt = asDate(payload.completed_at)
 		await task.save()
@@ -210,11 +463,55 @@ const createOperationalService = ({ io }) => {
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
+	const cancelTask = async (taskId, personnelId) => {
+		if (!personnelId) {
+			return { status: 400, body: { success: false, message: 'Personnel ID is required.' } }
+		}
+
+		const task = await Task.findOne({ taskId })
+		if (!task) return createNotFoundResult('Task')
+		if (task.requestedBy !== personnelId) {
+			return {
+				status: 403,
+				body: {
+					success: false,
+					message: 'Only the officer who requested backup can cancel it.',
+				},
+			}
+		}
+		if (task.type !== 'backup') {
+			return {
+				status: 409,
+				body: { success: false, message: 'Only backup requests can be cancelled here.' },
+			}
+		}
+		if (task.status === 'completed') {
+			return {
+				status: 409,
+				body: { success: false, message: 'A completed backup request cannot be cancelled.' },
+			}
+		}
+
+		if (task.status !== 'cancelled') {
+			task.status = 'cancelled'
+			task.cancelledAt = new Date()
+			await task.save()
+		}
+
+		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const serialized = serializeTask(task, personnelById)
+		io.emit('task:updated', serialized)
+		io.emit('dashboard:updated')
+		return { status: 200, body: { success: true, task: serialized } }
+	}
+
 	const listReports = async (query = {}) => {
 		const pagination = parsePagination(query)
 		const filter = {}
 		if (query.personnel_id) filter.submittedBy = String(query.personnel_id)
 		if (query.report_type) filter.reportType = String(query.report_type).toLowerCase()
+		if (query.category === 'incident') filter.isIncident = true
+		if (query.category === 'routine') filter.isIncident = false
 		if (query.barangay) filter.barangayCode = normalizeBarangayCode(query.barangay)
 		if (['open', 'resolved', 'not_applicable'].includes(query.case_status)) {
 			filter.caseStatus = query.case_status
@@ -233,6 +530,23 @@ const createOperationalService = ({ io }) => {
 				{ assignedArea: pattern },
 				{ locationName: pattern },
 			]
+		}
+
+		if (query.pagination === 'cursor') {
+			const cursorPage = await findCursorPage({
+				model: Report,
+				filter,
+				dateField: 'submittedAt',
+				limit: Math.min(pagination.limit, 50),
+				cursor: query.cursor,
+			})
+			const personnelById = await loadPersonnelMap(
+				cursorPage.data.map((report) => report.submittedBy),
+			)
+			return {
+				data: cursorPage.data.map((report) => serializeReport(report, personnelById)),
+				pagination: cursorPage.pagination,
+			}
 		}
 
 		const [documents, total] = await Promise.all([
@@ -259,6 +573,22 @@ const createOperationalService = ({ io }) => {
 		return serializeReport(report, personnelById)
 	}
 
+	const getReportRoute = async (reportId) => {
+		const report = await Report.findOne({ reportNumber: reportId })
+		if (!report) return null
+		const { from, to, points } = await captureReportRouteSnapshot(report)
+		return {
+			report_id: report.reportNumber,
+			captured_at: report.routeSnapshotCapturedAt?.toISOString(),
+			window: {
+				from: from.toISOString(),
+				to: to.toISOString(),
+				complete: Date.now() >= to.getTime(),
+			},
+			points: points.map(serializeRoutePoint),
+		}
+	}
+
 	const updateReportValidation = async (reportId, payload = {}) => {
 		const validationStatus = String(payload.validation_status || '').toLowerCase()
 		if (!['pending', 'validated', 'rejected'].includes(validationStatus)) {
@@ -276,7 +606,17 @@ const createOperationalService = ({ io }) => {
 		await report.save()
 		const personnelById = await loadPersonnelMap([report.submittedBy])
 		const serialized = serializeReport(report, personnelById)
+		await createNotification({
+			type: validationStatus === 'validated'
+				? 'success'
+				: validationStatus === 'rejected' ? 'warning' : 'info',
+			title: 'Report Review Updated',
+			message: `${report.reportNumber} was marked ${validationStatus} by the COP.`,
+			referenceType: 'report',
+			referenceId: report.reportNumber,
+		})
 		io.emit('report:updated', serialized)
+		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, report: serialized } }
 	}
 
@@ -329,6 +669,7 @@ const createOperationalService = ({ io }) => {
 			{ returnDocument: 'after' },
 		)
 		if (!deployment) return createNotFoundResult('Deployment')
+		await reconcileDeploymentShifts({ broadcast: false })
 		const activeDeployments = await loadDeployments()
 		const personnelById = await loadPersonnelMap([deployment.personnelId])
 		io.emit('deployments:updated', activeDeployments)
@@ -342,6 +683,27 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const createTask = async (payload = {}) => {
+		const taskType = payload.type === 'urgent' ? 'urgent' : 'backup'
+		if (taskType === 'backup') {
+			const personnelId = String(payload.requested_by || '').trim()
+			const activeDeployment = personnelId
+				? await Deployment.findOne({
+					personnelId,
+					status: 'active',
+					$and: activeShiftConditions(new Date()),
+				}).select('_id').lean()
+				: null
+
+			if (!activeDeployment) {
+				const error = new Error(
+					'Backup requests are available only during your active deployment shift.',
+				)
+				error.status = 409
+				error.code = 'OFF_DUTY_BACKUP_REQUEST'
+				throw error
+			}
+		}
+
 		const requester = payload.requested_by
 			? await getPersonnelMember(payload.requested_by)
 			: null
@@ -351,7 +713,7 @@ const createOperationalService = ({ io }) => {
 		}
 		const task = await Task.create({
 			taskId: `TSK-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`,
-			type: payload.type === 'urgent' ? 'urgent' : 'backup',
+			type: taskType,
 			title: payload.title || 'Backup requested',
 			description: payload.description || 'Additional personnel assistance requested.',
 			requestedBy: payload.requested_by || 'supervisor',
@@ -401,6 +763,15 @@ const createOperationalService = ({ io }) => {
 			task = await Task.findOne({ taskId })
 			if (!task) {
 				return { status: 404, body: { success: false, message: 'Task not found.' } }
+			}
+			if (task.status === 'cancelled' || task.status === 'completed') {
+				return {
+					status: 409,
+					body: {
+						success: false,
+						message: 'This task is no longer active.',
+					},
+				}
 			}
 			if (task.type === 'backup' && task.requestedBy === personnelId) {
 				return {
@@ -507,11 +878,17 @@ const createOperationalService = ({ io }) => {
 			description,
 			locationName,
 			locationSource,
-			...(locationSource === 'gps' && {
+			...(hasSuppliedCoordinates && {
 				location: point(suppliedLongitude, suppliedLatitude),
+			}),
+			...(locationSource === 'gps' && hasSuppliedCoordinates && {
 				submittedFrom: point(suppliedLongitude, suppliedLatitude),
 			}),
+			...(payload.evidence_photo && {
+				evidencePhoto: payload.evidence_photo,
+			}),
 		})
+		await captureReportRouteSnapshot(report)
 		const personnelById = await loadPersonnelMap([report.submittedBy])
 		const serialized = serializeReport(report, personnelById)
 
@@ -573,6 +950,18 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const replaceDeployments = async (payload = []) => {
+		for (const assignment of payload) {
+			const shiftStart = optionalDate(assignment.shiftStart)
+			const shiftEnd = optionalDate(assignment.shiftEnd)
+
+			if (!shiftStart || !shiftEnd || shiftEnd <= shiftStart) {
+				const error = new Error('Each deployment requires a valid shift end later than its shift start.')
+				error.status = 400
+				error.code = 'INVALID_DEPLOYMENT_SHIFT'
+				throw error
+			}
+		}
+
 		const assignmentIds = payload.map((item) => String(item.id))
 
 		if (payload.length > 0) {
@@ -618,6 +1007,7 @@ const createOperationalService = ({ io }) => {
 			{ $set: { status: 'cancelled' } },
 		)
 
+		await reconcileDeploymentShifts({ broadcast: false })
 		const deployments = await loadDeployments()
 		await createNotification({
 			title: 'Deployment Updated',
@@ -631,22 +1021,23 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const registerSocket = async (socket) => {
-		const [tasks, reports, deployments] = await Promise.all([
-			loadTasks(),
-			loadReports(),
+		const [taskPayload, deployments] = await Promise.all([
+			listTasks({ view: 'active', limit: 100 }),
 			loadDeployments(),
 		])
-		socket.emit('tasks:bootstrap', tasks)
-		socket.emit('reports:bootstrap', reports)
+		socket.emit('tasks:bootstrap', taskPayload.data)
 		socket.emit('deployments:bootstrap', deployments)
 	}
 
 	return {
 		acceptTask,
+		acknowledgeDeployment,
+		cancelTask,
 		completeTask,
 		createTask,
 		getDeployment,
 		getReport,
+		getReportRoute,
 		getTask,
 		listDeployments,
 		listReports,
@@ -655,6 +1046,7 @@ const createOperationalService = ({ io }) => {
 		loadReports,
 		loadTasks,
 		registerSocket,
+		reconcileDeploymentShifts,
 		replaceDeployments,
 		resolveReport,
 		submitReport,

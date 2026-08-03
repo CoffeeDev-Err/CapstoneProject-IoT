@@ -32,6 +32,8 @@ const serializeUser = (user, profile) => ({
 	role: user.role,
 	personnelId: user.personnelId,
 	forcePasswordReset: user.forcePasswordReset,
+	createdAt: user.createdAt?.toISOString(),
+	lastLoginAt: user.lastLoginAt?.toISOString(),
 	profile: profile ? {
 		fullName: profile.fullName,
 		badgeNumber: profile.badgeNumber,

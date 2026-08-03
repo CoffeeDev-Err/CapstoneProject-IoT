@@ -8,6 +8,7 @@ node_modules/
 # Generated output
 dist/
 coverage/
+tmp/
 
 # Local tooling
 .DS_Store

@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Download, Eye, Search } from 'lucide-react'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
 import { usePersonnelContext } from '../context/usePersonnelContext'
+import { updateReportValidation } from '../services/operations'
 
 const REPORTS_PER_PAGE = 10
 
@@ -65,13 +67,18 @@ const getReportCsvRows = (report) => [
 ]
 
 function ReportsPage() {
-  const { reports: realtimeReports } = usePersonnelContext()
+  const { reports: realtimeReports, refreshReports } = usePersonnelContext()
   const [reportMessage, setReportMessage] = useState('')
   const [selectedReportId, setSelectedReportId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [reportTypeFilter, setReportTypeFilter] = useState('all')
   const [caseStatusFilter, setCaseStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
+  const [reviewState, setReviewState] = useState({
+    isSaving: false,
+    error: '',
+    message: '',
+  })
   const reports = useMemo(
     () => [...realtimeReports].sort(
       (firstReport, secondReport) => new Date(secondReport.date_time) - new Date(firstReport.date_time)
@@ -123,7 +130,30 @@ function ReportsPage() {
 
   const handleCloseReport = useCallback(() => {
     setSelectedReportId(null)
+    setReviewState({ isSaving: false, error: '', message: '' })
   }, [])
+
+  const handleOpenReport = useCallback((reportId) => {
+    setReviewState({ isSaving: false, error: '', message: '' })
+    setSelectedReportId(reportId)
+  }, [])
+
+  const handleValidationChange = useCallback(async (validationStatus) => {
+    if (!selectedReport || reviewState.isSaving) return
+
+    setReviewState({ isSaving: true, error: '', message: '' })
+    try {
+      await updateReportValidation(selectedReport.id, validationStatus)
+      await refreshReports()
+      setReviewState({
+        isSaving: false,
+        error: '',
+        message: `Report marked ${validationStatus}. Analytics has been updated.`,
+      })
+    } catch (error) {
+      setReviewState({ isSaving: false, error: error.message, message: '' })
+    }
+  }, [refreshReports, reviewState.isSaving, selectedReport])
 
   const handleDownloadReport = useCallback((report) => {
     downloadCsv(getReportCsvRows(report), `${report.id.toLowerCase()}.csv`)
@@ -165,10 +195,7 @@ function ReportsPage() {
         <div className="report-list-controls">
           <label className="report-search">
             <span className="visually-hidden">Search reports</span>
-            <svg className="report-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-4-4" />
-            </svg>
+            <Search className="report-search__icon" aria-hidden="true" />
             <input
               type="search"
               value={searchTerm}
@@ -242,22 +269,15 @@ function ReportsPage() {
                   className="report-action-btn report-action-btn--secondary"
                   onClick={() => handleDownloadReport(report)}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 3v12" />
-                    <path d="M7 10l5 5 5-5" />
-                    <path d="M5 21h14" />
-                  </svg>
+                  <Download aria-hidden="true" />
                   Download
                 </button>
                 <button
                   type="button"
                   className="report-action-btn report-action-btn--primary"
-                  onClick={() => setSelectedReportId(report.id)}
+                  onClick={() => handleOpenReport(report.id)}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
-                    <circle cx="12" cy="12" r="2.5" />
-                  </svg>
+                  <Eye aria-hidden="true" />
                   View report
                 </button>
               </div>
@@ -286,9 +306,7 @@ function ReportsPage() {
               aria-label="Previous page"
               title="Previous page"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="m15 18-6-6 6-6" />
-              </svg>
+              <ChevronLeft aria-hidden="true" />
             </button>
 
             {visiblePageNumbers.map((pageNumber) => (
@@ -312,9 +330,7 @@ function ReportsPage() {
               aria-label="Next page"
               title="Next page"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
+              <ChevronRight aria-hidden="true" />
             </button>
           </div>
         </nav>
@@ -325,6 +341,8 @@ function ReportsPage() {
         formatDateTime={formatDateTime}
         onClose={handleCloseReport}
         onDownload={handleDownloadReport}
+        onValidationChange={handleValidationChange}
+        validationState={reviewState}
       />
     </div>
   )

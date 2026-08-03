@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { CheckCircle2, Download, Route, X, XCircle } from 'lucide-react'
 import ReportLocationMap from './ReportLocationMap'
-import { getPersonnelLocationHistory } from '../services/personnel'
+import { getReportRoute } from '../services/operations'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
-const ROUTE_LOOKBACK_MS = 30 * 60 * 1000
-const ROUTE_LOOKAHEAD_MS = 15 * 60 * 1000
+const resolveEvidenceUrl = (assetUrl) => {
+  if (!assetUrl) return ''
+  if (/^https?:\/\//i.test(assetUrl)) return assetUrl
+  return `${API_URL}${assetUrl.startsWith('/') ? '' : '/'}${assetUrl}`
+}
 
 const emptyRouteState = {
   reportId: null,
@@ -37,7 +42,14 @@ const formatCoordinates = (latitude, longitude) => {
   return `${parsedLatitude.toFixed(6)}, ${parsedLongitude.toFixed(6)}`
 }
 
-function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
+function ReportDetailDrawer({
+  report,
+  formatDateTime,
+  onClose,
+  onDownload,
+  onValidationChange,
+  validationState,
+}) {
   const closeButtonRef = useRef(null)
   const [routeState, setRouteState] = useState(emptyRouteState)
 
@@ -88,9 +100,7 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
     : ''
 
   const handleLoadRoute = async () => {
-    const eventTime = new Date(occurredAt)
-
-    if (!report.personnel_id || Number.isNaN(eventTime.getTime())) {
+    if (!report.id) {
       setRouteState({
         ...emptyRouteState,
         reportId: report.id,
@@ -100,23 +110,15 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
       return
     }
 
-    const from = new Date(eventTime.getTime() - ROUTE_LOOKBACK_MS).toISOString()
-    const to = new Date(eventTime.getTime() + ROUTE_LOOKAHEAD_MS).toISOString()
     setRouteState({
       ...emptyRouteState,
       reportId: report.id,
       status: 'loading',
-      from,
-      to,
     })
 
     try {
-      const result = await getPersonnelLocationHistory({
-        personnelId: report.personnel_id,
-        from,
-        to,
-      })
-      const points = [...result.points].sort(
+      const result = await getReportRoute(report.id)
+      const points = [...(result?.points || [])].sort(
         (first, second) => new Date(first.recorded_at) - new Date(second.recorded_at),
       )
       setRouteState({
@@ -125,9 +127,9 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
         points,
         message: points.length > 0
           ? ''
-          : 'No GPS samples are available for this time window. Route samples currently expire after 24 hours.',
-        from,
-        to,
+          : 'No GPS samples were captured for this report window.',
+        from: result?.window?.from || '',
+        to: result?.window?.to || '',
       })
     } catch (error) {
       setRouteState({
@@ -135,8 +137,6 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
         reportId: report.id,
         status: 'error',
         message: error.message,
-        from,
-        to,
       })
     }
   }
@@ -163,9 +163,7 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
             aria-label="Close report details"
             title="Close"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+            <X aria-hidden="true" />
           </button>
         </header>
 
@@ -234,6 +232,48 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
             </dl>
           </section>
 
+          {report.is_incident && (
+          <section className="report-detail-section report-review-panel">
+            <div className="report-review-panel__heading">
+              <div>
+                <h4>COP review</h4>
+                <p>Validated incident reports are included in operational analytics.</p>
+              </div>
+              <span className={`report-review-status report-review-status--${report.validation_status}`}>
+                {report.validation_status}
+              </span>
+            </div>
+            <div className="report-review-actions">
+              <button
+                type="button"
+                className="report-review-button report-review-button--reject"
+                onClick={() => onValidationChange('rejected')}
+                disabled={validationState?.isSaving || report.validation_status === 'rejected'}
+              >
+                <XCircle aria-hidden="true" />
+                Reject
+              </button>
+              <button
+                type="button"
+                className="report-review-button report-review-button--validate"
+                onClick={() => onValidationChange('validated')}
+                disabled={validationState?.isSaving || report.validation_status === 'validated'}
+              >
+                <CheckCircle2 aria-hidden="true" />
+                {validationState?.isSaving ? 'Saving...' : 'Validate report'}
+              </button>
+            </div>
+            {(validationState?.message || validationState?.error) && (
+              <p
+                className={`report-review-feedback ${validationState.error ? 'is-error' : ''}`}
+                role="status"
+              >
+                {validationState.error || validationState.message}
+              </p>
+            )}
+          </section>
+          )}
+
           <section className="report-detail-section">
             <div className="report-detail-section__header">
               <h4>Reported location and route</h4>
@@ -256,7 +296,7 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
             <div className="report-route-history">
               <div>
                 <strong>Officer route near report</strong>
-                <span>30 minutes before to 15 minutes after the reported time</span>
+                <span>Saved snapshot from 30 minutes before to 15 minutes after the report time</span>
               </div>
               <button
                 type="button"
@@ -264,11 +304,7 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
                 onClick={handleLoadRoute}
                 disabled={activeRouteState.status === 'loading'}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <path d="M5 19h14M5 5h14M7 5v5l10 4v5" />
-                  <circle cx="7" cy="5" r="2" />
-                  <circle cx="17" cy="19" r="2" />
-                </svg>
+                <Route aria-hidden="true" />
                 {activeRouteState.status === 'loading'
                   ? 'Loading route...'
                   : activeRouteState.status === 'loaded'
@@ -295,6 +331,28 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
             <p>{report.description}</p>
           </section>
 
+          {report.evidence_photo?.url && (
+            <section className="report-detail-section">
+              <h4>Photo evidence</h4>
+              <figure className="report-evidence">
+                <img
+                  src={resolveEvidenceUrl(report.evidence_photo.url)}
+                  alt={`Evidence attached to ${report.id}`}
+                />
+                <figcaption>
+                  <span>
+                    {report.evidence_photo.camera_facing === 'front'
+                      ? 'Front camera'
+                      : 'Back camera'}
+                  </span>
+                  {report.evidence_photo.captured_at && (
+                    <span>{formatDateTime(report.evidence_photo.captured_at)}</span>
+                  )}
+                </figcaption>
+              </figure>
+            </section>
+          )}
+
           {report.resolution_notes && (
             <section className="report-detail-section">
               <h4>Resolution notes</h4>
@@ -312,11 +370,7 @@ function ReportDetailDrawer({ report, formatDateTime, onClose, onDownload }) {
             className="report-action-btn report-action-btn--primary"
             onClick={() => onDownload(report)}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3v12" />
-              <path d="M7 10l5 5 5-5" />
-              <path d="M5 21h14" />
-            </svg>
+            <Download aria-hidden="true" />
             Download report
           </button>
         </footer>

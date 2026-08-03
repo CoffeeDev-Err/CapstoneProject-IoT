@@ -15,6 +15,7 @@
  *   User clicks marker/name → setSelectedPersonnel → modal opens
  */
 import { useMemo, useState } from 'react'
+import { PanelLeft } from 'lucide-react'
 import ProfileModal from '../components/ProfileModal'
 import PersonnelMap from '../components/PersonnelMap'
 import SidePanel from '../components/SidePanel'
@@ -24,9 +25,11 @@ function MonitoringPage() {
   // Pull live officer data and status from the shared context
   const {
     personnel,
+    activePersonnel,
     personnelCount,
     statusMessage,
     outOfBoundaryPersonnel,
+    stalePersonnel,
     deployments,
   } = usePersonnelContext()
 
@@ -39,6 +42,9 @@ function MonitoringPage() {
     () => personnel.find((member) => member.id === selectedPersonnelId) || null,
     [personnel, selectedPersonnelId]
   )
+  const effectiveStatusMessage = stalePersonnel.length > 0
+    ? `${stalePersonnel.map((member) => member.name).join(', ')} ${stalePersonnel.length === 1 ? 'has' : 'have'} no current GPS fix. Last known positions are hidden.`
+    : statusMessage
 
   const handleSelectPersonnel = (member) => {
     setSelectedPersonnelId(member?.id || null)
@@ -54,7 +60,11 @@ function MonitoringPage() {
       return
     }
 
-    if (typeof member.latitude !== 'number' || typeof member.longitude !== 'number') {
+    if (
+      member.isLocationStale === true
+      || !Number.isFinite(member.latitude)
+      || !Number.isFinite(member.longitude)
+    ) {
       return
     }
 
@@ -79,22 +89,20 @@ function MonitoringPage() {
             aria-label={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
             title={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
           >
-            <svg className="side-panel-collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
-              <path d="M9 6.7v10.6" />
-            </svg>
+            <PanelLeft className="side-panel-collapse-icon" aria-hidden="true" />
           </button>
 
           <SidePanel
-            personnel={personnel}
+            personnel={activePersonnel}
             personnelCount={personnelCount}
-            statusMessage={statusMessage}
+            statusMessage={effectiveStatusMessage}
             outOfBoundaryPersonnelCount={outOfBoundaryPersonnel.length}
+            stalePersonnelCount={stalePersonnel.length}
             onSelectPersonnel={handleSelectPersonnel}
           />
         </aside>
         <PersonnelMap
-          personnel={personnel}
+          personnel={activePersonnel}
           deployments={deployments}
           onSelectPersonnel={handleSelectPersonnel}
           focusTarget={focusTarget}

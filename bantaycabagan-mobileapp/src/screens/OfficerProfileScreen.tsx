@@ -3,22 +3,36 @@ import {
   Image,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { mobileTheme } from '../constants/mobileTheme';
+import { useNavigation } from '@react-navigation/native';
+import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { useAuth } from '../context/AuthContext';
 import { useOperationalContext } from '../context/OperationalContext';
+import { useMobileTheme } from '../context/ThemeContext';
+
+const formatAccountDate = (value?: string, includeTime = false) => {
+  if (!value) return 'Not available';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not available';
+  return date.toLocaleString([], includeTime
+    ? { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }
+    : { month: 'long', day: 'numeric', year: 'numeric' });
+};
 
 export default function OfficerProfileScreen() {
+  const navigation = useNavigation<any>();
   const { currentOfficer, deployments } = useOperationalContext();
   const { clearSession, logout, token, user } = useAuth();
+  const { colors, isDark, toggleTheme } = useMobileTheme();
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
-  const assignment = deployments[0];
+  const assignment = deployments.find((item) => item.isCurrentShift !== false);
   const profile = user?.profile;
   const officer = {
     name: currentOfficer.name,
@@ -26,6 +40,7 @@ export default function OfficerProfileScreen() {
     badge: currentOfficer.badge || profile?.badgeNumber || user?.personnelId || '-',
     station: 'Cabagan Police Station',
     contact: profile?.mobileNumber || 'Not provided',
+    email: user?.email || 'Not provided',
     photoUrl: currentOfficer.photoUrl,
   };
 
@@ -34,68 +49,121 @@ export default function OfficerProfileScreen() {
     : 'Not scheduled';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Icon name="local-police" size={27} color="#ffffff" />
-        <Text style={styles.headerTitle}>My Profile</Text>
-        <View style={styles.headerSpacer} />
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
+      <View style={[styles.topBar, isDark && styles.topBarDark]}>
+        <View style={styles.topBarIdentity}>
+          <Image
+            source={require('../../assets/pnp-logo.png')}
+            style={styles.topBarLogo}
+            resizeMode="contain"
+          />
+          <View style={styles.topBarCopy}>
+            <Text style={[styles.topBarAgency, isDark && styles.textDark]}>
+              Philippine National Police
+            </Text>
+            <Text style={[styles.topBarStation, isDark && styles.mutedDark]}>Cabagan Station</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          accessibilityLabel="Back to map"
+          style={styles.accountBackButton}
+          onPress={() => navigation.navigate('Map')}
+        >
+          <Icon name="chevron-left" size={20} color={colors.textMuted} />
+          <Text style={[styles.topBarTitle, { color: colors.text }]}>My Account</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.profileCard}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.identity}>
           <Image source={{ uri: officer.photoUrl }} style={styles.avatar} />
-          <Text style={styles.name}>{officer.name}</Text>
+          <View style={styles.nameLine}>
+            <Text style={[styles.name, isDark && styles.textDark]}>{officer.name}</Text>
+            {user?.emailVerified && (
+              <Icon name="verified" size={18} color={mobileTheme.blue}/>
+            )}
+          </View>
+          <Text style={[styles.email, isDark && styles.mutedDark]}>{officer.email}</Text>
           <Text style={styles.rank}>{officer.rank}</Text>
+        </View>
 
-          <View style={styles.divider} />
-          <ProfileRow label="Personnel ID" value={officer.badge} />
-          <View style={styles.divider} />
-          <ProfileRow label="Station" value={officer.station} />
-          <View style={styles.divider} />
-          <ProfileRow
-            label="Status"
+        <DetailSection title="Personal details">
+          <DetailRow label="Full name" value={officer.name} />
+          <DetailRow label="Badge number" value={officer.badge} />
+          <DetailRow label="Rank" value={officer.rank} />
+          <DetailRow label="Station" value={officer.station} />
+          <DetailRow label="Phone number" value={officer.contact} />
+          <DetailRow label="Email" value={officer.email} />
+        </DetailSection>
+
+        <DetailSection title="Account details">
+          <DetailRow label="Login ID" value={user?.username || 'Not available'} />
+          <DetailRow label="Account created" value={formatAccountDate(user?.createdAt)} />
+          <DetailRow label="Last login" value={formatAccountDate(user?.lastLoginAt, true)} />
+          <DetailRow
+            label="Duty status"
             value={currentOfficer.status}
             valueStyle={currentOfficer.status === 'Off Duty'
               ? styles.statusOffline
               : styles.statusOnDuty}
           />
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Current Duty</Text>
-            <View style={styles.dutyBadge}>
-              <Text style={styles.dutyBadgeText}>{assignment?.patrolArea || 'No assignment'}</Text>
+          <DetailRow
+            label="Account verification"
+            value={user?.emailVerified ? 'Verified' : 'Pending'}
+            valueStyle={user?.emailVerified ? styles.statusOnDuty : styles.statusOffline}
+          />
+          <DetailRow label="Current deployment" value={assignment?.patrolArea || 'No active deployment'} />
+          <DetailRow label="Shift" value={shift} isLast />
+        </DetailSection>
+
+        {assignment?.notes && (
+          <DetailSection title="Assignment instructions">
+            <Text style={[styles.instructions, isDark && styles.mutedDark]}>{assignment.notes}</Text>
+          </DetailSection>
+        )}
+
+        <DetailSection title="Preferences">
+          <View style={[styles.themeRow, isDark && styles.themeRowDark]}>
+            <View style={[styles.themeIcon, isDark && styles.themeIconDark]}>
+              <Icon
+                name={isDark ? 'dark-mode' : 'light-mode'}
+                size={21}
+                color={isDark ? '#7aa7ff' : mobileTheme.blue}
+              />
             </View>
+            <View style={styles.themeCopy}>
+              <Text style={[styles.themeTitle, isDark && styles.textDark]}>Dark Theme</Text>
+              <Text style={[styles.themeDescription, isDark && styles.mutedDark]}>
+                Use the secure black-navy interface.
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel="Toggle dark theme"
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: mobileTheme.border, true: mobileTheme.blue }}
+              thumbColor="#ffffff"
+            />
           </View>
-          <View style={styles.divider} />
-          <ProfileRow label="Shift" value={shift} />
-          <View style={styles.divider} />
-          <ProfileRow label="Contact" value={officer.contact} />
-          {assignment?.notes && (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.notesRow}>
-                <Text style={styles.label}>Instructions</Text>
-                <Text style={styles.notesValue}>{assignment.notes}</Text>
-              </View>
-            </>
-          )}
-        </View>
+        </DetailSection>
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.changePasswordButton}
+            accessibilityRole="button"
+            style={[styles.secondaryButton, isDark && styles.secondaryButtonDark]}
             onPress={() => setPasswordModalOpen(true)}
           >
-            <Icon name="lock-outline" size={19} color="#ffffff" />
-            <Text style={styles.actionText}>Change Password</Text>
+            <Icon name="lock-outline" size={20} color={mobileTheme.blue} />
+            <Text style={styles.secondaryButtonText}>Change Password</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Icon name="logout" size={19} color="#ffffff" />
-            <Text style={styles.actionText}>Logout</Text>
+          <TouchableOpacity accessibilityRole="button" style={styles.logoutButton} onPress={logout}>
+            <Icon name="logout" size={20} color="#ffffff" />
+            <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
       {token && (
         <ChangePasswordModal
           visible={passwordModalOpen}
@@ -111,120 +179,161 @@ export default function OfficerProfileScreen() {
   );
 }
 
-function ProfileRow({
+function DetailSection({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  const { isDark } = useMobileTheme();
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, isDark && styles.textDark]}>{title}</Text>
+      <View style={styles.sectionBody}>{children}</View>
+    </View>
+  );
+}
+
+function DetailRow({
+  isLast = false,
   label,
   value,
   valueStyle,
 }: {
+  isLast?: boolean;
   label: string;
   value: string;
   valueStyle?: object;
 }) {
+  const { isDark } = useMobileTheme();
   return (
-    <View style={styles.infoRow}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={[styles.value, valueStyle]}>{value}</Text>
+    <View style={[
+      styles.detailRow,
+      isDark && styles.detailRowDark,
+      isLast && styles.detailRowLast,
+    ]}>
+      <Text style={[styles.label, isDark && styles.mutedDark]}>{label}</Text>
+      <Text style={[styles.value, isDark && styles.textDark, valueStyle]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: mobileTheme.background },
-  header: {
-    height: 76,
-    paddingHorizontal: 22,
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    fontFamily: mobileFontFamily,
+  },
+  topBar: {
+    height: 54,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: mobileTheme.borderSoft,
+    backgroundColor: '#ffffff',
     justifyContent: 'space-between',
-    backgroundColor: mobileTheme.blue,
   },
-  headerTitle: { color: '#ffffff', fontSize: 20, fontWeight: '800' },
-  headerSpacer: { width: 27 },
-  content: { padding: 20, paddingBottom: 118 },
-  profileCard: {
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 20,
-    alignItems: 'center',
-    borderRadius: 22,
-    backgroundColor: mobileTheme.surface,
-    shadowColor: '#1c1c4d',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  avatar: {
-    width: 104,
-    height: 104,
-    borderWidth: 3,
-    borderColor: mobileTheme.blue,
-    borderRadius: 52,
-    backgroundColor: '#e5e5ea',
-  },
-  name: { marginTop: 14, color: '#111111', fontSize: 25, fontWeight: '800', textAlign: 'center' },
-  rank: { marginTop: 3, color: mobileTheme.purple, fontSize: 19, fontWeight: '800', textAlign: 'center' },
-  divider: { width: '100%', height: 1, marginVertical: 13, backgroundColor: mobileTheme.border },
-  infoRow: {
-    width: '100%',
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 14,
-  },
-  label: { color: '#686868', fontSize: 14 },
-  value: { flex: 1, color: '#111111', fontSize: 14, fontWeight: '700', textAlign: 'right' },
-  statusOnDuty: { color: mobileTheme.success },
-  statusOffline: { color: mobileTheme.warning },
-  dutyBadge: {
-    maxWidth: '62%',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 13,
-    backgroundColor: mobileTheme.blue,
-  },
-  dutyBadgeText: { color: '#ffffff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  notesRow: { width: '100%' },
-  notesValue: { marginTop: 7, color: mobileTheme.text, fontSize: 12, lineHeight: 18 },
-  actions: {
-    marginTop: 18,
+  topBarDark: { borderBottomColor: '#22314a', backgroundColor: '#0b1528' },
+  topBarLogo: { width: 24, height: 30 },
+  topBarIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topBarCopy: { flex: 1 },
+  topBarAgency: { color: mobileTheme.text, fontSize: 10, fontWeight: '800' },
+  topBarStation: { marginTop: 1, color: mobileTheme.textMuted, fontSize: 9 },
+  accountBackButton: {
+    minWidth: 96,
+    height: 42,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 10,
   },
-  changePasswordButton: {
-    minHeight: 46,
+  topBarTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '700' },
+  content: { paddingBottom: 110 },
+  identity: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 26, paddingBottom: 24 },
+  avatar: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: mobileTheme.surfaceMuted,
+  },
+  nameLine: { marginTop: 13, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name: { color: mobileTheme.text, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  email: { marginTop: 4, color: mobileTheme.textMuted, fontSize: 13, textAlign: 'center' },
+  rank: { marginTop: 5, color: mobileTheme.blue, fontSize: 12, fontWeight: '700' },
+  section: { paddingHorizontal: 22, paddingTop: 14 },
+  sectionTitle: { marginBottom: 8, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
+  sectionBody: { width: '100%' },
+  detailRow: {
+    minHeight: 48,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: mobileTheme.borderSoft,
+    gap: 18,
+  },
+  detailRowLast: { borderBottomWidth: 0 },
+  label: { width: '39%', color: mobileTheme.textMuted, fontSize: 13, lineHeight: 20 },
+  value: {
     flex: 1,
-    paddingHorizontal: 20,
+    color: mobileTheme.text,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 20,
+    textAlign: 'left',
+  },
+  statusOnDuty: { color: mobileTheme.success },
+  statusOffline: { color: mobileTheme.warning },
+  instructions: { color: mobileTheme.textMuted, fontSize: 13, lineHeight: 20 },
+  themeRow: {
+    minHeight: 66,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: mobileTheme.borderSoft,
+  },
+  themeRowDark: { borderBottomColor: '#22314a' },
+  themeIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: mobileTheme.blueSoft,
+  },
+  themeIconDark: { backgroundColor: '#132442' },
+  themeCopy: { flex: 1 },
+  themeTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '700' },
+  themeDescription: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 10 },
+  actions: { paddingHorizontal: 22, paddingTop: 26, gap: 10 },
+  secondaryButton: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: mobileTheme.blue,
+    borderRadius: 8,
     gap: 8,
-    borderRadius: 23,
-    backgroundColor: mobileTheme.purple,
-    shadowColor: '#1c1c4d',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: '#ffffff',
   },
+  secondaryButtonText: { color: mobileTheme.blue, fontSize: 14, fontWeight: '800' },
+  secondaryButtonDark: { backgroundColor: '#0b1528' },
   logoutButton: {
-    minHeight: 46,
-    minWidth: 122,
-    paddingHorizontal: 20,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
     gap: 8,
-    borderRadius: 23,
-    backgroundColor: mobileTheme.blue,
-    shadowColor: '#1c1c4d',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: mobileTheme.navy,
   },
-  actionText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  logoutButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  containerDark: { backgroundColor: '#050b18' },
+  textDark: { color: '#f8fafc' },
+  mutedDark: { color: '#9eabc0' },
+  detailRowDark: { borderBottomColor: '#22314a' },
 });

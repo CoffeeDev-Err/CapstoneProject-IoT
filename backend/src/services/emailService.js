@@ -2,19 +2,19 @@ const nodemailer = require('nodemailer')
 
 const PURPOSE_COPY = {
 	verify_email: {
-		subject: 'Verify your BantayCabagan email',
+		subject: (brandName) => `Verify your ${brandName} email`,
 		heading: 'Verify your official email',
 	},
 	login: {
-		subject: 'Your BantayCabagan login code',
+		subject: (brandName) => `Your ${brandName} login code`,
 		heading: 'Complete your secure sign in',
 	},
 	reset_password: {
-		subject: 'Reset your BantayCabagan password',
+		subject: (brandName) => `Reset your ${brandName} password`,
 		heading: 'Reset your password',
 	},
 	change_password: {
-		subject: 'Confirm your BantayCabagan password change',
+		subject: (brandName) => `Confirm your ${brandName} password change`,
 		heading: 'Confirm your password change',
 	},
 }
@@ -40,7 +40,13 @@ const getTransporter = () => {
 	return transporter
 }
 
-const buildHtml = ({ code, heading }) => `
+const getBrandName = () => String(
+	process.env.EMAIL_BRAND_NAME
+	|| process.env.EMAIL_FROM_NAME
+	|| 'BantayCabagan',
+).trim()
+
+const buildHtml = ({ brandName, code, heading }) => `
 	<div style="font-family:Arial,sans-serif;color:#172033;max-width:520px;margin:auto">
 		<h2 style="margin-bottom:8px">${heading}</h2>
 		<p style="line-height:1.6">Use this one-time verification code:</p>
@@ -48,13 +54,14 @@ const buildHtml = ({ code, heading }) => `
 			${code}
 		</div>
 		<p style="line-height:1.6">This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>
-		<p style="color:#667085;font-size:13px">BantayCabagan secure account service</p>
+		<p style="color:#667085;font-size:13px">${brandName} secure account service</p>
 	</div>
 `
 
 const sendVerificationCode = async ({ email, code, purpose }) => {
 	const mode = getDeliveryMode()
 	const copy = PURPOSE_COPY[purpose] || PURPOSE_COPY.login
+	const brandName = getBrandName()
 
 	if (mode === 'console') {
 		console.log(`[EMAIL-CONSOLE] ${purpose} code for ${email}: ${code}`)
@@ -75,11 +82,11 @@ const sendVerificationCode = async ({ email, code, purpose }) => {
 
 	await getTransporter().sendMail({
 		from: process.env.EMAIL_FROM
-			|| `BantayCabagan <${process.env.GMAIL_USER}>`,
+			|| `${process.env.EMAIL_FROM_NAME || brandName} <${process.env.GMAIL_USER}>`,
 		to: email,
-		subject: copy.subject,
+		subject: copy.subject(brandName),
 		text: `${copy.heading}\n\nYour verification code is ${code}. It expires in 10 minutes.`,
-		html: buildHtml({ code, heading: copy.heading }),
+		html: buildHtml({ brandName, code, heading: copy.heading }),
 	})
 	return { mode }
 }

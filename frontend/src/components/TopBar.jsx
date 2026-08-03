@@ -13,6 +13,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Moon,
+  Sun,
+  UserRoundKey,
+} from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import ConfirmModal from './ConfirmModal'
 import PasswordChangeModal from './PasswordChangeModal'
@@ -241,21 +249,7 @@ function TopBar({
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {isDark ? (
-            /* Sun — click to go back to light mode */
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="4.5" />
-              <line x1="12" y1="2" x2="12" y2="4.5" /><line x1="12" y1="19.5" x2="12" y2="22" />
-              <line x1="4.93" y1="4.93" x2="6.7" y2="6.7" /><line x1="17.3" y1="17.3" x2="19.07" y2="19.07" />
-              <line x1="2" y1="12" x2="4.5" y2="12" /><line x1="19.5" y1="12" x2="22" y2="12" />
-              <line x1="4.93" y1="19.07" x2="6.7" y2="17.3" /><line x1="17.3" y1="6.7" x2="19.07" y2="4.93" />
-            </svg>
-          ) : (
-            /* Moon — click to enable dark mode */
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          )}
+          {isDark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
         </button>
 
         {/* Notifications — appears before profile and shows unread green dot */}
@@ -269,10 +263,7 @@ function TopBar({
             aria-haspopup="true"
             title="Notifications"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-5-5.9V4a1 1 0 1 0-2 0v1.1A6 6 0 0 0 6 11v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-              <path d="M9 17a3 3 0 0 0 6 0" />
-            </svg>
+            <Bell aria-hidden="true" />
             {unreadNotificationCount > 0 && <span className="notification-dot" aria-hidden="true" />}
           </button>
 
@@ -380,9 +371,7 @@ function TopBar({
               <span className="supervisor-name">{supervisor.name}</span>
               <span className="supervisor-role mt-1">{supervisor.role}</span>
             </div>
-            <svg className="supervisor-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            <ChevronDown className="supervisor-chevron" aria-hidden="true" />
           </button>
 
           {/* Dropdown menu — appears below the button */}
@@ -414,31 +403,13 @@ function TopBar({
                   setPasswordModalOpen(true)
                 }}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                </svg>
+                <UserRoundKey aria-hidden="true" />
                 Change Password
               </button>
-              <button
-                type="button"
-                className="dropdown-item"
-                onClick={() => {
-                  setDropdownOpen(false)
-                  navigate('/settings')
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
-                </svg>
-                Account Management
-              </button>
-
               <div className="dropdown-divider" />
 
               <button type="button" className="dropdown-item dropdown-item--logout" onClick={handleLogout}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
+                <LogOut aria-hidden="true" />
                 Log Out
               </button>
             </div>

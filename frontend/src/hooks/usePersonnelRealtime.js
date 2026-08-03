@@ -47,10 +47,18 @@ const withPersonnelPhoto = (member) => ({
 
 const normalizePersonnel = (member) => withPersonnelPhoto(member)
 
-const withBoundaryStatus = (member) => ({
-  ...member,
-  isInsideCabagan: isInsideCabagan(member.latitude, member.longitude),
-})
+const withBoundaryStatus = (member) => {
+  const hasCurrentCoordinates = member.isLocationStale !== true
+    && Number.isFinite(member.latitude)
+    && Number.isFinite(member.longitude)
+
+  return {
+    ...member,
+    isInsideCabagan: hasCurrentCoordinates
+      ? isInsideCabagan(member.latitude, member.longitude)
+      : null,
+  }
+}
 
 const normalizeAndTagPersonnel = (member) => withBoundaryStatus(normalizePersonnel(member))
 
@@ -76,6 +84,12 @@ export const usePersonnelRealtime = () => {
   // Report records stay available app-wide so mobile status events update analytics immediately.
   const [reports, setReports] = useState([])
   const [deployments, setDeployments] = useState([])
+
+  const refreshReports = useCallback(async () => {
+    const reportPayload = await getReports()
+    setReports(reportPayload)
+    return reportPayload
+  }, [])
 
   // Tracks which personnel are currently outside Cabagan to avoid repeated alerts
   const outsidePersonnelIdsRef = useRef(new Set())
@@ -118,7 +132,9 @@ export const usePersonnelRealtime = () => {
   }, [])
 
   const evaluateGeofence = (list) => {
-    const outsidePersonnel = list.filter((member) => !member.isInsideCabagan)
+    const outsidePersonnel = list.filter((member) => (
+      member.isVisibleOnMap !== false && member.isInsideCabagan === false
+    ))
     const outsideIds = new Set(outsidePersonnel.map((member) => member.id))
     const newlyOutside = outsidePersonnel.filter((member) => !outsidePersonnelIdsRef.current.has(member.id))
     const hasRecovered = outsidePersonnel.length === 0 && outsidePersonnelIdsRef.current.size > 0
@@ -353,6 +369,21 @@ export const usePersonnelRealtime = () => {
       })
     }
 
+    const onReportUpdated = (payload) => {
+      mergeReportUpdates([payload])
+    }
+
+    const onPersonnelInactivity = (payload) => {
+      const message = payload?.message || 'An on-duty officer has no detected movement.'
+      setStatusMessage(message)
+      addNotification({
+        type: 'warning',
+        title: payload?.title || 'Personnel Inactivity',
+        message,
+        timestamp: payload?.timestamp,
+      })
+    }
+
     const onPersonnelIdentityUpdated = (payload) => {
       if (!payload?.personnelId) return
 
@@ -388,9 +419,11 @@ export const usePersonnelRealtime = () => {
     socket.on('reports:bootstrap', onReportsBootstrap)
     socket.on('report:submitted', onReportSubmitted)
     socket.on('report:resolved', onReportResolved)
+    socket.on('report:updated', onReportUpdated)
     socket.on('deployments:bootstrap', onDeploymentsBootstrap)
     socket.on('deployments:updated', onDeploymentsUpdated)
     socket.on('task:created', onTaskCreated)
+    socket.on('personnel:inactivity', onPersonnelInactivity)
 
     Promise.all([
       getPersonnel(),
@@ -418,16 +451,28 @@ export const usePersonnelRealtime = () => {
       socket.off('reports:bootstrap', onReportsBootstrap)
       socket.off('report:submitted', onReportSubmitted)
       socket.off('report:resolved', onReportResolved)
+      socket.off('report:updated', onReportUpdated)
       socket.off('deployments:bootstrap', onDeploymentsBootstrap)
       socket.off('deployments:updated', onDeploymentsUpdated)
       socket.off('task:created', onTaskCreated)
+      socket.off('personnel:inactivity', onPersonnelInactivity)
     }
   }, [addNotification]) // Subscribe once and keep notification handler current
 
   // Derive the count from the array so consumers don't have to compute it
-  const personnelCount = useMemo(() => personnel.length, [personnel])
+  const activePersonnel = useMemo(
+    () => personnel.filter((member) => member.isVisibleOnMap !== false),
+    [personnel]
+  )
+  const personnelCount = useMemo(() => activePersonnel.length, [activePersonnel])
   const outOfBoundaryPersonnel = useMemo(
-    () => personnel.filter((member) => !member.isInsideCabagan),
+    () => activePersonnel.filter((member) => member.isInsideCabagan === false),
+    [activePersonnel]
+  )
+  const stalePersonnel = useMemo(
+    () => personnel.filter((member) => (
+      member.isOnDuty !== false && member.locationStatus !== 'current'
+    )),
     [personnel]
   )
   const unreadNotificationCount = useMemo(
@@ -437,10 +482,12 @@ export const usePersonnelRealtime = () => {
 
   return {
     personnel,
+    activePersonnel,
     reports,
     deployments,
     personnelCount,
     outOfBoundaryPersonnel,
+    stalePersonnel,
     isConnected,
     statusMessage,
     notifications,
@@ -448,5 +495,6 @@ export const usePersonnelRealtime = () => {
     markNotificationAsRead,
     markAllNotificationsRead,
     clearNotifications,
+    refreshReports,
   }
 }

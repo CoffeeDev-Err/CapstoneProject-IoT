@@ -3,6 +3,19 @@ const FAILURE_CACHE_TTL_MS = 5 * 60 * 1000
 const MIN_REQUEST_INTERVAL_MS = 1100
 const REQUEST_TIMEOUT_MS = 5000
 
+// Public geocoders currently label the ISU Cabagan campus as Centro. Local
+// records place this area in Eastern Catabayungan, so prefer the operational
+// location name used by the municipality.
+const LOCAL_LOCATION_ZONES = [
+	{
+		name: 'Eastern, Catabayungan, Cabagan',
+		minLatitude: 17.4295,
+		maxLatitude: 17.4325,
+		minLongitude: 121.7634,
+		maxLongitude: 121.7671,
+	},
+]
+
 const cache = new Map()
 const pendingRequests = new Map()
 let requestQueue = Promise.resolve()
@@ -14,6 +27,15 @@ const formatCoordinates = (latitude, longitude) => (
 
 const getCacheKey = (latitude, longitude) => (
 	`${latitude.toFixed(4)},${longitude.toFixed(4)}`
+)
+
+const getLocalLocationName = (latitude, longitude) => (
+	LOCAL_LOCATION_ZONES.find((zone) => (
+		latitude >= zone.minLatitude
+		&& latitude <= zone.maxLatitude
+		&& longitude >= zone.minLongitude
+		&& longitude <= zone.maxLongitude
+	))?.name || null
 )
 
 const readCachedValue = (key) => {
@@ -52,34 +74,26 @@ const scheduleRequest = (request) => {
 	return requestQueue
 }
 
-const getLocalityName = (address = {}) => (
-	address.village
-	|| address.suburb
-	|| address.neighbourhood
-	|| address.quarter
-	|| address.city_district
-	|| address.town
-	|| address.city
-	|| address.municipality
-	|| address.county
-)
+const normalizeLocationPart = (value) => String(value || '')
+	.trim()
+	.replace(/^barangay\s+/i, '')
 
-const getAreaName = (address = {}) => (
-	address.municipality
-	|| address.town
-	|| address.city
-	|| address.county
-	|| address.state
-)
+const getLocationParts = (address = {}) => {
+	const detailedArea = address.neighbourhood || address.quarter || address.hamlet
+	const barangay = address.village || address.suburb || address.city_district
+	const municipality = address.municipality || address.town || address.city || address.county
+
+	return [detailedArea, barangay, municipality]
+		.map(normalizeLocationPart)
+		.filter((part, index, parts) => (
+			part
+			&& parts.findIndex((candidate) => candidate.toLowerCase() === part.toLowerCase()) === index
+		))
+}
 
 const formatLocationName = (payload, fallback) => {
-	const locality = getLocalityName(payload?.address)
-	const area = getAreaName(payload?.address)
-
-	if (locality && area && locality !== area) {
-		return `${locality}, ${area}`
-	}
-	if (locality) return locality
+	const locationParts = getLocationParts(payload?.address)
+	if (locationParts.length) return locationParts.join(', ')
 	return payload?.display_name?.split(',').slice(0, 2).join(',').trim() || fallback
 }
 
@@ -90,7 +104,7 @@ const fetchLocationName = async (latitude, longitude, fallback) => {
 		format: 'jsonv2',
 		lat: String(latitude),
 		lon: String(longitude),
-		zoom: '16',
+		zoom: '18',
 		addressdetails: '1',
 	})
 	const controller = new AbortController()
@@ -122,6 +136,8 @@ const resolveLocationName = async (latitudeValue, longitudeValue) => {
 	}
 
 	const fallback = formatCoordinates(latitude, longitude)
+	const localLocationName = getLocalLocationName(latitude, longitude)
+	if (localLocationName) return localLocationName
 	if (process.env.REVERSE_GEOCODING_ENABLED === 'false') return fallback
 
 	const key = getCacheKey(latitude, longitude)
@@ -147,5 +163,6 @@ const resolveLocationName = async (latitudeValue, longitudeValue) => {
 
 module.exports = {
 	formatCoordinates,
+	getLocalLocationName,
 	resolveLocationName,
 }

@@ -1,7 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -10,8 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { PolicePageHeader } from '../components/PolicePageHeader';
+import { ReportLocationPickerModal } from '../components/ReportLocationPickerModal';
 import {
   CABAGAN_BARANGAYS,
   findCabaganBarangay,
@@ -19,9 +24,16 @@ import {
 } from '../constants/cabaganBarangays';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
-import type { PoliceReport, SubmitReportInput } from '../types/operations';
+import { useMobileTheme } from '../context/ThemeContext';
+import { resolveApiAssetUrl } from '../services/operationsApi';
+import type {
+  PoliceReport,
+  ReportEvidenceInput,
+  SubmitReportInput,
+} from '../types/operations';
 
 const reportTypes = ['incident', 'patrol', 'checkpoint', 'others'];
+const SUBMIT_MODAL_TOP_OFFSET = 1;
 
 type ReportForm = SubmitReportInput & {
   occurred_at: string;
@@ -64,6 +76,8 @@ const getBarangayFromArea = (area?: string) => {
 };
 
 export default function ReportsScreen() {
+  const { colors, isDark } = useMobileTheme();
+  const insets = useSafeAreaInsets();
   const {
     currentPersonnelId,
     reports,
@@ -71,15 +85,26 @@ export default function ReportsScreen() {
     personnel,
     submitReport,
     resolveReport,
+    refreshReports,
+    loadMoreReports,
+    reportsHasMore,
+    isReportsLoading,
+    isReportsLoadingMore,
   } = useOperationalContext();
   const [filter, setFilter] = useState<'all' | 'incident' | 'routine'>('all');
   const [formVisible, setFormVisible] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [selectedReport, setSelectedReport] = useState<PoliceReport | null>(null);
   const [resolveTarget, setResolveTarget] = useState<PoliceReport | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [evidencePhoto, setEvidencePhoto] = useState<ReportEvidenceInput | null>(null);
+
+  useEffect(() => {
+    refreshReports(filter).catch(() => undefined);
+  }, [filter, refreshReports]);
 
   const filteredReports = useMemo(() => reports.filter((report) => {
     if (filter === 'incident') return report.is_incident;
@@ -99,7 +124,53 @@ export default function ReportsScreen() {
       assigned_area: assignedArea,
       barangay: getBarangayFromArea(assignedArea),
     });
+    setEvidencePhoto(null);
     setFormVisible(true);
+  };
+
+  const captureEvidencePhoto = async (cameraFacing: 'front' | 'back') => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Camera permission required',
+        'Allow camera access in your phone settings to capture report evidence.',
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      cameraType: cameraFacing === 'front'
+        ? ImagePicker.CameraType.front
+        : ImagePicker.CameraType.back,
+      quality: 0.72,
+      allowsEditing: false,
+      exif: false,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'image/jpeg';
+    const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+    setEvidencePhoto({
+      uri: asset.uri,
+      name: asset.fileName || `report-evidence-${Date.now()}.${extension}`,
+      type: mimeType,
+      camera_facing: cameraFacing,
+      captured_at: new Date().toISOString(),
+    });
+  };
+
+  const chooseEvidenceCamera = () => {
+    Alert.alert(
+      evidencePhoto ? 'Retake photo evidence' : 'Capture photo evidence',
+      'Choose which camera to use.',
+      [
+        { text: 'Back camera', onPress: () => captureEvidencePhoto('back') },
+        { text: 'Front camera', onPress: () => captureEvidencePhoto('front') },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   const updateForm = <Field extends keyof ReportForm>(
@@ -125,17 +196,32 @@ export default function ReportsScreen() {
       ...current,
       location,
       location_source: 'manual',
-      latitude: undefined,
-      longitude: undefined,
+      latitude: current.location_source === 'gps' ? undefined : current.latitude,
+      longitude: current.location_source === 'gps' ? undefined : current.longitude,
     }));
+  };
+
+  const usePinnedLocation = (coordinates: { latitude: number; longitude: number }) => {
+    setForm((current) => ({
+      ...current,
+      location_source: 'manual',
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+    }));
+    setLocationPickerVisible(false);
   };
 
   const useCurrentGpsSuggestion = () => {
     const liveOfficer = personnel.find((member) => member.id === currentPersonnelId);
-    const hasCoordinates = liveOfficer
-      && Number.isFinite(liveOfficer.latitude)
-      && Number.isFinite(liveOfficer.longitude);
-    if (!liveOfficer || !hasCoordinates) {
+    const latitude = liveOfficer?.latitude;
+    const longitude = liveOfficer?.longitude;
+    const hasCurrentCoordinates = liveOfficer?.locationStatus === 'current'
+      && liveOfficer.isLocationStale !== true
+      && typeof latitude === 'number'
+      && Number.isFinite(latitude)
+      && typeof longitude === 'number'
+      && Number.isFinite(longitude);
+    if (!liveOfficer || !hasCurrentCoordinates) {
       Alert.alert(
         'GPS unavailable',
         'You can still submit the report manually. Select the Cabagan barangay and enter the exact incident place.',
@@ -157,8 +243,8 @@ export default function ReportsScreen() {
       barangay: detectedBarangay,
       location: liveOfficer.locationName,
       location_source: 'gps',
-      latitude: liveOfficer.latitude,
-      longitude: liveOfficer.longitude,
+      latitude,
+      longitude,
     }));
   };
 
@@ -175,8 +261,12 @@ export default function ReportsScreen() {
 
     setIsSaving(true);
     try {
-      await submitReport(form);
+      await submitReport({
+        ...form,
+        ...(evidencePhoto && { evidence_photo: evidencePhoto }),
+      });
       setForm(emptyForm);
+      setEvidencePhoto(null);
       setBarangayPickerVisible(false);
       setFormVisible(false);
       Alert.alert('Report submitted', form.report_type === 'incident'
@@ -214,6 +304,7 @@ export default function ReportsScreen() {
     return (
       <View style={[
         styles.reportCard,
+        isDark && themeStyles.surface,
         item.is_incident ? styles.reportCardIncident : styles.reportCardRoutine,
       ]}>
         <View style={styles.reportTopRow}>
@@ -227,8 +318,8 @@ export default function ReportsScreen() {
           )}
         </View>
 
-        <Text style={styles.reportTitle}>{item.title}</Text>
-        <Text style={styles.reportMeta}>
+        <Text style={[styles.reportTitle, isDark && themeStyles.text]}>{item.title}</Text>
+        <Text style={[styles.reportMeta, isDark && themeStyles.muted]}>
           {new Date(item.date_time).toLocaleString([], {
             month: 'short',
             day: 'numeric',
@@ -238,8 +329,8 @@ export default function ReportsScreen() {
           })}
         </Text>
         <View style={styles.locationRow}>
-          <Icon name="place" size={16} color={mobileTheme.textMuted} />
-          <Text style={styles.locationText} numberOfLines={1}>{item.location}</Text>
+          <Icon name="place" size={16} color={colors.textMuted} />
+          <Text style={[styles.locationText, isDark && themeStyles.muted]} numberOfLines={1}>{item.location}</Text>
         </View>
 
         <View style={styles.reportActions}>
@@ -249,7 +340,7 @@ export default function ReportsScreen() {
               <Text style={styles.resolveButtonText}>Resolve Incident</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.viewButton} onPress={() => setSelectedReport(item)}>
+          <TouchableOpacity style={[styles.viewButton, isDark && themeStyles.surfaceMuted]} onPress={() => setSelectedReport(item)}>
             <Icon name="visibility" size={17} color={mobileTheme.purple} />
             <Text style={styles.viewButtonText}>View</Text>
           </TouchableOpacity>
@@ -259,15 +350,15 @@ export default function ReportsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDark && themeStyles.screen]} edges={['top']}>
+      <PolicePageHeader />
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Reports</Text>
-          <Text style={styles.subtitle}>Your submitted report history</Text>
+          <Text style={[styles.title, isDark && themeStyles.text]}>Reports</Text>
+          <Text style={[styles.subtitle, isDark && themeStyles.muted]}>Your submitted report history</Text>
         </View>
-        <TouchableOpacity style={styles.submitButton} onPress={openSubmitForm}>
+         <TouchableOpacity style={styles.submitButton} onPress={openSubmitForm}>
           <Icon name="add" size={19} color="#ffffff" />
-          <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
 
@@ -275,10 +366,20 @@ export default function ReportsScreen() {
         {(['all', 'incident', 'routine'] as const).map((item) => (
           <TouchableOpacity
             key={item}
-            style={[styles.filterButton, filter === item && styles.filterButtonActive]}
+            style={[
+              styles.filterButton,
+              isDark && themeStyles.filterButton,
+              filter === item && styles.filterButtonActive,
+              isDark && filter === item && themeStyles.filterButtonActive,
+            ]}
             onPress={() => setFilter(item)}
           >
-            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item}</Text>
+            <Text style={[
+              styles.filterText,
+              isDark && themeStyles.muted,
+              filter === item && styles.filterTextActive,
+              isDark && filter === item && themeStyles.text,
+            ]}>{item}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -288,40 +389,72 @@ export default function ReportsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderReport}
         contentContainerStyle={styles.list}
+        ListFooterComponent={reportsHasMore ? (
+          <TouchableOpacity
+            style={[styles.loadMoreButton, isDark && themeStyles.surfaceMuted]}
+            onPress={() => loadMoreReports().catch(() => undefined)}
+            disabled={isReportsLoadingMore}
+          >
+            {isReportsLoadingMore ? (
+              <ActivityIndicator size="small" color={mobileTheme.blue} />
+            ) : (
+              <Icon name="expand-more" size={20} color={mobileTheme.blue} />
+            )}
+            <Text style={styles.loadMoreText}>
+              {isReportsLoadingMore ? 'Loading...' : 'Load more'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         ListEmptyComponent={(
           <View style={styles.emptyState}>
-            <Icon name="description" size={34} color={mobileTheme.textMuted} />
-            <Text style={styles.emptyTitle}>No submitted reports</Text>
-            <Text style={styles.emptyText}>Reports you submit will appear here.</Text>
+            <Icon name="description" size={34} color={colors.textMuted} />
+            <Text style={[styles.emptyTitle, isDark && themeStyles.text]}>
+              {isReportsLoading ? 'Loading reports...' : 'No submitted reports'}
+            </Text>
+            <Text style={[styles.emptyText, isDark && themeStyles.muted]}>
+              {isReportsLoading ? 'Getting your latest records.' : 'Reports you submit will appear here.'}
+            </Text>
           </View>
         )}
       />
 
-      <Modal visible={formVisible} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalScreen}>
-          <View style={styles.modalHeader}>
+      <Modal
+        visible={formVisible && !locationPickerVisible}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+      >
+        <View style={styles.submitModalRoot}>
+          <View style={{ height: insets.top + SUBMIT_MODAL_TOP_OFFSET }} />
+          <SafeAreaView
+            style={[styles.modalScreen, isDark && themeStyles.screen]}
+            edges={['bottom']}
+          >
+          <View style={[styles.modalHeader, isDark && themeStyles.border]}>
             <View>
-              <Text style={styles.modalTitle}>Submit Report</Text>
-              <Text style={styles.modalSubtitle}>Record an incident or completed activity</Text>
+              <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Submit Report</Text>
+              <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Record an incident or completed activity</Text>
             </View>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, isDark && themeStyles.surfaceMuted]}
               onPress={() => {
                 setBarangayPickerVisible(false);
+                setEvidencePhoto(null);
                 setFormVisible(false);
               }}
             >
-              <Icon name="close" size={22} color={mobileTheme.text} />
+              <Icon name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.form}>
-            <Text style={styles.fieldLabel}>REPORT TYPE</Text>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REPORT TYPE</Text>
             <View style={styles.typeOptions}>
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type}
-                  style={[styles.typeOption, form.report_type === type && styles.typeOptionActive]}
+                  style={[styles.typeOption, isDark && themeStyles.surfaceMuted, form.report_type === type && styles.typeOptionActive]}
                   onPress={() => updateForm('report_type', type)}
                 >
                   <Text style={[styles.typeOptionText, form.report_type === type && styles.typeOptionTextActive]}>
@@ -331,13 +464,13 @@ export default function ReportsScreen() {
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>TITLE</Text>
-            <TextInput style={styles.input} value={form.title} onChangeText={(value) => updateForm('title', value)} placeholder="Short report title" />
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>TITLE</Text>
+            <TextInput style={[styles.input, isDark && themeStyles.input]} value={form.title} onChangeText={(value) => updateForm('title', value)} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
 
-            <Text style={styles.fieldLabel}>TIME</Text>
-            <View style={styles.autoField}>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>TIME</Text>
+            <View style={[styles.autoField, isDark && themeStyles.input]}>
               <Icon name="schedule" size={18} color={mobileTheme.purple} />
-              <Text style={styles.autoFieldText}>
+              <Text style={[styles.autoFieldText, isDark && themeStyles.text]}>
                 {form.occurred_at
                   ? new Date(form.occurred_at).toLocaleString([], {
                     month: 'short',
@@ -350,71 +483,132 @@ export default function ReportsScreen() {
               </Text>
             </View>
 
-            <Text style={styles.fieldLabel}>ASSIGNED AREA</Text>
-            <View style={styles.autoField}>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>ASSIGNED AREA</Text>
+            <View style={[styles.autoField, isDark && themeStyles.input]}>
               <Icon name="assignment-ind" size={18} color={mobileTheme.purple} />
-              <Text style={styles.autoFieldText}>
+              <Text style={[styles.autoFieldText, isDark && themeStyles.text]}>
                 {form.assigned_area || 'No active deployment assigned'}
               </Text>
             </View>
 
-            <Text style={styles.fieldLabel}>BARANGAY</Text>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>BARANGAY</Text>
             <TouchableOpacity
-              style={styles.selectField}
+              style={[styles.selectField, isDark && themeStyles.input]}
               onPress={() => setBarangayPickerVisible(true)}
             >
               <Icon name="map" size={18} color={mobileTheme.purple} />
-              <Text style={[styles.autoFieldText, !form.barangay && styles.placeholderText]}>
+              <Text style={[styles.autoFieldText, isDark && themeStyles.text, !form.barangay && styles.placeholderText]}>
                 {form.barangay || 'Select a Cabagan barangay'}
               </Text>
-              <Icon name="keyboard-arrow-down" size={21} color={mobileTheme.textMuted} />
+              <Icon name="keyboard-arrow-down" size={21} color={colors.textMuted} />
             </TouchableOpacity>
 
-            <Text style={styles.fieldLabel}>EXACT INCIDENT PLACE / LANDMARK</Text>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>EXACT INCIDENT PLACE / LANDMARK</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isDark && themeStyles.input]}
               value={form.location}
               onChangeText={updateManualLocation}
               placeholder="Example: Anao Public Market entrance"
+              placeholderTextColor={colors.textMuted}
             />
             <View style={styles.locationAssistRow}>
               <View style={styles.locationSource}>
                 <Icon
                   name={form.location_source === 'gps' ? 'gps-fixed' : 'edit-location-alt'}
                   size={15}
-                  color={mobileTheme.textMuted}
+                  color={colors.textMuted}
                 />
-                <Text style={styles.locationSourceText}>
+                <Text style={[styles.locationSourceText, isDark && themeStyles.muted]}>
                   {form.location_source === 'gps' ? 'Current GPS suggestion' : 'Manual incident location'}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.gpsSuggestionButton} onPress={useCurrentGpsSuggestion}>
+              <TouchableOpacity style={[styles.gpsSuggestionButton, isDark && themeStyles.surfaceMuted]} onPress={useCurrentGpsSuggestion}>
                 <Icon name="my-location" size={16} color={mobileTheme.purple} />
                 <Text style={styles.gpsSuggestionText}>Use current GPS</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.locationHelper}>
+            <TouchableOpacity
+              style={[styles.mapPickerButton, isDark && themeStyles.input]}
+              onPress={() => setLocationPickerVisible(true)}
+            >
+              <View style={styles.mapPickerIcon}>
+                <Icon name="add-location-alt" size={20} color={mobileTheme.purple} />
+              </View>
+              <View style={styles.mapPickerCopy}>
+                <Text style={[styles.mapPickerTitle, isDark && themeStyles.text]}>Pick the incident point on map</Text>
+                <Text style={[styles.mapPickerMeta, isDark && themeStyles.muted]}>
+                  {typeof form.latitude === 'number' && typeof form.longitude === 'number'
+                    ? `${form.latitude.toFixed(6)}, ${form.longitude.toFixed(6)}`
+                    : 'Recommended when the report is submitted after leaving the scene'}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+            <Text style={[styles.locationHelper, isDark && themeStyles.muted]}>
               Verify the actual incident place. Your current position may be different if you submit later.
             </Text>
 
-            <Text style={styles.fieldLabel}>DESCRIPTION</Text>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>DESCRIPTION</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, isDark && themeStyles.input]}
               value={form.description}
               onChangeText={(value) => updateForm('description', value)}
               placeholder="What happened and what action was taken?"
+              placeholderTextColor={colors.textMuted}
               multiline
               textAlignVertical="top"
             />
 
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE (OPTIONAL)</Text>
+            {evidencePhoto ? (
+              <View style={[styles.evidencePreview, isDark && themeStyles.surfaceMuted]}>
+                <Image source={{ uri: evidencePhoto.uri }} style={styles.evidencePreviewImage} />
+                <View style={styles.evidencePreviewInfo}>
+                  <View style={styles.evidencePreviewCopy}>
+                    <Text style={[styles.evidencePreviewTitle, isDark && themeStyles.text]}>Photo ready</Text>
+                    <Text style={[styles.evidencePreviewMeta, isDark && themeStyles.muted]}>
+                      {evidencePhoto.camera_facing === 'front' ? 'Front camera' : 'Back camera'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.evidenceIconButton, isDark && themeStyles.border]}
+                    onPress={() => setEvidencePhoto(null)}
+                    accessibilityLabel="Remove photo evidence"
+                  >
+                    <Icon name="delete-outline" size={20} color={mobileTheme.danger} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={styles.retakeButton} onPress={chooseEvidenceCamera}>
+                  <Icon name="cameraswitch" size={18} color={mobileTheme.purple} />
+                  <Text style={styles.retakeButtonText}>Retake photo</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.captureButton, isDark && themeStyles.input]}
+                onPress={chooseEvidenceCamera}
+              >
+                <View style={styles.captureButtonIcon}>
+                  <Icon name="photo-camera" size={22} color={mobileTheme.purple} />
+                </View>
+                <View style={styles.captureButtonCopy}>
+                  <Text style={[styles.captureButtonTitle, isDark && themeStyles.text]}>Capture evidence</Text>
+                  <Text style={[styles.captureButtonMeta, isDark && themeStyles.muted]}>
+                    Use the front or back camera. Maximum upload: 5 MB.
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
+
             {form.report_type === 'incident' && (
               <>
-                <Text style={styles.fieldLabel}>SEVERITY</Text>
+                <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>SEVERITY</Text>
                 <View style={styles.severityOptions}>
                   {[1, 2, 3, 4, 5].map((severity) => (
                     <TouchableOpacity
                       key={severity}
-                      style={[styles.severityButton, form.severity === severity && styles.severityButtonActive]}
+                      style={[styles.severityButton, isDark && themeStyles.surfaceMuted, form.severity === severity && styles.severityButtonActive]}
                       onPress={() => updateForm('severity', severity)}
                     >
                       <Text style={[styles.severityText, form.severity === severity && styles.severityTextActive]}>
@@ -430,22 +624,31 @@ export default function ReportsScreen() {
               <Text style={styles.primaryButtonText}>{isSaving ? 'Submitting...' : 'Submit Report'}</Text>
             </TouchableOpacity>
           </ScrollView>
-        </SafeAreaView>
+          </SafeAreaView>
+        </View>
       </Modal>
+
+      <ReportLocationPickerModal
+        visible={locationPickerVisible}
+        initialLatitude={form.latitude}
+        initialLongitude={form.longitude}
+        onClose={() => setLocationPickerVisible(false)}
+        onConfirm={usePinnedLocation}
+      />
 
       <Modal visible={barangayPickerVisible} transparent animationType="fade">
         <View style={styles.overlay}>
-          <View style={styles.pickerModal}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.pickerModal, isDark && themeStyles.surface]}>
+            <View style={[styles.modalHeader, isDark && themeStyles.border]}>
               <View>
-                <Text style={styles.modalTitle}>Select Barangay</Text>
-                <Text style={styles.modalSubtitle}>Official barangays of Cabagan only</Text>
+                <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Select Barangay</Text>
+                <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Official barangays of Cabagan only</Text>
               </View>
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, isDark && themeStyles.surfaceMuted]}
                 onPress={() => setBarangayPickerVisible(false)}
               >
-                <Icon name="close" size={22} color={mobileTheme.text} />
+                <Icon name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -456,11 +659,12 @@ export default function ReportsScreen() {
                 const isSelected = form.barangay === item;
                 return (
                   <TouchableOpacity
-                    style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                    style={[styles.pickerOption, isDark && themeStyles.border, isSelected && styles.pickerOptionSelected]}
                     onPress={() => selectBarangay(item)}
                   >
                     <Text style={[
                       styles.pickerOptionText,
+                      isDark && themeStyles.text,
                       isSelected && styles.pickerOptionTextSelected,
                     ]}>
                       {item}
@@ -478,17 +682,17 @@ export default function ReportsScreen() {
 
       <Modal visible={Boolean(selectedReport)} transparent animationType="fade">
         <View style={styles.overlay}>
-          <View style={styles.detailModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Report Details</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedReport(null)}>
-                <Icon name="close" size={22} color={mobileTheme.text} />
+          <View style={[styles.detailModal, isDark && themeStyles.surface]}>
+            <View style={[styles.modalHeader, isDark && themeStyles.border]}>
+              <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Report Details</Text>
+              <TouchableOpacity style={[styles.closeButton, isDark && themeStyles.surfaceMuted]} onPress={() => setSelectedReport(null)}>
+                <Icon name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
             {selectedReport && (
               <ScrollView contentContainerStyle={styles.detailBody}>
-                <Text style={styles.detailEyebrow}>{selectedReport.id}</Text>
-                <Text style={styles.detailTitle}>{selectedReport.title}</Text>
+                <Text style={[styles.detailEyebrow, isDark && themeStyles.muted]}>{selectedReport.id}</Text>
+                <Text style={[styles.detailTitle, isDark && themeStyles.text]}>{selectedReport.title}</Text>
                 <Detail label="Report type" value={selectedReport.report_type} />
                 <Detail label="Case status" value={selectedReport.case_status} />
                 <Detail label="Barangay" value={selectedReport.barangay} />
@@ -500,6 +704,19 @@ export default function ReportsScreen() {
                     : 'Manually entered'}
                 />
                 <Detail label="Description" value={selectedReport.description} />
+                {selectedReport.evidence_photo?.url && (
+                  <View style={[styles.detailEvidence, isDark && themeStyles.border]}>
+                    <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE</Text>
+                    <Image
+                      source={{ uri: resolveApiAssetUrl(selectedReport.evidence_photo.url) }}
+                      style={styles.detailEvidenceImage}
+                      resizeMode="cover"
+                    />
+                    <Text style={[styles.detailEvidenceMeta, isDark && themeStyles.muted]}>
+                      Captured with {selectedReport.evidence_photo.camera_facing === 'front' ? 'front' : 'back'} camera
+                    </Text>
+                  </View>
+                )}
                 {selectedReport.resolution_notes && (
                   <Detail label="Resolution notes" value={selectedReport.resolution_notes} />
                 )}
@@ -511,23 +728,24 @@ export default function ReportsScreen() {
 
       <Modal visible={Boolean(resolveTarget)} transparent animationType="fade">
         <View style={styles.overlay}>
-          <View style={styles.resolveModal}>
-            <Text style={styles.modalTitle}>Resolve Incident</Text>
-            <Text style={styles.resolveCopy}>
+          <View style={[styles.resolveModal, isDark && themeStyles.surface]}>
+            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Resolve Incident</Text>
+            <Text style={[styles.resolveCopy, isDark && themeStyles.muted]}>
               Confirm that {resolveTarget?.title} has been handled. This will update the web dashboard.
             </Text>
-            <Text style={styles.fieldLabel}>RESOLUTION NOTES</Text>
+            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>RESOLUTION NOTES</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, isDark && themeStyles.input]}
               value={resolutionNotes}
               onChangeText={setResolutionNotes}
               placeholder="Describe the action taken and outcome"
+              placeholderTextColor={colors.textMuted}
               multiline
               textAlignVertical="top"
             />
             <View style={styles.resolveActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setResolveTarget(null)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+              <TouchableOpacity style={[styles.cancelButton, isDark && themeStyles.border]} onPress={() => setResolveTarget(null)}>
+                <Text style={[styles.cancelButtonText, isDark && themeStyles.text]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.primaryButtonCompact} onPress={handleResolve} disabled={isSaving}>
                 <Text style={styles.primaryButtonText}>{isSaving ? 'Saving...' : 'Confirm Resolve'}</Text>
@@ -541,16 +759,17 @@ export default function ReportsScreen() {
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
+  const { isDark } = useMobileTheme();
   return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
+    <View style={[styles.detailRow, isDark && themeStyles.border]}>
+      <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>{label}</Text>
+      <Text style={[styles.detailValue, isDark && themeStyles.text]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: mobileTheme.background },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   header: {
     paddingHorizontal: 22,
     paddingTop: 18,
@@ -567,7 +786,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 22,
+    borderRadius: 50,
     backgroundColor: mobileTheme.purple,
     shadowColor: '#1c1c4d',
     shadowOffset: { width: 0, height: 4 },
@@ -587,28 +806,29 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: mobileTheme.purple,
-    borderRadius: 22,
-    backgroundColor: '#d9d7e2',
-    shadowColor: '#1c1c4d',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
   },
-  filterButtonActive: { borderColor: mobileTheme.navy, backgroundColor: mobileTheme.surface },
+  filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#edf4ff' },
   filterText: { color: mobileTheme.navy, fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
-  filterTextActive: { color: mobileTheme.navy },
+  filterTextActive: { color: mobileTheme.blue },
   list: { paddingHorizontal: 22, paddingBottom: 112, gap: 13 },
   reportCard: {
     padding: 16,
-    borderWidth: 2,
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
     backgroundColor: mobileTheme.surface,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  reportCardIncident: { borderColor: mobileTheme.danger },
-  reportCardRoutine: { borderColor: mobileTheme.purple },
+  reportCardIncident: { borderLeftWidth: 3, borderLeftColor: mobileTheme.danger },
+  reportCardRoutine: { borderLeftWidth: 3, borderLeftColor: mobileTheme.blue },
   reportTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   typeBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10 },
   incidentBadge: { backgroundColor: mobileTheme.dangerSoft },
@@ -623,14 +843,34 @@ const styles = StyleSheet.create({
   locationRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationText: { flex: 1, color: mobileTheme.textMuted, fontSize: 12 },
   reportActions: { marginTop: 14, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  resolveButton: { minHeight: 42, paddingHorizontal: 11, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 21, backgroundColor: mobileTheme.success },
+  resolveButton: { minHeight: 42, paddingHorizontal: 11, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, backgroundColor: mobileTheme.success },
   resolveButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
-  viewButton: { minHeight: 42, minWidth: 90, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1.5, borderColor: mobileTheme.purple, borderRadius: 21, backgroundColor: mobileTheme.surface },
+  viewButton: { minHeight: 42, minWidth: 90, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.blue, borderRadius: 8, backgroundColor: mobileTheme.surface },
   viewButtonText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
   emptyState: { paddingTop: 80, alignItems: 'center' },
   emptyTitle: { marginTop: 10, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
   emptyText: { marginTop: 4, color: mobileTheme.textMuted, fontSize: 12 },
-  modalScreen: { flex: 1, backgroundColor: mobileTheme.background },
+  loadMoreButton: {
+    minHeight: 44,
+    marginTop: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
+  },
+  loadMoreText: { color: mobileTheme.blue, fontSize: 12, fontWeight: '800' },
+  submitModalRoot: { flex: 1 },
+  modalScreen: {
+    flex: 1,
+    overflow: 'hidden',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    backgroundColor: mobileTheme.background,
+  },
   modalHeader: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: mobileTheme.border },
   modalTitle: { color: mobileTheme.text, fontSize: 19, fontWeight: '800' },
   modalSubtitle: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 11 },
@@ -652,8 +892,27 @@ const styles = StyleSheet.create({
   locationSourceText: { flex: 1, color: mobileTheme.textMuted, fontSize: 10 },
   gpsSuggestionButton: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 18, backgroundColor: mobileTheme.surface },
   gpsSuggestionText: { color: mobileTheme.purple, fontSize: 10, fontWeight: '800' },
+  mapPickerButton: { minHeight: 70, marginTop: 10, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  mapPickerIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: mobileTheme.purpleSoft },
+  mapPickerCopy: { flex: 1 },
+  mapPickerTitle: { color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
+  mapPickerMeta: { marginTop: 3, color: mobileTheme.textMuted, fontSize: 9, lineHeight: 14 },
   locationHelper: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 10, lineHeight: 15 },
   textArea: { minHeight: 110, paddingTop: 12 },
+  captureButton: { minHeight: 82, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  captureButtonIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: mobileTheme.purpleSoft },
+  captureButtonCopy: { flex: 1 },
+  captureButtonTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
+  captureButtonMeta: { marginTop: 3, color: mobileTheme.textMuted, fontSize: 10, lineHeight: 15 },
+  evidencePreview: { overflow: 'hidden', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  evidencePreviewImage: { width: '100%', aspectRatio: 4 / 3, backgroundColor: mobileTheme.background },
+  evidencePreviewInfo: { padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  evidencePreviewCopy: { flex: 1 },
+  evidencePreviewTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
+  evidencePreviewMeta: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 10 },
+  evidenceIconButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8 },
+  retakeButton: { minHeight: 42, marginHorizontal: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 8 },
+  retakeButtonText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
   severityOptions: { flexDirection: 'row', gap: 8 },
   severityButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 21, backgroundColor: mobileTheme.surface },
   severityButtonActive: { borderColor: mobileTheme.purple, backgroundColor: mobileTheme.purple },
@@ -676,9 +935,24 @@ const styles = StyleSheet.create({
   detailRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: mobileTheme.border },
   detailLabel: { color: mobileTheme.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
   detailValue: { marginTop: 4, color: mobileTheme.text, fontSize: 13, lineHeight: 19, textTransform: 'capitalize' },
+  detailEvidence: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: mobileTheme.border },
+  detailEvidenceImage: { width: '100%', marginTop: 8, aspectRatio: 4 / 3, borderRadius: 10, backgroundColor: mobileTheme.background },
+  detailEvidenceMeta: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 10 },
   resolveModal: { padding: 18, borderRadius: 20, backgroundColor: mobileTheme.surface },
   resolveCopy: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 12, lineHeight: 18 },
   resolveActions: { marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   cancelButton: { minHeight: 44, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 22 },
   cancelButtonText: { color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
+});
+
+const themeStyles = StyleSheet.create({
+  screen: { backgroundColor: '#050b18' },
+  surface: { borderColor: '#22314a', backgroundColor: '#0b1528' },
+  surfaceMuted: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  text: { color: '#f8fafc' },
+  muted: { color: '#9eabc0' },
+  border: { borderColor: '#22314a' },
+  input: { borderColor: '#2a3a56', backgroundColor: '#0e1a30', color: '#f8fafc' },
+  filterButton: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#132442' },
 });

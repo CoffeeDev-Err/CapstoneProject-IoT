@@ -197,9 +197,9 @@ const createPoliceMarkerIcon = (member) => {
         </div>
       </div>
     `,
-    iconSize: [40, 48],
-    iconAnchor: [20, 44],
-    popupAnchor: [0, -40],
+    iconSize: [38, 44],
+    iconAnchor: [19, 40],
+    popupAnchor: [0, -36],
   })
 }
 
@@ -292,7 +292,9 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
   const deploymentGroups = useMemo(() => {
     const groups = new Map()
 
-    deployments.forEach((assignment) => {
+    deployments
+      .filter((assignment) => assignment.isCurrentShift !== false)
+      .forEach((assignment) => {
       const latitude = Number(assignment.latitude)
       const longitude = Number(assignment.longitude)
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
@@ -307,7 +309,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
       }
       group.personnelNames.push(assignment.personnelName)
       groups.set(key, group)
-    })
+      })
 
     return [...groups.values()]
   }, [deployments])
@@ -319,7 +321,20 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
         its own internal state. Markers are updated by React re-rendering
         the <Marker> components with new position props.
       */}
-      <MapContainer center={CABAGAN_CENTER} zoom={14} scrollWheelZoom className="map-view">
+      <MapContainer
+        center={CABAGAN_CENTER}
+        zoom={14}
+        maxZoom={19}
+        scrollWheelZoom
+        zoomAnimation
+        fadeAnimation
+        markerZoomAnimation
+        zoomSnap={0.25}
+        zoomDelta={0.5}
+        wheelDebounceTime={25}
+        wheelPxPerZoomLevel={90}
+        className="map-view"
+      >
         <FocusCabaganOnLoad />
         <FocusCabaganOnLayoutChange layoutVersion={layoutVersion} />
         <FocusPersonnelOnLocate focusTarget={focusTarget} />
@@ -327,6 +342,8 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
         {/* OpenStreetMap tile layer — loads the map imagery */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          maxNativeZoom={19}
+          maxZoom={19}
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 

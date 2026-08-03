@@ -96,10 +96,13 @@ const currentLocationSchema = new mongoose.Schema({
 	accuracy: Number,
 	speed: Number,
 	heading: Number,
+	batteryLevel: Number,
 	source: { type: String, enum: ['gps', 'mock'], default: 'mock' },
 	isSimulated: { type: Boolean, default: true },
 	recordedAt: { type: Date, required: true, default: Date.now },
 	receivedAt: { type: Date, required: true, default: Date.now },
+	lastMovedAt: { type: Date, default: Date.now },
+	inactivityAlertedAt: Date,
 }, {
 	collection: 'current_locations',
 	timestamps: true,
@@ -161,6 +164,8 @@ const deploymentSchema = new mongoose.Schema({
 	assignedAt: { type: Date, default: Date.now },
 	location: { type: pointSchema, required: true },
 	status: { type: String, enum: ['active', 'completed', 'cancelled'], default: 'active' },
+	acknowledgedAt: Date,
+	acknowledgedSignature: String,
 }, {
 	collection: 'deployments',
 	timestamps: true,
@@ -169,11 +174,30 @@ deploymentSchema.index({ assignmentId: 1 }, { unique: true })
 deploymentSchema.index({ personnelId: 1, status: 1 })
 deploymentSchema.index({ barangayCode: 1, status: 1 })
 deploymentSchema.index({ shiftStart: -1 })
+deploymentSchema.index({ status: 1, shiftStart: 1, shiftEnd: 1 })
 
 const resolutionSchema = new mongoose.Schema({
 	resolvedAt: Date,
 	resolvedBy: String,
 	notes: { type: String, default: '' },
+}, { _id: false })
+
+const reportEvidenceSchema = new mongoose.Schema({
+	path: { type: String, required: true },
+	originalName: { type: String, default: '' },
+	mimeType: { type: String, required: true },
+	size: { type: Number, min: 0, required: true },
+	cameraFacing: { type: String, enum: ['front', 'back'], default: 'back' },
+	capturedAt: { type: Date, required: true },
+}, { _id: false })
+
+const reportRoutePointSchema = new mongoose.Schema({
+	location: { type: pointSchema, required: true },
+	accuracy: Number,
+	speed: Number,
+	heading: Number,
+	source: { type: String, enum: ['gps', 'mock'], default: 'gps' },
+	recordedAt: { type: Date, required: true },
 }, { _id: false })
 
 const reportSchema = new mongoose.Schema({
@@ -199,6 +223,9 @@ const reportSchema = new mongoose.Schema({
 	submittedFrom: pointSchema,
 	incidentAt: { type: Date, required: true },
 	submittedAt: { type: Date, required: true, default: Date.now },
+	evidencePhoto: reportEvidenceSchema,
+	routeSnapshot: { type: [reportRoutePointSchema], default: [] },
+	routeSnapshotCapturedAt: Date,
 	resolution: resolutionSchema,
 }, {
 	collection: 'reports',
@@ -206,7 +233,7 @@ const reportSchema = new mongoose.Schema({
 })
 reportSchema.index({ reportNumber: 1 }, { unique: true })
 reportSchema.index({ submittedAt: -1, _id: -1 })
-reportSchema.index({ submittedBy: 1, submittedAt: -1 })
+reportSchema.index({ submittedBy: 1, submittedAt: -1, _id: -1 })
 reportSchema.index({ barangayCode: 1, incidentAt: -1 })
 reportSchema.index({ reportType: 1, caseStatus: 1, incidentAt: -1 })
 reportSchema.index({ location: '2dsphere' })
@@ -228,15 +255,16 @@ const taskSchema = new mongoose.Schema({
 	barangayCode: { type: String, trim: true, uppercase: true },
 	locationName: { type: String, required: true },
 	location: { type: pointSchema, required: true },
-	status: { type: String, enum: ['open', 'full', 'completed'], default: 'open' },
+	status: { type: String, enum: ['open', 'full', 'completed', 'cancelled'], default: 'open' },
 	completedAt: Date,
+	cancelledAt: Date,
 }, {
 	collection: 'tasks',
 	timestamps: true,
 })
 taskSchema.index({ taskId: 1 }, { unique: true })
-taskSchema.index({ status: 1, createdAt: -1 })
-taskSchema.index({ requestedBy: 1, createdAt: -1 })
+taskSchema.index({ status: 1, createdAt: -1, _id: -1 })
+taskSchema.index({ requestedBy: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ 'responders.personnelId': 1, status: 1 })
 
 const notificationSchema = new mongoose.Schema({

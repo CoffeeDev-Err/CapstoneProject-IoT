@@ -86,30 +86,40 @@
 }
 
 .account-create-section {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  flex: 0 1 auto;
+  min-height: auto;
+  overflow: visible;
   padding-right: 0.2rem;
 }
 
 .page-container--settings {
-  height: calc(100vh - var(--top-bar-h));
-  overflow: hidden;
+  min-height: calc(100vh - var(--top-bar-h));
+  height: auto;
+  overflow: visible;
 }
 
 .page-container--settings .settings-grid {
-  height: 100%;
+  height: auto;
 }
 
 .account-management-card {
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: auto;
 }
 
 .account-form--fixed {
   flex-shrink: 0;
+}
+
+.account-role-note {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  line-height: 1.45;
 }
 
 .account-form-grid {

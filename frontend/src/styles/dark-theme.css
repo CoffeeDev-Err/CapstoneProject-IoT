@@ -848,6 +848,12 @@
   z-index: 10001;
 }
 
+/* The map profile is a compact non-blocking overlay, not a centered dialog. */
+.profile-map-card {
+  position: fixed;
+  z-index: 10001;
+}
+
 /* Absolute stacking safety for Live Map view */
 .monitoring-shell {
   isolation: isolate;

@@ -13,12 +13,11 @@ const createOperationalController = (operationalService) => ({
 
 	getBootstrap: async (req, res) => {
 		const personnelId = req.auth.user.personnelId
-		const [tasks, reports, deployments] = await Promise.all([
-			operationalService.loadTasks(),
-			operationalService.loadReports(personnelId),
+		const [taskPayload, deployments] = await Promise.all([
+			operationalService.listTasks({ view: 'active', limit: 100 }),
 			operationalService.loadDeployments(personnelId),
 		])
-		res.json({ tasks, reports, deployments })
+		res.json({ tasks: taskPayload.data, reports: [], deployments })
 	},
 
 	createTask: async (req, res) => {
@@ -31,6 +30,14 @@ const createOperationalController = (operationalService) => ({
 
 	acceptTask: async (req, res) => {
 		const result = await operationalService.acceptTask(
+			req.params.taskId,
+			req.auth.user.personnelId,
+		)
+		res.status(result.status).json(result.body)
+	},
+
+	cancelTask: async (req, res) => {
+		const result = await operationalService.cancelTask(
 			req.params.taskId,
 			req.auth.user.personnelId,
 		)
@@ -54,10 +61,30 @@ const createOperationalController = (operationalService) => ({
 		return res.json({ report })
 	},
 
+	getReportRoute: async (req, res) => {
+		const route = await operationalService.getReportRoute(req.params.reportId)
+		if (!route) {
+			return res.status(404).json({ success: false, message: 'Report not found.' })
+		}
+		return res.json({ route })
+	},
+
 	submitReport: async (req, res) => {
 		const report = await operationalService.submitReport({
 			...req.body,
 			personnel_id: req.auth.user.personnelId,
+			...(req.file && {
+				evidence_photo: {
+					path: `/uploads/report-evidence/${req.file.filename}`,
+					originalName: req.file.originalname,
+					mimeType: req.file.mimetype,
+					size: req.file.size,
+					cameraFacing: req.body.evidence_camera_facing === 'front'
+						? 'front'
+						: 'back',
+					capturedAt: req.body.evidence_captured_at || new Date(),
+				},
+			}),
 		})
 		res.status(201).json({ success: true, report })
 	},
@@ -94,6 +121,14 @@ const createOperationalController = (operationalService) => ({
 			})
 		}
 		return res.json({ deployment })
+	},
+
+	acknowledgeDeployment: async (req, res) => {
+		const result = await operationalService.acknowledgeDeployment(
+			req.params.assignmentId,
+			req.auth.user.personnelId,
+		)
+		res.status(result.status).json(result.body)
 	},
 
 	replaceDeployments: async (req, res) => {

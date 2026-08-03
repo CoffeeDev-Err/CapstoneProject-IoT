@@ -20,11 +20,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 import { WebView } from 'react-native-webview';
 import type { WebViewMessageEvent } from 'react-native-webview';
+import { PolicePageHeader } from '../components/PolicePageHeader';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
+import { useMobileTheme } from '../context/ThemeContext';
 import type { LivePersonnel } from '../types/operations';
 
 type MapPersonnel = LivePersonnel & {
@@ -72,10 +73,13 @@ const WebMapFrame = forwardRef<any, { html: string; onLoad: () => void }>(
 WebMapFrame.displayName = 'WebMapFrame';
 
 export default function OfficerMapScreen() {
+  const { colors, isDark } = useMobileTheme();
   const {
     deployments,
     personnel,
     tasks,
+    acknowledgeDeployment,
+    cancelBackupRequest,
     createBackupRequest,
     currentOfficer,
     currentPersonnelId,
@@ -86,36 +90,47 @@ export default function OfficerMapScreen() {
   const emergencyPulse = useRef(new Animated.Value(0)).current;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [backupActionPending, setBackupActionPending] = useState(false);
   const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('street');
-  const [acknowledgedAssignmentKey, setAcknowledgedAssignmentKey] = useState('');
-  const [assignmentAcknowledgementReady, setAssignmentAcknowledgementReady] = useState(false);
-  const assignment = deployments[0];
-  const assignmentKey = assignment
-    ? `${assignment.id}:${assignment.assignedAt || ''}`
-    : '';
-  const assignmentStorageKey = `deployment-acknowledgement:${currentPersonnelId || 'anonymous'}`;
-  const deploymentPromptVisible = Boolean(
-    assignment
-      && assignmentAcknowledgementReady
-      && acknowledgedAssignmentKey !== assignmentKey,
-  );
+  const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
+  const assignment = deployments.find((item) => item.isCurrentShift !== false);
+  const canRequestBackup = Boolean(assignment && currentOfficer.isOnDuty !== false);
+  const hasCurrentGpsFix = currentOfficer.isLocationStale !== true
+    && currentOfficer.isVisibleOnMap !== false;
+  const deploymentPromptVisible = Boolean(assignment && !assignment.acknowledged);
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => {
-    if (personnel.length) return personnel;
-    return currentPersonnelId ? [currentOfficer] : [];
+    if (personnel.length) {
+      return personnel.filter((member) => (
+        member.isVisibleOnMap !== false
+        && member.isLocationStale !== true
+        && Number.isFinite(member.latitude)
+        && Number.isFinite(member.longitude)
+      ));
+    }
+    return currentPersonnelId && currentOfficer.isVisibleOnMap !== false ? [currentOfficer] : [];
   }, [currentOfficer, currentPersonnelId, personnel]);
 
   const emergencyPersonnelIds = useMemo(() => {
     const ids = new Set<string>();
     tasks
-      .filter((task) => task.type === 'backup' && task.status !== 'completed')
+      .filter((task) => (
+        task.type === 'backup'
+        && (task.status === 'open' || task.status === 'full')
+      ))
       .forEach((task) => {
         ids.add(task.requested_by);
         task.accepted_by.forEach((personnelId) => ids.add(personnelId));
       });
     return ids;
   }, [tasks]);
+
+  const activeOwnBackupRequest = useMemo(() => tasks.find((task) => (
+    task.type === 'backup'
+    && task.requested_by === currentPersonnelId
+    && (task.status === 'open' || task.status === 'full')
+  )), [currentPersonnelId, tasks]);
 
   const mapPersonnel = useMemo<MapPersonnel[]>(() => (
     visiblePersonnel.map((member) => ({
@@ -134,37 +149,6 @@ export default function OfficerMapScreen() {
     ? emergencyPersonnelIds.has(selectedOfficer.id)
     : false;
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
-
-  useEffect(() => {
-    let cancelled = false;
-    setAssignmentAcknowledgementReady(false);
-
-    const loadAcknowledgement = async () => {
-      if (!assignmentKey) {
-        if (!cancelled) {
-          setAcknowledgedAssignmentKey('');
-          setAssignmentAcknowledgementReady(true);
-        }
-        return;
-      }
-
-      try {
-        const savedKey = Platform.OS === 'web'
-          ? window.localStorage.getItem(assignmentStorageKey)
-          : await SecureStore.getItemAsync(assignmentStorageKey);
-        if (!cancelled) setAcknowledgedAssignmentKey(savedKey || '');
-      } catch {
-        if (!cancelled) setAcknowledgedAssignmentKey('');
-      } finally {
-        if (!cancelled) setAssignmentAcknowledgementReady(true);
-      }
-    };
-
-    loadAcknowledgement();
-    return () => {
-      cancelled = true;
-    };
-  }, [assignmentKey, assignmentStorageKey]);
 
   useEffect(() => {
     if (!hasEmergencyParticipants) {
@@ -199,6 +183,12 @@ export default function OfficerMapScreen() {
     const patrolArea = JSON.stringify(assignment?.patrolArea || 'Cabagan Police Station');
     const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
+    const controlBackground = isDark ? '#0b1528' : '#ffffff';
+    const controlBorder = isDark ? '#2a3a56' : '#d9dee8';
+    const controlText = isDark ? '#f8fafc' : '#1c1c4d';
+    const popupBackground = isDark ? '#0b1528' : '#ffffff';
+    const popupText = isDark ? '#f8fafc' : '#17172f';
+    const popupMuted = isDark ? '#9eabc0' : '#686982';
 
     return `
       <!doctype html>
@@ -210,25 +200,27 @@ export default function OfficerMapScreen() {
           <style>
             html,body,#map{height:100%;margin:0}
             body{overflow:hidden;background:#e5e4df}
-            .leaflet-control-attribution{font-size:8px}
+            .leaflet-control-attribution{font-size:8px;background:${controlBackground}!important;color:${controlText}!important}
             .leaflet-top.leaflet-right{top:145px;right:10px}
-            .leaflet-control-zoom{border:0!important;box-shadow:0 4px 12px rgba(28,28,77,.22)!important}
-            .leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important;color:#1c1c4d!important}
-            .officer-pin{position:relative;width:62px;height:76px;display:flex;flex-direction:column;align-items:center}
-            .officer-photo{width:52px;height:52px;border:4px solid #6b28f1;border-radius:50%;object-fit:cover;background:#fff;box-shadow:0 5px 14px rgba(28,28,77,.32)}
+            .leaflet-control-zoom{border:1px solid ${controlBorder}!important;border-radius:12px!important;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.28)!important}
+            .leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important;border-color:${controlBorder}!important;background:${controlBackground}!important;color:${controlText}!important}
+            .leaflet-control-zoom a:hover{background:${isDark ? '#132442' : '#f1f5f9'}!important}
+            .officer-pin{position:relative;width:52px;height:62px;display:flex;flex-direction:column;align-items:center}
+            .officer-photo{width:42px;height:42px;border:3px solid #6b28f1;border-radius:50%;object-fit:cover;background:#fff;box-shadow:0 4px 10px rgba(28,28,77,.28)}
             .officer-photo.current{border-color:#27c93f}
             .officer-photo.emergency{border-color:#ff2f3d;animation:emergency-ring 1.15s ease-in-out infinite}
-            .officer-arrow{width:0;height:0;margin-top:-2px;border-left:12px solid transparent;border-right:12px solid transparent;border-top:18px solid #6b28f1}
+            .officer-arrow{width:0;height:0;margin-top:-2px;border-left:10px solid transparent;border-right:10px solid transparent;border-top:15px solid #6b28f1}
             .officer-arrow.current{border-top-color:#27c93f}
             .officer-arrow.emergency{border-top-color:#ff2f3d}
             @keyframes emergency-ring{
-              0%,100%{box-shadow:0 0 0 0 rgba(255,47,61,.72),0 5px 14px rgba(28,28,77,.32)}
-              50%{box-shadow:0 0 0 10px rgba(255,47,61,0),0 5px 14px rgba(28,28,77,.32)}
+              0%,100%{box-shadow:0 0 0 0 rgba(255,47,61,.72),0 4px 10px rgba(28,28,77,.28)}
+              50%{box-shadow:0 0 0 7px rgba(255,47,61,0),0 4px 10px rgba(28,28,77,.28)}
             }
             .officer-popup{min-width:132px;font-family:Arial,sans-serif}
-            .officer-popup strong{display:block;color:#17172f;font-size:13px}
-            .officer-popup span{display:block;margin-top:3px;color:#686982;font-size:11px}
-            .leaflet-popup-content-wrapper{border-radius:12px}
+            .officer-popup strong{display:block;color:${popupText};font-size:13px}
+            .officer-popup span{display:block;margin-top:3px;color:${popupMuted};font-size:11px}
+            .leaflet-popup-content-wrapper{border-radius:12px;background:${popupBackground};color:${popupText}}
+            .leaflet-popup-tip{background:${popupBackground}}
           </style>
         </head>
         <body>
@@ -241,22 +233,31 @@ export default function OfficerMapScreen() {
               scrollWheelZoom:true,
               doubleClickZoom:true,
               dragging:true,
-              zoomAnimation:true
+              zoomAnimation:true,
+              fadeAnimation:true,
+              markerZoomAnimation:true,
+              zoomSnap:.25,
+              zoomDelta:.5,
+              wheelDebounceTime:25,
+              wheelPxPerZoomLevel:90
             }).setView([${latitude},${longitude}],15);
             const streetLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+              maxNativeZoom:19,
               maxZoom:19,
               attribution:'&copy; OpenStreetMap'
             });
             const satelliteLayer=L.tileLayer(
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
               {
-                maxZoom:19,
+                maxNativeZoom:18,
+                maxZoom:18,
                 attribution:'Tiles &copy; Esri'
               }
             );
             const baseLayers={street:streetLayer,satellite:satelliteLayer};
             let activeBaseLayer=streetLayer;
             activeBaseLayer.addTo(map);
+            map.attributionControl.setPrefix(false);
             L.control.zoom({position:'topright'}).addTo(map);
             L.circle([${latitude},${longitude}],{
               radius:320,
@@ -352,6 +353,10 @@ export default function OfficerMapScreen() {
               activeBaseLayer=nextLayer;
               activeBaseLayer.addTo(map);
               activeBaseLayer.bringToBack();
+              const maximumZoom=mode==='satellite'?18:19;
+              if(map.getZoom()>maximumZoom){
+                map.setZoom(maximumZoom,{animate:true});
+              }
             };
 
             window.handleMapCommand=(command)=>{
@@ -373,7 +378,7 @@ export default function OfficerMapScreen() {
         </body>
       </html>
     `;
-  }, [assignment, currentPersonnelId, personnelRosterKey]);
+  }, [assignment, currentPersonnelId, isDark, personnelRosterKey]);
 
   const sendMapCommand = useCallback((command: MapCommand) => {
     if (Platform.OS === 'web') {
@@ -421,6 +426,12 @@ export default function OfficerMapScreen() {
     }
   };
 
+  const handleShouldStartMapLoad = useCallback(({ url }: { url: string }) => (
+    url === 'about:blank'
+    || url.startsWith('data:text/html')
+    || url.startsWith('file://')
+  ), []);
+
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
 
@@ -467,21 +478,26 @@ export default function OfficerMapScreen() {
   };
 
   const handleConfirmAssignment = async () => {
-    if (!assignmentKey) return;
-    setAcknowledgedAssignmentKey(assignmentKey);
-
+    if (!assignment || assignmentAcknowledgementPending) return;
+    setAssignmentAcknowledgementPending(true);
     try {
-      if (Platform.OS === 'web') {
-        window.localStorage.setItem(assignmentStorageKey, assignmentKey);
-      } else {
-        await SecureStore.setItemAsync(assignmentStorageKey, assignmentKey);
-      }
-    } catch {
-      // The acknowledgement still applies for the current app session.
+      await acknowledgeDeployment(assignment.id);
+    } catch (error) {
+      Alert.alert('Unable to confirm assignment', (error as Error).message);
+    } finally {
+      setAssignmentAcknowledgementPending(false);
     }
   };
 
   const handleBackupRequest = () => {
+    if (!canRequestBackup) {
+      Alert.alert(
+        'Backup unavailable',
+        'You can request backup only during an active deployment shift.',
+      );
+      return;
+    }
+
     Alert.alert(
       'Request backup?',
       `Request up to 3 responders at ${assignment?.patrolArea || currentOfficer.locationName}?`,
@@ -490,10 +506,43 @@ export default function OfficerMapScreen() {
         {
           text: 'Request',
           style: 'destructive',
-          onPress: () => {
-            createBackupRequest()
-              .then(() => Alert.alert('Backup requested', 'The request is now visible in Tasks.'))
-              .catch((error: Error) => Alert.alert('Request failed', error.message));
+          onPress: async () => {
+            setBackupActionPending(true);
+            try {
+              await createBackupRequest();
+              Alert.alert('Backup requested', 'The request is now visible in Tasks.');
+            } catch (error) {
+              Alert.alert('Request failed', (error as Error).message);
+            } finally {
+              setBackupActionPending(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCancelBackupRequest = () => {
+    if (!activeOwnBackupRequest) return;
+
+    Alert.alert(
+      'Cancel backup request?',
+      'The request will close and responders will no longer see it as active.',
+      [
+        { text: 'Keep Request', style: 'cancel' },
+        {
+          text: 'Cancel Request',
+          style: 'destructive',
+          onPress: async () => {
+            setBackupActionPending(true);
+            try {
+              await cancelBackupRequest(activeOwnBackupRequest.id);
+              Alert.alert('Backup cancelled', 'The backup request has been closed.');
+            } catch (error) {
+              Alert.alert('Unable to cancel backup', (error as Error).message);
+            } finally {
+              setBackupActionPending(false);
+            }
           },
         },
       ],
@@ -514,7 +563,9 @@ export default function OfficerMapScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
+      <PolicePageHeader />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
       {Platform.OS === 'web' && React.createElement('style', {
         dangerouslySetInnerHTML: {
           __html: `
@@ -543,6 +594,7 @@ export default function OfficerMapScreen() {
             javaScriptEnabled
             domStorageEnabled
             originWhitelist={['*']}
+            onShouldStartLoadWithRequest={handleShouldStartMapLoad}
             onLoad={handleMapLoad}
             onMessage={handleNativeMessage}
           />
@@ -559,9 +611,15 @@ export default function OfficerMapScreen() {
         />
       )}
 
-      <SafeAreaView pointerEvents="box-none" style={styles.overlay} edges={['top', 'left', 'right']}>
-        <View style={[styles.searchContainer, searchFocused && styles.searchContainerFocused]}>
-          <Icon name="search" size={24} color={mobileTheme.textMuted} />
+      <SafeAreaView pointerEvents="box-none" style={styles.overlay} edges={['left', 'right']}>
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            searchFocused && { borderColor: colors.purple },
+          ]}
+        >
+          <Icon name="search" size={24} color={colors.textMuted} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -569,9 +627,9 @@ export default function OfficerMapScreen() {
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             placeholder="Search officer or location"
-            placeholderTextColor="#89899b"
+            placeholderTextColor={colors.textMuted}
             returnKeyType="search"
-            style={[styles.searchInput, webSearchInputReset]}
+            style={[styles.searchInput, { color: colors.text }, webSearchInputReset]}
           />
           <View style={[styles.connectionDot, !isConnected && styles.connectionDotOffline]} />
         </View>
@@ -586,13 +644,21 @@ export default function OfficerMapScreen() {
                   {assignment?.patrolArea || 'No active assignment'}
                 </Text>
               </View>
-              <Text style={[styles.liveText, !isConnected && styles.offlineText]}>
-                {isConnected ? 'LIVE' : 'OFFLINE'}
+              <Text style={[
+                styles.liveText,
+                (!isConnected || !hasCurrentGpsFix) && styles.offlineText,
+              ]}>
+                {!isConnected ? 'OFFLINE' : (hasCurrentGpsFix ? 'LIVE' : 'GPS STALE')}
               </Text>
             </View>
           )}
 
-          <View style={styles.mapModeControl}>
+          <View
+            style={[
+              styles.mapModeControl,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <TouchableOpacity
               accessibilityLabel="Use normal map"
               accessibilityState={{ selected: mapMode === 'street' }}
@@ -602,7 +668,7 @@ export default function OfficerMapScreen() {
               <Icon
                 name="map"
                 size={20}
-                color={mapMode === 'street' ? '#ffffff' : mobileTheme.textMuted}
+                color={mapMode === 'street' ? '#ffffff' : colors.textMuted}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -614,7 +680,7 @@ export default function OfficerMapScreen() {
               <Icon
                 name="satellite-alt"
                 size={20}
-                color={mapMode === 'satellite' ? '#ffffff' : mobileTheme.textMuted}
+                color={mapMode === 'satellite' ? '#ffffff' : colors.textMuted}
               />
             </TouchableOpacity>
           </View>
@@ -627,15 +693,20 @@ export default function OfficerMapScreen() {
             <Icon name="place" size={23} color={mobileTheme.purple} />
           </View>
           <View style={styles.assignmentBody}>
-            <Text style={styles.assignmentTitle}>Assigned to {assignment.patrolArea}</Text>
+            <Text style={styles.assignmentTitle}>Assigned to {assignment?.patrolArea}</Text>
             <Text style={styles.assignmentNotes} numberOfLines={2}>
-              {assignment.notes || 'Maintain visibility within the assigned area.'}
+              {assignment?.notes || 'Maintain visibility within the assigned area.'}
             </Text>
           </View>
           <TouchableOpacity
             accessibilityLabel="Confirm deployment assignment"
-            style={styles.assignmentConfirmButton}
+            accessibilityState={{ disabled: assignmentAcknowledgementPending }}
+            style={[
+              styles.assignmentConfirmButton,
+              assignmentAcknowledgementPending && styles.assignmentConfirmButtonPending,
+            ]}
             onPress={handleConfirmAssignment}
+            disabled={assignmentAcknowledgementPending}
           >
             <Icon name="check" size={22} color="#ffffff" />
           </TouchableOpacity>
@@ -644,11 +715,17 @@ export default function OfficerMapScreen() {
 
       {!selectedOfficer && (
         <TouchableOpacity
-          accessibilityLabel="Request backup"
-          style={styles.backupButton}
-          onPress={handleBackupRequest}
+          accessibilityLabel={activeOwnBackupRequest ? 'Cancel backup request' : 'Request backup'}
+          accessibilityState={{ disabled: backupActionPending }}
+          style={[
+            styles.backupButton,
+            !activeOwnBackupRequest && !canRequestBackup && styles.backupButtonUnavailable,
+            backupActionPending && styles.backupButtonPending,
+          ]}
+          onPress={activeOwnBackupRequest ? handleCancelBackupRequest : handleBackupRequest}
+          disabled={backupActionPending}
         >
-          <Icon name="campaign" size={24} color="#ffffff" />
+          <Icon name={activeOwnBackupRequest ? 'close' : 'campaign'} size={24} color="#ffffff" />
         </TouchableOpacity>
       )}
 
@@ -705,13 +782,50 @@ export default function OfficerMapScreen() {
               </TouchableOpacity>
             )}
           </View>
+          <View style={styles.telemetryGrid}>
+            <View style={styles.telemetryItem}>
+              <Icon name="speed" size={16} color="#93a4bd" />
+              <Text style={styles.telemetryLabel}>Speed</Text>
+              <Text style={styles.telemetryValue}>
+                {Number.isFinite(selectedOfficer.speed)
+                  ? `${Number(selectedOfficer.speed).toFixed(1)} km/h`
+                  : 'Unavailable'}
+              </Text>
+            </View>
+            <View style={styles.telemetryItem}>
+              <Icon name="battery-full" size={16} color="#93a4bd" />
+              <Text style={styles.telemetryLabel}>Battery</Text>
+              <Text style={styles.telemetryValue}>
+                {Number.isFinite(selectedOfficer.batteryLevel)
+                  ? `${Math.round(Number(selectedOfficer.batteryLevel))}%`
+                  : 'Unavailable'}
+              </Text>
+            </View>
+            <View style={styles.telemetryItem}>
+              <Icon name="schedule" size={16} color="#93a4bd" />
+              <Text style={styles.telemetryLabel}>GPS time</Text>
+              <Text style={styles.telemetryValue} numberOfLines={1}>
+                {selectedOfficer.locationRecordedAt
+                  ? new Date(selectedOfficer.locationRecordedAt).toLocaleString('en-PH', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                  : 'Unavailable'}
+              </Text>
+            </View>
+          </View>
         </View>
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#ffffff' },
   container: { flex: 1, backgroundColor: '#e8e7ec' },
   mapWrap: { ...StyleSheet.absoluteFillObject },
   map: { flex: 1, backgroundColor: '#e2e5e8' },
@@ -721,14 +835,13 @@ const styles = StyleSheet.create({
   },
   overlay: { ...StyleSheet.absoluteFillObject, paddingHorizontal: 20 },
   searchContainer: {
-    height: 54,
-    marginTop: 2,
+    height: 45,
+    marginTop: 5,
     paddingHorizontal: 17,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
     borderColor: 'transparent',
-    borderRadius: 18,
+    borderRadius: 15,
     backgroundColor: mobileTheme.surface,
     shadowColor: '#1c1c4d',
     shadowOffset: { width: 0, height: 5 },
@@ -741,7 +854,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 53,
+    height: 50,
     marginLeft: 10,
     borderWidth: 0,
     borderColor: 'transparent',
@@ -782,7 +895,7 @@ const styles = StyleSheet.create({
   offlineText: { color: mobileTheme.warning },
   mapModeControl: {
     width: 88,
-    height: 44,
+    height: 42,
     padding: 3,
     flexDirection: 'row',
     borderRadius: 14,
@@ -795,7 +908,7 @@ const styles = StyleSheet.create({
   },
   mapModeButton: {
     width: 41,
-    height: 38,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 11,
@@ -843,6 +956,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: mobileTheme.success,
   },
+  assignmentConfirmButtonPending: { opacity: 0.55 },
   backupButton: {
     position: 'absolute',
     right: 30,
@@ -859,6 +973,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 7,
   },
+  backupButtonPending: { opacity: 0.6 },
+  backupButtonUnavailable: { backgroundColor: mobileTheme.offline },
   officerSheet: {
     position: 'absolute',
     right: 20,
@@ -931,6 +1047,20 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.16)',
   },
   locationText: { flex: 1, color: '#ffffff', fontSize: 12, lineHeight: 17 },
+  telemetryGrid: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.10)',
+  },
+  telemetryItem: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  telemetryLabel: { width: 62, color: '#93a4bd', fontSize: 11, fontWeight: '700' },
+  telemetryValue: { flex: 1, color: '#ffffff', fontSize: 11, fontWeight: '700', textAlign: 'right' },
   locateButton: {
     minHeight: 40,
     paddingHorizontal: 14,

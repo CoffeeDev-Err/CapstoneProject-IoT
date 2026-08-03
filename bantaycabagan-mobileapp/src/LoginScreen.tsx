@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,8 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileTheme } from './constants/mobileTheme';
 import { useAuth } from './context/AuthContext';
 import {
@@ -127,7 +128,9 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={mobileTheme.background} />
+      <StatusBar barStyle="light-content" backgroundColor="#050b18" />
+      <View pointerEvents="none" style={styles.accentTop} />
+      <View pointerEvents="none" style={styles.accentBottom} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -137,9 +140,12 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.brand}>
-            <View style={styles.logo}>
-              <Icon name="local-police" size={34} color="#ffffff" />
-            </View>
+            <Image
+              source={require('../assets/pnp-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityLabel="Philippine National Police seal"
+            />
             <View>
               <Text style={styles.brandName}>BantayCabagan</Text>
               <Text style={styles.brandCaption}>Police Personnel Portal</Text>
@@ -241,16 +247,38 @@ export default function LoginScreen() {
 function Field({
   label,
   style,
+  secureTextEntry = false,
   ...props
 }: React.ComponentProps<typeof TextInput> & { label: string }) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        {...props}
-        style={[styles.input, style]}
-        placeholderTextColor="#999aab"
-      />
+      <View style={secureTextEntry ? styles.passwordInputShell : undefined}>
+        <TextInput
+          {...props}
+          secureTextEntry={secureTextEntry && !passwordVisible}
+          style={[styles.input, secureTextEntry && styles.passwordInput, style]}
+          placeholderTextColor="#999aab"
+        />
+        {secureTextEntry ? (
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={() => setPasswordVisible((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+            accessibilityState={{ selected: passwordVisible }}
+            hitSlop={8}
+          >
+            <Icon
+              name={passwordVisible ? 'visibility-off' : 'visibility'}
+              size={21}
+              color="#93a4bd"
+            />
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -328,54 +356,86 @@ function Feedback({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: mobileTheme.background },
+  safeArea: { flex: 1, backgroundColor: '#050b18' },
+  accentTop: {
+    position: 'absolute',
+    top: -34,
+    left: -54,
+    width: 270,
+    height: 118,
+    borderBottomRightRadius: 96,
+    backgroundColor: '#132442',
+    transform: [{ rotate: '-5deg' }],
+  },
+  accentBottom: {
+    position: 'absolute',
+    right: -62,
+    bottom: -36,
+    width: 286,
+    height: 126,
+    borderTopLeftRadius: 108,
+    backgroundColor: '#0b2d63',
+    transform: [{ rotate: '-4deg' }],
+  },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 36,
+    paddingVertical: 32,
   },
   brand: {
-    marginBottom: 28,
+    marginBottom: 26,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   logo: {
-    width: 54,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: mobileTheme.blue,
+    width: 62,
+    height: 72,
   },
-  brandName: { color: mobileTheme.text, fontSize: 22, fontWeight: '800' },
-  brandCaption: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 12 },
+  brandName: { color: '#ffffff', fontSize: 22, fontWeight: '800' },
+  brandCaption: { marginTop: 3, color: '#93a4bd', fontSize: 12 },
   formPanel: {
     borderWidth: 1,
-    borderColor: mobileTheme.border,
+    borderColor: '#22314a',
     borderRadius: 8,
     padding: 20,
-    backgroundColor: mobileTheme.surface,
+    backgroundColor: '#0b1528',
   },
-  title: { color: mobileTheme.text, fontSize: 26, fontWeight: '800' },
-  subtitle: { marginTop: 6, marginBottom: 24, color: mobileTheme.textMuted, fontSize: 13, lineHeight: 20 },
+  title: { color: '#f8fafc', fontSize: 28, fontWeight: '800' },
+  subtitle: { marginTop: 7, marginBottom: 24, color: '#9eabc0', fontSize: 13, lineHeight: 20 },
   field: { marginBottom: 14 },
-  label: { marginBottom: 7, color: mobileTheme.textMuted, fontSize: 12, fontWeight: '700' },
+  label: { marginBottom: 7, color: '#aebbd0', fontSize: 12, fontWeight: '700' },
   input: {
-    height: 52,
+    height: 54,
     borderWidth: 1,
-    borderColor: mobileTheme.border,
+    borderColor: '#2a3a56',
     borderRadius: 8,
     paddingHorizontal: 14,
-    backgroundColor: '#fafbff',
-    color: mobileTheme.text,
+    backgroundColor: '#0e1a30',
+    color: '#f8fafc',
     fontSize: 14,
+  },
+  passwordInputShell: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    top: 8,
+    right: 7,
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 19,
   },
   codeInput: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
   textActionRight: { alignSelf: 'flex-end', marginTop: -2, marginBottom: 18 },
   textButton: { alignSelf: 'center', padding: 9 },
-  textAction: { color: mobileTheme.blue, fontSize: 13, fontWeight: '700' },
+  textAction: { color: '#72a7ff', fontSize: 13, fontWeight: '700' },
   submit: {
     minHeight: 52,
     marginTop: 4,
@@ -383,7 +443,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    backgroundColor: mobileTheme.blue,
+    backgroundColor: '#2864e8',
   },
   submitText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.65 },

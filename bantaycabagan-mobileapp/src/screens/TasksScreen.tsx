@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   StyleSheet,
@@ -11,9 +12,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
+import { useMobileTheme } from '../context/ThemeContext';
 import type { OperationalTask } from '../types/operations';
 
-const filters = ['All', 'Open', 'Accepted'] as const;
+const filters = ['Open', 'Accepted', 'History'] as const;
 
 type TasksScreenProps = {
   presentation?: 'screen' | 'modal';
@@ -24,14 +26,35 @@ export default function TasksScreen({
   presentation = 'screen',
   onClose,
 }: TasksScreenProps) {
-  const { tasks, acceptTask, currentPersonnelId, isLoading } = useOperationalContext();
-  const [filter, setFilter] = useState<(typeof filters)[number]>('All');
+  const { colors, isDark } = useMobileTheme();
+  const {
+    tasks,
+    acceptTask,
+    cancelBackupRequest,
+    currentPersonnelId,
+    isLoading,
+    isTaskHistoryLoading,
+    isTaskHistoryLoadingMore,
+    taskHistoryHasMore,
+    refreshTaskHistory,
+    loadMoreTaskHistory,
+  } = useOperationalContext();
+  const [filter, setFilter] = useState<(typeof filters)[number]>('Open');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (filter !== 'History') return;
+    refreshTaskHistory().catch(() => undefined);
+  }, [filter, refreshTaskHistory]);
 
   const filteredTasks = useMemo(() => tasks.filter((task) => {
-    if (filter === 'Open') return task.status === 'open';
-    if (filter === 'Accepted') return task.accepted_by.includes(currentPersonnelId);
-    return true;
+    const active = task.status === 'open' || task.status === 'full';
+    if (filter === 'Open') return active;
+    if (filter === 'Accepted') {
+      return active && task.accepted_by.includes(currentPersonnelId);
+    }
+    return task.status === 'completed' || task.status === 'cancelled';
   }), [currentPersonnelId, filter, tasks]);
 
   const handleAccept = async (task: OperationalTask) => {
@@ -45,16 +68,52 @@ export default function TasksScreen({
     }
   };
 
+  const handleCancel = (task: OperationalTask) => {
+    Alert.alert(
+      'Cancel backup request?',
+      'This closes the request for every responder.',
+      [
+        { text: 'Keep Request', style: 'cancel' },
+        {
+          text: 'Cancel Request',
+          style: 'destructive',
+          onPress: async () => {
+            setCancellingId(task.id);
+            try {
+              await cancelBackupRequest(task.id);
+            } catch (error) {
+              Alert.alert('Unable to cancel backup', (error as Error).message);
+            } finally {
+              setCancellingId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const renderTask = ({ item }: { item: OperationalTask }) => {
     const accepted = item.accepted_by.includes(currentPersonnelId);
     const full = item.accepted_by.length >= item.required_responders || item.status === 'full';
     const ownRequest = item.type === 'backup' && item.requested_by === currentPersonnelId;
+    const active = item.status === 'open' || item.status === 'full';
+    const cancelled = item.status === 'cancelled';
+    const completed = item.status === 'completed';
     const remaining = Math.max(0, item.required_responders - item.accepted_by.length);
+    const statusLabel = cancelled
+      ? 'Cancelled'
+      : completed
+        ? 'Completed'
+        : full
+          ? 'Team Full'
+          : 'Open';
 
     return (
       <View style={[
         styles.taskCard,
+        isDark && darkStyles.surface,
         item.type === 'backup' ? styles.taskCardBackup : styles.taskCardUrgent,
+        isDark && item.type === 'urgent' && darkStyles.urgentSurface,
       ]}>
         <View style={styles.taskTopRow}>
           <View style={[styles.taskType, item.type === 'backup' ? styles.taskTypeBackup : styles.taskTypeUrgent]}>
@@ -63,75 +122,129 @@ export default function TasksScreen({
               {item.type}
             </Text>
           </View>
-          <Text style={styles.taskTime}>
+          <Text style={[styles.taskTime, isDark && darkStyles.muted]}>
             {new Date(item.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </Text>
         </View>
 
-        <Text style={styles.taskTitle}>{item.title}</Text>
-        <Text style={styles.taskDescription}>{item.description}</Text>
+        <Text style={[styles.taskTitle, isDark && darkStyles.text]}>{item.title}</Text>
+        <Text style={[styles.taskDescription, isDark && darkStyles.muted]}>{item.description}</Text>
 
         <View style={styles.locationRow}>
-          <Icon name="place" size={17} color={mobileTheme.textMuted} />
-          <Text style={styles.locationText}>{item.location}</Text>
+          <Icon name="place" size={17} color={colors.textMuted} />
+          <Text style={[styles.locationText, isDark && darkStyles.text]}>{item.location}</Text>
         </View>
 
-        <View style={styles.responseRow}>
+        <View style={[styles.responseRow, isDark && darkStyles.border]}>
           <View>
-            <Text style={styles.responseLabel}>RESPONSE TEAM</Text>
-            <Text style={styles.responseCount}>
+            <Text style={[styles.responseLabel, isDark && darkStyles.muted]}>RESPONSE TEAM</Text>
+            <Text style={[styles.responseCount, isDark && darkStyles.text]}>
               {item.accepted_by.length}/{item.required_responders} accepted
-              {!full && ` · ${remaining} slot${remaining === 1 ? '' : 's'} left`}
+              {!full && ` - ${remaining} slot${remaining === 1 ? '' : 's'} left`}
             </Text>
           </View>
-          <View style={[styles.statusBadge, full ? styles.statusFull : styles.statusOpen]}>
-            <Text style={styles.statusText}>{full ? 'Team Full' : 'Open'}</Text>
+          <View style={[
+            styles.statusBadge,
+            cancelled
+              ? styles.statusCancelled
+              : completed
+                ? styles.statusCompleted
+                : full
+                  ? styles.statusFull
+                  : styles.statusOpen,
+          ]}>
+            <Text style={[styles.statusText, isDark && darkStyles.text]}>{statusLabel}</Text>
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.acceptButton, (accepted || full || ownRequest) && styles.acceptButtonDisabled]}
-          onPress={() => handleAccept(item)}
-          disabled={accepted || full || ownRequest || acceptingId === item.id}
-        >
-          <Icon name={accepted ? 'check' : 'person-add'} size={18} color={accepted || full || ownRequest ? mobileTheme.textMuted : '#ffffff'} />
-          <Text style={[styles.acceptButtonText, (accepted || full || ownRequest) && styles.acceptButtonTextDisabled]}>
-            {ownRequest ? 'Requested by You' : accepted ? 'Accepted' : full ? 'Team Full' : acceptingId === item.id ? 'Accepting...' : 'Accept Task'}
-          </Text>
-        </TouchableOpacity>
+        {ownRequest && active ? (
+          <TouchableOpacity
+            style={[styles.acceptButton, styles.cancelButton, cancellingId === item.id && styles.actionPending]}
+            onPress={() => handleCancel(item)}
+            disabled={cancellingId === item.id}
+          >
+            <Icon name="close" size={18} color="#ffffff" />
+            <Text style={styles.acceptButtonText}>
+              {cancellingId === item.id ? 'Cancelling...' : 'Cancel Request'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.acceptButton, (!active || accepted || full) && styles.acceptButtonDisabled]}
+            onPress={() => handleAccept(item)}
+            disabled={!active || accepted || full || acceptingId === item.id}
+          >
+            <Icon
+              name={accepted ? 'check' : 'person-add'}
+              size={18}
+              color={!active || accepted || full ? colors.textMuted : '#ffffff'}
+            />
+            <Text style={[
+              styles.acceptButtonText,
+              (!active || accepted || full) && styles.acceptButtonTextDisabled,
+            ]}>
+              {cancelled
+                ? 'Request Cancelled'
+                : completed
+                  ? 'Task Completed'
+                  : accepted
+                    ? 'Accepted'
+                    : full
+                      ? 'Team Full'
+                      : acceptingId === item.id
+                        ? 'Accepting...'
+                        : 'Accept Task'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
 
   return (
     <SafeAreaView
-      style={[styles.container, presentation === 'modal' && styles.modalContainer]}
+      style={[
+        styles.container,
+        isDark && darkStyles.screen,
+        presentation === 'modal' && styles.modalContainer,
+        isDark && presentation === 'modal' && darkStyles.surface,
+      ]}
       edges={presentation === 'modal' ? [] : ['top']}
     >
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
-          <Text style={styles.title}>My Task</Text>
+          <Text style={[styles.title, isDark && darkStyles.text]}>My Task</Text>
           {presentation === 'modal' && (
             <TouchableOpacity
               accessibilityLabel="Close tasks"
-              style={styles.closeButton}
+              style={[styles.closeButton, isDark && darkStyles.surfaceMuted]}
               onPress={onClose}
             >
-              <Icon name="close" size={23} color={mobileTheme.navy} />
+              <Icon name="close" size={23} color={colors.text} />
             </TouchableOpacity>
           )}
         </View>
-        <Text style={styles.subtitle}>Backup and urgent response requests</Text>
+        <Text style={[styles.subtitle, isDark && darkStyles.muted]}>Backup and urgent response requests</Text>
       </View>
 
       <View style={styles.filters}>
         {filters.map((item) => (
           <TouchableOpacity
             key={item}
-            style={[styles.filterButton, filter === item && styles.filterButtonActive]}
+            style={[
+              styles.filterButton,
+              isDark && darkStyles.filterButton,
+              filter === item && styles.filterButtonActive,
+              isDark && filter === item && darkStyles.filterButtonActive,
+            ]}
             onPress={() => setFilter(item)}
           >
-            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item}</Text>
+            <Text style={[
+              styles.filterText,
+              isDark && darkStyles.muted,
+              filter === item && styles.filterTextActive,
+              isDark && filter === item && darkStyles.text,
+            ]}>{item}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -141,11 +254,35 @@ export default function TasksScreen({
         keyExtractor={(item) => item.id}
         renderItem={renderTask}
         contentContainerStyle={[styles.list, presentation === 'modal' && styles.modalList]}
+        ListFooterComponent={filter === 'History' && taskHistoryHasMore ? (
+          <TouchableOpacity
+            style={[styles.loadMoreButton, isDark && darkStyles.surfaceMuted]}
+            onPress={() => loadMoreTaskHistory().catch(() => undefined)}
+            disabled={isTaskHistoryLoadingMore}
+          >
+            {isTaskHistoryLoadingMore ? (
+              <ActivityIndicator size="small" color={mobileTheme.blue} />
+            ) : (
+              <Icon name="expand-more" size={20} color={mobileTheme.blue} />
+            )}
+            <Text style={styles.loadMoreText}>
+              {isTaskHistoryLoadingMore ? 'Loading...' : 'Load more'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         ListEmptyComponent={(
           <View style={styles.emptyState}>
-            <Icon name="assignment-turned-in" size={34} color={mobileTheme.textMuted} />
-            <Text style={styles.emptyTitle}>{isLoading ? 'Loading tasks...' : 'No tasks here'}</Text>
-            <Text style={styles.emptyText}>New backup and urgent requests will appear automatically.</Text>
+            <Icon name="assignment-turned-in" size={34} color={colors.textMuted} />
+            <Text style={[styles.emptyTitle, isDark && darkStyles.text]}>
+              {(filter === 'History' ? isTaskHistoryLoading : isLoading)
+                ? 'Loading tasks...'
+                : 'No tasks here'}
+            </Text>
+            <Text style={[styles.emptyText, isDark && darkStyles.muted]}>
+              {filter === 'History'
+                ? 'Completed and cancelled tasks will appear here.'
+                : 'New backup and urgent requests will appear automatically.'}
+            </Text>
           </View>
         )}
       />
@@ -186,29 +323,30 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: mobileTheme.purple,
-    borderRadius: 22,
-    backgroundColor: '#d9d7e2',
-    shadowColor: '#1c1c4d',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
   },
-  filterButtonActive: { borderColor: mobileTheme.navy, backgroundColor: mobileTheme.surface },
+  filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#edf4ff' },
   filterText: { color: mobileTheme.navy, fontSize: 12, fontWeight: '700' },
-  filterTextActive: { color: mobileTheme.navy },
+  filterTextActive: { color: mobileTheme.blue },
   list: { paddingHorizontal: 22, paddingBottom: 112, gap: 13 },
   modalList: { paddingBottom: 28 },
   taskCard: {
     padding: 16,
-    borderWidth: 2,
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
     backgroundColor: mobileTheme.surface,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  taskCardBackup: { borderColor: mobileTheme.purple },
-  taskCardUrgent: { borderColor: mobileTheme.danger, backgroundColor: '#fffafa' },
+  taskCardBackup: { borderLeftWidth: 3, borderLeftColor: mobileTheme.blue },
+  taskCardUrgent: { borderLeftWidth: 3, borderLeftColor: mobileTheme.danger },
   taskTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   taskType: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   taskTypeBackup: { backgroundColor: 'transparent' },
@@ -234,6 +372,8 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
   statusOpen: { backgroundColor: mobileTheme.successSoft },
   statusFull: { backgroundColor: mobileTheme.blueSoft },
+  statusCompleted: { backgroundColor: mobileTheme.successSoft },
+  statusCancelled: { backgroundColor: '#e2e2ea' },
   statusText: { color: mobileTheme.text, fontSize: 10, fontWeight: '800' },
   acceptButton: {
     minHeight: 42,
@@ -242,13 +382,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    borderRadius: 22,
+    borderRadius: 8,
     backgroundColor: mobileTheme.purple,
   },
   acceptButtonDisabled: { backgroundColor: '#e2e2ea' },
+  cancelButton: { backgroundColor: mobileTheme.danger },
+  actionPending: { opacity: 0.6 },
   acceptButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   acceptButtonTextDisabled: { color: mobileTheme.textMuted },
   emptyState: { paddingTop: 80, alignItems: 'center' },
   emptyTitle: { marginTop: 12, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
   emptyText: { maxWidth: 260, marginTop: 5, color: mobileTheme.textMuted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  loadMoreButton: {
+    minHeight: 44,
+    marginTop: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
+  },
+  loadMoreText: { color: mobileTheme.blue, fontSize: 12, fontWeight: '800' },
+});
+
+const darkStyles = StyleSheet.create({
+  screen: { backgroundColor: '#050b18' },
+  surface: { borderColor: '#22314a', backgroundColor: '#0b1528' },
+  urgentSurface: { backgroundColor: '#0b1528' },
+  surfaceMuted: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  text: { color: '#f8fafc' },
+  muted: { color: '#9eabc0' },
+  border: { borderColor: '#22314a' },
+  filterButton: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#132442' },
 });

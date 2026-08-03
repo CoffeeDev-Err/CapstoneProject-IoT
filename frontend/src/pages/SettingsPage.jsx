@@ -178,6 +178,12 @@ function SettingsPage() {
     [createdAccounts]
   )
 
+  const editingAccount = useMemo(
+    () => createdAccounts.find((account) => account.id === editingAccountId) || null,
+    [createdAccounts, editingAccountId]
+  )
+  const isEditingSupervisor = editingAccount?.role === 'Supervisor'
+
   const handleFieldChange = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
 
@@ -219,35 +225,37 @@ function SettingsPage() {
   const validateAccountForm = () => {
     const errors = {}
 
-    if (!accountForm.fullName.trim()) {
-      errors.fullName = 'Full name is required.'
-    }
+    if (!isEditingSupervisor) {
+      if (!accountForm.fullName.trim()) {
+        errors.fullName = 'Full name is required.'
+      }
 
-    if (!accountForm.badgeNumber.trim()) {
-      errors.badgeNumber = 'Badge number is required.'
-    }
+      if (!accountForm.badgeNumber.trim()) {
+        errors.badgeNumber = 'Badge number is required.'
+      }
 
-    if (!accountForm.imei.trim()) {
-      errors.imei = 'GPS device ID is required.'
-    } else if (!flespiDevices.some((device) => device.imei === accountForm.imei)) {
-      errors.imei = 'Select a device ID registered in Flespi.'
-    }
+      if (!accountForm.imei.trim()) {
+        errors.imei = 'GPS device ID is required.'
+      } else if (!flespiDevices.some((device) => device.imei === accountForm.imei)) {
+        errors.imei = 'Select a device ID registered in Flespi.'
+      }
 
-    const duplicateBadge = createdAccounts.some(
-      (account) => (
-        account.id !== editingAccountId
-        && account.badgeNumber.toLowerCase() === accountForm.badgeNumber.trim().toLowerCase()
+      const duplicateBadge = createdAccounts.some(
+        (account) => (
+          account.id !== editingAccountId
+          && account.badgeNumber.toLowerCase() === accountForm.badgeNumber.trim().toLowerCase()
+        )
       )
-    )
-    if (duplicateBadge) {
-      errors.badgeNumber = 'Badge number already exists.'
-    }
+      if (duplicateBadge) {
+        errors.badgeNumber = 'Badge number already exists.'
+      }
 
-    const duplicateImei = createdAccounts.some(
-      (account) => account.id !== editingAccountId && account.imei === accountForm.imei.trim()
-    )
-    if (duplicateImei) {
-      errors.imei = 'Device ID is already assigned to another personnel account.'
+      const duplicateImei = createdAccounts.some(
+        (account) => account.id !== editingAccountId && account.imei === accountForm.imei.trim()
+      )
+      if (duplicateImei) {
+        errors.imei = 'Device ID is already assigned to another personnel account.'
+      }
     }
 
     if (!accountForm.loginId.trim()) {
@@ -293,7 +301,7 @@ function SettingsPage() {
       errors.temporaryPassword = 'Use at least 10 chars with upper, lower, number, and symbol.'
     }
 
-    if (accountForm.mobileNumber.trim() && !/^\+?\d{10,14}$/.test(accountForm.mobileNumber.trim())) {
+    if (!isEditingSupervisor && accountForm.mobileNumber.trim() && !/^\+?\d{10,14}$/.test(accountForm.mobileNumber.trim())) {
       errors.mobileNumber = 'Use 10-14 digits, optional + prefix.'
     }
 
@@ -339,7 +347,8 @@ function SettingsPage() {
       mobileNumber: account.mobileNumber ?? '',
     })
     setFormErrors({})
-    setFormMessage(`Editing ${account.fullName}. Update details then click Save Changes.`)
+    const accountLabel = account.fullName || account.loginId
+    setFormMessage(`Editing ${accountLabel}. Update details then click Save Changes.`)
     setFormMessageKind('success')
   }
 
@@ -374,7 +383,12 @@ function SettingsPage() {
         resetFormToCreate()
       }
 
-      setFormMessage(`${account.fullName} account deactivated and its GPS device was released.`)
+      const accountLabel = account.fullName || account.loginId
+      setFormMessage(
+        account.role === 'Supervisor'
+          ? `${accountLabel} account deactivated.`
+          : `${accountLabel} account deactivated and its GPS device was released.`
+      )
       setFormMessageKind('success')
     } catch (error) {
       setFormMessage(error.message)
@@ -400,21 +414,28 @@ function SettingsPage() {
       return
     }
 
-    const normalizedPayload = {
-      fullName: accountForm.fullName.trim(),
-      badgeNumber: accountForm.badgeNumber.trim(),
-      imei: accountForm.imei.trim(),
-      flespiDeviceId: accountForm.flespiDeviceId,
-      flespiDeviceName: accountForm.flespiDeviceName,
-      rank: accountForm.rank,
-      role: 'Officer',
-      loginId: accountForm.loginId.trim(),
-      officialEmail: accountForm.officialEmail.trim().toLowerCase(),
-      temporaryPassword: accountForm.temporaryPassword,
-      mobileNumber: accountForm.mobileNumber.trim(),
-      accountStatus: 'Active',
-      forcePasswordReset: true,
-    }
+    const normalizedPayload = isEditingSupervisor
+      ? {
+          loginId: accountForm.loginId.trim(),
+          officialEmail: accountForm.officialEmail.trim().toLowerCase(),
+          temporaryPassword: accountForm.temporaryPassword,
+          accountStatus: editingAccount?.accountStatus || 'Active',
+        }
+      : {
+          fullName: accountForm.fullName.trim(),
+          badgeNumber: accountForm.badgeNumber.trim(),
+          imei: accountForm.imei.trim(),
+          flespiDeviceId: accountForm.flespiDeviceId,
+          flespiDeviceName: accountForm.flespiDeviceName,
+          rank: accountForm.rank,
+          role: 'Officer',
+          loginId: accountForm.loginId.trim(),
+          officialEmail: accountForm.officialEmail.trim().toLowerCase(),
+          temporaryPassword: accountForm.temporaryPassword,
+          mobileNumber: accountForm.mobileNumber.trim(),
+          accountStatus: 'Active',
+          forcePasswordReset: true,
+        }
 
     setAccountRequestPending(true)
 
@@ -424,7 +445,7 @@ function SettingsPage() {
         setCreatedAccounts((prev) => prev.map((account) => (
           account.id === editingAccountId ? updatedAccount : account
         )))
-        setFormMessage(`${normalizedPayload.fullName} account updated successfully.`)
+        setFormMessage(`${updatedAccount.fullName || updatedAccount.loginId} account updated successfully.`)
       } else {
         const newAccount = await createAccount(normalizedPayload)
         setCreatedAccounts((prev) => [newAccount, ...prev])
@@ -505,9 +526,16 @@ function SettingsPage() {
 
             {activeAccountView === 'create' && (
               <div className="account-create-section">
-                <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount}>
-                  <div className="account-form-grid">
-                <label className="account-field">
+	                <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount}>
+	                  {isEditingSupervisor && (
+	                    <p className="settings-hint account-role-note">
+	                      Supervisor accounts are for web monitoring and administration. A badge, field rank, mobile number, and GPS device are not required.
+	                    </p>
+	                  )}
+	                  <div className="account-form-grid">
+	                {!isEditingSupervisor && (
+	                  <>
+	                <label className="account-field">
                   <span>Full Name *</span>
                   <input
                     className={`settings-input w-100 ${formErrors.fullName ? 'settings-input--error' : ''}`}
@@ -582,16 +610,18 @@ function SettingsPage() {
                   {formErrors.imei && <small className="field-error">{formErrors.imei}</small>}
                 </div>
 
-                <label className="account-field">
-                  <span>Rank *</span>
+	                <label className="account-field">
+	                  <span>Rank *</span>
                   <select className="settings-input w-100" value={accountForm.rank} onChange={handleFieldChange('rank')}>
                     {rankOptions.map((rank) => (
                       <option key={rank} value={rank}>
                         {rank}
                       </option>
                     ))}
-                  </select>
-                </label>
+	                  </select>
+	                </label>
+	                  </>
+	                )}
 
                 <label className="account-field">
                   <span>Login ID *</span>
@@ -634,24 +664,26 @@ function SettingsPage() {
                   )}
                 </div>
 
-                <label className="account-field">
-                  <span>Mobile Number</span>
-                  <input
-                    className={`settings-input w-100 ${formErrors.mobileNumber ? 'settings-input--error' : ''}`}
-                    value={accountForm.mobileNumber}
-                    onChange={handleFieldChange('mobileNumber')}
-                    placeholder="09XXXXXXXXX or +639XXXXXXXXX"
-                  />
-                  {formErrors.mobileNumber && <small className="field-error">{formErrors.mobileNumber}</small>}
-                </label>
-                  </div>
+	                {!isEditingSupervisor && (
+	                  <label className="account-field">
+	                    <span>Mobile Number</span>
+	                    <input
+	                      className={`settings-input w-100 ${formErrors.mobileNumber ? 'settings-input--error' : ''}`}
+	                      value={accountForm.mobileNumber}
+	                      onChange={handleFieldChange('mobileNumber')}
+	                      placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+	                    />
+	                    {formErrors.mobileNumber && <small className="field-error">{formErrors.mobileNumber}</small>}
+	                  </label>
+	                )}
+	                  </div>
 
                   <div className="account-form-actions">
                     <button
                       type="submit"
                       className="account-submit-btn"
-                      disabled={devicesLoading || accountRequestPending || flespiDevices.length === 0}
-                      title={flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
+	                      disabled={accountRequestPending || (!isEditingSupervisor && (devicesLoading || flespiDevices.length === 0))}
+	                      title={!isEditingSupervisor && flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
                     >
                       {accountRequestPending
                         ? 'Saving...'
@@ -719,12 +751,18 @@ function SettingsPage() {
                       ) : (
                         filteredAccounts.map((account, index) => (
                           <tr key={account.id} className="personnel-row">
-                            <td>{account.fullName}</td>
-                            <td>{account.rank}</td>
-                            <td className="personnel-badge">{account.badgeNumber}</td>
-                            <td>
-                              <span>{getDeviceCode(account, index)} | {account.flespiDeviceName || 'Registered GPS'}</span>
-                              <small className="d-block text-body-secondary">{account.imei}</small>
+	                            <td>{account.fullName || 'Supervisor account'}</td>
+	                            <td>{account.role === 'Supervisor' ? 'Supervisor' : account.rank}</td>
+	                            <td className="personnel-badge">{account.role === 'Supervisor' ? '-' : account.badgeNumber}</td>
+	                            <td>
+	                              {account.role === 'Supervisor' ? (
+	                                <span className="text-body-secondary">Not required</span>
+	                              ) : (
+	                                <>
+	                                  <span>{getDeviceCode(account, index)} | {account.flespiDeviceName || 'Registered GPS'}</span>
+	                                  <small className="d-block text-body-secondary">{account.imei}</small>
+	                                </>
+	                              )}
                             </td>
                             <td>{account.loginId}</td>
                             <td>
@@ -776,7 +814,9 @@ function SettingsPage() {
         open={Boolean(pendingDeleteAccount)}
         title="Deactivate Account?"
         message={pendingDeleteAccount
-          ? `Deactivate ${pendingDeleteAccount.fullName}? Mobile access will stop and the GPS device will be released for reassignment.`
+          ? pendingDeleteAccount.role === 'Supervisor'
+            ? `Deactivate ${pendingDeleteAccount.loginId}? Web administration access will stop.`
+            : `Deactivate ${pendingDeleteAccount.fullName}? Mobile access will stop and the GPS device will be released for reassignment.`
           : ''}
         confirmLabel="Deactivate"
         cancelLabel="Cancel"

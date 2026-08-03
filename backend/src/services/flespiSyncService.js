@@ -1,4 +1,5 @@
 const { GpsDeviceAssignment } = require('../models')
+const { getLocationFreshness } = require('../utils/locationFreshness')
 const { resolveLocationName } = require('./reverseGeocodingService')
 
 const toRecordedAt = (value) => {
@@ -8,8 +9,14 @@ const toRecordedAt = (value) => {
 }
 
 const createFlespiSyncService = ({ flespiService, personnelService }) => {
-	const syncAssignedLocations = async () => {
-		const assignments = await GpsDeviceAssignment.find({ status: 'active' }).lean()
+	const syncAssignedLocations = async ({ deviceIds = [] } = {}) => {
+		const selectedDeviceIds = [...new Set(deviceIds.map(String).filter(Boolean))]
+		const query = { status: 'active' }
+		if (selectedDeviceIds.length > 0) {
+			query.flespiDeviceId = { $in: selectedDeviceIds }
+		}
+
+		const assignments = await GpsDeviceAssignment.find(query).lean()
 		if (assignments.length === 0) {
 			return { assignments: 0, accepted: 0, skipped: 0 }
 		}
@@ -37,6 +44,10 @@ const createFlespiSyncService = ({ flespiService, personnelService }) => {
 				skipped += 1
 				return
 			}
+			if (getLocationFreshness({ recordedAt, source: 'gps' }).isLocationStale) {
+				skipped += 1
+				return
+			}
 
 			const result = await personnelService.ingestLocation({
 				imei: assignment.imei,
@@ -48,6 +59,9 @@ const createFlespiSyncService = ({ flespiService, personnelService }) => {
 				),
 				speed: Number.isFinite(telemetry.speed) ? telemetry.speed : undefined,
 				heading: Number.isFinite(telemetry.heading) ? telemetry.heading : undefined,
+				battery_level: Number.isFinite(telemetry.batteryLevel)
+					? telemetry.batteryLevel
+					: undefined,
 				recorded_at: recordedAt.toISOString(),
 				source: 'gps',
 			})
