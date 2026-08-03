@@ -143,8 +143,9 @@ const fetchLatestTelemetry = async ({ deviceIds = [] } = {}) => {
 			heading: Number(readTelemetry(telemetry, 'position.direction')?.value),
 			batteryLevel: Number(readTelemetry(telemetry, 'battery.level')?.value),
 			recordedAt: Number(trackerTimestamp?.value)
-				|| Number(serverTimestamp?.value)
-				|| positionTimestamp,
+				|| positionTimestamp
+				|| Number(serverTimestamp?.value),
+			receivedAt: Number(serverTimestamp?.value) || null,
 		};
 	});
 };

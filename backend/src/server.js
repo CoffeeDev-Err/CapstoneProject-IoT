@@ -33,12 +33,14 @@ const auditService = require('./services/auditService')
 const authService = require('./services/authService')
 const barangayService = require('./services/barangayService')
 const flespiService = require('./services/flespiService')
+const createFlespiMqttService = require('./services/flespiMqttService')
 const createFlespiSyncService = require('./services/flespiSyncService')
 const gpsDeviceService = require('./services/gpsDeviceService')
 const notificationService = require('./services/notificationService')
 const createOperationalService = require('./services/operationalService')
 const personnelService = require('./services/personnelService')
 const {
+	evaluatePersonnelInactivity,
 	getPersonnelMember,
 	getPersonnelWithLocations,
 	updateMockLocations,
@@ -53,6 +55,10 @@ const FLESPI_SYNC_INTERVAL_MS = Math.max(
 	Number(process.env.FLESPI_SYNC_INTERVAL_MS) || 3000,
 )
 const HISTORY_SAMPLE_INTERVAL_MS = 30_000
+const DEPLOYMENT_STATUS_INTERVAL_MS = Math.max(
+	5000,
+	Number(process.env.DEPLOYMENT_STATUS_INTERVAL_MS) || 15000,
+)
 
 const server = http.createServer(app)
 const io = new Server(server, {
@@ -157,6 +163,10 @@ io.on('connection', async (socket) => {
 let locationUpdateRunning = false
 let lastHistorySampleAt = 0
 let flespiSyncRunning = false
+let flespiSyncAllPending = false
+const pendingFlespiDeviceIds = new Set()
+let flespiMqttService = null
+let lifecycleCheckRunning = false
 
 const broadcastMockLocations = async () => {
 	if (locationUpdateRunning || mongoose.connection.readyState !== 1) return
@@ -175,14 +185,28 @@ const broadcastMockLocations = async () => {
 	}
 }
 
-const broadcastFlespiLocations = async () => {
+const broadcastFlespiLocations = async ({ deviceIds = [] } = {}) => {
+	if (deviceIds.length === 0) flespiSyncAllPending = true
+	else deviceIds.forEach((deviceId) => pendingFlespiDeviceIds.add(String(deviceId)))
+
 	if (flespiSyncRunning || mongoose.connection.readyState !== 1) return
 	flespiSyncRunning = true
 
 	try {
-		const result = await flespiSyncService.syncAssignedLocations()
-		if (result.accepted > 0) {
-			io.emit('personnel:update', await getPersonnelWithLocations())
+		while (flespiSyncAllPending || pendingFlespiDeviceIds.size > 0) {
+			const syncAll = flespiSyncAllPending
+			flespiSyncAllPending = false
+			const selectedDeviceIds = syncAll
+				? []
+				: [...pendingFlespiDeviceIds]
+			pendingFlespiDeviceIds.clear()
+
+			const result = await flespiSyncService.syncAssignedLocations({
+				deviceIds: selectedDeviceIds,
+			})
+			if (result.accepted > 0) {
+				io.emit('personnel:update', await getPersonnelWithLocations())
+			}
 		}
 	} catch (error) {
 		console.error('Flespi GPS sync failed:', error.message)
@@ -191,20 +215,50 @@ const broadcastFlespiLocations = async () => {
 	}
 }
 
+const runFlespiFallbackSync = () => {
+	if (flespiMqttService?.isConnected()) return
+	void broadcastFlespiLocations()
+}
+
+const runOperationalLifecycleCheck = async () => {
+	if (lifecycleCheckRunning || mongoose.connection.readyState !== 1) return
+	lifecycleCheckRunning = true
+	try {
+		await operationalService.reconcileDeploymentShifts()
+		await evaluatePersonnelInactivity({ io })
+	} catch (error) {
+		console.error('Operational lifecycle check failed:', error.message)
+	} finally {
+		lifecycleCheckRunning = false
+	}
+}
+
 const start = async () => {
 	try {
 		await connectDB()
 		await seedDatabase(models)
 		console.log('MongoDB collections and indexes are ready')
+		await operationalService.reconcileDeploymentShifts({ broadcast: false })
 
 		server.listen(PORT, () => {
-			console.log(`BantayCabagan backend server running on port ${PORT}`)
+			console.log(`GeoSentri backend server running on port ${PORT}`)
 		})
 		setInterval(broadcastMockLocations, GPS_UPDATE_INTERVAL_MS)
+		setInterval(runOperationalLifecycleCheck, DEPLOYMENT_STATUS_INTERVAL_MS)
 		if (process.env.FLESPI_TOKEN) {
-			console.log(`Flespi GPS sync enabled (${FLESPI_SYNC_INTERVAL_MS}ms interval)`)
-			setTimeout(broadcastFlespiLocations, 1000)
-			setInterval(broadcastFlespiLocations, FLESPI_SYNC_INTERVAL_MS)
+			flespiMqttService = createFlespiMqttService({
+				onDeviceTelemetry: (deviceId) => broadcastFlespiLocations({
+					deviceIds: [deviceId],
+				}),
+			})
+			const mqttEnabled = flespiMqttService.start()
+			console.log(mqttEnabled
+				? 'Flespi MQTT realtime sync enabled'
+				: 'Flespi MQTT disabled; using REST polling')
+			console.log(`Flespi REST fallback enabled (${FLESPI_SYNC_INTERVAL_MS}ms interval)`)
+			// Seed the UI with the latest complete snapshot even before the next MQTT event.
+			setTimeout(() => void broadcastFlespiLocations(), 1000)
+			setInterval(runFlespiFallbackSync, FLESPI_SYNC_INTERVAL_MS)
 		} else {
 			console.log('Flespi GPS sync disabled: FLESPI_TOKEN is not configured')
 		}

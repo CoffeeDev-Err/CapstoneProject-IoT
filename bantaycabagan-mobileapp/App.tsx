@@ -9,6 +9,7 @@ import LoginScreen from './src/LoginScreen';
 import { mobileTheme } from './src/constants/mobileTheme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OperationalProvider } from './src/context/OperationalContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import MainTabs from './src/navigation/MainTabs';
 import { mobileFontFamily } from './src/constants/mobileTheme';
 
@@ -29,11 +30,13 @@ applyDefaultFont(TextInput);
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

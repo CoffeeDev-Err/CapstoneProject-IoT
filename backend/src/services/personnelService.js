@@ -1,5 +1,6 @@
 const {
 	CurrentLocation,
+	Deployment,
 	GpsDeviceAssignment,
 	LocationHistory,
 	Personnel,
@@ -11,26 +12,74 @@ const {
 	escapeRegex,
 	parsePagination,
 } = require('../utils/query')
+const { createNotification } = require('./notificationService')
+const { getLocalLocationName } = require('./reverseGeocodingService')
+const { getLocationFreshness } = require('../utils/locationFreshness')
 
-const DEFAULT_COORDINATES = [121.7681, 17.4239]
 const HISTORY_SAMPLE_INTERVAL_MS = 30_000
 const MAX_MOCK_OFFSET = 0.002
+const toOptionalNumber = (value) => {
+	if (value === null || value === undefined || value === '') return undefined
+	const parsed = Number(value)
+	return Number.isFinite(parsed) ? parsed : undefined
+}
 const mockAnchors = new Map([
 	['psms-002', [121.7683, 17.4213]],
 ])
 
-const serializePersonnel = (profile, currentLocation) => {
-	const coordinates = currentLocation?.location?.coordinates || DEFAULT_COORDINATES
+const currentShiftFilter = (now = new Date(), extra = {}) => ({
+	status: 'active',
+	$and: [
+		{ $or: [{ shiftStart: { $exists: false } }, { shiftStart: null }, { shiftStart: { $lte: now } }] },
+		{ $or: [{ shiftEnd: { $exists: false } }, { shiftEnd: null }, { shiftEnd: { $gt: now } }] },
+	],
+	...extra,
+})
+
+const distanceInMeters = (first = [], second = []) => {
+	if (first.length !== 2 || second.length !== 2) return Number.POSITIVE_INFINITY
+	const toRadians = (value) => (value * Math.PI) / 180
+	const [firstLongitude, firstLatitude] = first
+	const [secondLongitude, secondLatitude] = second
+	const latitudeDelta = toRadians(secondLatitude - firstLatitude)
+	const longitudeDelta = toRadians(secondLongitude - firstLongitude)
+	const a = Math.sin(latitudeDelta / 2) ** 2
+		+ Math.cos(toRadians(firstLatitude))
+		* Math.cos(toRadians(secondLatitude))
+		* Math.sin(longitudeDelta / 2) ** 2
+	return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+const serializePersonnel = (profile, currentLocation, options = {}) => {
+	const coordinates = currentLocation?.location?.coordinates
+	const hasCoordinates = Array.isArray(coordinates)
+		&& coordinates.length === 2
+		&& coordinates.every(Number.isFinite)
+	const isOnDuty = options.isOnDuty ?? profile.dutyStatus !== 'Off Duty'
+	const freshness = getLocationFreshness({
+		recordedAt: currentLocation?.recordedAt || currentLocation?.updatedAt,
+		source: currentLocation?.source,
+	})
+	const hasCurrentLocation = hasCoordinates && !freshness.isLocationStale
+	const localLocationName = hasCoordinates
+		? getLocalLocationName(coordinates[1], coordinates[0])
+		: null
+	const lastKnownLocationName = localLocationName
+		|| currentLocation?.locationName
+		|| profile.defaultLocationName
 
 	return {
 		id: profile.personnelId,
 		badge: profile.badgeNumber,
 		name: profile.fullName,
 		rank: profile.rank,
-		locationName: currentLocation?.locationName || profile.defaultLocationName,
-		latitude: coordinates[1],
-		longitude: coordinates[0],
-		status: profile.dutyStatus,
+		locationName: hasCurrentLocation ? lastKnownLocationName : 'GPS location unavailable',
+		lastKnownLocationName: hasCoordinates ? lastKnownLocationName : undefined,
+		latitude: hasCoordinates ? coordinates[1] : null,
+		longitude: hasCoordinates ? coordinates[0] : null,
+		status: isOnDuty ? 'On Duty' : 'Off Duty',
+		isOnDuty,
+		isVisibleOnMap: isOnDuty && hasCurrentLocation,
 		mobileNumber: profile.mobileNumber,
 		photoUrl: profile.photoUrl,
 		lastUpdated: (
@@ -41,30 +90,48 @@ const serializePersonnel = (profile, currentLocation) => {
 		).toISOString(),
 		source: currentLocation?.source || 'mock',
 		isSimulated: currentLocation?.isSimulated ?? true,
+		isLocationStale: freshness.isLocationStale,
+		locationStatus: !hasCoordinates
+			? 'unavailable'
+			: (freshness.isLocationStale ? 'stale' : 'current'),
+		locationAgeSeconds: freshness.locationAgeSeconds,
+		locationRecordedAt: freshness.locationRecordedAt?.toISOString(),
+		speed: Number.isFinite(currentLocation?.speed) ? currentLocation.speed : null,
+		batteryLevel: Number.isFinite(currentLocation?.batteryLevel)
+			? currentLocation.batteryLevel
+			: null,
+		lastMovedAt: currentLocation?.lastMovedAt?.toISOString(),
+		inactivityAlertedAt: currentLocation?.inactivityAlertedAt?.toISOString(),
 	}
 }
 
 const getPersonnelWithLocations = async () => {
-	const [profiles, locations] = await Promise.all([
+	const now = new Date()
+	const [profiles, locations, onDutyPersonnelIds] = await Promise.all([
 		Personnel.find({ status: 'active' }).sort({ fullName: 1 }).lean(),
 		CurrentLocation.find().lean(),
+		Deployment.distinct('personnelId', currentShiftFilter(now)),
 	])
+	const onDutySet = new Set(onDutyPersonnelIds)
 	const locationsByPersonnel = new Map(
 		locations.map((location) => [location.personnelId, location]),
 	)
 
 	return profiles.map((profile) => (
-		serializePersonnel(profile, locationsByPersonnel.get(profile.personnelId))
+		serializePersonnel(profile, locationsByPersonnel.get(profile.personnelId), {
+			isOnDuty: onDutySet.has(profile.personnelId),
+		})
 	))
 }
 
 const getPersonnelMember = async (personnelId) => {
-	const [profile, location] = await Promise.all([
+	const [profile, location, deployment] = await Promise.all([
 		Personnel.findOne({ personnelId, status: 'active' }).lean(),
 		CurrentLocation.findOne({ personnelId }).lean(),
+		Deployment.findOne(currentShiftFilter(new Date(), { personnelId })).select('_id').lean(),
 	])
 
-	return profile ? serializePersonnel(profile, location) : null
+	return profile ? serializePersonnel(profile, location, { isOnDuty: Boolean(deployment) }) : null
 }
 
 const listPersonnel = async (query = {}) => {
@@ -90,16 +157,22 @@ const listPersonnel = async (query = {}) => {
 		Personnel.countDocuments(filter),
 	])
 	const personnelIds = profiles.map((profile) => profile.personnelId)
-	const locations = await CurrentLocation.find({
-		personnelId: { $in: personnelIds },
-	}).lean()
+	const [locations, onDutyPersonnelIds] = await Promise.all([
+		CurrentLocation.find({ personnelId: { $in: personnelIds } }).lean(),
+		Deployment.distinct('personnelId', currentShiftFilter(new Date(), {
+			personnelId: { $in: personnelIds },
+		})),
+	])
+	const onDutySet = new Set(onDutyPersonnelIds)
 	const locationByPersonnel = new Map(
 		locations.map((location) => [location.personnelId, location]),
 	)
 
 	return {
 		data: profiles.map((profile) => (
-			serializePersonnel(profile, locationByPersonnel.get(profile.personnelId))
+			serializePersonnel(profile, locationByPersonnel.get(profile.personnelId), {
+				isOnDuty: onDutySet.has(profile.personnelId),
+			})
 		)),
 		pagination: createPaginationMeta({ ...pagination, total }),
 	}
@@ -167,7 +240,10 @@ const ingestLocation = async (payload = {}) => {
 		throw error
 	}
 
-	const profile = await Personnel.findOne({ personnelId, status: 'active' }).lean()
+	const [profile, activeDeployment] = await Promise.all([
+		Personnel.findOne({ personnelId, status: 'active' }).lean(),
+		Deployment.findOne(currentShiftFilter(new Date(), { personnelId })).select('_id').lean(),
+	])
 	if (!profile) {
 		const error = new Error('Active personnel profile not found.')
 		error.status = 404
@@ -197,31 +273,50 @@ const ingestLocation = async (payload = {}) => {
 	}
 
 	const source = payload.source === 'mock' ? 'mock' : 'gps'
+	const speed = toOptionalNumber(payload.speed)
+	const heading = toOptionalNumber(payload.heading)
+	const batteryLevel = toOptionalNumber(payload.battery_level)
 	const current = await CurrentLocation.findOne({ personnelId })
 	if (
 		current?.recordedAt
 		&& current.source === source
 		&& recordedAt <= current.recordedAt
 	) {
+		const isSameReading = recordedAt.getTime() === current.recordedAt.getTime()
 		const refreshedLocationName = String(payload.location_name || '').trim()
+		const telemetryChanged = isSameReading && (
+			(speed !== undefined && speed !== current.speed)
+			|| (heading !== undefined && heading !== current.heading)
+			|| (batteryLevel !== undefined && batteryLevel !== current.batteryLevel)
+		)
 		if (
 			source === 'gps'
-			&& refreshedLocationName
-			&& refreshedLocationName !== current.locationName
+			&& isSameReading
+			&& (
+				telemetryChanged
+				|| (refreshedLocationName && refreshedLocationName !== current.locationName)
+			)
 		) {
-			current.locationName = refreshedLocationName
+			if (refreshedLocationName) current.locationName = refreshedLocationName
+			if (speed !== undefined) current.speed = speed
+			if (heading !== undefined) current.heading = heading
+			if (batteryLevel !== undefined) current.batteryLevel = batteryLevel
 			current.receivedAt = new Date()
 			await current.save()
 			return {
-				personnel: serializePersonnel(profile, current),
+				personnel: serializePersonnel(profile, current, {
+					isOnDuty: Boolean(activeDeployment),
+				}),
 				accepted: true,
-				reason: 'location_name_refreshed',
+				reason: telemetryChanged ? 'telemetry_refreshed' : 'location_name_refreshed',
 				historySampled: false,
 			}
 		}
 
 		return {
-			personnel: serializePersonnel(profile, current),
+			personnel: serializePersonnel(profile, current, {
+				isOnDuty: Boolean(activeDeployment),
+			}),
 			accepted: false,
 			reason: 'stale_location',
 			historySampled: false,
@@ -234,18 +329,28 @@ const ingestLocation = async (payload = {}) => {
 			status: 'active',
 		}).lean()
 	}
+	const movementThreshold = Math.max(5, Number(process.env.MOVEMENT_THRESHOLD_METERS) || 20)
+	const hasMoved = !current
+		|| current.source !== source
+		|| distanceInMeters(current.location?.coordinates, [longitude, latitude]) >= movementThreshold
+		|| (speed ?? 0) >= 2
 	const nextLocation = {
 		personnelId,
 		deviceAssignmentId: assignment?.assignmentId,
 		locationName: String(payload.location_name || current?.locationName || profile.defaultLocationName),
 		location: point(longitude, latitude),
 		accuracy: Number.isFinite(Number(payload.accuracy)) ? Number(payload.accuracy) : undefined,
-		speed: Number.isFinite(Number(payload.speed)) ? Number(payload.speed) : undefined,
-		heading: Number.isFinite(Number(payload.heading)) ? Number(payload.heading) : undefined,
+		speed,
+		heading,
+		batteryLevel,
 		source,
 		isSimulated: source === 'mock',
 		recordedAt,
 		receivedAt: new Date(),
+		lastMovedAt: hasMoved
+			? recordedAt
+			: (current?.lastMovedAt || current?.recordedAt || recordedAt),
+		inactivityAlertedAt: hasMoved ? null : current?.inactivityAlertedAt,
 	}
 	const updated = await CurrentLocation.findOneAndUpdate(
 		{ personnelId },
@@ -274,10 +379,95 @@ const ingestLocation = async (payload = {}) => {
 	}
 
 	return {
-		personnel: serializePersonnel(profile, updated),
+		personnel: serializePersonnel(profile, updated, {
+			isOnDuty: Boolean(activeDeployment),
+		}),
 		accepted: true,
 		historySampled: shouldSample,
 	}
+}
+
+const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
+	const inactivityMinutes = Math.max(2, Number(process.env.INACTIVITY_ALERT_MINUTES) || 5)
+	const inactivityMs = inactivityMinutes * 60_000
+	const deployments = await Deployment.find(currentShiftFilter(now))
+		.select('assignmentId personnelId shiftStart')
+		.lean()
+	if (deployments.length === 0) return []
+
+	const deploymentByPersonnel = new Map(
+		deployments.map((deployment) => [deployment.personnelId, deployment]),
+	)
+	const personnelIds = [...deploymentByPersonnel.keys()]
+	const [locations, profiles] = await Promise.all([
+		CurrentLocation.find({ personnelId: { $in: personnelIds }, source: 'gps' }),
+		Personnel.find({ personnelId: { $in: personnelIds }, status: 'active' })
+			.select('personnelId fullName rank')
+			.lean(),
+	])
+	const profilesById = new Map(profiles.map((profile) => [profile.personnelId, profile]))
+	const alerts = []
+
+	for (const location of locations) {
+		if (getLocationFreshness({
+			recordedAt: location.recordedAt || location.updatedAt,
+			source: location.source,
+			now,
+		}).isLocationStale) continue
+
+		const deployment = deploymentByPersonnel.get(location.personnelId)
+		const movementAt = location.lastMovedAt || location.recordedAt || location.updatedAt
+		const shiftStartedAt = deployment?.shiftStart || movementAt
+		const monitoringStartedAt = new Date(Math.max(
+			movementAt?.getTime?.() || now.getTime(),
+			shiftStartedAt?.getTime?.() || now.getTime(),
+		))
+		if (now.getTime() - monitoringStartedAt.getTime() < inactivityMs) continue
+
+		const result = await CurrentLocation.updateOne(
+			{
+				_id: location._id,
+				$or: [
+					{ inactivityAlertedAt: { $exists: false } },
+					{ inactivityAlertedAt: null },
+				],
+			},
+			{ $set: { inactivityAlertedAt: now } },
+		)
+		if (result.modifiedCount === 0) continue
+
+		const profile = profilesById.get(location.personnelId)
+		const officerName = profile?.fullName || location.personnelId
+		const message = `${officerName} has no detected movement for ${inactivityMinutes} minutes during an active shift.`
+		const [supervisorNotification] = await Promise.all([
+			createNotification({
+				recipientId: 'supervisor',
+				type: 'warning',
+				title: 'Personnel Inactivity',
+				message,
+				referenceType: 'personnel',
+				referenceId: location.personnelId,
+			}),
+			createNotification({
+				recipientId: location.personnelId,
+				type: 'warning',
+				title: 'Movement Check Required',
+				message: `No movement has been detected for ${inactivityMinutes} minutes. Please confirm your status or move if safe to do so.`,
+				referenceType: 'deployment',
+				referenceId: deployment.assignmentId,
+			}),
+		])
+		const alert = {
+			...supervisorNotification,
+			personnelId: location.personnelId,
+			personnelName: officerName,
+			inactivityMinutes,
+		}
+		alerts.push(alert)
+		io?.emit('personnel:inactivity', alert)
+	}
+
+	return alerts
 }
 
 const updateMockLocations = async ({ sampleHistory = false } = {}) => {
@@ -349,6 +539,7 @@ module.exports = {
 	getLocationHistory,
 	ingestLocation,
 	listPersonnel,
+	evaluatePersonnelInactivity,
 	serializePersonnel,
 	updateMockLocations,
 	updateDutyStatus,

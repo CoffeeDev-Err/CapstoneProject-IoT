@@ -10,8 +10,11 @@ export type OperationalTask = {
   requester_name: string;
   required_responders: number;
   accepted_by: string[];
-  status: 'open' | 'full' | 'completed';
+  status: 'open' | 'full' | 'completed' | 'cancelled';
   created_at: string;
+  updated_at?: string;
+  completed_at?: string;
+  cancelled_at?: string;
 };
 
 export type PoliceReport = {
@@ -41,6 +44,21 @@ export type PoliceReport = {
   resolved_at?: string;
   resolved_by?: string;
   resolution_notes?: string;
+  evidence_photo?: {
+    url: string;
+    mime_type: string;
+    size: number;
+    camera_facing: 'front' | 'back';
+    captured_at: string;
+  };
+};
+
+export type ReportEvidenceInput = {
+  uri: string;
+  name: string;
+  type: string;
+  camera_facing: 'front' | 'back';
+  captured_at: string;
 };
 
 export type DeploymentAssignment = {
@@ -56,6 +74,10 @@ export type DeploymentAssignment = {
   assignedAt: string;
   latitude: number;
   longitude: number;
+  status: 'active' | 'completed' | 'cancelled';
+  isCurrentShift: boolean;
+  acknowledged: boolean;
+  acknowledgedAt?: string;
 };
 
 export type LivePersonnel = {
@@ -64,13 +86,24 @@ export type LivePersonnel = {
   name: string;
   rank: string;
   locationName: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   photoUrl: string;
   lastUpdated: string;
   source?: string;
   isSimulated?: boolean;
+  isOnDuty?: boolean;
+  isVisibleOnMap?: boolean;
+  isLocationStale?: boolean;
+  locationStatus?: 'current' | 'stale' | 'unavailable';
+  locationAgeSeconds?: number | null;
+  locationRecordedAt?: string;
+  speed?: number | null;
+  batteryLevel?: number | null;
+  lastKnownLocationName?: string;
+  lastMovedAt?: string;
+  inactivityAlertedAt?: string;
 };
 
 export type SubmitReportInput = {
@@ -85,4 +118,5 @@ export type SubmitReportInput = {
   location_source?: 'gps' | 'manual';
   latitude?: number;
   longitude?: number;
+  evidence_photo?: ReportEvidenceInput;
 };

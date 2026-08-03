@@ -77,6 +77,11 @@ const toDateTimeLocalValue = (value) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
+const toIsoDateTime = (value) => {
+  const parsedDate = new Date(value)
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString()
+}
+
 const resolveGroupId = (assignment) => assignment.groupId || `${assignment.patrolArea}__${assignment.assignedAt || 'none'}`
 
 function AssignAreaPage() {
@@ -280,6 +285,19 @@ function AssignAreaPage() {
       return
     }
 
+    const shiftStart = toIsoDateTime(assignmentForm.shiftStart)
+    const shiftEnd = toIsoDateTime(assignmentForm.shiftEnd)
+
+    if (!shiftStart || !shiftEnd) {
+      setAssignMessage('Enter both the shift start and shift end before saving.')
+      return
+    }
+
+    if (new Date(shiftEnd) <= new Date(shiftStart)) {
+      setAssignMessage('Shift end must be later than shift start.')
+      return
+    }
+
     if (editingGroupId) {
       const currentGroupAssignments = assignments.filter((assignment) => resolveGroupId(assignment) === editingGroupId)
 
@@ -299,8 +317,8 @@ function AssignAreaPage() {
           return {
             ...existingAssignment,
             patrolArea: assignmentForm.patrolArea.trim(),
-            shiftStart: assignmentForm.shiftStart,
-            shiftEnd: assignmentForm.shiftEnd,
+            shiftStart,
+            shiftEnd,
             notes: assignmentForm.notes.trim(),
           }
         }
@@ -312,8 +330,8 @@ function AssignAreaPage() {
           personnelName: member.name,
           rank: member.rank,
           patrolArea: assignmentForm.patrolArea.trim(),
-          shiftStart: assignmentForm.shiftStart,
-          shiftEnd: assignmentForm.shiftEnd,
+          shiftStart,
+          shiftEnd,
           notes: assignmentForm.notes.trim(),
           assignedAt: new Date().toISOString(),
         }
@@ -354,8 +372,8 @@ function AssignAreaPage() {
           personnelName: selectedMember.name,
           rank: selectedMember.rank,
           patrolArea: assignmentForm.patrolArea.trim(),
-          shiftStart: assignmentForm.shiftStart,
-          shiftEnd: assignmentForm.shiftEnd,
+          shiftStart,
+          shiftEnd,
           notes: assignmentForm.notes.trim(),
         }
       })
@@ -380,8 +398,8 @@ function AssignAreaPage() {
       personnelName: member.name,
       rank: member.rank,
       patrolArea: assignmentForm.patrolArea.trim(),
-      shiftStart: assignmentForm.shiftStart,
-      shiftEnd: assignmentForm.shiftEnd,
+      shiftStart,
+      shiftEnd,
       notes: assignmentForm.notes.trim(),
       assignedAt,
     }))
@@ -641,22 +659,25 @@ function AssignAreaPage() {
             </label>
 
             <label className="assignment-field">
-              <span>Shift Start</span>
+              <span>Shift Start *</span>
               <input
                 type="datetime-local"
                 className="settings-input w-100"
                 value={assignmentForm.shiftStart}
                 onChange={handleFormChange('shiftStart')}
+                required
               />
             </label>
 
             <label className="assignment-field">
-              <span>Shift End (Optional)</span>
+              <span>Shift End *</span>
               <input
                 type="datetime-local"
                 className="settings-input w-100"
                 value={assignmentForm.shiftEnd}
                 onChange={handleFormChange('shiftEnd')}
+                min={assignmentForm.shiftStart}
+                required
               />
             </label>
 
@@ -716,6 +737,7 @@ function AssignAreaPage() {
                 <th>Personnel</th>
                 <th>Patrol Area</th>
                 <th>Shift Start</th>
+                <th>Shift End</th>
                 <th>Assigned At</th>
                 <th>Action</th>
               </tr>
@@ -724,7 +746,7 @@ function AssignAreaPage() {
               {filteredGroupedAssignments.map((group) => (
                 <Fragment key={group.groupId}>
                   <tr className="assignment-group-row">
-                    <td colSpan={5} className="assignment-group-cell">
+                    <td colSpan={6} className="assignment-group-cell">
                       <div className="assignment-group-content">
                         <strong className="assignment-group-label">{group.patrolArea}</strong>
                         <small className="assignment-group-meta">
@@ -775,6 +797,7 @@ function AssignAreaPage() {
                       </td>
                       <td>{assignment.patrolArea}</td>
                       <td>{assignment.shiftStart ? formatDateTime(assignment.shiftStart) : '-'}</td>
+                      <td>{assignment.shiftEnd ? formatDateTime(assignment.shiftEnd) : '-'}</td>
                       <td>{formatDateTime(assignment.assignedAt)}</td>
                       <td className="assignment-table-actions">
                         <button

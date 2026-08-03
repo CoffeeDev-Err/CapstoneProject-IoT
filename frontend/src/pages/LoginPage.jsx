@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import frameImage from '../assets/image 4.png'
+import { Eye, EyeOff } from 'lucide-react'
+import pnpLogo from '../assets/pnp-logo.png'
 import { useAuth } from '../context/useAuth'
 import {
   beginLogin,
@@ -163,23 +164,30 @@ function LoginPage() {
   }[mode]
 
   return (
-    <div className="login-page d-flex align-items-bottom justify-content-bottom vh-100 px-3">
-      <div className="login-layout">
-        <div className="login-hero position-relative">
-          <div className="hero-circle circle-1" />
-          <div className="hero-circle circle-2" />
-          <img src={frameImage} alt="Police personnel" className="login-hero-image" />
-        </div>
-
-        <div className="login-card card border-0 shadow-sm">
-          <div className="login-copy">
-            <div className="login-badge">{copy.badge}</div>
-            <h1 className="login-copy-title">{copy.title}</h1>
-            <p className="login-copy-subtitle">{copy.subtitle}</p>
+    <div className="login-page">
+      <div className="login-accent login-accent--top" aria-hidden="true" />
+      <div className="login-accent login-accent--bottom" aria-hidden="true" />
+      <main className="login-layout">
+        <section className="login-card" aria-labelledby="login-title">
+          <div className="login-brand">
+            <span className="login-brand__logo-frame">
+              <img src={pnpLogo} alt="Philippine National Police seal" className="login-brand__logo" />
+            </span>
+            <div>
+              <strong>BantayCabagan</strong>
+              <span>Cabagan Police Station Operations Portal</span>
+            </div>
           </div>
 
-          {mode === 'login' && (
-            <form onSubmit={handleLogin} className="login-form">
+          <div className="login-form-card">
+            <div className="login-copy">
+              <div className="login-badge">{copy.badge}</div>
+              <h1 id="login-title" className="login-copy-title">{copy.title}</h1>
+              <p className="login-copy-subtitle">{copy.subtitle}</p>
+            </div>
+
+            {mode === 'login' && (
+              <form onSubmit={handleLogin} className="login-form">
               <label className="login-field">
                 <span className="login-label">Login ID</span>
                 <input
@@ -192,18 +200,14 @@ function LoginPage() {
                   required
                 />
               </label>
-              <label className="login-field">
-                <span className="login-label">Password</span>
-                <input
-                  type="password"
-                  className="form-control form-control-lg fs-6 login-input"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
-              </label>
+              <PasswordField
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
               <button
                 type="button"
                 className="login-text-action"
@@ -217,11 +221,11 @@ function LoginPage() {
               </button>
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Sign In" />
-            </form>
-          )}
+              </form>
+            )}
 
-          {mode === 'otp' && (
-            <form onSubmit={handleVerifyLogin} className="login-form">
+            {mode === 'otp' && (
+              <form onSubmit={handleVerifyLogin} className="login-form">
               <CodeField code={code} setCode={setCode} />
               {challenge?.debugCode && (
                 <p className="auth-debug-code">Development code: {challenge.debugCode}</p>
@@ -234,11 +238,11 @@ function LoginPage() {
               <button type="button" className="login-text-action login-text-action--center" onClick={goToLogin}>
                 Use another account
               </button>
-            </form>
-          )}
+              </form>
+            )}
 
-          {mode === 'forgot' && (
-            <form onSubmit={handleForgotPassword} className="login-form">
+            {mode === 'forgot' && (
+              <form onSubmit={handleForgotPassword} className="login-form">
               <label className="login-field">
                 <span className="login-label">Login ID or Official Email</span>
                 <input
@@ -254,34 +258,26 @@ function LoginPage() {
               <button type="button" className="login-text-action login-text-action--center" onClick={goToLogin}>
                 Back to sign in
               </button>
-            </form>
-          )}
+              </form>
+            )}
 
-          {mode === 'reset' && (
-            <form onSubmit={handleResetPassword} className="login-form">
+            {mode === 'reset' && (
+              <form onSubmit={handleResetPassword} className="login-form">
               <CodeField code={code} setCode={setCode} />
-              <label className="login-field">
-                <span className="login-label">New Password</span>
-                <input
-                  type="password"
-                  className="form-control form-control-lg fs-6 login-input"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              <label className="login-field">
-                <span className="login-label">Confirm New Password</span>
-                <input
-                  type="password"
-                  className="form-control form-control-lg fs-6 login-input"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
+              <PasswordField
+                label="New Password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <PasswordField
+                label="Confirm New Password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                required
+              />
               {challenge?.debugCode && (
                 <p className="auth-debug-code">Development code: {challenge.debugCode}</p>
               )}
@@ -290,11 +286,38 @@ function LoginPage() {
               <button type="button" className="login-text-action login-text-action--center" onClick={goToLogin}>
                 Cancel
               </button>
-            </form>
-          )}
-        </div>
-      </div>
+              </form>
+            )}
+          </div>
+        </section>
+      </main>
     </div>
+  )
+}
+
+function PasswordField({ label, ...inputProps }) {
+  const [visible, setVisible] = useState(false)
+
+  return (
+    <label className="login-field">
+      <span className="login-label">{label}</span>
+      <span className="login-password-control">
+        <input
+          {...inputProps}
+          type={visible ? 'text' : 'password'}
+          className="form-control form-control-lg fs-6 login-input login-password-input"
+        />
+        <button
+          type="button"
+          className="login-password-toggle"
+          onClick={() => setVisible((current) => !current)}
+          aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-pressed={visible}
+        >
+          {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+        </button>
+      </span>
+    </label>
   )
 }
 

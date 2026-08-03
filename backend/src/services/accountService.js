@@ -43,16 +43,24 @@ const serializeAccount = (user, profile, device) => ({
 	updatedAt: user.updatedAt?.toISOString(),
 })
 
-const validateAccountPayload = (payload, { requirePassword = true } = {}) => {
-	const requiredFields = [
-		['fullName', 'Full name'],
-		['badgeNumber', 'Badge number'],
-		['rank', 'Rank'],
-		['loginId', 'Login ID'],
-		['officialEmail', 'Official email'],
-		['imei', 'GPS device ID'],
-		['flespiDeviceId', 'Flespi device'],
-	]
+const validateAccountPayload = (
+	payload,
+	{ requirePassword = true, requirePersonnel = true } = {},
+) => {
+	const requiredFields = requirePersonnel
+		? [
+			['fullName', 'Full name'],
+			['badgeNumber', 'Badge number'],
+			['rank', 'Rank'],
+			['loginId', 'Login ID'],
+			['officialEmail', 'Official email'],
+			['imei', 'GPS device ID'],
+			['flespiDeviceId', 'Flespi device'],
+		]
+		: [
+			['loginId', 'Login ID'],
+			['officialEmail', 'Official email'],
+		]
 
 	for (const [field, label] of requiredFields) {
 		if (!String(payload[field] || '').trim()) {
@@ -216,9 +224,40 @@ const createAccountService = ({ io, personnelService }) => {
 	}
 
 	const updateAccount = async (accountId, payload, { ipAddress } = {}) => {
-		validateAccountPayload(payload, { requirePassword: false })
 		const user = await User.findById(accountId)
 		if (!user) throw createHttpError('Account not found.', 404)
+		const isSupervisor = user.role === 'supervisor'
+
+		validateAccountPayload(payload, {
+			requirePassword: false,
+			requirePersonnel: !isSupervisor,
+		})
+
+		if (isSupervisor) {
+			user.username = String(payload.loginId).trim().toLowerCase()
+			const nextEmail = String(payload.officialEmail).trim().toLowerCase()
+			if (user.email !== nextEmail) {
+				user.email = nextEmail
+				user.emailVerifiedAt = null
+			}
+			user.status = normalizeStatus(payload.accountStatus)
+			if (payload.temporaryPassword) {
+				user.passwordHash = await hashPassword(payload.temporaryPassword)
+				user.forcePasswordReset = true
+			}
+
+			await user.save()
+			await AuditLog.create({
+				action: 'account.updated',
+				entityType: 'user',
+				entityId: String(user._id),
+				changes: { role: user.role },
+				ipAddress,
+			})
+
+			await broadcastAccountData()
+			return serializeAccount(user, null, null)
+		}
 
 		const [profile, currentAssignment] = await Promise.all([
 			Personnel.findOne({ personnelId: user.personnelId }),

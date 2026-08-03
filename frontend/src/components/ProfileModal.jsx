@@ -1,81 +1,125 @@
-/**
- * ProfileModal.jsx — Officer Profile Detail Modal
- *
- * A centred, dismissible modal that appears when a supervisor clicks a map
- * marker or a name in the SidePanel. Shows the officer's full details.
- *
- * Backdrop click  — closes the modal (calls onClose)
- * Stop propagation — prevents clicks inside the card from bubbling to the backdrop
- * Close button    — explicit dismiss
- *
- * Props:
- *   selectedPersonnel {Object|null} — officer object from personnel array,
- *                                     or null when no officer is selected
- *   onClose           {Function}    — called to dismiss the modal
- *   onLocate          {Function}    — called to focus the map on this officer
- */
-import { formatTime } from '../utils/dateTime'
+import {
+  BatteryMedium,
+  Clock3,
+  Gauge,
+  LocateFixed,
+  MapPin,
+  X,
+} from 'lucide-react'
 import { createPortal } from 'react-dom'
 
+import { formatTime } from '../utils/dateTime'
+
+const formatGpsDateTime = (value) => {
+  if (!value) return 'Unavailable'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unavailable'
+
+  return new Intl.DateTimeFormat('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
 function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
-  // Do not render anything if no officer has been selected
-  if (!selectedPersonnel) {
-    return null
-  }
+  if (!selectedPersonnel) return null
+
+  const hasCurrentLocation = !selectedPersonnel.isLocationStale
+    && selectedPersonnel.isVisibleOnMap !== false
+  const speed = Number.isFinite(selectedPersonnel.speed)
+    ? `${selectedPersonnel.speed.toFixed(1)} km/h`
+    : 'Unavailable'
+  const battery = Number.isFinite(selectedPersonnel.batteryLevel)
+    ? `${Math.round(selectedPersonnel.batteryLevel)}%`
+    : 'Unavailable'
 
   return createPortal(
-    // Semi-transparent backdrop — clicking outside the card dismisses the modal
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="profile-modal-layer" role="presentation">
+      <section
+        className="profile-map-card"
+        role="dialog"
+        aria-label={`${selectedPersonnel.name} live details`}
+      >
+        <button
+          type="button"
+          className="profile-map-card__close"
+          onClick={onClose}
+          aria-label="Close personnel details"
+          title="Close"
+        >
+          <X size={18} strokeWidth={2.2} />
+        </button>
 
-      {/*
-        The card itself — stopPropagation prevents backdrop's onClick
-        from firing when the user clicks anywhere inside the card.
-      */}
-      <div className="profile-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-
-        {/* Circular officer photo centered at the top of the card */}
-        <div className="profile-photo-wrap d-flex justify-content-center mb-3">
+        <header className="profile-map-card__header">
           <img
             src={selectedPersonnel.photoUrl}
-            alt={selectedPersonnel.name}
-            className="profile-photo"
-            onError={(e) => {
-              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPersonnel.name)}&background=1d4ed8&color=fff&size=128`
+            alt=""
+            className="profile-map-card__photo"
+            onError={(event) => {
+              event.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPersonnel.name)}&background=1d4ed8&color=fff&size=128`
             }}
           />
-        </div>
+          <div className="profile-map-card__identity">
+            <h3>{selectedPersonnel.name}</h3>
+            <p>{selectedPersonnel.rank}</p>
+            <span className="profile-map-card__status">
+              <i aria-hidden="true" />
+              {selectedPersonnel.status}
+            </span>
+          </div>
+        </header>
 
-        {/* Officer name and rank header */}
-        <h3 className="mb-0 fw-bold">{selectedPersonnel.name}</h3>
-        <p className="rank mb-3">{selectedPersonnel.rank}</p>
-
-        {/* Detail rows — label on left, value on right */}
-        <div className="profile-row d-flex justify-content-between align-items-center">
-          <span>Location</span>
-          <strong>{selectedPersonnel.locationName}</strong>
-        </div>
-        <div className="profile-row d-flex justify-content-between align-items-center">
-          <span>Status</span>
-          <strong>{selectedPersonnel.status}</strong>
-        </div>
-        <div className="profile-row d-flex justify-content-between align-items-center">
-          <span>Last Updated</span>
-          {/* formatTime converts the ISO timestamp to a human-readable local time */}
-          <strong>{formatTime(selectedPersonnel.lastUpdated)}</strong>
-        </div>
-
-        {/* Action buttons */}
-        <div className="modal-actions">
-          <button type="button" className="locate-btn" onClick={onLocate}>
-            Locate
+        <div className="profile-map-card__location">
+          <MapPin size={17} aria-hidden="true" />
+          <div>
+            <span>Current location</span>
+            <strong>{selectedPersonnel.locationName || 'Location unavailable'}</strong>
+            {selectedPersonnel.isLocationStale && selectedPersonnel.lastKnownLocationName && (
+              <small>Last known: {selectedPersonnel.lastKnownLocationName}</small>
+            )}
+          </div>
+          <button
+            type="button"
+            className="profile-map-card__locate"
+            onClick={onLocate}
+            disabled={!hasCurrentLocation}
+            aria-label="Locate personnel on map"
+            title={hasCurrentLocation ? 'Locate on map' : 'Waiting for a current GPS fix'}
+          >
+            <LocateFixed size={17} aria-hidden="true" />
+            <span>Locate</span>
           </button>
-          <button type="button" className="secondary-btn" onClick={onClose}>
-            Close
-          </button>
         </div>
-      </div>
+
+        <div className="profile-map-card__telemetry">
+          <div className="profile-map-card__metric">
+            <Gauge size={16} aria-hidden="true" />
+            <span>Speed</span>
+            <strong>{speed}</strong>
+          </div>
+          <div className="profile-map-card__metric">
+            <BatteryMedium size={16} aria-hidden="true" />
+            <span>Battery</span>
+            <strong>{battery}</strong>
+          </div>
+          <div className="profile-map-card__metric">
+            <Clock3 size={16} aria-hidden="true" />
+            <span>GPS time</span>
+            <strong>{formatGpsDateTime(selectedPersonnel.locationRecordedAt || selectedPersonnel.lastUpdated)}</strong>
+          </div>
+          <div className="profile-map-card__metric">
+            <Clock3 size={16} aria-hidden="true" />
+            <span>Updated</span>
+            <strong>{formatTime(selectedPersonnel.lastUpdated)}</strong>
+          </div>
+        </div>
+      </section>
     </div>,
-    document.body
+    document.body,
   )
 }
 

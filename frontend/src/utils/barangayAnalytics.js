@@ -56,9 +56,7 @@ export const getAnalyticsPeriodRange = (period, referenceDate) => {
   const start = startOfDay(referenceDate)
 
   if (period === 'weekly') {
-    const dayOfWeek = start.getDay()
-    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-    start.setDate(start.getDate() - daysSinceMonday)
+    start.setDate(start.getDate() - 6)
   } else if (period === 'monthly') {
     start.setDate(1)
   } else {
@@ -70,11 +68,15 @@ export const getAnalyticsPeriodRange = (period, referenceDate) => {
 
 const formatPeriodLabel = (period, start, end) => {
   if (period === 'weekly') {
-    return `Week of ${new Intl.DateTimeFormat('en-PH', {
+    const formatter = new Intl.DateTimeFormat('en-PH', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    }).format(start)}`
+    })
+    const range = typeof formatter.formatRange === 'function'
+      ? formatter.formatRange(start, end)
+      : `${formatter.format(start)} - ${formatter.format(end)}`
+    return `Last 7 days: ${range}`
   }
 
   if (period === 'monthly') {

@@ -15,7 +15,14 @@
  *   statusMessage     {string}   — human-readable status from the socket hook
  *   onSelectPersonnel {Function} — called with the officer object when a list item is clicked
  */
-function SidePanel({ personnel, personnelCount, statusMessage, outOfBoundaryPersonnelCount, onSelectPersonnel }) {
+function SidePanel({
+  personnel,
+  personnelCount,
+  statusMessage,
+  outOfBoundaryPersonnelCount,
+  stalePersonnelCount,
+  onSelectPersonnel,
+}) {
   return (
     <section className="side-panel h-100">
 
@@ -33,6 +40,11 @@ function SidePanel({ personnel, personnelCount, statusMessage, outOfBoundaryPers
         {outOfBoundaryPersonnelCount > 0 && (
           <span className="geofence-alert-pill">
             {outOfBoundaryPersonnelCount} personnel outside Cabagan
+          </span>
+        )}
+        {stalePersonnelCount > 0 && (
+          <span className="geofence-alert-pill">
+            {stalePersonnelCount} personnel awaiting a current GPS fix
           </span>
         )}
       </article>

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileTheme } from '../constants/mobileTheme';
+import { useMobileTheme } from '../context/ThemeContext';
 import {
   confirmPasswordChange,
   requestPasswordChange,
@@ -38,6 +39,7 @@ export default function ChangePasswordModal({
   onClose,
   onChanged,
 }: Props) {
+  const { colors, isDark } = useMobileTheme();
   const [step, setStep] = useState<'password' | 'verify'>('password');
   const [currentPassword, setCurrentPassword] = useState('');
   const [code, setCode] = useState('');
@@ -99,18 +101,18 @@ export default function ChangePasswordModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, isDark && darkStyles.sheet]}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Change Password</Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.title, isDark && darkStyles.text]}>Change Password</Text>
+              <Text style={[styles.subtitle, isDark && darkStyles.muted]}>
                 {step === 'password'
                   ? 'Confirm your current password.'
                   : `Enter the code sent to ${challenge?.maskedEmail}.`}
               </Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Icon name="close" size={22} color={mobileTheme.textMuted} />
+              <Icon name="close" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -165,13 +167,14 @@ export default function ChangePasswordModal({
 
 function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
   const { label, ...inputProps } = props;
+  const { colors, isDark } = useMobileTheme();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, isDark && darkStyles.muted]}>{label}</Text>
       <TextInput
         {...inputProps}
-        style={styles.input}
-        placeholderTextColor="#999aab"
+        style={[styles.input, isDark && darkStyles.input]}
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
       />
     </View>
@@ -239,4 +242,11 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.65 },
   submitText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+});
+
+const darkStyles = StyleSheet.create({
+  sheet: { borderWidth: 1, borderColor: '#22314a', backgroundColor: '#0b1528' },
+  input: { borderColor: '#2a3a56', backgroundColor: '#0e1a30', color: '#f8fafc' },
+  text: { color: '#f8fafc' },
+  muted: { color: '#9eabc0' },
 });

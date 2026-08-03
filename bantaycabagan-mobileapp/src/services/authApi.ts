@@ -8,6 +8,8 @@ export type AuthUser = {
   role: 'supervisor' | 'officer';
   personnelId?: string;
   forcePasswordReset: boolean;
+  createdAt?: string;
+  lastLoginAt?: string;
   profile: {
     fullName: string;
     badgeNumber: string;

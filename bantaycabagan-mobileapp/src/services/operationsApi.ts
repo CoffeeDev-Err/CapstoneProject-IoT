@@ -26,10 +26,11 @@ const request = async <T>(
   options?: RequestInit,
   token?: string | null,
 ): Promise<T> => {
+  const isMultipart = options?.body instanceof FormData;
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(!isMultipart ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
@@ -43,6 +44,23 @@ const request = async <T>(
   return body;
 };
 
+export type CursorPagination = {
+  limit: number;
+  hasNextPage: boolean;
+  nextCursor: string | null;
+};
+
+export type CursorPage<T> = {
+  data: T[];
+  pagination: CursorPagination;
+};
+
+export const resolveApiAssetUrl = (assetUrl?: string) => {
+  if (!assetUrl) return '';
+  if (/^https?:\/\//i.test(assetUrl)) return assetUrl;
+  return `${API_URL}${assetUrl.startsWith('/') ? '' : '/'}${assetUrl}`;
+};
+
 export const fetchOperations = (personnelId: string, token?: string | null) => request<{
   tasks: OperationalTask[];
   reports: PoliceReport[];
@@ -52,6 +70,46 @@ export const fetchOperations = (personnelId: string, token?: string | null) => r
 export const fetchLivePersonnel = (token?: string | null) => request<{
   data: LivePersonnel[];
 }>('/api/personnel?limit=100', undefined, token);
+
+export const fetchReportPage = ({
+  personnelId,
+  category = 'all',
+  cursor,
+  limit = 10,
+}: {
+  personnelId: string;
+  category?: 'all' | 'incident' | 'routine';
+  cursor?: string | null;
+  limit?: number;
+}, token?: string | null) => {
+  const params = new URLSearchParams({
+    pagination: 'cursor',
+    limit: String(limit),
+    personnel_id: personnelId,
+  });
+  if (category !== 'all') params.set('category', category);
+  if (cursor) params.set('cursor', cursor);
+  return request<CursorPage<PoliceReport>>(`/api/reports?${params.toString()}`, undefined, token);
+};
+
+export const fetchTaskHistoryPage = ({
+  personnelId,
+  cursor,
+  limit = 10,
+}: {
+  personnelId: string;
+  cursor?: string | null;
+  limit?: number;
+}, token?: string | null) => {
+  const params = new URLSearchParams({
+    pagination: 'cursor',
+    view: 'history',
+    limit: String(limit),
+    personnel_id: personnelId,
+  });
+  if (cursor) params.set('cursor', cursor);
+  return request<CursorPage<OperationalTask>>(`/api/tasks?${params.toString()}`, undefined, token);
+};
 
 export const acceptOperationalTask = (
   taskId: string,
@@ -63,6 +121,24 @@ export const acceptOperationalTask = (
     method: 'POST',
     body: JSON.stringify({ personnel_id: actor.id }),
   },
+  token,
+);
+
+export const cancelOperationalTask = (
+  taskId: string,
+  token?: string | null,
+) => request<{ task: OperationalTask }>(
+  `/api/tasks/${taskId}/cancel`,
+  { method: 'PATCH' },
+  token,
+);
+
+export const acknowledgeDeploymentAssignment = (
+  assignmentId: string,
+  token?: string | null,
+) => request<{ deployment: DeploymentAssignment }>(
+  `/api/deployments/${encodeURIComponent(assignmentId)}/acknowledge`,
+  { method: 'PATCH' },
   token,
 );
 
@@ -94,9 +170,8 @@ export const submitPoliceReport = (
   actor: OfficerActor,
   deployment?: DeploymentAssignment,
   token?: string | null,
-) => request<{ report: PoliceReport }>('/api/reports', {
-  method: 'POST',
-  body: JSON.stringify({
+) => {
+  const payload = {
     ...input,
     personnel_id: actor.id,
     officer: actor.name,
@@ -104,8 +179,33 @@ export const submitPoliceReport = (
     occurred_at: input.occurred_at,
     latitude: input.latitude,
     longitude: input.longitude,
-  }),
-}, token);
+  };
+
+  if (!input.evidence_photo) {
+    return request<{ report: PoliceReport }>('/api/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, token);
+  }
+
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (key === 'evidence_photo' || value === undefined || value === null) return;
+    formData.append(key, String(value));
+  });
+  formData.append('evidence_camera_facing', input.evidence_photo.camera_facing);
+  formData.append('evidence_captured_at', input.evidence_photo.captured_at);
+  formData.append('evidence_photo', {
+    uri: input.evidence_photo.uri,
+    name: input.evidence_photo.name,
+    type: input.evidence_photo.type,
+  } as unknown as Blob);
+
+  return request<{ report: PoliceReport }>('/api/reports', {
+    method: 'POST',
+    body: formData,
+  }, token);
+};
 
 export const resolveIncidentReport = (
   reportId: string,

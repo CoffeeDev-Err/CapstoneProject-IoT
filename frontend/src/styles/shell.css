@@ -56,16 +56,17 @@
 
 .nav-sidebar__badge {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #2563eb;
-  color: #fff;
+  width: 38px;
+  height: 44px;
   display: grid;
   place-items: center;
-  font-weight: 800;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
+}
+
+.nav-sidebar__badge img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .nav-sidebar__brand-name {

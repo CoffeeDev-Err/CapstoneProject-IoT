@@ -4,13 +4,19 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { Alert } from 'react-native';
 import { useAuth } from './AuthContext';
 import {
   acceptOperationalTask,
+  acknowledgeDeploymentAssignment,
+  cancelOperationalTask,
   fetchOperations,
   fetchLivePersonnel,
+  fetchReportPage,
+  fetchTaskHistoryPage,
   operationsSocket,
   requestBackup,
   resolveIncidentReport,
@@ -31,12 +37,24 @@ type OperationalContextValue = {
   personnel: LivePersonnel[];
   isConnected: boolean;
   isLoading: boolean;
+  isReportsLoading: boolean;
+  isReportsLoadingMore: boolean;
+  reportsHasMore: boolean;
+  isTaskHistoryLoading: boolean;
+  isTaskHistoryLoadingMore: boolean;
+  taskHistoryHasMore: boolean;
   currentOfficer: LivePersonnel;
   currentPersonnelId: string;
   acceptTask: (taskId: string) => Promise<void>;
+  cancelBackupRequest: (taskId: string) => Promise<void>;
   createBackupRequest: () => Promise<void>;
   submitReport: (input: SubmitReportInput) => Promise<void>;
   resolveReport: (reportId: string, resolutionNotes: string) => Promise<void>;
+  acknowledgeDeployment: (assignmentId: string) => Promise<void>;
+  refreshReports: (category: 'all' | 'incident' | 'routine') => Promise<void>;
+  loadMoreReports: () => Promise<void>;
+  refreshTaskHistory: () => Promise<void>;
+  loadMoreTaskHistory: () => Promise<void>;
 };
 
 const OperationalContext = createContext<OperationalContextValue | null>(null);
@@ -48,6 +66,16 @@ const upsertById = <T extends { id: string }>(items: T[], incoming: T) => {
     : [incoming, ...items];
 };
 
+const mergeById = <T extends { id: string }>(first: T[], second: T[]) => {
+  const merged = new Map<string, T>();
+  [...first, ...second].forEach((item) => merged.set(item.id, item));
+  return [...merged.values()];
+};
+
+const isActiveTask = (task: OperationalTask) => (
+  task.status === 'open' || task.status === 'full'
+);
+
 export function OperationalProvider({ children }: { children: React.ReactNode }) {
   const { token, user } = useAuth();
   const currentPersonnelId = user?.personnelId || '';
@@ -57,6 +85,17 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const [personnel, setPersonnel] = useState<LivePersonnel[]>([]);
   const [isConnected, setIsConnected] = useState(operationsSocket.connected);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReportsLoading, setIsReportsLoading] = useState(false);
+  const [isReportsLoadingMore, setIsReportsLoadingMore] = useState(false);
+  const [reportsHasMore, setReportsHasMore] = useState(false);
+  const [reportCursor, setReportCursor] = useState<string | null>(null);
+  const [reportCategory, setReportCategory] = useState<'all' | 'incident' | 'routine'>('all');
+  const [isTaskHistoryLoading, setIsTaskHistoryLoading] = useState(false);
+  const [isTaskHistoryLoadingMore, setIsTaskHistoryLoadingMore] = useState(false);
+  const [taskHistoryHasMore, setTaskHistoryHasMore] = useState(false);
+  const [taskHistoryCursor, setTaskHistoryCursor] = useState<string | null>(null);
+  const reportRequestId = useRef(0);
+  const taskHistoryRequestId = useRef(0);
 
   const currentOfficer = useMemo<LivePersonnel>(() => {
     const liveProfile = personnel.find((member) => member.id === currentPersonnelId);
@@ -67,12 +106,15 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       badge: user?.profile?.badgeNumber || currentPersonnelId,
       name: user?.profile?.fullName || 'Police Personnel',
       rank: user?.profile?.rank || 'Police Officer',
-      locationName: 'Cabagan Police Station',
-      latitude: 17.4239,
-      longitude: 121.7681,
+      locationName: 'GPS location unavailable',
+      latitude: null,
+      longitude: null,
       status: user?.profile?.dutyStatus || 'Off Duty',
       photoUrl: user?.profile?.photoUrl || 'https://randomuser.me/api/portraits/men/32.jpg',
       lastUpdated: new Date().toISOString(),
+      isVisibleOnMap: false,
+      isLocationStale: true,
+      locationStatus: 'unavailable',
     };
   }, [currentPersonnelId, personnel, user]);
 
@@ -89,13 +131,20 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     }
 
     setIsLoading(true);
+    setReports([]);
+    setReportCursor(null);
+    setReportsHasMore(false);
+    setTaskHistoryCursor(null);
+    setTaskHistoryHasMore(false);
     Promise.all([
       fetchOperations(currentPersonnelId, token),
       fetchLivePersonnel(token),
     ])
       .then(([operationsPayload, personnelPayload]) => {
-        setTasks(operationsPayload.tasks);
-        setReports(operationsPayload.reports);
+        setTasks((items) => {
+          const history = items.filter((task) => !isActiveTask(task));
+          return mergeById(operationsPayload.tasks, history);
+        });
         setDeployments(operationsPayload.deployments);
         setPersonnel(personnelPayload.data);
       })
@@ -138,10 +187,10 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
           : assignment
       )));
     };
-    const onTasksBootstrap = (payload: OperationalTask[]) => setTasks(payload);
-    const onReportsBootstrap = (payload: PoliceReport[]) => {
-      setReports(payload.filter((report) => report.personnel_id === currentPersonnelId));
-    };
+    const onTasksBootstrap = (payload: OperationalTask[]) => setTasks((items) => {
+      const history = items.filter((task) => !isActiveTask(task));
+      return mergeById(payload, history);
+    });
     const onTaskCreated = (task: OperationalTask) => setTasks((items) => upsertById(items, task));
     const onTaskUpdated = (task: OperationalTask) => setTasks((items) => upsertById(items, task));
     const onReportSubmitted = (report: PoliceReport) => {
@@ -155,10 +204,30 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       }
     };
     const onDeploymentsBootstrap = (payload: DeploymentAssignment[]) => {
-      setDeployments(payload.filter((assignment) => assignment.personnelId === currentPersonnelId));
+      setDeployments(payload.filter((assignment) => (
+        assignment.personnelId === currentPersonnelId
+        && assignment.isCurrentShift !== false
+      )));
     };
     const onDeploymentsUpdated = (payload: DeploymentAssignment[]) => {
-      setDeployments(payload.filter((assignment) => assignment.personnelId === currentPersonnelId));
+      setDeployments(payload.filter((assignment) => (
+        assignment.personnelId === currentPersonnelId
+        && assignment.isCurrentShift !== false
+      )));
+    };
+    const onDeploymentAcknowledged = (assignment: DeploymentAssignment) => {
+      if (assignment.personnelId !== currentPersonnelId) return;
+      setDeployments((items) => upsertById(items, assignment));
+    };
+    const onPersonnelInactivity = (payload: {
+      personnelId?: string;
+      inactivityMinutes?: number;
+    }) => {
+      if (payload.personnelId !== currentPersonnelId) return;
+      Alert.alert(
+        'Movement check required',
+        `No movement has been detected for ${payload.inactivityMinutes || 5} minutes. Please confirm your status or move if safe to do so.`,
+      );
     };
 
     operationsSocket.on('connect', onConnect);
@@ -167,13 +236,14 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     operationsSocket.on('personnel:update', onPersonnelUpdate);
     operationsSocket.on('personnel:identity-updated', onPersonnelIdentityUpdated);
     operationsSocket.on('tasks:bootstrap', onTasksBootstrap);
-    operationsSocket.on('reports:bootstrap', onReportsBootstrap);
     operationsSocket.on('task:created', onTaskCreated);
     operationsSocket.on('task:updated', onTaskUpdated);
     operationsSocket.on('report:submitted', onReportSubmitted);
     operationsSocket.on('report:resolved', onReportResolved);
     operationsSocket.on('deployments:bootstrap', onDeploymentsBootstrap);
     operationsSocket.on('deployments:updated', onDeploymentsUpdated);
+    operationsSocket.on('deployment:acknowledged', onDeploymentAcknowledged);
+    operationsSocket.on('personnel:inactivity', onPersonnelInactivity);
     setIsConnected(operationsSocket.connected);
     if (!operationsSocket.connected) operationsSocket.connect();
 
@@ -184,21 +254,98 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       operationsSocket.off('personnel:update', onPersonnelUpdate);
       operationsSocket.off('personnel:identity-updated', onPersonnelIdentityUpdated);
       operationsSocket.off('tasks:bootstrap', onTasksBootstrap);
-      operationsSocket.off('reports:bootstrap', onReportsBootstrap);
       operationsSocket.off('task:created', onTaskCreated);
       operationsSocket.off('task:updated', onTaskUpdated);
       operationsSocket.off('report:submitted', onReportSubmitted);
       operationsSocket.off('report:resolved', onReportResolved);
       operationsSocket.off('deployments:bootstrap', onDeploymentsBootstrap);
       operationsSocket.off('deployments:updated', onDeploymentsUpdated);
+      operationsSocket.off('deployment:acknowledged', onDeploymentAcknowledged);
+      operationsSocket.off('personnel:inactivity', onPersonnelInactivity);
       operationsSocket.disconnect();
     };
   }, [currentPersonnelId]);
+
+  const refreshReports = useCallback(async (
+    category: 'all' | 'incident' | 'routine',
+  ) => {
+    if (!currentPersonnelId) return;
+    const requestId = ++reportRequestId.current;
+    setReportCategory(category);
+    setIsReportsLoading(true);
+    setReportCursor(null);
+    try {
+      const payload = await fetchReportPage({
+        personnelId: currentPersonnelId,
+        category,
+      }, token);
+      if (requestId !== reportRequestId.current) return;
+      setReports(payload.data);
+      setReportCursor(payload.pagination.nextCursor);
+      setReportsHasMore(payload.pagination.hasNextPage);
+    } finally {
+      if (requestId === reportRequestId.current) setIsReportsLoading(false);
+    }
+  }, [currentPersonnelId, token]);
+
+  const loadMoreReports = useCallback(async () => {
+    if (!currentPersonnelId || !reportCursor || isReportsLoadingMore) return;
+    setIsReportsLoadingMore(true);
+    try {
+      const payload = await fetchReportPage({
+        personnelId: currentPersonnelId,
+        category: reportCategory,
+        cursor: reportCursor,
+      }, token);
+      setReports((items) => mergeById(items, payload.data));
+      setReportCursor(payload.pagination.nextCursor);
+      setReportsHasMore(payload.pagination.hasNextPage);
+    } finally {
+      setIsReportsLoadingMore(false);
+    }
+  }, [currentPersonnelId, isReportsLoadingMore, reportCategory, reportCursor, token]);
+
+  const refreshTaskHistory = useCallback(async () => {
+    if (!currentPersonnelId) return;
+    const requestId = ++taskHistoryRequestId.current;
+    setIsTaskHistoryLoading(true);
+    setTaskHistoryCursor(null);
+    try {
+      const payload = await fetchTaskHistoryPage({ personnelId: currentPersonnelId }, token);
+      if (requestId !== taskHistoryRequestId.current) return;
+      setTasks((items) => mergeById(items.filter(isActiveTask), payload.data));
+      setTaskHistoryCursor(payload.pagination.nextCursor);
+      setTaskHistoryHasMore(payload.pagination.hasNextPage);
+    } finally {
+      if (requestId === taskHistoryRequestId.current) setIsTaskHistoryLoading(false);
+    }
+  }, [currentPersonnelId, token]);
+
+  const loadMoreTaskHistory = useCallback(async () => {
+    if (!currentPersonnelId || !taskHistoryCursor || isTaskHistoryLoadingMore) return;
+    setIsTaskHistoryLoadingMore(true);
+    try {
+      const payload = await fetchTaskHistoryPage({
+        personnelId: currentPersonnelId,
+        cursor: taskHistoryCursor,
+      }, token);
+      setTasks((items) => mergeById(items, payload.data));
+      setTaskHistoryCursor(payload.pagination.nextCursor);
+      setTaskHistoryHasMore(payload.pagination.hasNextPage);
+    } finally {
+      setIsTaskHistoryLoadingMore(false);
+    }
+  }, [currentPersonnelId, isTaskHistoryLoadingMore, taskHistoryCursor, token]);
 
   const acceptTask = useCallback(async (taskId: string) => {
     const response = await acceptOperationalTask(taskId, actor, token);
     setTasks((items) => upsertById(items, response.task));
   }, [actor, token]);
+
+  const cancelBackupRequest = useCallback(async (taskId: string) => {
+    const response = await cancelOperationalTask(taskId, token);
+    setTasks((items) => upsertById(items, response.task));
+  }, [token]);
 
   const createBackupRequest = useCallback(async () => {
     const response = await requestBackup(actor, deployments[0], token);
@@ -215,6 +362,11 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setReports((items) => upsertById(items, response.report));
   }, [actor, token]);
 
+  const acknowledgeDeployment = useCallback(async (assignmentId: string) => {
+    const response = await acknowledgeDeploymentAssignment(assignmentId, token);
+    setDeployments((items) => upsertById(items, response.deployment));
+  }, [token]);
+
   const value = useMemo(() => ({
     tasks,
     reports,
@@ -222,23 +374,47 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     personnel,
     isConnected,
     isLoading,
+    isReportsLoading,
+    isReportsLoadingMore,
+    reportsHasMore,
+    isTaskHistoryLoading,
+    isTaskHistoryLoadingMore,
+    taskHistoryHasMore,
     currentOfficer,
     currentPersonnelId,
     acceptTask,
+    cancelBackupRequest,
     createBackupRequest,
     submitReport,
     resolveReport,
+    acknowledgeDeployment,
+    refreshReports,
+    loadMoreReports,
+    refreshTaskHistory,
+    loadMoreTaskHistory,
   }), [
     acceptTask,
+    cancelBackupRequest,
     createBackupRequest,
     currentOfficer,
     currentPersonnelId,
     deployments,
     isConnected,
     isLoading,
+    isReportsLoading,
+    isReportsLoadingMore,
+    reportsHasMore,
+    isTaskHistoryLoading,
+    isTaskHistoryLoadingMore,
+    taskHistoryHasMore,
     personnel,
     reports,
     resolveReport,
+    acknowledgeDeployment,
+    refreshReports,
+    loadMoreReports,
+    refreshTaskHistory,
+    loadMoreTaskHistory,
     submitReport,
     tasks,
   ]);
