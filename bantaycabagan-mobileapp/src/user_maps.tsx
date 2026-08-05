@@ -463,7 +463,7 @@ export default function UserMaps({ navigation }: any) {
 <View style={styles.locationRow}>
   <View>
     <Text style={styles.locationLabel}>Location</Text>
-    <Text style={styles.locationValue}>Xentro Mall Cabagan</Text>
+    <Text style={styles.locationValue}>Cansan highway</Text>
   </View>
 
   <TouchableOpacity style={styles.reportButton}>

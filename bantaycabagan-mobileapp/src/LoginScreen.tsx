@@ -28,6 +28,8 @@ export default function LoginScreen({ navigation }: any) {
         style={styles.bottomRightAccent}
       />
 
+
+
       {/* TITLE */}
       <Text style={styles.title}>Login</Text>
 
