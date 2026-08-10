@@ -24,7 +24,7 @@ const {
 	parsePagination,
 } = require('../utils/query')
 const { getPersonnelMember, getPersonnelWithLocations } = require('./personnelService')
-const { createNotification } = require('./notificationService')
+const { createNotification, deliverNotification } = require('./notificationService')
 
 const asDate = (value, fallback = new Date()) => {
 	const date = value ? new Date(value) : fallback
@@ -39,6 +39,8 @@ const optionalDate = (value) => {
 
 const REPORT_ROUTE_BEFORE_MS = 30 * 60 * 1000
 const REPORT_ROUTE_AFTER_MS = 15 * 60 * 1000
+const MANAGEABLE_DEPLOYMENT_STATUSES = ['scheduled', 'active']
+const DEPLOYMENT_STATUSES = [...MANAGEABLE_DEPLOYMENT_STATUSES, 'completed', 'cancelled']
 
 const getReportRouteWindow = (report) => {
 	const incidentAt = asDate(report.incidentAt)
@@ -77,6 +79,17 @@ const deploymentSignature = (deployment) => createHash('sha256')
 		shiftEnd: deployment.shiftEnd ? new Date(deployment.shiftEnd).toISOString() : null,
 		instructions: deployment.instructions || '',
 		location: deployment.location?.coordinates || [],
+	}))
+	.digest('hex')
+
+const deploymentNoticeSignature = (deployment) => createHash('sha256')
+	.update(JSON.stringify({
+		personnelId: deployment.personnelId,
+		patrolArea: deployment.patrolArea,
+		shiftStart: deployment.shiftStart ? new Date(deployment.shiftStart).toISOString() : null,
+		shiftEnd: deployment.shiftEnd ? new Date(deployment.shiftEnd).toISOString() : null,
+		instructions: deployment.instructions ?? deployment.notes ?? '',
+		status: deployment.status,
 	}))
 	.digest('hex')
 
@@ -309,10 +322,42 @@ const createOperationalService = ({ io }) => {
 		))
 	}
 
+	const getUpcomingDeployment = async (personnelId, now = new Date()) => {
+		if (!personnelId) return null
+
+		const deployment = await Deployment.findOne({
+			personnelId,
+			status: 'scheduled',
+			shiftStart: { $gt: now },
+			shiftEnd: { $gt: now },
+		})
+			.sort({ shiftStart: 1, _id: 1 })
+			.lean()
+		if (!deployment) return null
+
+		const personnelById = await loadPersonnelMap([personnelId])
+		return serializeDeployment(deployment, personnelById)
+	}
+
 	const reconcileDeploymentShifts = async ({ broadcast = true, now = new Date() } = {}) => {
-		const expired = await Deployment.updateMany(
-			{ status: 'active', shiftEnd: { $ne: null, $lte: now } },
+		const activatingDeployments = broadcast
+			? await Deployment.find({
+				status: 'scheduled',
+				shiftStart: { $ne: null, $lte: now },
+				shiftEnd: { $gt: now },
+			}).lean()
+			: []
+		const completed = await Deployment.updateMany(
+			{ status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES }, shiftEnd: { $ne: null, $lte: now } },
 			{ $set: { status: 'completed' } },
+		)
+		const activated = await Deployment.updateMany(
+			{
+				status: 'scheduled',
+				shiftStart: { $ne: null, $lte: now },
+				shiftEnd: { $gt: now },
+			},
+			{ $set: { status: 'active' } },
 		)
 		const onDutyPersonnelIds = await Deployment.distinct('personnelId', {
 			status: 'active',
@@ -330,7 +375,8 @@ const createOperationalService = ({ io }) => {
 				{ $set: { dutyStatus: 'Off Duty' } },
 			),
 		])
-		const changed = expired.modifiedCount > 0
+		const changed = completed.modifiedCount > 0
+			|| activated.modifiedCount > 0
 			|| onDutyUpdate.modifiedCount > 0
 			|| offDutyUpdate.modifiedCount > 0
 
@@ -342,6 +388,52 @@ const createOperationalService = ({ io }) => {
 			io.emit('deployments:updated', deployments)
 			io.emit('personnel:update', personnel)
 			io.emit('dashboard:updated')
+		}
+
+		if (broadcast && activatingDeployments.length > 0) {
+			await Promise.all(activatingDeployments.map((deployment) => deliverNotification({
+				io,
+				recipientId: deployment.personnelId,
+				type: 'deployment',
+				title: 'Your Shift Is Now Active',
+				message: `Your deployment at ${deployment.patrolArea} is now active. Open Map to confirm your assignment.`,
+				referenceType: 'deployment',
+				referenceId: deployment.assignmentId,
+				priority: 'high',
+				data: { destination: 'Map', assignmentId: deployment.assignmentId },
+				dedupeKey: `deployment:${deployment.assignmentId}:active`,
+			})))
+		}
+
+		if (broadcast) {
+			const reminderMinutes = Math.max(5, Number(process.env.SHIFT_REMINDER_MINUTES) || 30)
+			const reminderCutoff = new Date(now.getTime() + reminderMinutes * 60_000)
+			const reminders = await Deployment.find({
+				status: 'scheduled',
+				shiftStart: { $gt: now, $lte: reminderCutoff },
+				shiftEnd: { $gt: now },
+			}).lean()
+			for (const deployment of reminders) {
+				const reminderKey = deployment.shiftStart.toISOString()
+				if (deployment.upcomingReminderSentFor === reminderKey) continue
+				const updated = await Deployment.updateOne(
+					{ _id: deployment._id, upcomingReminderSentFor: { $ne: reminderKey } },
+					{ $set: { upcomingReminderSentFor: reminderKey } },
+				)
+				if (updated.modifiedCount === 0) continue
+				await deliverNotification({
+					io,
+					recipientId: deployment.personnelId,
+					type: 'deployment',
+					title: 'Upcoming Shift',
+					message: `Your shift at ${deployment.patrolArea} starts in ${reminderMinutes} minutes or less.`,
+					referenceType: 'deployment',
+					referenceId: deployment.assignmentId,
+					priority: 'high',
+					data: { destination: 'Tasks', assignmentId: deployment.assignmentId },
+					dedupeKey: `deployment:${deployment.assignmentId}:reminder:${reminderKey}`,
+				})
+			}
 		}
 
 		return { changed, onDutyPersonnelIds }
@@ -459,6 +551,22 @@ const createOperationalService = ({ io }) => {
 		await task.save()
 		const personnelById = await loadPersonnelMap([task.requestedBy])
 		const serialized = serializeTask(task, personnelById)
+		const recipients = [...new Set([
+			task.requestedBy,
+			...(task.responders || []).map((responder) => responder.personnelId),
+		])].filter((personnelId) => personnelId && personnelId !== 'supervisor')
+		await Promise.all(recipients.map((recipientId) => deliverNotification({
+			io,
+			recipientId,
+			type: 'success',
+			title: 'Task Completed',
+			message: `${task.title} has been marked completed.`,
+			referenceType: 'task',
+			referenceId: task.taskId,
+			priority: 'normal',
+			data: { destination: 'Tasks', taskId: task.taskId },
+			dedupeKey: `task:${task.taskId}:completed`,
+		})))
 		io.emit('task:updated', serialized)
 		return { status: 200, body: { success: true, task: serialized } }
 	}
@@ -500,6 +608,18 @@ const createOperationalService = ({ io }) => {
 
 		const personnelById = await loadPersonnelMap([task.requestedBy])
 		const serialized = serializeTask(task, personnelById)
+		await Promise.all((task.responders || []).map((responder) => deliverNotification({
+			io,
+			recipientId: responder.personnelId,
+			type: 'warning',
+			title: 'Backup Request Cancelled',
+			message: `${task.title} has been cancelled by the requesting officer.`,
+			referenceType: 'task',
+			referenceId: task.taskId,
+			priority: 'high',
+			data: { destination: 'Tasks', taskId: task.taskId },
+			dedupeKey: `task:${task.taskId}:cancelled`,
+		})))
 		io.emit('task:updated', serialized)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, task: serialized } }
@@ -615,6 +735,20 @@ const createOperationalService = ({ io }) => {
 			referenceType: 'report',
 			referenceId: report.reportNumber,
 		})
+		await deliverNotification({
+			io,
+			recipientId: report.submittedBy,
+			type: validationStatus === 'validated'
+				? 'success'
+				: validationStatus === 'rejected' ? 'warning' : 'info',
+			title: 'Report Review Updated',
+			message: `${report.reportNumber} was marked ${validationStatus} by the COP.`,
+			referenceType: 'report',
+			referenceId: report.reportNumber,
+			priority: validationStatus === 'rejected' ? 'high' : 'normal',
+			data: { destination: 'Reports', reportId: report.reportNumber },
+			dedupeKey: `report:${report.reportNumber}:validation:${validationStatus}`,
+		})
 		io.emit('report:updated', serialized)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, report: serialized } }
@@ -625,7 +759,9 @@ const createOperationalService = ({ io }) => {
 		const filter = {}
 		if (query.personnel_id) filter.personnelId = String(query.personnel_id)
 		if (query.barangay) filter.barangayCode = normalizeBarangayCode(query.barangay)
-		if (['active', 'completed', 'cancelled'].includes(query.status)) {
+		if (query.view === 'manageable') {
+			filter.status = { $in: MANAGEABLE_DEPLOYMENT_STATUSES }
+		} else if (DEPLOYMENT_STATUSES.includes(query.status)) {
 			filter.status = query.status
 		} else {
 			filter.status = 'active'
@@ -657,7 +793,7 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const updateDeploymentStatus = async (assignmentId, status) => {
-		if (!['active', 'completed', 'cancelled'].includes(status)) {
+		if (!DEPLOYMENT_STATUSES.includes(status)) {
 			return {
 				status: 400,
 				body: { success: false, message: 'Invalid deployment status.' },
@@ -672,12 +808,27 @@ const createOperationalService = ({ io }) => {
 		await reconcileDeploymentShifts({ broadcast: false })
 		const activeDeployments = await loadDeployments()
 		const personnelById = await loadPersonnelMap([deployment.personnelId])
+		const serialized = serializeDeployment(deployment, personnelById)
+		await deliverNotification({
+			io,
+			recipientId: deployment.personnelId,
+			type: status === 'cancelled' ? 'warning' : 'deployment',
+			title: status === 'cancelled' ? 'Deployment Cancelled' : 'Deployment Status Updated',
+			message: status === 'cancelled'
+				? `Your deployment at ${deployment.patrolArea} has been cancelled.`
+				: `Your deployment at ${deployment.patrolArea} is now ${status}.`,
+			referenceType: 'deployment',
+			referenceId: deployment.assignmentId,
+			priority: status === 'cancelled' ? 'high' : 'normal',
+			data: { destination: status === 'active' ? 'Map' : 'Tasks', assignmentId },
+			dedupeKey: `deployment:${assignmentId}:status:${status}`,
+		})
 		io.emit('deployments:updated', activeDeployments)
 		return {
 			status: 200,
 			body: {
 				success: true,
-				deployment: serializeDeployment(deployment, personnelById),
+				deployment: serialized,
 			},
 		}
 	}
@@ -732,6 +883,23 @@ const createOperationalService = ({ io }) => {
 			referenceType: 'task',
 			referenceId: task.taskId,
 		})
+		const eligiblePersonnelIds = await Deployment.distinct('personnelId', {
+			status: 'active',
+			$and: activeShiftConditions(new Date()),
+			personnelId: { $ne: task.requestedBy },
+		})
+		await Promise.all(eligiblePersonnelIds.map((personnelId) => deliverNotification({
+			io,
+			recipientId: personnelId,
+			type: task.type === 'backup' ? 'emergency' : 'warning',
+			title: task.type === 'backup' ? 'Officer Requests Backup' : 'Urgent Task',
+			message: `${task.title} at ${task.locationName}.`,
+			referenceType: 'task',
+			referenceId: task.taskId,
+			priority: 'critical',
+			data: { destination: 'Tasks', taskId: task.taskId },
+			dedupeKey: `task:${task.taskId}:created`,
+		})))
 		io.emit('task:created', serialized)
 		io.emit('dashboard:updated')
 		return serialized
@@ -807,6 +975,20 @@ const createOperationalService = ({ io }) => {
 
 		const personnelById = await loadPersonnelMap([task.requestedBy])
 		const serialized = serializeTask(task, personnelById)
+		if (task.requestedBy !== 'supervisor') {
+			await deliverNotification({
+				io,
+				recipientId: task.requestedBy,
+				type: 'task',
+				title: 'Responder Accepted',
+				message: `An officer accepted your request: ${task.title}.`,
+				referenceType: 'task',
+				referenceId: task.taskId,
+				priority: 'normal',
+				data: { destination: 'Tasks', taskId: task.taskId },
+				dedupeKey: `task:${task.taskId}:accepted:${personnelId}`,
+			})
+		}
 		io.emit('task:updated', serialized)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, task: serialized } }
@@ -950,9 +1132,25 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const replaceDeployments = async (payload = []) => {
-		for (const assignment of payload) {
-			const shiftStart = optionalDate(assignment.shiftStart)
-			const shiftEnd = optionalDate(assignment.shiftEnd)
+		const now = new Date()
+		const normalizedAssignments = payload.map((assignment) => ({
+			...assignment,
+			id: String(assignment.id),
+			status: assignment.status === 'scheduled' ? 'scheduled' : 'active',
+			shiftStart: optionalDate(assignment.shiftStart),
+			shiftEnd: optionalDate(assignment.shiftEnd),
+		}))
+		const assignmentIds = normalizedAssignments.map((item) => item.id)
+
+		if (new Set(assignmentIds).size !== assignmentIds.length) {
+			const error = new Error('Each deployment assignment must have a unique ID.')
+			error.status = 400
+			error.code = 'DUPLICATE_DEPLOYMENT_ID'
+			throw error
+		}
+
+		for (const assignment of normalizedAssignments) {
+			const { shiftStart, shiftEnd } = assignment
 
 			if (!shiftStart || !shiftEnd || shiftEnd <= shiftStart) {
 				const error = new Error('Each deployment requires a valid shift end later than its shift start.')
@@ -960,12 +1158,54 @@ const createOperationalService = ({ io }) => {
 				error.code = 'INVALID_DEPLOYMENT_SHIFT'
 				throw error
 			}
+
+			if (assignment.status === 'scheduled' && shiftStart <= now) {
+				const error = new Error('Scheduled deployments must start in the future.')
+				error.status = 400
+				error.code = 'INVALID_SCHEDULED_DEPLOYMENT_START'
+				throw error
+			}
 		}
 
-		const assignmentIds = payload.map((item) => String(item.id))
+		const assignmentsByPersonnel = new Map()
+		normalizedAssignments.forEach((assignment) => {
+			const personnelId = String(assignment.personnelId || '')
+			const personnelAssignments = assignmentsByPersonnel.get(personnelId) || []
+			personnelAssignments.push(assignment)
+			assignmentsByPersonnel.set(personnelId, personnelAssignments)
+		})
 
-		if (payload.length > 0) {
-			await Deployment.bulkWrite(payload.map((assignment) => {
+		for (const [personnelId, personnelAssignments] of assignmentsByPersonnel) {
+			const orderedAssignments = personnelAssignments.sort((first, second) => (
+				first.shiftStart.getTime() - second.shiftStart.getTime()
+			))
+
+			for (let index = 1; index < orderedAssignments.length; index += 1) {
+				const previous = orderedAssignments[index - 1]
+				const current = orderedAssignments[index]
+				if (current.shiftStart < previous.shiftEnd) {
+					const personnelName = current.personnelName || previous.personnelName || personnelId
+					const error = new Error(
+						`${personnelName} already has a deployment that overlaps this shift.`,
+					)
+					error.status = 409
+					error.code = 'DEPLOYMENT_SHIFT_CONFLICT'
+					throw error
+				}
+			}
+		}
+		const previousDeployments = await Deployment.find({
+			$or: [
+				{ assignmentId: { $in: assignmentIds } },
+				{ status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES } },
+			],
+		}).lean()
+		const previousById = new Map(
+			previousDeployments.map((deployment) => [deployment.assignmentId, deployment]),
+		)
+
+		if (normalizedAssignments.length > 0) {
+			await Deployment.bulkWrite(normalizedAssignments.map((assignment) => {
 				const fallback = getAreaCoordinates(assignment.patrolArea)
 				return {
 					updateOne: {
@@ -978,8 +1218,8 @@ const createOperationalService = ({ io }) => {
 								rank: assignment.rank,
 								barangayCode: normalizeBarangayCode(assignment.patrolArea),
 								patrolArea: assignment.patrolArea,
-								shiftStart: optionalDate(assignment.shiftStart),
-								shiftEnd: optionalDate(assignment.shiftEnd),
+								shiftStart: assignment.shiftStart,
+								shiftEnd: assignment.shiftEnd,
 								instructions: assignment.notes || '',
 								assignedBy: assignment.assignedBy || 'supervisor',
 								assignedAt: asDate(assignment.assignedAt),
@@ -987,7 +1227,7 @@ const createOperationalService = ({ io }) => {
 									assignment.longitude ?? fallback.longitude,
 									assignment.latitude ?? fallback.latitude,
 								),
-								status: 'active',
+								status: assignment.status,
 							},
 							$setOnInsert: { assignmentId: String(assignment.id) },
 						},
@@ -999,7 +1239,7 @@ const createOperationalService = ({ io }) => {
 
 		await Deployment.updateMany(
 			{
-				status: 'active',
+				status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES },
 				...(assignmentIds.length > 0
 					? { assignmentId: { $nin: assignmentIds } }
 					: {}),
@@ -1008,16 +1248,60 @@ const createOperationalService = ({ io }) => {
 		)
 
 		await reconcileDeploymentShifts({ broadcast: false })
-		const deployments = await loadDeployments()
+		const [activeDeployments, manageablePayload] = await Promise.all([
+			loadDeployments(),
+			listDeployments({ view: 'manageable', limit: 100 }),
+		])
 		await createNotification({
 			title: 'Deployment Updated',
-			message: `${deployments.length} active personnel assignment${deployments.length === 1 ? '' : 's'} synced.`,
+			message: `${manageablePayload.data.length} current or scheduled personnel assignment${manageablePayload.data.length === 1 ? '' : 's'} synced.`,
 			referenceType: 'deployment',
-			referenceId: payload[0]?.groupId || 'active',
+			referenceId: normalizedAssignments[0]?.groupId || 'active',
 		})
-		io.emit('deployments:updated', deployments)
+		for (const assignment of normalizedAssignments) {
+			const previous = previousById.get(assignment.id)
+			const signature = deploymentNoticeSignature(assignment)
+			if (previous && deploymentNoticeSignature(previous) === signature) continue
+			const scheduled = assignment.status === 'scheduled'
+			const scheduleText = assignment.shiftStart.toLocaleString('en-PH', {
+				dateStyle: 'medium',
+				timeStyle: 'short',
+				timeZone: 'Asia/Manila',
+			})
+			await deliverNotification({
+				io,
+				recipientId: assignment.personnelId,
+				type: 'deployment',
+				title: previous ? 'Deployment Updated' : (scheduled ? 'New Scheduled Shift' : 'New Deployment'),
+				message: scheduled
+					? `You are scheduled at ${assignment.patrolArea} on ${scheduleText}.`
+					: `You are assigned to ${assignment.patrolArea}. Open Map to confirm your deployment.`,
+				referenceType: 'deployment',
+				referenceId: assignment.id,
+				priority: 'high',
+				data: { destination: scheduled ? 'Tasks' : 'Map', assignmentId: assignment.id },
+				dedupeKey: `deployment:${assignment.id}:assignment:${signature}`,
+			})
+		}
+		const cancelledDeployments = previousDeployments.filter((deployment) => (
+			MANAGEABLE_DEPLOYMENT_STATUSES.includes(deployment.status)
+			&& !assignmentIds.includes(deployment.assignmentId)
+		))
+		await Promise.all(cancelledDeployments.map((deployment) => deliverNotification({
+			io,
+			recipientId: deployment.personnelId,
+			type: 'warning',
+			title: 'Deployment Cancelled',
+			message: `Your deployment at ${deployment.patrolArea} has been cancelled.`,
+			referenceType: 'deployment',
+			referenceId: deployment.assignmentId,
+			priority: 'high',
+			data: { destination: 'Tasks', assignmentId: deployment.assignmentId },
+			dedupeKey: `deployment:${deployment.assignmentId}:cancelled`,
+		})))
+		io.emit('deployments:updated', activeDeployments)
 		io.emit('dashboard:updated')
-		return deployments
+		return manageablePayload.data
 	}
 
 	const registerSocket = async (socket) => {
@@ -1036,6 +1320,7 @@ const createOperationalService = ({ io }) => {
 		completeTask,
 		createTask,
 		getDeployment,
+		getUpcomingDeployment,
 		getReport,
 		getReportRoute,
 		getTask,

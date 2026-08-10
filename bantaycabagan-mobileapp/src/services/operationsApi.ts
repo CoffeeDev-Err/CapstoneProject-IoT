@@ -65,6 +65,7 @@ export const fetchOperations = (personnelId: string, token?: string | null) => r
   tasks: OperationalTask[];
   reports: PoliceReport[];
   deployments: DeploymentAssignment[];
+  upcomingDeployment: DeploymentAssignment | null;
 }>(`/api/operations/bootstrap?personnel_id=${encodeURIComponent(personnelId)}`, undefined, token);
 
 export const fetchLivePersonnel = (token?: string | null) => request<{

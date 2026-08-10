@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema({
 	passwordHash: { type: String, required: true, select: false },
 	role: { type: String, enum: ['supervisor', 'officer'], default: 'officer' },
 	personnelId: { type: String, trim: true },
+	photoUrl: { type: String, trim: true, default: '' },
 	status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 	forcePasswordReset: { type: Boolean, default: true },
 	lastLoginAt: Date,
@@ -103,6 +104,9 @@ const currentLocationSchema = new mongoose.Schema({
 	receivedAt: { type: Date, required: true, default: Date.now },
 	lastMovedAt: { type: Date, default: Date.now },
 	inactivityAlertedAt: Date,
+	geofenceStatus: { type: String, enum: ['inside', 'outside'] },
+	geofenceBoundaryId: String,
+	geofenceTransitionAt: Date,
 }, {
 	collection: 'current_locations',
 	timestamps: true,
@@ -163,9 +167,10 @@ const deploymentSchema = new mongoose.Schema({
 	assignedBy: { type: String, default: 'supervisor' },
 	assignedAt: { type: Date, default: Date.now },
 	location: { type: pointSchema, required: true },
-	status: { type: String, enum: ['active', 'completed', 'cancelled'], default: 'active' },
+	status: { type: String, enum: ['scheduled', 'active', 'completed', 'cancelled'], default: 'active' },
 	acknowledgedAt: Date,
 	acknowledgedSignature: String,
+	upcomingReminderSentFor: String,
 }, {
 	collection: 'deployments',
 	timestamps: true,
@@ -175,6 +180,7 @@ deploymentSchema.index({ personnelId: 1, status: 1 })
 deploymentSchema.index({ barangayCode: 1, status: 1 })
 deploymentSchema.index({ shiftStart: -1 })
 deploymentSchema.index({ status: 1, shiftStart: 1, shiftEnd: 1 })
+deploymentSchema.index({ personnelId: 1, shiftStart: 1, shiftEnd: 1 })
 
 const resolutionSchema = new mongoose.Schema({
 	resolvedAt: Date,
@@ -275,6 +281,9 @@ const notificationSchema = new mongoose.Schema({
 	message: { type: String, required: true },
 	referenceType: String,
 	referenceId: String,
+	priority: { type: String, enum: ['low', 'normal', 'high', 'critical'], default: 'normal' },
+	data: mongoose.Schema.Types.Mixed,
+	dedupeKey: String,
 	isRead: { type: Boolean, default: false },
 	readAt: Date,
 }, {
@@ -284,6 +293,25 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ notificationId: 1 }, { unique: true })
 notificationSchema.index({ recipientId: 1, createdAt: -1 })
 notificationSchema.index({ recipientId: 1, isRead: 1, createdAt: -1 })
+notificationSchema.index(
+	{ recipientId: 1, dedupeKey: 1 },
+	{ unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } },
+)
+
+const pushDeviceSchema = new mongoose.Schema({
+	userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+	personnelId: { type: String, required: true, trim: true },
+	expoPushToken: { type: String, required: true, trim: true },
+	platform: { type: String, enum: ['android', 'ios'], required: true },
+	deviceName: { type: String, trim: true, default: '' },
+	status: { type: String, enum: ['active', 'invalid', 'revoked'], default: 'active' },
+	lastSeenAt: { type: Date, default: Date.now },
+}, {
+	collection: 'push_devices',
+	timestamps: true,
+})
+pushDeviceSchema.index({ expoPushToken: 1 }, { unique: true })
+pushDeviceSchema.index({ personnelId: 1, status: 1 })
 
 const authSessionSchema = new mongoose.Schema({
 	userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -348,6 +376,7 @@ const models = {
 	Report: model('Report', reportSchema),
 	Task: model('Task', taskSchema),
 	Notification: model('Notification', notificationSchema),
+	PushDevice: model('PushDevice', pushDeviceSchema),
 	AuthSession: model('AuthSession', authSessionSchema),
 	EmailVerification: model('EmailVerification', emailVerificationSchema),
 	AuditLog: model('AuditLog', auditLogSchema),

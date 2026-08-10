@@ -9,6 +9,7 @@ import LoginScreen from './src/LoginScreen';
 import { mobileTheme } from './src/constants/mobileTheme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OperationalProvider } from './src/context/OperationalContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import MainTabs from './src/navigation/MainTabs';
 import { mobileFontFamily } from './src/constants/mobileTheme';
@@ -58,9 +59,11 @@ function AppNavigator() {
       {token ? (
         <Stack.Screen name="Main">
           {() => (
-            <OperationalProvider>
-              <MainTabs />
-            </OperationalProvider>
+            <NotificationProvider>
+              <OperationalProvider>
+                <MainTabs />
+              </OperationalProvider>
+            </NotificationProvider>
           )}
         </Stack.Screen>
       ) : (

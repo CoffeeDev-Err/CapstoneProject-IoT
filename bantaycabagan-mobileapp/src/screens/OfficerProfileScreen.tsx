@@ -16,6 +16,7 @@ import ChangePasswordModal from '../components/ChangePasswordModal';
 import { useAuth } from '../context/AuthContext';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
+import { resolveApiAssetUrl } from '../services/operationsApi';
 
 const formatAccountDate = (value?: string, includeTime = false) => {
   if (!value) return 'Not available';
@@ -41,7 +42,7 @@ export default function OfficerProfileScreen() {
     station: 'Cabagan Police Station',
     contact: profile?.mobileNumber || 'Not provided',
     email: user?.email || 'Not provided',
-    photoUrl: currentOfficer.photoUrl,
+    photoUrl: resolveApiAssetUrl(currentOfficer.photoUrl),
   };
 
   const shift = assignment?.shiftStart

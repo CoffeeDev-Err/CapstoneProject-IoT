@@ -17,6 +17,28 @@ import type { OperationalTask } from '../types/operations';
 
 const filters = ['Open', 'Accepted', 'History'] as const;
 
+const formatShiftDate = (value?: string) => {
+  if (!value) return 'Date unavailable';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return date.toLocaleDateString('en-PH', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatShiftTime = (value?: string) => {
+  if (!value) return 'Not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return date.toLocaleTimeString('en-PH', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
 type TasksScreenProps = {
   presentation?: 'screen' | 'modal';
   onClose?: () => void;
@@ -29,6 +51,7 @@ export default function TasksScreen({
   const { colors, isDark } = useMobileTheme();
   const {
     tasks,
+    upcomingDeployment,
     acceptTask,
     cancelBackupRequest,
     currentPersonnelId,
@@ -224,7 +247,75 @@ export default function TasksScreen({
             </TouchableOpacity>
           )}
         </View>
-        <Text style={[styles.subtitle, isDark && darkStyles.muted]}>Backup and urgent response requests</Text>
+        <Text style={[styles.subtitle, isDark && darkStyles.muted]}>Duty schedule and operational response requests</Text>
+      </View>
+
+      <View style={styles.upcomingSection}>
+        <View style={styles.sectionHeadingRow}>
+          <View>
+            <Text style={[styles.sectionTitle, isDark && darkStyles.text]}>Upcoming Shift</Text>
+            <Text style={[styles.sectionSubtitle, isDark && darkStyles.muted]}>Your nearest scheduled deployment</Text>
+          </View>
+          <Icon name="event" size={22} color={mobileTheme.blue} />
+        </View>
+
+        {isLoading && !upcomingDeployment ? (
+          <View style={[styles.upcomingEmpty, isDark && darkStyles.surfaceMuted]}>
+            <ActivityIndicator size="small" color={mobileTheme.blue} />
+            <Text style={[styles.upcomingEmptyText, isDark && darkStyles.muted]}>Loading upcoming shift...</Text>
+          </View>
+        ) : upcomingDeployment ? (
+          <View style={[styles.upcomingCard, isDark && darkStyles.upcomingCard]}>
+            <View style={styles.upcomingCardHeader}>
+              <View style={[styles.calendarIcon, isDark && darkStyles.calendarIcon]}>
+                <Icon name="calendar-today" size={20} color={mobileTheme.blue} />
+              </View>
+              <View style={styles.upcomingDateBlock}>
+                <Text style={[styles.upcomingEyebrow, isDark && darkStyles.muted]}>NEXT DUTY</Text>
+                <Text style={[styles.upcomingDate, isDark && darkStyles.text]}>
+                  {formatShiftDate(upcomingDeployment.shiftStart)}
+                </Text>
+              </View>
+              <View style={[styles.scheduledBadge, isDark && darkStyles.scheduledBadge]}>
+                <Text style={styles.scheduledBadgeText}>Scheduled</Text>
+              </View>
+            </View>
+
+            <View style={[styles.shiftDetails, isDark && darkStyles.border]}>
+              <View style={styles.shiftDetailRow}>
+                <Icon name="schedule" size={18} color={colors.textMuted} />
+                <View style={styles.shiftDetailText}>
+                  <Text style={[styles.shiftDetailLabel, isDark && darkStyles.muted]}>SHIFT TIME</Text>
+                  <Text style={[styles.shiftDetailValue, isDark && darkStyles.text]}>
+                    {formatShiftTime(upcomingDeployment.shiftStart)} - {formatShiftTime(upcomingDeployment.shiftEnd)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.shiftDetailRow}>
+                <Icon name="place" size={18} color={colors.textMuted} />
+                <View style={styles.shiftDetailText}>
+                  <Text style={[styles.shiftDetailLabel, isDark && darkStyles.muted]}>ASSIGNED AREA</Text>
+                  <Text style={[styles.shiftDetailValue, isDark && darkStyles.text]} numberOfLines={2}>
+                    {upcomingDeployment.patrolArea}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.upcomingEmpty, isDark && darkStyles.surfaceMuted]}>
+            <Icon name="event-available" size={22} color={colors.textMuted} />
+            <View style={styles.upcomingEmptyCopy}>
+              <Text style={[styles.upcomingEmptyTitle, isDark && darkStyles.text]}>No upcoming shift scheduled.</Text>
+              <Text style={[styles.upcomingEmptyText, isDark && darkStyles.muted]}>Your next deployment will appear here.</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.regularTasksHeading}>
+        <Text style={[styles.sectionTitle, isDark && darkStyles.text]}>Regular Assigned Tasks</Text>
+        <Text style={[styles.sectionSubtitle, isDark && darkStyles.muted]}>Backup and urgent response requests</Text>
       </View>
 
       <View style={styles.filters}>
@@ -312,6 +403,74 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: mobileTheme.surface,
   },
+  upcomingSection: { paddingHorizontal: 22, paddingBottom: 18 },
+  sectionHeadingRow: {
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: { color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
+  sectionSubtitle: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 11 },
+  upcomingCard: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderLeftWidth: 3,
+    borderLeftColor: mobileTheme.blue,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
+    shadowColor: mobileTheme.navy,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  upcomingCardHeader: { flexDirection: 'row', alignItems: 'center' },
+  calendarIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: mobileTheme.blueSoft,
+  },
+  upcomingDateBlock: { flex: 1, marginHorizontal: 11 },
+  upcomingEyebrow: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  upcomingDate: { marginTop: 3, color: mobileTheme.text, fontSize: 14, fontWeight: '800' },
+  scheduledBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: mobileTheme.blueSoft,
+  },
+  scheduledBadgeText: { color: mobileTheme.blue, fontSize: 9, fontWeight: '800' },
+  shiftDetails: {
+    marginTop: 13,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: mobileTheme.borderSoft,
+    gap: 10,
+  },
+  shiftDetailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  shiftDetailText: { flex: 1 },
+  shiftDetailLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
+  shiftDetailValue: { marginTop: 2, color: mobileTheme.text, fontSize: 12, fontWeight: '700' },
+  upcomingEmpty: {
+    minHeight: 66,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surfaceMuted,
+  },
+  upcomingEmptyCopy: { flex: 1 },
+  upcomingEmptyTitle: { color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
+  upcomingEmptyText: { color: mobileTheme.textMuted, fontSize: 11 },
+  regularTasksHeading: { paddingHorizontal: 22, paddingBottom: 10 },
   filters: {
     marginHorizontal: 22,
     marginBottom: 16,
@@ -418,4 +577,7 @@ const darkStyles = StyleSheet.create({
   border: { borderColor: '#22314a' },
   filterButton: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
   filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#132442' },
+  upcomingCard: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  calendarIcon: { backgroundColor: '#132442' },
+  scheduledBadge: { backgroundColor: '#132442' },
 });

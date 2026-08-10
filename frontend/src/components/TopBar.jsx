@@ -22,6 +22,7 @@ import {
   UserRoundKey,
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
+import { resolveApiAssetUrl } from '../services/apiAssets'
 import ConfirmModal from './ConfirmModal'
 import PasswordChangeModal from './PasswordChangeModal'
 
@@ -128,10 +129,10 @@ function TopBar({
   const navigate = useNavigate()
   const { clearSession, logout, token, user } = useAuth()
   const supervisor = {
-    name: user?.profile?.name || user?.name || SUPERVISOR_FALLBACK.name,
+    name: user?.profile?.fullName || user?.name || SUPERVISOR_FALLBACK.name,
     rank: user?.profile?.rank || SUPERVISOR_FALLBACK.rank,
     role: user?.role === 'supervisor' ? 'Supervisor' : 'Officer',
-    photoUrl: user?.profile?.photoUrl || SUPERVISOR_FALLBACK.photoUrl,
+    photoUrl: resolveApiAssetUrl(user?.photoUrl || user?.profile?.photoUrl) || SUPERVISOR_FALLBACK.photoUrl,
   }
 
   const handleLogout = async () => {

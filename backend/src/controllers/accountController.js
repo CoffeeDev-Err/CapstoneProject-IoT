@@ -4,7 +4,10 @@ const createAccountController = (accountService) => ({
 	},
 
 	createAccount: async (req, res) => {
-		const account = await accountService.createAccount(req.body, {
+		const account = await accountService.createAccount({
+			...req.body,
+			...(req.file ? { photoUrl: `/uploads/profile-photos/${req.file.filename}` } : {}),
+		}, {
 			ipAddress: req.ip,
 		})
 		res.status(201).json({ success: true, account })
@@ -13,7 +16,10 @@ const createAccountController = (accountService) => ({
 	updateAccount: async (req, res) => {
 		const account = await accountService.updateAccount(
 			req.params.accountId,
-			req.body,
+			{
+				...req.body,
+				...(req.file ? { photoUrl: `/uploads/profile-photos/${req.file.filename}` } : {}),
+			},
 			{ ipAddress: req.ip },
 		)
 		res.json({ success: true, account })

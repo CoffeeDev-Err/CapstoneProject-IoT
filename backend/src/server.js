@@ -41,6 +41,7 @@ const createOperationalService = require('./services/operationalService')
 const personnelService = require('./services/personnelService')
 const {
 	evaluatePersonnelInactivity,
+	evaluatePersonnelGeofences,
 	getPersonnelMember,
 	getPersonnelWithLocations,
 	updateMockLocations,
@@ -100,13 +101,29 @@ app.use('/api/barangays', createBarangayRoutes(barangayController))
 app.use('/api/dashboard', createDashboardRoutes(analyticsController))
 app.use('/api/gps-devices', createGpsDeviceRoutes(gpsDeviceController))
 app.use('/api/locations', createLocationRoutes(personnelController))
-app.use('/api/notifications', createNotificationRoutes(notificationController))
+app.use('/api/notifications', createNotificationRoutes({
+	authService,
+	controller: notificationController,
+}))
 app.use('/api/personnel', createPersonnelRoutes(personnelController))
 app.use('/api', createSystemRoutes(systemController))
 app.use(errorHandler)
 
+io.use(async (socket, next) => {
+	const token = String(socket.handshake.auth?.token || '')
+	if (!token) return next()
+	try {
+		socket.data.auth = await authService.authenticate(token)
+		return next()
+	} catch (error) {
+		return next(error)
+	}
+})
+
 io.on('connection', async (socket) => {
 	try {
+		const personnelId = socket.data.auth?.user?.personnelId
+		if (personnelId) socket.join(`personnel:${personnelId}`)
 		const personnel = await getPersonnelWithLocations()
 		socket.emit('personnel:bootstrap', personnel)
 		await operationalService.registerSocket(socket)
@@ -226,6 +243,7 @@ const runOperationalLifecycleCheck = async () => {
 	try {
 		await operationalService.reconcileDeploymentShifts()
 		await evaluatePersonnelInactivity({ io })
+		await evaluatePersonnelGeofences({ io })
 	} catch (error) {
 		console.error('Operational lifecycle check failed:', error.message)
 	} finally {
