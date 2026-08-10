@@ -30,6 +30,7 @@ const serializeAccount = (user, profile, device) => ({
 	badgeNumber: profile?.badgeNumber || '',
 	rank: profile?.rank || '',
 	mobileNumber: profile?.mobileNumber || '',
+	photoUrl: profile?.photoUrl || user.photoUrl || '',
 	loginId: user.username,
 	officialEmail: user.email || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
@@ -165,6 +166,7 @@ const createAccountService = ({ io, personnelService }) => {
 				fullName: payload.fullName,
 				rank: payload.rank,
 				mobileNumber: payload.mobileNumber || '',
+				photoUrl: payload.photoUrl || '',
 				dutyStatus: 'Off Duty',
 				status: 'active',
 			})
@@ -185,6 +187,7 @@ const createAccountService = ({ io, personnelService }) => {
 				passwordHash: await hashPassword(payload.temporaryPassword),
 				role: 'officer',
 				personnelId,
+				photoUrl: payload.photoUrl || '',
 				status: 'active',
 				forcePasswordReset: true,
 			})
@@ -241,6 +244,7 @@ const createAccountService = ({ io, personnelService }) => {
 				user.emailVerifiedAt = null
 			}
 			user.status = normalizeStatus(payload.accountStatus)
+			if (payload.photoUrl) user.photoUrl = payload.photoUrl
 			if (payload.temporaryPassword) {
 				user.passwordHash = await hashPassword(payload.temporaryPassword)
 				user.forcePasswordReset = true
@@ -296,6 +300,7 @@ const createAccountService = ({ io, personnelService }) => {
 		profile.badgeNumber = String(payload.badgeNumber).trim()
 		profile.rank = String(payload.rank).trim()
 		profile.mobileNumber = String(payload.mobileNumber || '').trim()
+		if (payload.photoUrl) profile.photoUrl = payload.photoUrl
 		profile.status = normalizeStatus(payload.accountStatus)
 
 		user.username = String(payload.loginId).trim().toLowerCase()
@@ -305,6 +310,7 @@ const createAccountService = ({ io, personnelService }) => {
 			user.emailVerifiedAt = null
 		}
 		user.status = normalizeStatus(payload.accountStatus)
+		if (payload.photoUrl) user.photoUrl = payload.photoUrl
 		if (payload.temporaryPassword) {
 			user.passwordHash = await hashPassword(payload.temporaryPassword)
 			user.forcePasswordReset = true
@@ -346,6 +352,7 @@ const createAccountService = ({ io, personnelService }) => {
 			personnelId: user.personnelId,
 			name: profile.fullName,
 			rank: profile.rank,
+			photoUrl: profile.photoUrl,
 		})
 		return serializeAccount(user, profile, assignment)
 	}

@@ -171,6 +171,72 @@
   grid-column: 1 / -1;
 }
 
+.account-photo-control {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 84px;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.account-photo-preview,
+.account-photo-placeholder,
+.account-table-avatar {
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-primary);
+}
+
+.account-photo-placeholder,
+.account-table-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.account-photo-copy {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.account-photo-picker {
+  position: relative;
+  overflow: hidden;
+}
+
+.account-photo-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.account-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 180px;
+}
+
+.account-table-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 0.78rem;
+}
+
 .account-password-row {
   display: flex;
   align-items: center;
@@ -185,13 +251,17 @@
 
 .account-action-btn,
 .account-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   border: 1px solid var(--border-color);
-  border-radius: 9px;
+  border-radius: 8px;
   font-size: 0.813rem;
   font-weight: 700;
-  padding: 0.6rem 0.85rem;
+  padding: 0.65rem 1rem;
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
   text-transform: uppercase;
   letter-spacing: 0.01em;
 }
@@ -203,25 +273,25 @@
 }
 
 .account-action-btn:hover:not(:disabled) {
-  background: #eff6ff;
-  border-color: var(--color-primary-light);
-  color: var(--color-primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: none;
+  box-shadow: none;
 }
 
 .account-submit-btn {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: #ffffff;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .account-submit-btn:hover:not(:disabled) {
   border-color: var(--color-primary-dark);
   background: var(--color-primary-dark);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  transform: none;
+  box-shadow: 0 8px 18px -12px rgba(37, 99, 235, 0.8);
 }
 
 .account-action-btn:disabled,
@@ -320,10 +390,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  min-width: 100px;
+  min-height: 40px;
+  min-width: 96px;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-primary);
   color: var(--text-secondary);
   font-size: 0.813rem;
@@ -332,14 +402,14 @@
   letter-spacing: 0.01em;
   padding: 0.5rem 0.9rem;
   cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition: all var(--transition-base);
+  box-shadow: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
   text-transform: uppercase;
 }
 
 .account-table-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
+  transform: none;
+  box-shadow: none;
 }
 
 .account-table-btn:focus-visible {
@@ -348,27 +418,27 @@
 }
 
 .account-table-btn--edit {
-  border-color: var(--color-primary-light);
-  background: #eff6ff;
-  color: var(--color-primary-dark);
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #334155;
 }
 
 .account-table-btn--edit:hover {
-  background: #dbeafe;
-  border-color: var(--color-primary);
-  color: var(--color-primary-dark);
-  box-shadow: var(--shadow-md);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  box-shadow: none;
 }
 
 .account-table-btn--delete {
   border-color: var(--color-danger-border);
-  background: var(--color-danger-soft);
+  background: #ffffff;
   color: var(--color-danger-dark);
 }
 
 .account-table-btn--delete:hover {
   border-color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 18%, #ffffff 82%);
+  background: var(--color-danger-soft);
   color: var(--color-danger-strong);
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
 }

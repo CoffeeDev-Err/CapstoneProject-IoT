@@ -31,6 +31,7 @@ const serializeUser = (user, profile) => ({
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role,
 	personnelId: user.personnelId,
+	photoUrl: profile?.photoUrl || user.photoUrl || '',
 	forcePasswordReset: user.forcePasswordReset,
 	createdAt: user.createdAt?.toISOString(),
 	lastLoginAt: user.lastLoginAt?.toISOString(),
@@ -39,7 +40,7 @@ const serializeUser = (user, profile) => ({
 		badgeNumber: profile.badgeNumber,
 		rank: profile.rank,
 		mobileNumber: profile.mobileNumber,
-		photoUrl: profile.photoUrl,
+		photoUrl: profile.photoUrl || user.photoUrl || '',
 		dutyStatus: profile.dutyStatus,
 	} : null,
 })

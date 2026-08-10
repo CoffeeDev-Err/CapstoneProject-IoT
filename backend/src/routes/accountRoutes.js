@@ -1,6 +1,7 @@
 const express = require('express')
 const asyncHandler = require('../middleware/asyncHandler')
 const createAuthenticateSession = require('../middleware/authenticateSession')
+const uploadProfilePhoto = require('../middleware/profilePhotoUpload')
 
 const createAccountRoutes = ({ authService, controller }) => {
 	const router = express.Router()
@@ -18,8 +19,8 @@ const createAccountRoutes = ({ authService, controller }) => {
 
 	router.use(authenticate, requireSupervisor)
 	router.get('/', asyncHandler(controller.getAccounts))
-	router.post('/', asyncHandler(controller.createAccount))
-	router.put('/:accountId', asyncHandler(controller.updateAccount))
+	router.post('/', uploadProfilePhoto, asyncHandler(controller.createAccount))
+	router.put('/:accountId', uploadProfilePhoto, asyncHandler(controller.updateAccount))
 	router.delete('/:accountId', asyncHandler(controller.deactivateAccount))
 
 	return router

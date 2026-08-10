@@ -33,6 +33,7 @@ import {
 import { getDeployments, getReports } from '../services/operations'
 import { getPersonnel } from '../services/personnel'
 import { socket } from '../services/socket'
+import { resolveApiAssetUrl } from '../services/apiAssets'
 import { isInsideCabagan } from '../utils/cabaganGeofence'
 
 const personnelPhotos = {
@@ -42,7 +43,7 @@ const personnelPhotos = {
 
 const withPersonnelPhoto = (member) => ({
   ...member,
-  photoUrl: member.photoUrl || personnelPhotos[member.id],
+  photoUrl: resolveApiAssetUrl(member.photoUrl) || personnelPhotos[member.id],
 })
 
 const normalizePersonnel = (member) => withPersonnelPhoto(member)
@@ -389,7 +390,12 @@ export const usePersonnelRealtime = () => {
 
       setPersonnel((current) => current.map((member) => (
         member.id === payload.personnelId
-          ? { ...member, name: payload.name || member.name, rank: payload.rank || member.rank }
+          ? {
+              ...member,
+              name: payload.name || member.name,
+              rank: payload.rank || member.rank,
+              photoUrl: payload.photoUrl ? resolveApiAssetUrl(payload.photoUrl) : member.photoUrl,
+            }
           : member
       )))
       setReports((current) => current.map((report) => (

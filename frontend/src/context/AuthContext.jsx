@@ -42,14 +42,15 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!token) return undefined
-    getCurrentUser(token)
+    const refreshCurrentUser = () => getCurrentUser(token)
       .then(({ user: currentUser }) => {
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser))
         setUser(currentUser)
       })
       .catch(clearSession)
-      .finally(() => setLoading(false))
-    return undefined
+    refreshCurrentUser().finally(() => setLoading(false))
+    window.addEventListener('bantaycabagan:account-updated', refreshCurrentUser)
+    return () => window.removeEventListener('bantaycabagan:account-updated', refreshCurrentUser)
   }, [clearSession, token])
 
   const value = useMemo(() => ({

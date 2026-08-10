@@ -26,6 +26,13 @@ export const getDeployments = () => (
   getCollection('/api/deployments?limit=100', 'Unable to load deployments.')
 )
 
+export const getManageableDeployments = () => (
+  getCollection(
+    '/api/deployments?view=manageable&limit=100',
+    'Unable to load current and scheduled deployments.',
+  )
+)
+
 export const replaceDeployments = async (assignments) => {
   const response = await fetch(`${API_URL}/api/deployments`, {
     method: 'PUT',

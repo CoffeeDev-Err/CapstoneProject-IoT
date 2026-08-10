@@ -475,18 +475,102 @@
   background: #334155;
   color: #cbd5e1;
 }
-[data-theme="dark"] .assignment-field span {
+[data-theme="dark"] .deployment-form-card.widget-card:hover,
+[data-theme="dark"] .deployment-list-card.widget-card:hover {
+  border-color: #334155;
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .assignment-field > span {
+  color: #aebbd0;
+}
+
+[data-theme="dark"] .assignment-mode-selector legend {
   color: #94a3b8;
 }
-[data-theme="dark"] .assignment-field__hint {
-  color: #64748b;
-}
-[data-theme="dark"] .assignment-checklist {
+
+[data-theme="dark"] .assignment-mode-options {
   border-color: #334155;
   background: #0f172a;
 }
+
+[data-theme="dark"] .assignment-mode-option {
+  border-color: transparent;
+  background: transparent;
+}
+
+[data-theme="dark"] .assignment-mode-option:hover {
+  border-color: #3b82f6;
+  background: #132442;
+}
+
+[data-theme="dark"] .assignment-mode-option.is-active {
+  border-color: #2563eb;
+  background: #2563eb;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .assignment-mode-option.is-active:hover {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
+[data-theme="dark"] .assignment-mode-option strong {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .assignment-mode-option small {
+  color: #9eabc0;
+}
+[data-theme="dark"] .assignment-mode-option.is-active strong {
+  color: #ffffff;
+}
+[data-theme="dark"] .assignment-mode-option.is-active small {
+  color: #dbeafe;
+}
+[data-theme="dark"] .assignment-mode-status {
+  border-color: #2a3a56;
+  background: #0e1a30;
+  color: #9eabc0;
+}
+[data-theme="dark"] .assignment-mode-status strong,
+[data-theme="dark"] .assignment-field__datetime-preview {
+  color: #e2e8f0;
+}
+[data-theme="dark"] .assignment-field__hint {
+  color: #9eabc0;
+}
+[data-theme="dark"] .assignment-form .settings-input {
+  border-color: #2a3a56;
+  background: #0e1a30;
+  color: #f8fafc;
+}
+[data-theme="dark"] .assignment-form .settings-input:hover:not(:disabled) {
+  border-color: #475569;
+  box-shadow: none;
+}
+[data-theme="dark"] .assignment-form .settings-input:focus,
+[data-theme="dark"] .assignment-area-trigger[aria-expanded='true'] {
+  border-color: #2563eb;
+  background: #0e1a30;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+[data-theme="dark"] .assignment-form input[type='datetime-local'] {
+  color-scheme: dark;
+}
+[data-theme="dark"] .assignment-checklist {
+  border-color: #2a3a56;
+  background: #0e1a30;
+}
 [data-theme="dark"] .assignment-check-item {
   color: #e2e8f0;
+}
+[data-theme="dark"] .assignment-check-item:hover {
+  background: #132442;
+}
+[data-theme="dark"] .assignment-check-item:has(input:checked) {
+  background: #172554;
+  color: #dbeafe;
 }
 [data-theme="dark"] .assignment-checklist__empty {
   color: #94a3b8;
@@ -501,26 +585,36 @@
   background: #1e293b;
   color: #f1f5f9;
 }
-[data-theme="dark"] .assignment-area-trigger__icon {
-  color: #94a3b8;
-}
-[data-theme="dark"] .assignment-area-dropdown {
-  border-color: #334155;
-  background: #0f172a;
-  box-shadow: 0 18px 34px -20px rgba(2, 6, 23, 0.8);
-}
-[data-theme="dark"] .assignment-area-option {
-  background: #111827;
-  color: #e2e8f0;
-}
-[data-theme="dark"] .assignment-area-option:hover {
+[data-theme="dark"] .assignment-group-menu-trigger {
   border-color: #475569;
+  background: transparent;
+  color: #cbd5e1;
+}
+[data-theme="dark"] .assignment-group-menu-trigger:hover {
+  border-color: #64748b;
   background: #1e293b;
   color: #f8fafc;
 }
+[data-theme="dark"] .assignment-area-trigger__icon {
+  border-color: #9eabc0;
+}
+[data-theme="dark"] .assignment-area-dropdown {
+  border-color: #2a3a56;
+  background: #0b1528;
+  box-shadow: 0 18px 34px -20px rgba(2, 6, 23, 0.8);
+}
+[data-theme="dark"] .assignment-area-option {
+  background: #0e1a30;
+  color: #e2e8f0;
+}
+[data-theme="dark"] .assignment-area-option:hover {
+  border-color: #3b82f6;
+  background: #132442;
+  color: #f8fafc;
+}
 [data-theme="dark"] .assignment-area-option.is-active {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
+  border-color: #2563eb;
+  background: #132442;
   color: #dbeafe;
 }
 [data-theme="dark"] .report-feedback {
@@ -532,25 +626,51 @@
 [data-theme="dark"] .assignment-personnel-rank {
   color: #94a3b8;
 }
-[data-theme="dark"] .assignment-edit-btn {
+
+[data-theme="dark"] .deployment-status--scheduled {
   border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #dbeafe;
+  background: #172554;
+  color: #bfdbfe;
+}
+
+[data-theme="dark"] .deployment-status--active {
+  border-color: #166534;
+  background: #052e16;
+  color: #bbf7d0;
+}
+
+[data-theme="dark"] .deployment-status--completed {
+  border-color: #475569;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .deployment-status--cancelled {
+  border-color: #991b1b;
+  background: #450a0a;
+  color: #fecaca;
+}
+[data-theme="dark"] .assignment-edit-btn {
+  border-color: #475569;
+  background: transparent;
+  color: #cbd5e1;
 }
 [data-theme="dark"] .assignment-edit-btn:hover {
-  border-color: #2563eb;
-  background: #1d4ed8;
+  border-color: #64748b;
+  background: #1e293b;
+  color: #f8fafc;
 }
 [data-theme="dark"] .assignment-delete-btn,
 [data-theme="dark"] .assignment-remove-btn {
-  border-color: #7c4a13;
-  background: #2a1b08;
-  color: #fbbf24;
+  border-color: #7f1d1d;
+  background: transparent;
+  color: #fca5a5;
 }
 [data-theme="dark"] .assignment-delete-btn:hover,
 [data-theme="dark"] .assignment-remove-btn:hover {
-  border-color: #b45309;
-  background: #3b210a;
+  border-color: #dc2626;
+  background: #450a0a;
+  color: #fecaca;
 }
 
 [data-theme="dark"] .assignment-group-cell {
@@ -567,39 +687,37 @@
 }
 
 [data-theme="dark"] .assignment-group-edit-btn {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #dbeafe;
+  border-color: #475569;
+  background: transparent;
+  color: #cbd5e1;
 }
 
 [data-theme="dark"] .assignment-group-edit-btn:hover {
-  border-color: #2563eb;
-  background: #1d4ed8;
+  border-color: #64748b;
+  background: #1e293b;
+  color: #f8fafc;
 }
 
 [data-theme="dark"] .assignment-group-delete-btn {
-  border-color: #7c4a13;
-  background: #2a1b08;
-  color: #fbbf24;
+  border-color: #7f1d1d;
+  background: transparent;
+  color: #fca5a5;
 }
 
 [data-theme="dark"] .assignment-group-delete-btn:hover {
-  border-color: #b45309;
-  background: #3b210a;
+  border-color: #dc2626;
+  background: #450a0a;
+  color: #fecaca;
 }
 
 @media (max-width: 1260px) {
   .assignment-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .assignment-field--personnel {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
-
-  .assignment-field--notes {
-    grid-column: 1 / -1;
+    grid-template-areas:
+      'area start'
+      'end end'
+      'personnel personnel'
+      'notes notes';
   }
 
   .account-form-grid {
@@ -611,14 +729,15 @@
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 760px) {
   .assignment-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .assignment-field--personnel,
-  .assignment-field--notes {
-    grid-column: 1 / -1;
+    grid-template-areas:
+      'area'
+      'start'
+      'end'
+      'personnel'
+      'notes';
   }
 
   .assignment-field__hint-row {
@@ -693,29 +812,30 @@
   border-color: #334155;
   background: #0f172a;
   color: #e2e8f0;
-  box-shadow: 0 12px 24px -18px rgba(2, 6, 23, 0.95);
+  box-shadow: none;
 }
 [data-theme="dark"] .account-table-btn:focus-visible {
   outline-color: rgba(96, 165, 250, 0.45);
 }
 [data-theme="dark"] .account-table-btn--edit {
-  border-color: #36507c;
-  background: #1a2b45;
-  color: #bfdbfe;
+  border-color: #475569;
+  background: transparent;
+  color: #cbd5e1;
 }
 [data-theme="dark"] .account-table-btn--edit:hover {
-  border-color: #4d6a94;
-  background: #233859;
-  color: #dbeafe;
+  border-color: #64748b;
+  background: #1e293b;
+  color: #f8fafc;
 }
 [data-theme="dark"] .account-table-btn--delete {
-  border-color: #7c4a13;
-  background: #2a1b08;
-  color: #fbbf24;
+  border-color: #7f1d1d;
+  background: transparent;
+  color: #fca5a5;
 }
 [data-theme="dark"] .account-table-btn--delete:hover {
-  border-color: #b45309;
-  background: #3b210a;
+  border-color: #dc2626;
+  background: #450a0a;
+  color: #fecaca;
 }
 [data-theme="dark"] .account-view-nav {
   border-color: #334155;

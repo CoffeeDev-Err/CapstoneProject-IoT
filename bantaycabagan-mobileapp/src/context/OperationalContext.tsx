@@ -19,6 +19,7 @@ import {
   fetchTaskHistoryPage,
   operationsSocket,
   requestBackup,
+  resolveApiAssetUrl,
   resolveIncidentReport,
   submitPoliceReport,
 } from '../services/operationsApi';
@@ -34,6 +35,7 @@ type OperationalContextValue = {
   tasks: OperationalTask[];
   reports: PoliceReport[];
   deployments: DeploymentAssignment[];
+  upcomingDeployment: DeploymentAssignment | null;
   personnel: LivePersonnel[];
   isConnected: boolean;
   isLoading: boolean;
@@ -59,6 +61,11 @@ type OperationalContextValue = {
 
 const OperationalContext = createContext<OperationalContextValue | null>(null);
 
+const resolvePersonnelPhoto = (member: LivePersonnel): LivePersonnel => ({
+  ...member,
+  photoUrl: resolveApiAssetUrl(member.photoUrl),
+});
+
 const upsertById = <T extends { id: string }>(items: T[], incoming: T) => {
   const exists = items.some((item) => item.id === incoming.id);
   return exists
@@ -82,6 +89,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const [tasks, setTasks] = useState<OperationalTask[]>([]);
   const [reports, setReports] = useState<PoliceReport[]>([]);
   const [deployments, setDeployments] = useState<DeploymentAssignment[]>([]);
+  const [upcomingDeployment, setUpcomingDeployment] = useState<DeploymentAssignment | null>(null);
   const [personnel, setPersonnel] = useState<LivePersonnel[]>([]);
   const [isConnected, setIsConnected] = useState(operationsSocket.connected);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,7 +118,8 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       latitude: null,
       longitude: null,
       status: user?.profile?.dutyStatus || 'Off Duty',
-      photoUrl: user?.profile?.photoUrl || 'https://randomuser.me/api/portraits/men/32.jpg',
+      photoUrl: resolveApiAssetUrl(user?.profile?.photoUrl)
+        || 'https://randomuser.me/api/portraits/men/32.jpg',
       lastUpdated: new Date().toISOString(),
       isVisibleOnMap: false,
       isLocationStale: true,
@@ -126,6 +135,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!currentPersonnelId) {
+      setUpcomingDeployment(null);
       setIsLoading(false);
       return;
     }
@@ -146,21 +156,28 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
           return mergeById(operationsPayload.tasks, history);
         });
         setDeployments(operationsPayload.deployments);
-        setPersonnel(personnelPayload.data);
+        setUpcomingDeployment(operationsPayload.upcomingDeployment);
+        setPersonnel(personnelPayload.data.map(resolvePersonnelPhoto));
       })
       .catch(() => undefined)
       .finally(() => setIsLoading(false));
   }, [currentPersonnelId, token]);
 
   useEffect(() => {
+    operationsSocket.auth = token ? { token } : {};
     const onConnect = () => setIsConnected(true);
     const onDisconnect = () => setIsConnected(false);
-    const onPersonnelBootstrap = (payload: LivePersonnel[]) => setPersonnel(payload);
-    const onPersonnelUpdate = (payload: LivePersonnel[]) => setPersonnel(payload);
+    const onPersonnelBootstrap = (payload: LivePersonnel[]) => {
+      setPersonnel(payload.map(resolvePersonnelPhoto));
+    };
+    const onPersonnelUpdate = (payload: LivePersonnel[]) => {
+      setPersonnel(payload.map(resolvePersonnelPhoto));
+    };
     const onPersonnelIdentityUpdated = (payload: {
       personnelId?: string;
       name?: string;
       rank?: string;
+      photoUrl?: string;
     }) => {
       if (!payload.personnelId) return;
       setPersonnel((items) => items.map((member) => (
@@ -169,6 +186,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
             ...member,
             name: payload.name || member.name,
             rank: payload.rank || member.rank,
+            photoUrl: payload.photoUrl ? resolveApiAssetUrl(payload.photoUrl) : member.photoUrl,
           }
           : member
       )));
@@ -214,6 +232,11 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
         assignment.personnelId === currentPersonnelId
         && assignment.isCurrentShift !== false
       )));
+      fetchOperations(currentPersonnelId, token)
+        .then((operationsPayload) => {
+          setUpcomingDeployment(operationsPayload.upcomingDeployment);
+        })
+        .catch(() => undefined);
     };
     const onDeploymentAcknowledged = (assignment: DeploymentAssignment) => {
       if (assignment.personnelId !== currentPersonnelId) return;
@@ -264,7 +287,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       operationsSocket.off('personnel:inactivity', onPersonnelInactivity);
       operationsSocket.disconnect();
     };
-  }, [currentPersonnelId]);
+  }, [currentPersonnelId, token]);
 
   const refreshReports = useCallback(async (
     category: 'all' | 'incident' | 'routine',
@@ -371,6 +394,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     tasks,
     reports,
     deployments,
+    upcomingDeployment,
     personnel,
     isConnected,
     isLoading,
@@ -399,6 +423,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     currentOfficer,
     currentPersonnelId,
     deployments,
+    upcomingDeployment,
     isConnected,
     isLoading,
     isReportsLoading,

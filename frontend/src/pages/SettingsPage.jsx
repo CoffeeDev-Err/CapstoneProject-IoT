@@ -14,6 +14,7 @@ import {
   updateAccount,
 } from '../services/accounts'
 import { getRegisteredFlespiDevices } from '../services/flespiDevices'
+import { resolveApiAssetUrl } from '../services/apiAssets'
 
 const rankOptions = [
   'Patrolman',
@@ -92,6 +93,8 @@ const formatDateTime = (isoValue) => {
 
 function SettingsPage() {
   const [accountForm, setAccountForm] = useState(initialFormState)
+  const [profilePhoto, setProfilePhoto] = useState(null)
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
   const [createdAccounts, setCreatedAccounts] = useState([])
   const [accountSearch, setAccountSearch] = useState('')
   const [editingAccountId, setEditingAccountId] = useState(null)
@@ -222,6 +225,35 @@ function SettingsPage() {
     })
   }
 
+  const handleProfilePhotoChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!supportedTypes.includes(file.type)) {
+      setProfilePhoto(null)
+      setFormErrors((prev) => ({ ...prev, profilePhoto: 'Use a JPEG, PNG, or WebP image.' }))
+      event.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfilePhoto(null)
+      setFormErrors((prev) => ({ ...prev, profilePhoto: 'Profile photo must be 5 MB or smaller.' }))
+      event.target.value = ''
+      return
+    }
+
+    setProfilePhoto(file)
+    setFormErrors((prev) => {
+      const nextErrors = { ...prev }
+      delete nextErrors.profilePhoto
+      return nextErrors
+    })
+    const reader = new FileReader()
+    reader.onload = () => setProfilePhotoPreview(String(reader.result || ''))
+    reader.readAsDataURL(file)
+  }
+
   const validateAccountForm = () => {
     const errors = {}
 
@@ -323,6 +355,8 @@ function SettingsPage() {
       rank: accountForm.rank,
     })
     setFormErrors({})
+    setProfilePhoto(null)
+    setProfilePhotoPreview('')
   }
 
   const handleEditAccount = (accountId) => {
@@ -346,6 +380,8 @@ function SettingsPage() {
       temporaryPassword: '',
       mobileNumber: account.mobileNumber ?? '',
     })
+    setProfilePhoto(null)
+    setProfilePhotoPreview(resolveApiAssetUrl(account.photoUrl))
     setFormErrors({})
     const accountLabel = account.fullName || account.loginId
     setFormMessage(`Editing ${accountLabel}. Update details then click Save Changes.`)
@@ -441,19 +477,20 @@ function SettingsPage() {
 
     try {
       if (editingAccountId) {
-        const updatedAccount = await updateAccount(editingAccountId, normalizedPayload)
+        const updatedAccount = await updateAccount(editingAccountId, normalizedPayload, profilePhoto)
         setCreatedAccounts((prev) => prev.map((account) => (
           account.id === editingAccountId ? updatedAccount : account
         )))
         setFormMessage(`${updatedAccount.fullName || updatedAccount.loginId} account updated successfully.`)
       } else {
-        const newAccount = await createAccount(normalizedPayload)
+        const newAccount = await createAccount(normalizedPayload, profilePhoto)
         setCreatedAccounts((prev) => [newAccount, ...prev])
         setFormMessage(
           `${newAccount.fullName} account created successfully. Temporary password issued for first login.`
         )
       }
       setFormMessageKind('success')
+      window.dispatchEvent(new Event('bantaycabagan:account-updated'))
       resetFormToCreate()
       setActiveAccountView('manage')
     } catch (error) {
@@ -533,6 +570,30 @@ function SettingsPage() {
 	                    </p>
 	                  )}
 	                  <div className="account-form-grid">
+	                <div className="account-field account-field--full account-photo-field">
+	                  <span>Profile Photo</span>
+	                  <div className="account-photo-control">
+	                    {profilePhotoPreview ? (
+	                      <img className="account-photo-preview" src={profilePhotoPreview} alt="Selected account profile" />
+	                    ) : (
+	                      <div className="account-photo-placeholder" aria-hidden="true">
+	                        {(accountForm.fullName || accountForm.loginId || 'P').trim().charAt(0).toUpperCase()}
+	                      </div>
+	                    )}
+	                    <div className="account-photo-copy">
+	                      <label className="account-action-btn account-photo-picker">
+	                        {profilePhotoPreview ? 'Change Photo' : 'Choose Photo'}
+	                        <input
+	                          type="file"
+	                          accept="image/jpeg,image/png,image/webp"
+	                          onChange={handleProfilePhotoChange}
+	                        />
+	                      </label>
+	                      <small className="settings-hint">JPEG, PNG, or WebP. Maximum 5 MB.</small>
+	                      {formErrors.profilePhoto && <small className="field-error">{formErrors.profilePhoto}</small>}
+	                    </div>
+	                  </div>
+	                </div>
 	                {!isEditingSupervisor && (
 	                  <>
 	                <label className="account-field">
@@ -556,6 +617,19 @@ function SettingsPage() {
                   />
                   {formErrors.badgeNumber && <small className="field-error">{formErrors.badgeNumber}</small>}
                 </label>
+
+                <label className="account-field">
+	                  <span>Rank *</span>
+                  <select className="settings-input w-100" value={accountForm.rank} onChange={handleFieldChange('rank')}>
+                    {rankOptions.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+	                  </select>
+	                </label>
+	                  </>
+	                )}
 
                 <div className="account-field account-field--wide">
                   <span>Registered GPS Device *</span>
@@ -609,19 +683,6 @@ function SettingsPage() {
                   )}
                   {formErrors.imei && <small className="field-error">{formErrors.imei}</small>}
                 </div>
-
-	                <label className="account-field">
-	                  <span>Rank *</span>
-                  <select className="settings-input w-100" value={accountForm.rank} onChange={handleFieldChange('rank')}>
-                    {rankOptions.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-	                  </select>
-	                </label>
-	                  </>
-	                )}
 
                 <label className="account-field">
                   <span>Login ID *</span>
@@ -692,7 +753,7 @@ function SettingsPage() {
                     {editingAccountId && (
                       <button
                         type="button"
-                        className="account-action-btn"
+                        className="account-action-btn ms-2"
                         onClick={resetFormToCreate}
                       >
                         Cancel Edit
@@ -751,7 +812,22 @@ function SettingsPage() {
                       ) : (
                         filteredAccounts.map((account, index) => (
                           <tr key={account.id} className="personnel-row">
-	                            <td>{account.fullName || 'Supervisor account'}</td>
+	                            <td>
+	                              <div className="account-name-cell">
+	                                {account.photoUrl ? (
+	                                  <img
+	                                    className="account-table-avatar"
+	                                    src={resolveApiAssetUrl(account.photoUrl)}
+	                                    alt=""
+	                                  />
+	                                ) : (
+	                                  <span className="account-table-avatar account-table-avatar--fallback" aria-hidden="true">
+	                                    {(account.fullName || account.loginId || 'P').charAt(0).toUpperCase()}
+	                                  </span>
+	                                )}
+	                                <span>{account.fullName || 'Supervisor account'}</span>
+	                              </div>
+	                            </td>
 	                            <td>{account.role === 'Supervisor' ? 'Supervisor' : account.rank}</td>
 	                            <td className="personnel-badge">{account.role === 'Supervisor' ? '-' : account.badgeNumber}</td>
 	                            <td>

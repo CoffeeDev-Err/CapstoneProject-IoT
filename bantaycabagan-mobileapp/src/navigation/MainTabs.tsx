@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -19,8 +19,11 @@ import OfficerMapScreen from '../screens/OfficerMapScreen';
 import TasksScreen from '../screens/TasksScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import OfficerProfileScreen from '../screens/OfficerProfileScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import { useOperationalContext } from '../context/OperationalContext';
+import { useNotifications } from '../context/NotificationContext';
 import { useMobileTheme } from '../context/ThemeContext';
+import type { NotificationNavigationRequest } from '../types/notifications';
 
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
@@ -35,6 +38,10 @@ const tabIcons: Record<string, keyof typeof Icon.glyphMap> = {
 type FloatingTabBarProps = BottomTabBarProps & {
   openTaskModal: () => void;
   openTaskCount: number;
+  openNotifications: () => void;
+  unreadNotificationCount: number;
+  navigationRequest: NotificationNavigationRequest | null;
+  clearNavigationRequest: () => void;
 };
 
 function FloatingTabBar({
@@ -42,8 +49,19 @@ function FloatingTabBar({
   navigation,
   openTaskModal,
   openTaskCount,
+  openNotifications,
+  unreadNotificationCount,
+  navigationRequest,
+  clearNavigationRequest,
 }: FloatingTabBarProps) {
   const { colors, isDark } = useMobileTheme();
+
+  useEffect(() => {
+    if (!navigationRequest) return;
+    if (navigationRequest.destination === 'Tasks') openTaskModal();
+    else navigation.navigate(navigationRequest.destination);
+    clearNavigationRequest();
+  }, [clearNavigationRequest, navigation, navigationRequest, openTaskModal]);
 
   return (
     <View style={[styles.floatingBar, isDark && styles.floatingBarDark]}>
@@ -94,6 +112,24 @@ function FloatingTabBar({
           </TouchableOpacity>
         );
       })}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Open notifications"
+        activeOpacity={0.75}
+        style={styles.tabItem}
+        onPress={openNotifications}
+      >
+        <View style={styles.iconShell}>
+          <Icon name="notifications" size={27} color={colors.textMuted} />
+          {unreadNotificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.badgeText}>
+                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -101,8 +137,14 @@ function FloatingTabBar({
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const { tasks } = useOperationalContext();
+  const {
+    unreadCount,
+    navigationRequest,
+    clearNavigationRequest,
+  } = useNotifications();
   const { isDark } = useMobileTheme();
   const [tasksVisible, setTasksVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
   const openTaskCount = tasks.filter((task) => task.status === 'open').length;
 
   return (
@@ -118,6 +160,10 @@ export default function MainTabs() {
             {...props}
             openTaskCount={openTaskCount}
             openTaskModal={() => setTasksVisible(true)}
+            openNotifications={() => setNotificationsVisible(true)}
+            unreadNotificationCount={unreadCount}
+            navigationRequest={navigationRequest}
+            clearNavigationRequest={clearNavigationRequest}
           />
         )}
       >
@@ -145,6 +191,29 @@ export default function MainTabs() {
             <View style={[styles.taskSheet, isDark && styles.taskSheetDark]}>
               <View style={styles.sheetHandle} />
               <TasksScreen presentation="modal" onClose={() => setTasksVisible(false)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={notificationsVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setNotificationsVisible(false)}
+      >
+        <View style={styles.modalRoot}>
+          <View style={{ height: insets.top + TASK_MODAL_TOP_OFFSET }} />
+          <View style={styles.modalOverlay}>
+            <Pressable
+              accessibilityLabel="Close notifications"
+              style={StyleSheet.absoluteFill}
+              onPress={() => setNotificationsVisible(false)}
+            />
+            <View style={[styles.taskSheet, isDark && styles.taskSheetDark]}>
+              <View style={styles.sheetHandle} />
+              <NotificationsScreen onClose={() => setNotificationsVisible(false)} />
             </View>
           </View>
         </View>
@@ -184,7 +253,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconShell: {
-    width: 62,
+    width: 52,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
@@ -207,6 +276,20 @@ const styles = StyleSheet.create({
     borderColor: '#ffffff',
     borderRadius: 9,
     backgroundColor: mobileTheme.danger,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 8,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    borderRadius: 9,
+    backgroundColor: mobileTheme.warning,
   },
   badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
   modalRoot: {

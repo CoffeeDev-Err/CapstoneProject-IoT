@@ -2,10 +2,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 import { AUTH_TOKEN_KEY } from './auth'
 
 const request = async (path, options) => {
+  const isMultipart = options?.body instanceof FormData
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(!isMultipart ? { 'Content-Type': 'application/json' } : {}),
       Authorization: `Bearer ${localStorage.getItem(AUTH_TOKEN_KEY) || ''}`,
       ...options?.headers,
     },
@@ -27,18 +28,29 @@ export const getAccounts = async () => {
   return Array.isArray(payload.accounts) ? payload.accounts : []
 }
 
-export const createAccount = async (account) => {
+const createRequestBody = (account, profilePhoto) => {
+  if (!profilePhoto) return JSON.stringify(account)
+
+  const formData = new FormData()
+  Object.entries(account).forEach(([field, value]) => {
+    if (value !== undefined && value !== null) formData.append(field, String(value))
+  })
+  formData.append('profile_photo', profilePhoto)
+  return formData
+}
+
+export const createAccount = async (account, profilePhoto) => {
   const payload = await request('/api/accounts', {
     method: 'POST',
-    body: JSON.stringify(account),
+    body: createRequestBody(account, profilePhoto),
   })
   return payload.account
 }
 
-export const updateAccount = async (accountId, account) => {
+export const updateAccount = async (accountId, account, profilePhoto) => {
   const payload = await request(`/api/accounts/${accountId}`, {
     method: 'PUT',
-    body: JSON.stringify(account),
+    body: createRequestBody(account, profilePhoto),
   })
   return payload.account
 }

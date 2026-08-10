@@ -13,11 +13,17 @@ const createOperationalController = (operationalService) => ({
 
 	getBootstrap: async (req, res) => {
 		const personnelId = req.auth.user.personnelId
-		const [taskPayload, deployments] = await Promise.all([
+		const [taskPayload, deployments, upcomingDeployment] = await Promise.all([
 			operationalService.listTasks({ view: 'active', limit: 100 }),
 			operationalService.loadDeployments(personnelId),
+			operationalService.getUpcomingDeployment(personnelId),
 		])
-		res.json({ tasks: taskPayload.data, reports: [], deployments })
+		res.json({
+			tasks: taskPayload.data,
+			reports: [],
+			deployments,
+			upcomingDeployment,
+		})
 	},
 
 	createTask: async (req, res) => {

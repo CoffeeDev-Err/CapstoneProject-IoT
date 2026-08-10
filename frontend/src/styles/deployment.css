@@ -13,7 +13,8 @@
   color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 700;
-  padding: 0.35rem 0.55rem;
+  min-height: 40px;
+  padding: 0.55rem 0.8rem;
   cursor: pointer;
   transition: all var(--transition-base);
   text-transform: uppercase;
@@ -22,10 +23,10 @@
 
 .assignment-inline-btn:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: var(--color-primary-light);
-  color: var(--color-primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  transform: none;
+  box-shadow: none;
 }
 
 .assignment-inline-btn:active:not(:disabled) {
@@ -57,8 +58,8 @@
 }
 
 .assignment-group-row td {
-  border-bottom: 1px solid #334155;
-  background: #1b2a42;
+  border-bottom: 1px solid #1e3a5f;
+  background: #0f172a;
 }
 
 .assignment-group-cell {
@@ -72,14 +73,14 @@
 
 .assignment-group-label {
   display: block;
-  color: #dbeafe;
+  color: #ffffff;
   font-size: 0.84rem;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
 .assignment-group-meta {
-  color: #93c5fd;
+  color: #bfdbfe;
   font-size: 0.73rem;
   font-weight: 600;
 }
@@ -97,11 +98,12 @@
 }
 
 .assignment-group-menu-trigger {
-  border: 1px solid var(--color-primary-light);
-  background: #eff6ff;
-  color: var(--color-primary-dark);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   border-radius: 8px;
-  padding: 0.35rem 0.65rem;
+  min-height: 40px;
+  padding: 0.55rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -111,10 +113,11 @@
 }
 
 .assignment-group-menu-trigger:hover {
-  background: #dbeafe;
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-xs);
-  transform: translateY(-1px);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  box-shadow: none;
+  transform: none;
 }
 
 .assignment-group-menu-dropdown {
@@ -147,7 +150,9 @@
 .assignment-group-edit-btn,
 .assignment-group-delete-btn {
   border-radius: 8px;
-  padding: 0.4rem 0.7rem;
+  min-height: 40px;
+  min-width: 96px;
+  padding: 0.55rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -158,37 +163,40 @@
 }
 
 .assignment-group-edit-btn {
-  border-color: var(--color-primary-light);
-  background: #eff6ff;
-  color: var(--color-primary-dark);
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #334155;
 }
 
 .assignment-group-edit-btn:hover {
-  background: #dbeafe;
-  border-color: var(--color-primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: none;
+  box-shadow: none;
 }
 
 .assignment-group-delete-btn {
   border-color: var(--color-danger-border);
-  background: var(--color-danger-soft);
+  background: #ffffff;
   color: var(--color-danger-dark);
 }
 
 .assignment-group-delete-btn:hover {
-  background: color-mix(in srgb, var(--color-danger) 16%, #ffffff 84%);
+  background: var(--color-danger-soft);
   border-color: var(--color-danger);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  transform: none;
+  box-shadow: none;
 }
 
 .assignment-edit-btn {
-  border: 1px solid var(--color-primary-light);
-  background: #eff6ff;
-  color: var(--color-primary-dark);
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
   border-radius: 8px;
-  padding: 0.4rem 0.65rem;
+  min-height: 40px;
+  min-width: 96px;
+  padding: 0.55rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -198,19 +206,22 @@
 }
 
 .assignment-edit-btn:hover {
-  background: #dbeafe;
-  border-color: var(--color-primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: none;
+  box-shadow: none;
 }
 
 .assignment-delete-btn,
 .assignment-remove-btn {
   border: 1px solid var(--color-danger-border);
-  background: var(--color-danger-soft);
+  background: #ffffff;
   color: var(--color-danger-dark);
   border-radius: 8px;
-  padding: 0.4rem 0.65rem;
+  min-height: 40px;
+  min-width: 96px;
+  padding: 0.55rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -221,8 +232,24 @@
 
 .assignment-delete-btn:hover,
 .assignment-remove-btn:hover {
-  background: color-mix(in srgb, var(--color-danger) 16%, #ffffff 84%);
+  background: var(--color-danger-soft);
   border-color: var(--color-danger);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  transform: none;
+  box-shadow: none;
+}
+
+.assignment-inline-btn:focus-visible,
+.assignment-group-menu-trigger:focus-visible,
+.assignment-group-edit-btn:focus-visible,
+.assignment-group-delete-btn:focus-visible,
+.assignment-edit-btn:focus-visible,
+.assignment-delete-btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.assignment-group-delete-btn:focus-visible,
+.assignment-delete-btn:focus-visible,
+.assignment-remove-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16);
 }
