@@ -55,7 +55,7 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T;
 };
 
-const deviceName = 'BantayCabagan Expo mobile app';
+const deviceName = 'GeoSentri mobile app';
 
 export const beginLogin = (username: string, password: string) => (
   request<VerificationChallenge>('/api/auth/login', {

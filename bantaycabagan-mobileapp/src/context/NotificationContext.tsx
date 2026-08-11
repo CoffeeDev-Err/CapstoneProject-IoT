@@ -4,11 +4,10 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import { AppState, Platform } from 'react-native';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from './AuthContext';
@@ -47,6 +46,8 @@ type NotificationContextValue = {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 const mergeNotification = (
   items: OfficerNotification[],
   incoming: OfficerNotification,
@@ -72,7 +73,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [notifications, setNotifications] = useState<OfficerNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [navigationRequest, setNavigationRequest] = useState<NotificationNavigationRequest | null>(null);
-  const remotePushReadyRef = useRef(false);
 
   const refreshNotifications = useCallback(async () => {
     if (!token) return;
@@ -90,25 +90,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const onCreated = (notification: OfficerNotification) => {
       setNotifications((items) => mergeNotification(items, notification));
-      if (
-        Platform.OS !== 'web'
-        && AppState.currentState !== 'active'
-        && !remotePushReadyRef.current
-      ) {
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: notification.title,
-            body: notification.message,
-            data: {
-              notificationId: notification.id,
-              referenceId: notification.referenceId,
-              ...notification.data,
-            },
-            sound: notification.priority === 'low' ? undefined : 'default',
-          },
-          trigger: null,
-        }).catch(() => undefined);
-      }
     };
     operationsSocket.on('notification:created', onCreated);
     return () => {
@@ -160,6 +141,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     let active = true;
 
     const register = async () => {
+      const projectId = Constants.easConfig?.projectId
+        || Constants.expoConfig?.extra?.eas?.projectId;
+
+      if (isExpoGo) {
+        if (!Device.isDevice || !projectId) return;
+        const expoGoToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+        await unregisterNotificationDevice(expoGoToken, token);
+        return;
+      }
+
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('officer-alerts', {
           name: 'Officer alerts',
@@ -174,8 +165,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         : await Notifications.requestPermissionsAsync();
       if (permission.status !== 'granted') return;
 
-      const projectId = Constants.easConfig?.projectId
-        || Constants.expoConfig?.extra?.eas?.projectId;
       if (!projectId) return;
       const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       if (!active) return;
@@ -186,13 +175,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         deviceName: Device.deviceName,
         token,
       });
-      remotePushReadyRef.current = true;
     };
 
     register().catch(() => undefined);
     return () => {
       active = false;
-      remotePushReadyRef.current = false;
       if (registeredToken) {
         unregisterNotificationDevice(registeredToken, token).catch(() => undefined);
       }
