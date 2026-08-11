@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import { mobileTheme } from '../constants/mobileTheme';
 import { useNotifications } from '../context/NotificationContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { OfficerNotification } from '../types/notifications';
+import { SheetFlatList } from '../components/SwipeDismissSheet';
 
 const iconFor = (notification: OfficerNotification): keyof typeof Icon.glyphMap => {
   if (notification.type === 'emergency') return 'campaign';
@@ -41,7 +41,11 @@ const formatTimestamp = (value: string) => {
   });
 };
 
-export default function NotificationsScreen({ onClose }: { onClose: () => void }) {
+export default function NotificationsScreen({
+  onClose,
+}: {
+  onClose: (afterClose?: () => void) => void;
+}) {
   const { colors, isDark } = useMobileTheme();
   const {
     notifications,
@@ -51,10 +55,39 @@ export default function NotificationsScreen({ onClose }: { onClose: () => void }
     openNotification,
   } = useNotifications();
 
-  const handleOpen = (notification: OfficerNotification) => {
-    openNotification(notification);
-    onClose();
-  };
+  const handleOpen = useCallback((notification: OfficerNotification) => {
+    onClose(() => openNotification(notification));
+  }, [onClose, openNotification]);
+
+  const renderNotification = useCallback(({ item }: { item: OfficerNotification }) => {
+    const accent = colorFor(item);
+    return (
+      <TouchableOpacity
+        activeOpacity={0.75}
+        style={[
+          styles.notificationCard,
+          { borderColor: colors.border, backgroundColor: colors.surfaceMuted },
+          !item.isRead && { borderLeftColor: accent, borderLeftWidth: 3 },
+        ]}
+        onPress={() => handleOpen(item)}
+      >
+        <View style={[styles.iconShell, { backgroundColor: isDark ? '#132442' : mobileTheme.blueSoft }]}>
+          <Icon name={iconFor(item)} size={20} color={accent} />
+        </View>
+        <View style={styles.notificationCopy}>
+          <View style={styles.notificationTopRow}>
+            <Text style={[styles.notificationTitle, { color: colors.text }]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: accent }]} />}
+          </View>
+          <Text style={[styles.notificationMessage, { color: colors.textMuted }]}>{item.message}</Text>
+          <Text style={[styles.notificationTime, { color: colors.textMuted }]}>{formatTimestamp(item.timestamp)}</Text>
+        </View>
+        <Icon name="chevron-right" size={20} color={colors.textMuted} />
+      </TouchableOpacity>
+    );
+  }, [colors.border, colors.surfaceMuted, colors.text, colors.textMuted, handleOpen, isDark]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -70,48 +103,17 @@ export default function NotificationsScreen({ onClose }: { onClose: () => void }
             <Text style={styles.readAllText}>Mark all read</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          accessibilityLabel="Close notifications"
-          style={[styles.closeButton, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
-          onPress={onClose}
-        >
-          <Icon name="close" size={22} color={colors.text} />
-        </TouchableOpacity>
       </View>
 
-      <FlatList
+      <SheetFlatList
         data={notifications}
         keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => {
-          const accent = colorFor(item);
-          return (
-            <TouchableOpacity
-              activeOpacity={0.75}
-              style={[
-                styles.notificationCard,
-                { borderColor: colors.border, backgroundColor: colors.surfaceMuted },
-                !item.isRead && { borderLeftColor: accent, borderLeftWidth: 3 },
-              ]}
-              onPress={() => handleOpen(item)}
-            >
-              <View style={[styles.iconShell, { backgroundColor: isDark ? '#132442' : mobileTheme.blueSoft }]}>
-                <Icon name={iconFor(item)} size={20} color={accent} />
-              </View>
-              <View style={styles.notificationCopy}>
-                <View style={styles.notificationTopRow}>
-                  <Text style={[styles.notificationTitle, { color: colors.text }]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: accent }]} />}
-                </View>
-                <Text style={[styles.notificationMessage, { color: colors.textMuted }]}>{item.message}</Text>
-                <Text style={[styles.notificationTime, { color: colors.textMuted }]}>{formatTimestamp(item.timestamp)}</Text>
-              </View>
-              <Icon name="chevron-right" size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-          );
-        }}
+        renderItem={renderNotification}
         ListEmptyComponent={(
           <View style={styles.emptyState}>
             {isLoading ? (
@@ -142,7 +144,6 @@ const styles = StyleSheet.create({
   subtitle: { marginTop: 3, fontSize: 11 },
   readAllButton: { minHeight: 40, paddingHorizontal: 8, justifyContent: 'center' },
   readAllText: { color: mobileTheme.blue, fontSize: 11, fontWeight: '800' },
-  closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 28, gap: 10, flexGrow: 1 },
   notificationCard: { minHeight: 90, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderRadius: 8 },
   iconShell: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },

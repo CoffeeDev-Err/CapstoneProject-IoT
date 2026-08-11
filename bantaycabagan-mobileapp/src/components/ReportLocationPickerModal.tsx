@@ -107,8 +107,8 @@ export function ReportLocationPickerModal({
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={[styles.screen, isDark && styles.screenDark]}>
         <View style={[styles.header, isDark && styles.borderDark]}>
-          <TouchableOpacity style={[styles.iconButton, isDark && styles.buttonDark]} onPress={onClose}>
-            <Icon name="close" size={22} color={colors.text} />
+          <TouchableOpacity style={[styles.cancelButton, isDark && styles.buttonDark]} onPress={onClose}>
+            <Text style={[styles.cancelText, isDark && styles.textDark]}>Cancel</Text>
           </TouchableOpacity>
           <View style={styles.headerCopy}>
             <Text style={[styles.title, isDark && styles.textDark]}>Pin incident location</Text>
@@ -156,7 +156,8 @@ const styles = StyleSheet.create({
   screenDark: { backgroundColor: '#050b18' },
   header: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: mobileTheme.border, backgroundColor: mobileTheme.surface },
   borderDark: { borderColor: '#22314a', backgroundColor: '#0b1528' },
-  iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 10, backgroundColor: mobileTheme.background },
+  cancelButton: { minWidth: 64, height: 40, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 10, backgroundColor: mobileTheme.background },
+  cancelText: { color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
   buttonDark: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
   headerCopy: { flex: 1 },
   title: { color: mobileTheme.text, fontSize: 18, fontWeight: '800' },

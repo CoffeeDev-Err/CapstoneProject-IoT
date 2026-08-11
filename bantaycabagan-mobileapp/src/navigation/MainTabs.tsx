@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
-  Pressable,
   StatusBar,
   StyleSheet,
   Text,
@@ -13,7 +11,7 @@ import {
   type BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mobileTheme } from '../constants/mobileTheme';
 import OfficerMapScreen from '../screens/OfficerMapScreen';
 import TasksScreen from '../screens/TasksScreen';
@@ -24,6 +22,8 @@ import { useOperationalContext } from '../context/OperationalContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { NotificationNavigationRequest } from '../types/notifications';
+import { SwipeDismissSheet } from '../components/SwipeDismissSheet';
+import { PolicePageHeader } from '../components/PolicePageHeader';
 
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
@@ -35,11 +35,16 @@ const tabIcons: Record<string, keyof typeof Icon.glyphMap> = {
   Profile: 'person',
 };
 
+const tabLabels: Record<string, string> = {
+  Map: 'Map',
+  Tasks: 'Tasks',
+  Reports: 'Reports',
+  Profile: 'Account',
+};
+
 type FloatingTabBarProps = BottomTabBarProps & {
   openTaskModal: () => void;
   openTaskCount: number;
-  openNotifications: () => void;
-  unreadNotificationCount: number;
   navigationRequest: NotificationNavigationRequest | null;
   clearNavigationRequest: () => void;
 };
@@ -49,8 +54,6 @@ function FloatingTabBar({
   navigation,
   openTaskModal,
   openTaskCount,
-  openNotifications,
-  unreadNotificationCount,
   navigationRequest,
   clearNavigationRequest,
 }: FloatingTabBarProps) {
@@ -68,6 +71,7 @@ function FloatingTabBar({
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const isTasks = route.name === 'Tasks';
+        const label = tabLabels[route.name] || route.name;
 
         const handlePress = () => {
           if (isTasks) {
@@ -89,7 +93,7 @@ function FloatingTabBar({
           <TouchableOpacity
             key={route.key}
             accessibilityRole="tab"
-            accessibilityLabel={route.name}
+            accessibilityLabel={label}
             accessibilityState={{ selected: focused }}
             activeOpacity={0.75}
             style={styles.tabItem}
@@ -98,7 +102,7 @@ function FloatingTabBar({
             <View style={[styles.iconShell, focused && styles.iconShellActive]}>
               <Icon
                 name={tabIcons[route.name]}
-                size={28}
+                size={24}
                 color={focused ? '#ffffff' : colors.textMuted}
               />
               {isTasks && openTaskCount > 0 && (
@@ -108,28 +112,17 @@ function FloatingTabBar({
                   </Text>
                 </View>
               )}
+              <Text style={[
+                styles.tabLabel,
+                { color: focused ? '#ffffff' : colors.textMuted },
+                focused && styles.tabLabelActive,
+              ]}>
+                {label}
+              </Text>
             </View>
           </TouchableOpacity>
         );
       })}
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Open notifications"
-        activeOpacity={0.75}
-        style={styles.tabItem}
-        onPress={openNotifications}
-      >
-        <View style={styles.iconShell}>
-          <Icon name="notifications" size={27} color={colors.textMuted} />
-          {unreadNotificationCount > 0 && (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>
-                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
-              </Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -138,7 +131,6 @@ export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const { tasks } = useOperationalContext();
   const {
-    unreadCount,
     navigationRequest,
     clearNavigationRequest,
   } = useNotifications();
@@ -148,88 +140,78 @@ export default function MainTabs() {
   const openTaskCount = tasks.filter((task) => task.status === 'open').length;
 
   return (
-    <>
+    <View style={[styles.appRoot, isDark && styles.appRootDark]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={isDark ? '#0b1528' : '#ffffff'}
       />
+      <SafeAreaView
+        edges={['top']}
+        style={[styles.fixedHeaderArea, isDark && styles.fixedHeaderAreaDark]}
+      >
+        <PolicePageHeader onOpenNotifications={() => setNotificationsVisible(true)} />
+      </SafeAreaView>
+      <View style={styles.tabSceneArea}>
       <Tab.Navigator
-        screenOptions={{ headerShown: false }}
+        detachInactiveScreens={false}
+        screenOptions={{
+          animation: 'none',
+          headerShown: false,
+          sceneStyle: {
+            backgroundColor: isDark ? '#050b18' : '#ffffff',
+          },
+        }}
         tabBar={(props) => (
           <FloatingTabBar
             {...props}
             openTaskCount={openTaskCount}
             openTaskModal={() => setTasksVisible(true)}
-            openNotifications={() => setNotificationsVisible(true)}
-            unreadNotificationCount={unreadCount}
             navigationRequest={navigationRequest}
             clearNavigationRequest={clearNavigationRequest}
           />
         )}
       >
-        <Tab.Screen name="Map" component={OfficerMapScreen}/>
-        <Tab.Screen name="Tasks" component={TasksScreen} />
-        <Tab.Screen name="Reports" component={ReportsScreen} />
-        <Tab.Screen name="Profile" component={OfficerProfileScreen} />
+        <Tab.Screen name="Map" component={OfficerMapScreen} options={{ lazy: false }} />
+        <Tab.Screen name="Tasks" component={TasksScreen} options={{ animation: 'none', lazy: true }} />
+        <Tab.Screen name="Reports" component={ReportsScreen} options={{ lazy: false }} />
+        <Tab.Screen name="Profile" component={OfficerProfileScreen} options={{ lazy: false }} />
       </Tab.Navigator>
+      </View>
 
-      <Modal
+      <SwipeDismissSheet
         visible={tasksVisible}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setTasksVisible(false)}
+        topInset={insets.top + TASK_MODAL_TOP_OFFSET}
+        onClose={() => setTasksVisible(false)}
+        sheetStyle={[styles.taskSheet, isDark && styles.taskSheetDark]}
       >
-        <View style={styles.modalRoot}>
-          <View style={{ height: insets.top + TASK_MODAL_TOP_OFFSET }} />
-          <View style={styles.modalOverlay}>
-            <Pressable
-              accessibilityLabel="Close tasks"
-              style={StyleSheet.absoluteFill}
-              onPress={() => setTasksVisible(false)}
-            />
-            <View style={[styles.taskSheet, isDark && styles.taskSheetDark]}>
-              <View style={styles.sheetHandle} />
-              <TasksScreen presentation="modal" onClose={() => setTasksVisible(false)} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+        <TasksScreen presentation="modal" />
+      </SwipeDismissSheet>
 
-      <Modal
+      <SwipeDismissSheet
         visible={notificationsVisible}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setNotificationsVisible(false)}
+        topInset={insets.top + TASK_MODAL_TOP_OFFSET}
+        onClose={() => setNotificationsVisible(false)}
+        sheetStyle={[styles.taskSheet, isDark && styles.taskSheetDark]}
       >
-        <View style={styles.modalRoot}>
-          <View style={{ height: insets.top + TASK_MODAL_TOP_OFFSET }} />
-          <View style={styles.modalOverlay}>
-            <Pressable
-              accessibilityLabel="Close notifications"
-              style={StyleSheet.absoluteFill}
-              onPress={() => setNotificationsVisible(false)}
-            />
-            <View style={[styles.taskSheet, isDark && styles.taskSheetDark]}>
-              <View style={styles.sheetHandle} />
-              <NotificationsScreen onClose={() => setNotificationsVisible(false)} />
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </>
+        {({ close }) => <NotificationsScreen onClose={close} />}
+      </SwipeDismissSheet>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  appRoot: { flex: 1, backgroundColor: '#ffffff' },
+  appRootDark: { backgroundColor: '#050b18' },
+  fixedHeaderArea: { zIndex: 20, backgroundColor: '#ffffff' },
+  fixedHeaderAreaDark: { backgroundColor: '#0b1528' },
+  tabSceneArea: { flex: 1 },
   floatingBar: {
     position: 'absolute',
-    right: 25,
+    right: 45,
     bottom: 16,
-    left: 25,
-    height: 55,
-    paddingHorizontal: 2,
+    left: 45,
+    height: 50,
+    paddingHorizontal: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
@@ -248,22 +230,29 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    height: 64,
+    height: 55,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconShell: {
-    width: 52,
-    height: 40,
+    width: 58,
+    height: 43,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 1,
     borderRadius: 11,
     overflow: 'visible',
   },
   iconShellActive: {
     backgroundColor: mobileTheme.blue,
-    borderRadius: 13,
+    borderRadius: 15,
   },
+  tabLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    lineHeight: 9,
+  },
+  tabLabelActive: { fontWeight: '800' },
   badge: {
     position: 'absolute',
     top: -5,
@@ -277,45 +266,10 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: mobileTheme.danger,
   },
-  notificationBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 8,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    borderRadius: 9,
-    backgroundColor: mobileTheme.warning,
-  },
   badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
-  modalRoot: {
-    flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15,15,35,0.46)',
-  },
   taskSheet: {
-    flex: 1,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    height: '92%',
     backgroundColor: mobileTheme.surface,
-    overflow: 'hidden',
   },
   taskSheetDark: { backgroundColor: '#0b1528' },
-  sheetHandle: {
-    width: 44,
-    height: 5,
-    marginTop: 10,
-    marginBottom: -8,
-    alignSelf: 'center',
-    borderRadius: 3,
-    backgroundColor: '#cbc8d8',
-    zIndex: 1,
-  },
 });

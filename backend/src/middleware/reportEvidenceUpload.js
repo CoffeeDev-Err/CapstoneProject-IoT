@@ -1,9 +1,9 @@
 const { randomUUID } = require('crypto')
 const fs = require('fs')
-const path = require('path')
 const multer = require('multer')
+const { getUploadDirectory } = require('../config/uploads')
 
-const uploadDirectory = path.resolve(__dirname, '../../uploads/report-evidence')
+const uploadDirectory = getUploadDirectory('report-evidence')
 fs.mkdirSync(uploadDirectory, { recursive: true })
 
 const extensionByMimeType = {

@@ -1,16 +1,21 @@
 import 'react-native-gesture-handler';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  DarkTheme as NavigationDarkTheme,
+  DefaultTheme as NavigationLightTheme,
+  NavigationContainer,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import LoginScreen from './src/LoginScreen';
 import { mobileTheme } from './src/constants/mobileTheme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OperationalProvider } from './src/context/OperationalContext';
 import { NotificationProvider } from './src/context/NotificationContext';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useMobileTheme } from './src/context/ThemeContext';
 import MainTabs from './src/navigation/MainTabs';
 import { mobileFontFamily } from './src/constants/mobileTheme';
 
@@ -30,15 +35,47 @@ applyDefaultFont(TextInput);
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <AppNavigator />
-          </NavigationContainer>
-        </AuthProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.appRoot}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ThemedNavigation />
+          </AuthProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+function ThemedNavigation() {
+  const { isDark } = useMobileTheme();
+  const navigationTheme = React.useMemo(() => {
+    const baseTheme = isDark ? NavigationDarkTheme : NavigationLightTheme;
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        background: isDark ? '#050b18' : '#ffffff',
+        card: isDark ? '#0b1528' : '#ffffff',
+        border: isDark ? '#22314a' : mobileTheme.borderSoft,
+      },
+    };
+  }, [isDark]);
+
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <AppNavigator />
+    </NavigationContainer>
+  );
+}
+
+function MainAppScreen() {
+  return (
+    <NotificationProvider>
+      <OperationalProvider>
+        <MainTabs />
+      </OperationalProvider>
+    </NotificationProvider>
   );
 }
 
@@ -57,15 +94,7 @@ function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {token ? (
-        <Stack.Screen name="Main">
-          {() => (
-            <NotificationProvider>
-              <OperationalProvider>
-                <MainTabs />
-              </OperationalProvider>
-            </NotificationProvider>
-          )}
-        </Stack.Screen>
+        <Stack.Screen name="Main" component={MainAppScreen} />
       ) : (
         <Stack.Screen name="Login" component={LoginScreen} />
       )}
@@ -74,6 +103,7 @@ function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
+  appRoot: { flex: 1 },
   loading: {
     flex: 1,
     alignItems: 'center',

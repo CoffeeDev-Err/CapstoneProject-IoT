@@ -17,7 +17,7 @@ export type OfficerActor = {
 };
 
 export const operationsSocket = io(API_URL, {
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   autoConnect: false,
 });
 

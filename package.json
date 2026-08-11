@@ -1,7 +1,18 @@
 {
   "name": "bantaycabagan-system",
   "version": "1.0.0",
+  "main": "backend/src/server.js",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=20 <25"
+  },
   "scripts": {
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix backend",
     "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",

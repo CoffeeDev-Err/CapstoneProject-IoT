@@ -14,20 +14,19 @@
  *   emitBackupRequest — helper to fire an emergency backup request
  */
 import { io } from 'socket.io-client'
+import { SOCKET_URL } from './runtime'
 
 /**
- * Read the backend server address from the build-time environment.
- * In production, set VITE_SOCKET_URL=https://your-server.com in .env
+ * Read the backend address from the build-time environment. A production build
+ * served by the API defaults to the current HTTPS origin.
  */
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000'
-
 /**
  * Shared Socket.IO client instance used across the entire app.
  *   autoConnect: true  — connects as soon as this module is first imported
- *   transports         — tries native WebSocket first, falls back to HTTP polling
+ *   transports         — starts with polling and upgrades when WebSocket is supported
  */
 export const socket = io(SOCKET_URL, {
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   autoConnect: true,
 })
 

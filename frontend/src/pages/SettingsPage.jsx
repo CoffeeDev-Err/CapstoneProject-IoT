@@ -573,13 +573,6 @@ function SettingsPage() {
 	                <div className="account-field account-field--full account-photo-field">
 	                  <span>Profile Photo</span>
 	                  <div className="account-photo-control">
-	                    {profilePhotoPreview ? (
-	                      <img className="account-photo-preview" src={profilePhotoPreview} alt="Selected account profile" />
-	                    ) : (
-	                      <div className="account-photo-placeholder" aria-hidden="true">
-	                        {(accountForm.fullName || accountForm.loginId || 'P').trim().charAt(0).toUpperCase()}
-	                      </div>
-	                    )}
 	                    <div className="account-photo-copy">
 	                      <label className="account-action-btn account-photo-picker">
 	                        {profilePhotoPreview ? 'Change Photo' : 'Choose Photo'}

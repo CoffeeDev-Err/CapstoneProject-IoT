@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1087869326243",
+    "project_id": "bantaycabagan",
+    "storage_bucket": "bantaycabagan.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1087869326243:android:67bdf9e4a0a3a915464016",
+        "android_client_info": {
+          "package_name": "com.bantaycabagan.mobileapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxa4J2QRmdqrVEMCsxC_KJoEIzbc9zv2I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

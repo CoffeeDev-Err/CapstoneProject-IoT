@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "bantaycabagan-mobileapp",
-    "slug": "bantaycabagan-mobileapp",
+    "slug": "bantaycabagan-system",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,12 +16,17 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.bantaycabagan.mobileapp",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,6 +41,12 @@
           "cameraPermission": "Allow GeoSentri to use the camera for police report evidence."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c2af6e5e-a532-4520-9d37-c08a90f8277a"
+      }
+    },
+    "owner": "errorr"
   }
 }

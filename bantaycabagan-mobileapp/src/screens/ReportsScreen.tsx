@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
@@ -6,17 +13,32 @@ import {
   FlatList,
   Image,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
+  type StyleProp,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { PolicePageHeader } from '../components/PolicePageHeader';
+import Animated, {
+  cancelAnimation,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { ReportLocationPickerModal } from '../components/ReportLocationPickerModal';
+import {
+  SheetScrollView,
+  SwipeDismissSheet,
+} from '../components/SwipeDismissSheet';
 import {
   CABAGAN_BARANGAYS,
   findCabaganBarangay,
@@ -33,13 +55,19 @@ import type {
 } from '../types/operations';
 
 const reportTypes = ['incident', 'patrol', 'checkpoint', 'others'];
+const reportFilters = ['all', 'incident', 'routine'] as const;
 const SUBMIT_MODAL_TOP_OFFSET = 1;
+const CARD_LAYOUT_TRANSITION = LinearTransition.duration(220);
+const CARD_CONTENT_ENTER = FadeIn.duration(170);
+const CARD_CONTENT_EXIT = FadeOut.duration(130);
 
 type ReportForm = SubmitReportInput & {
   occurred_at: string;
   assigned_area: string;
   location_source: 'gps' | 'manual';
 };
+
+type SheetClose = (afterClose?: () => void) => void;
 
 const emptyForm: ReportForm = {
   report_type: 'incident',
@@ -91,7 +119,10 @@ export default function ReportsScreen() {
     isReportsLoading,
     isReportsLoadingMore,
   } = useOperationalContext();
-  const [filter, setFilter] = useState<'all' | 'incident' | 'routine'>('all');
+  const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
+  const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
+  const filterTranslateX = useSharedValue(0);
+  const pendingFilterDirection = useRef(0);
   const [formVisible, setFormVisible] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
@@ -101,10 +132,46 @@ export default function ReportsScreen() {
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [evidencePhoto, setEvidencePhoto] = useState<ReportEvidenceInput | null>(null);
+  const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
+  const filterAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: filterTranslateX.value }],
+  }));
+
+  const toggleReport = useCallback((reportId: string) => {
+    setExpandedReportIds((current) => {
+      const next = new Set(current);
+      if (next.has(reportId)) next.delete(reportId);
+      else next.add(reportId);
+      return next;
+    });
+  }, []);
+
+  const selectFilter = useCallback((nextFilter: (typeof reportFilters)[number]) => {
+    if (nextFilter === filter) return;
+
+    const forward = reportFilters.indexOf(nextFilter) > reportFilters.indexOf(filter);
+    pendingFilterDirection.current = forward ? 1 : -1;
+    setIsFilterTransitioning(true);
+    setFilter(nextFilter);
+  }, [filter]);
+
+  useLayoutEffect(() => {
+    if (pendingFilterDirection.current === 0) return;
+    cancelAnimation(filterTranslateX);
+    filterTranslateX.value = pendingFilterDirection.current * 14;
+    pendingFilterDirection.current = 0;
+    filterTranslateX.value = withTiming(0, { duration: 140 });
+
+    const transitionTimer = setTimeout(() => {
+      setIsFilterTransitioning(false);
+    }, 150);
+
+    return () => clearTimeout(transitionTimer);
+  }, [filter, filterTranslateX]);
 
   useEffect(() => {
-    refreshReports(filter).catch(() => undefined);
-  }, [filter, refreshReports]);
+    refreshReports('all').catch(() => undefined);
+  }, [refreshReports]);
 
   const filteredReports = useMemo(() => reports.filter((report) => {
     if (filter === 'incident') return report.is_incident;
@@ -188,7 +255,6 @@ export default function ReportsScreen() {
       latitude: undefined,
       longitude: undefined,
     }));
-    setBarangayPickerVisible(false);
   };
 
   const updateManualLocation = (location: string) => {
@@ -248,7 +314,7 @@ export default function ReportsScreen() {
     }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (close: SheetClose) => {
     if (
       !form.title.trim()
       || !form.description.trim()
@@ -266,12 +332,11 @@ export default function ReportsScreen() {
         ...(evidencePhoto && { evidence_photo: evidencePhoto }),
       });
       setForm(emptyForm);
-      setEvidencePhoto(null);
-      setBarangayPickerVisible(false);
-      setFormVisible(false);
-      Alert.alert('Report submitted', form.report_type === 'incident'
-        ? 'The incident is open and can now be resolved from Report History.'
-        : 'The activity report was saved to your history.');
+      close(() => {
+        Alert.alert('Report submitted', form.report_type === 'incident'
+          ? 'The incident is open and can now be resolved from Report History.'
+          : 'The activity report was saved to your history.');
+      });
     } catch (error) {
       Alert.alert('Submission failed', (error as Error).message);
     } finally {
@@ -279,7 +344,7 @@ export default function ReportsScreen() {
     }
   };
 
-  const handleResolve = async () => {
+  const handleResolve = async (close: SheetClose) => {
     if (!resolveTarget || !resolutionNotes.trim()) {
       Alert.alert('Resolution notes required', 'Describe the action taken before resolving the incident.');
       return;
@@ -288,9 +353,10 @@ export default function ReportsScreen() {
     setIsSaving(true);
     try {
       await resolveReport(resolveTarget.id, resolutionNotes.trim());
-      setResolveTarget(null);
-      setResolutionNotes('');
-      Alert.alert('Incident resolved', 'Web Reports and Analytics were updated automatically.');
+      close(() => {
+        setResolutionNotes('');
+        Alert.alert('Incident resolved', 'Web Reports and Analytics were updated automatically.');
+      });
     } catch (error) {
       Alert.alert('Unable to resolve incident', (error as Error).message);
     } finally {
@@ -298,60 +364,93 @@ export default function ReportsScreen() {
     }
   };
 
-  const renderReport = ({ item }: { item: PoliceReport }) => {
+  const renderReport = useCallback(({ item }: { item: PoliceReport }) => {
     const canResolve = item.is_incident && item.case_status !== 'resolved';
+    const expanded = expandedReportIds.has(item.id);
 
     return (
-      <View style={[
-        styles.reportCard,
-        isDark && themeStyles.surface,
-        item.is_incident ? styles.reportCardIncident : styles.reportCardRoutine,
-      ]}>
-        <View style={styles.reportTopRow}>
-          <View style={[styles.typeBadge, item.is_incident ? styles.incidentBadge : styles.routineBadge]}>
-            <Text style={styles.typeBadgeText}>{item.report_type}</Text>
-          </View>
-          {item.is_incident && (
-            <View style={[styles.caseBadge, item.case_status === 'resolved' ? styles.resolvedBadge : styles.openBadge]}>
-              <Text style={styles.caseBadgeText}>{item.case_status}</Text>
+      <Animated.View
+        layout={isFilterTransitioning ? undefined : CARD_LAYOUT_TRANSITION}
+        style={[
+          styles.reportCard,
+          isDark && themeStyles.surface,
+          item.is_incident ? styles.reportCardIncident : styles.reportCardRoutine,
+        ]}
+      >
+        <Animated.View style={filterAnimatedStyle}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          activeOpacity={0.76}
+          onPress={() => toggleReport(item.id)}
+        >
+          <View style={styles.reportTopRow}>
+            <View style={[styles.typeBadge, item.is_incident ? styles.incidentBadge : styles.routineBadge]}>
+              <Text style={styles.typeBadgeText}>{item.report_type}</Text>
             </View>
-          )}
-        </View>
+            <View style={styles.reportTopActions}>
+              {item.is_incident && (
+                <View style={[styles.caseBadge, item.case_status === 'resolved' ? styles.resolvedBadge : styles.openBadge]}>
+                  <Text style={styles.caseBadgeText}>{item.case_status}</Text>
+                </View>
+              )}
+              <Icon name={expanded ? 'expand-less' : 'expand-more'} size={21} color={colors.textMuted} />
+            </View>
+          </View>
 
-        <Text style={[styles.reportTitle, isDark && themeStyles.text]}>{item.title}</Text>
-        <Text style={[styles.reportMeta, isDark && themeStyles.muted]}>
-          {new Date(item.date_time).toLocaleString([], {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
-        </Text>
-        <View style={styles.locationRow}>
-          <Icon name="place" size={16} color={colors.textMuted} />
-          <Text style={[styles.locationText, isDark && themeStyles.muted]} numberOfLines={1}>{item.location}</Text>
-        </View>
+          <Text style={[styles.reportTitle, isDark && themeStyles.text]}>{item.title}</Text>
+          <Text style={[styles.reportMeta, isDark && themeStyles.muted]}>
+            {new Date(item.date_time).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </Text>
+          <View style={styles.locationRow}>
+            <Icon name="place" size={16} color={colors.textMuted} />
+            <Text style={[styles.locationText, isDark && themeStyles.muted]} numberOfLines={1}>{item.location}</Text>
+          </View>
+        </TouchableOpacity>
 
-        <View style={styles.reportActions}>
-          {canResolve && (
-            <TouchableOpacity style={styles.resolveButton} onPress={() => setResolveTarget(item)}>
-              <Icon name="check-circle" size={17} color="#ffffff" />
-              <Text style={styles.resolveButtonText}>Resolve Incident</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={[styles.viewButton, isDark && themeStyles.surfaceMuted]} onPress={() => setSelectedReport(item)}>
-            <Icon name="visibility" size={17} color={mobileTheme.purple} />
-            <Text style={styles.viewButtonText}>View</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        {expanded && (
+          <Animated.View
+            entering={CARD_CONTENT_ENTER}
+            exiting={CARD_CONTENT_EXIT}
+            style={[styles.reportExpanded, isDark && themeStyles.border]}
+          >
+            <Text style={[styles.reportDescription, isDark && themeStyles.muted]}>
+              {item.description || 'No description provided.'}
+            </Text>
+            <View style={styles.reportActions}>
+              {canResolve && (
+                <TouchableOpacity style={styles.resolveButton} onPress={() => setResolveTarget(item)}>
+                  <Icon name="check-circle" size={17} color="#ffffff" />
+                  <Text style={styles.resolveButtonText}>Resolve Incident</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.viewButton, isDark && themeStyles.surfaceMuted]} onPress={() => setSelectedReport(item)}>
+                <Icon name="visibility" size={17} color={mobileTheme.purple} />
+                <Text style={styles.viewButtonText}>View</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+        </Animated.View>
+      </Animated.View>
     );
-  };
+  }, [
+    colors.textMuted,
+    expandedReportIds,
+    filterAnimatedStyle,
+    isDark,
+    isFilterTransitioning,
+    toggleReport,
+  ]);
 
   return (
-    <SafeAreaView style={[styles.container, isDark && themeStyles.screen]} edges={['top']}>
-      <PolicePageHeader />
+    <SafeAreaView style={[styles.container, isDark && themeStyles.screen]} edges={[]}>
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, isDark && themeStyles.text]}>Reports</Text>
@@ -363,7 +462,7 @@ export default function ReportsScreen() {
       </View>
 
       <View style={styles.filters}>
-        {(['all', 'incident', 'routine'] as const).map((item) => (
+        {reportFilters.map((item) => (
           <TouchableOpacity
             key={item}
             style={[
@@ -372,7 +471,7 @@ export default function ReportsScreen() {
               filter === item && styles.filterButtonActive,
               isDark && filter === item && themeStyles.filterButtonActive,
             ]}
-            onPress={() => setFilter(item)}
+            onPress={() => selectFilter(item)}
           >
             <Text style={[
               styles.filterText,
@@ -384,50 +483,61 @@ export default function ReportsScreen() {
         ))}
       </View>
 
-      <FlatList
-        data={filteredReports}
-        keyExtractor={(item) => item.id}
-        renderItem={renderReport}
-        contentContainerStyle={styles.list}
-        ListFooterComponent={reportsHasMore ? (
-          <TouchableOpacity
-            style={[styles.loadMoreButton, isDark && themeStyles.surfaceMuted]}
-            onPress={() => loadMoreReports().catch(() => undefined)}
-            disabled={isReportsLoadingMore}
-          >
-            {isReportsLoadingMore ? (
-              <ActivityIndicator size="small" color={mobileTheme.blue} />
-            ) : (
-              <Icon name="expand-more" size={20} color={mobileTheme.blue} />
-            )}
-            <Text style={styles.loadMoreText}>
-              {isReportsLoadingMore ? 'Loading...' : 'Load more'}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-        ListEmptyComponent={(
-          <View style={styles.emptyState}>
-            <Icon name="description" size={34} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, isDark && themeStyles.text]}>
-              {isReportsLoading ? 'Loading reports...' : 'No submitted reports'}
-            </Text>
-            <Text style={[styles.emptyText, isDark && themeStyles.muted]}>
-              {isReportsLoading ? 'Getting your latest records.' : 'Reports you submit will appear here.'}
-            </Text>
-          </View>
-        )}
-      />
+      <View style={styles.listTransition}>
+        <FlatList
+          data={filteredReports}
+          keyExtractor={(item) => item.id}
+          renderItem={renderReport}
+          style={styles.listViewport}
+          contentContainerStyle={styles.list}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={false}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={reportsHasMore ? (
+            <TouchableOpacity
+              style={[styles.loadMoreButton, isDark && themeStyles.surfaceMuted]}
+              onPress={() => loadMoreReports().catch(() => undefined)}
+              disabled={isReportsLoadingMore}
+            >
+              {isReportsLoadingMore ? (
+                <ActivityIndicator size="small" color={mobileTheme.blue} />
+              ) : (
+                <Icon name="expand-more" size={20} color={mobileTheme.blue} />
+              )}
+              <Text style={styles.loadMoreText}>
+                {isReportsLoadingMore ? 'Loading...' : 'Load more'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          ListEmptyComponent={(
+            <Animated.View style={[styles.emptyState, filterAnimatedStyle]}>
+              <Icon name="description" size={34} color={colors.textMuted} />
+              <Text style={[styles.emptyTitle, isDark && themeStyles.text]}>
+                {isReportsLoading ? 'Loading reports...' : 'No submitted reports'}
+              </Text>
+              <Text style={[styles.emptyText, isDark && themeStyles.muted]}>
+                {isReportsLoading ? 'Getting your latest records.' : 'Reports you submit will appear here.'}
+              </Text>
+            </Animated.View>
+          )}
+        />
+      </View>
 
-      <Modal
+      <SwipeDismissSheet
         visible={formVisible && !locationPickerVisible}
-        animationType="slide"
-        transparent
-        statusBarTranslucent
-        presentationStyle="overFullScreen"
+        topInset={insets.top + SUBMIT_MODAL_TOP_OFFSET}
+        tapOutsideToClose={false}
+        sheetStyle={[styles.modalScreen, isDark && themeStyles.screen]}
+        onClose={() => {
+          setBarangayPickerVisible(false);
+          setEvidencePhoto(null);
+          setFormVisible(false);
+        }}
       >
-        <View style={styles.submitModalRoot}>
-          <View style={{ height: insets.top + SUBMIT_MODAL_TOP_OFFSET }} />
-          <SafeAreaView
+        {({ close }) => (
+        <SafeAreaView
             style={[styles.modalScreen, isDark && themeStyles.screen]}
             edges={['bottom']}
           >
@@ -436,19 +546,13 @@ export default function ReportsScreen() {
               <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Submit Report</Text>
               <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Record an incident or completed activity</Text>
             </View>
-            <TouchableOpacity
-              style={[styles.closeButton, isDark && themeStyles.surfaceMuted]}
-              onPress={() => {
-                setBarangayPickerVisible(false);
-                setEvidencePhoto(null);
-                setFormVisible(false);
-              }}
-            >
-              <Icon name="close" size={22} color={colors.text} />
-            </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.form}>
+          <SheetScrollView
+            contentContainerStyle={styles.form}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REPORT TYPE</Text>
             <View style={styles.typeOptions}>
               {reportTypes.map((type) => (
@@ -620,13 +724,13 @@ export default function ReportsScreen() {
               </>
             )}
 
-            <TouchableOpacity style={styles.primaryButton} onPress={handleSubmit} disabled={isSaving}>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => handleSubmit(close)} disabled={isSaving}>
               <Text style={styles.primaryButtonText}>{isSaving ? 'Submitting...' : 'Submit Report'}</Text>
             </TouchableOpacity>
-          </ScrollView>
+          </SheetScrollView>
           </SafeAreaView>
-        </View>
-      </Modal>
+        )}
+      </SwipeDismissSheet>
 
       <ReportLocationPickerModal
         visible={locationPickerVisible}
@@ -636,99 +740,120 @@ export default function ReportsScreen() {
         onConfirm={usePinnedLocation}
       />
 
-      <Modal visible={barangayPickerVisible} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={[styles.pickerModal, isDark && themeStyles.surface]}>
-            <View style={[styles.modalHeader, isDark && themeStyles.border]}>
-              <View>
-                <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Select Barangay</Text>
-                <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Official barangays of Cabagan only</Text>
-              </View>
+      <CenteredDialog
+        visible={barangayPickerVisible}
+        onClose={() => setBarangayPickerVisible(false)}
+        cardStyle={styles.pickerDialog}
+      >
+        <View style={[styles.modalHeader, isDark && themeStyles.border]}>
+          <View>
+            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Select Barangay</Text>
+            <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Official barangays of Cabagan only</Text>
+          </View>
+        </View>
+        <FlatList
+          data={[...CABAGAN_BARANGAYS]}
+          keyExtractor={(barangay) => barangay}
+          style={styles.dialogListViewport}
+          contentContainerStyle={styles.pickerList}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const isSelected = form.barangay === item;
+            return (
               <TouchableOpacity
-                style={[styles.closeButton, isDark && themeStyles.surfaceMuted]}
-                onPress={() => setBarangayPickerVisible(false)}
+                style={[styles.pickerOption, isDark && themeStyles.border, isSelected && styles.pickerOptionSelected]}
+                onPress={() => {
+                  selectBarangay(item);
+                  setBarangayPickerVisible(false);
+                }}
               >
-                <Icon name="close" size={22} color={colors.text} />
+                <Text style={[
+                  styles.pickerOptionText,
+                  isDark && themeStyles.text,
+                  isSelected && styles.pickerOptionTextSelected,
+                ]}>
+                  {item}
+                </Text>
+                {isSelected && (
+                  <Icon name="check-circle" size={20} color={mobileTheme.purple} />
+                )}
               </TouchableOpacity>
-            </View>
-            <FlatList
-              data={[...CABAGAN_BARANGAYS]}
-              keyExtractor={(barangay) => barangay}
-              contentContainerStyle={styles.pickerList}
-              renderItem={({ item }) => {
-                const isSelected = form.barangay === item;
-                return (
-                  <TouchableOpacity
-                    style={[styles.pickerOption, isDark && themeStyles.border, isSelected && styles.pickerOptionSelected]}
-                    onPress={() => selectBarangay(item)}
-                  >
-                    <Text style={[
-                      styles.pickerOptionText,
-                      isDark && themeStyles.text,
-                      isSelected && styles.pickerOptionTextSelected,
-                    ]}>
-                      {item}
-                    </Text>
-                    {isSelected && (
-                      <Icon name="check-circle" size={20} color={mobileTheme.purple} />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
+            );
+          }}
+        />
+        <View style={[styles.dialogFooter, isDark && themeStyles.border]}>
+          <TouchableOpacity
+            style={[styles.dialogCloseButton, isDark && themeStyles.surfaceMuted]}
+            onPress={() => setBarangayPickerVisible(false)}
+          >
+            <Text style={[styles.dialogCloseText, isDark && themeStyles.text]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </CenteredDialog>
+
+      <CenteredDialog
+        visible={Boolean(selectedReport)}
+        onClose={() => setSelectedReport(null)}
+        cardStyle={styles.detailDialog}
+      >
+        <View style={[styles.modalHeader, isDark && themeStyles.border]}>
+          <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Report Details</Text>
+        </View>
+        {selectedReport && (
+          <ScrollView
+            style={styles.dialogListViewport}
+            contentContainerStyle={styles.detailBody}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={[styles.detailEyebrow, isDark && themeStyles.muted]}>{selectedReport.id}</Text>
+            <Text style={[styles.detailTitle, isDark && themeStyles.text]}>{selectedReport.title}</Text>
+            <Detail label="Report type" value={selectedReport.report_type} />
+            <Detail label="Case status" value={selectedReport.case_status} />
+            <Detail label="Barangay" value={selectedReport.barangay} />
+            <Detail label="Location" value={selectedReport.location} />
+            <Detail
+              label="Location source"
+              value={selectedReport.location_source === 'gps'
+                ? 'Current GPS suggestion'
+                : 'Manually entered'}
             />
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={Boolean(selectedReport)} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={[styles.detailModal, isDark && themeStyles.surface]}>
-            <View style={[styles.modalHeader, isDark && themeStyles.border]}>
-              <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Report Details</Text>
-              <TouchableOpacity style={[styles.closeButton, isDark && themeStyles.surfaceMuted]} onPress={() => setSelectedReport(null)}>
-                <Icon name="close" size={22} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            {selectedReport && (
-              <ScrollView contentContainerStyle={styles.detailBody}>
-                <Text style={[styles.detailEyebrow, isDark && themeStyles.muted]}>{selectedReport.id}</Text>
-                <Text style={[styles.detailTitle, isDark && themeStyles.text]}>{selectedReport.title}</Text>
-                <Detail label="Report type" value={selectedReport.report_type} />
-                <Detail label="Case status" value={selectedReport.case_status} />
-                <Detail label="Barangay" value={selectedReport.barangay} />
-                <Detail label="Location" value={selectedReport.location} />
-                <Detail
-                  label="Location source"
-                  value={selectedReport.location_source === 'gps'
-                    ? 'Current GPS suggestion'
-                    : 'Manually entered'}
+            <Detail label="Description" value={selectedReport.description} />
+            {selectedReport.evidence_photo?.url && (
+              <View style={[styles.detailEvidence, isDark && themeStyles.border]}>
+                <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE</Text>
+                <Image
+                  source={{ uri: resolveApiAssetUrl(selectedReport.evidence_photo.url) }}
+                  style={styles.detailEvidenceImage}
+                  resizeMode="cover"
                 />
-                <Detail label="Description" value={selectedReport.description} />
-                {selectedReport.evidence_photo?.url && (
-                  <View style={[styles.detailEvidence, isDark && themeStyles.border]}>
-                    <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE</Text>
-                    <Image
-                      source={{ uri: resolveApiAssetUrl(selectedReport.evidence_photo.url) }}
-                      style={styles.detailEvidenceImage}
-                      resizeMode="cover"
-                    />
-                    <Text style={[styles.detailEvidenceMeta, isDark && themeStyles.muted]}>
-                      Captured with {selectedReport.evidence_photo.camera_facing === 'front' ? 'front' : 'back'} camera
-                    </Text>
-                  </View>
-                )}
-                {selectedReport.resolution_notes && (
-                  <Detail label="Resolution notes" value={selectedReport.resolution_notes} />
-                )}
-              </ScrollView>
+                <Text style={[styles.detailEvidenceMeta, isDark && themeStyles.muted]}>
+                  Captured with {selectedReport.evidence_photo.camera_facing === 'front' ? 'front' : 'back'} camera
+                </Text>
+              </View>
             )}
-          </View>
+            {selectedReport.resolution_notes && (
+              <Detail label="Resolution notes" value={selectedReport.resolution_notes} />
+            )}
+          </ScrollView>
+        )}
+        <View style={[styles.dialogFooter, isDark && themeStyles.border]}>
+          <TouchableOpacity
+            style={[styles.dialogCloseButton, styles.dialogPrimaryButton]}
+            onPress={() => setSelectedReport(null)}
+          >
+            <Text style={[styles.dialogCloseText, styles.dialogPrimaryText]}>Close</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </CenteredDialog>
 
-      <Modal visible={Boolean(resolveTarget)} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={[styles.resolveModal, isDark && themeStyles.surface]}>
+      <SwipeDismissSheet
+        visible={Boolean(resolveTarget)}
+        onClose={() => setResolveTarget(null)}
+        sheetStyle={[styles.resolveModal, isDark && themeStyles.surface]}
+      >
+        {({ close }) => (
+          <View style={styles.resolveContent}>
             <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Resolve Incident</Text>
             <Text style={[styles.resolveCopy, isDark && themeStyles.muted]}>
               Confirm that {resolveTarget?.title} has been handled. This will update the web dashboard.
@@ -744,16 +869,16 @@ export default function ReportsScreen() {
               textAlignVertical="top"
             />
             <View style={styles.resolveActions}>
-              <TouchableOpacity style={[styles.cancelButton, isDark && themeStyles.border]} onPress={() => setResolveTarget(null)}>
+              <TouchableOpacity style={[styles.cancelButton, isDark && themeStyles.border]} onPress={() => close()}>
                 <Text style={[styles.cancelButtonText, isDark && themeStyles.text]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButtonCompact} onPress={handleResolve} disabled={isSaving}>
+              <TouchableOpacity style={styles.primaryButtonCompact} onPress={() => handleResolve(close)} disabled={isSaving}>
                 <Text style={styles.primaryButtonText}>{isSaving ? 'Saving...' : 'Confirm Resolve'}</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
+        )}
+      </SwipeDismissSheet>
     </SafeAreaView>
   );
 }
@@ -765,6 +890,48 @@ function Detail({ label, value }: { label: string; value: string }) {
       <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>{label}</Text>
       <Text style={[styles.detailValue, isDark && themeStyles.text]}>{value}</Text>
     </View>
+  );
+}
+
+function CenteredDialog({
+  cardStyle,
+  children,
+  onClose,
+  visible,
+}: {
+  cardStyle?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+  onClose: () => void;
+  visible: boolean;
+}) {
+  const { isDark } = useMobileTheme();
+
+  return (
+    <Modal
+      animationType="fade"
+      hardwareAccelerated
+      onRequestClose={onClose}
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      transparent
+      visible={visible}
+    >
+      <View style={styles.dialogOverlay}>
+        <Pressable
+          accessibilityLabel="Close dialog"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.dialogBackdropPressTarget}
+        />
+        <Animated.View
+          accessibilityViewIsModal
+          entering={FadeIn.duration(180)}
+          style={[styles.dialogCard, isDark && themeStyles.surface, cardStyle]}
+        >
+          {children}
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
@@ -801,6 +968,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  listTransition: { flex: 1 },
+  listViewport: { flex: 1 },
   filterButton: {
     flex: 1,
     minHeight: 44,
@@ -814,9 +983,10 @@ const styles = StyleSheet.create({
   filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#edf4ff' },
   filterText: { color: mobileTheme.navy, fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   filterTextActive: { color: mobileTheme.blue },
-  list: { paddingHorizontal: 22, paddingBottom: 112, gap: 13 },
+  list: { paddingHorizontal: 22, paddingBottom: 112, gap: 9 },
   reportCard: {
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderWidth: 1,
     borderColor: mobileTheme.border,
     borderRadius: 8,
@@ -830,22 +1000,25 @@ const styles = StyleSheet.create({
   reportCardIncident: { borderLeftWidth: 3, borderLeftColor: mobileTheme.danger },
   reportCardRoutine: { borderLeftWidth: 3, borderLeftColor: mobileTheme.blue },
   reportTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  typeBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10 },
+  reportTopActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   incidentBadge: { backgroundColor: mobileTheme.dangerSoft },
   routineBadge: { backgroundColor: mobileTheme.blueSoft },
   typeBadgeText: { color: mobileTheme.text, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-  caseBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10 },
+  caseBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   openBadge: { backgroundColor: mobileTheme.warningSoft },
   resolvedBadge: { backgroundColor: mobileTheme.successSoft },
   caseBadgeText: { color: mobileTheme.text, fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
-  reportTitle: { marginTop: 13, color: mobileTheme.text, fontSize: 16, fontWeight: '800' },
-  reportMeta: { marginTop: 4, color: mobileTheme.textMuted, fontSize: 11 },
-  locationRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reportTitle: { marginTop: 7, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
+  reportMeta: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 11 },
+  locationRow: { marginTop: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationText: { flex: 1, color: mobileTheme.textMuted, fontSize: 12 },
-  reportActions: { marginTop: 14, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  resolveButton: { minHeight: 42, paddingHorizontal: 11, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, backgroundColor: mobileTheme.success },
+  reportExpanded: { marginTop: 8, paddingTop: 7, borderTopWidth: 1, borderTopColor: mobileTheme.border },
+  reportDescription: { color: mobileTheme.textMuted, fontSize: 12, lineHeight: 17 },
+  reportActions: { marginTop: 7, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  resolveButton: { minHeight: 36, paddingHorizontal: 11, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, backgroundColor: mobileTheme.success },
   resolveButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
-  viewButton: { minHeight: 42, minWidth: 90, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.blue, borderRadius: 8, backgroundColor: mobileTheme.surface },
+  viewButton: { minHeight: 36, minWidth: 84, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.blue, borderRadius: 8, backgroundColor: mobileTheme.surface },
   viewButtonText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
   emptyState: { paddingTop: 80, alignItems: 'center' },
   emptyTitle: { marginTop: 10, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
@@ -874,7 +1047,6 @@ const styles = StyleSheet.create({
   modalHeader: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: mobileTheme.border },
   modalTitle: { color: mobileTheme.text, fontSize: 19, fontWeight: '800' },
   modalSubtitle: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 11 },
-  closeButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 19, backgroundColor: mobileTheme.surface },
   form: { padding: 18, paddingBottom: 36 },
   fieldLabel: { marginTop: 14, marginBottom: 6, color: mobileTheme.textMuted, fontSize: 10, fontWeight: '800' },
   typeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
@@ -921,14 +1093,57 @@ const styles = StyleSheet.create({
   primaryButton: { minHeight: 48, marginTop: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: mobileTheme.purple },
   primaryButtonCompact: { minHeight: 44, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: mobileTheme.success },
   primaryButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  overlay: { flex: 1, padding: 18, justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.55)' },
-  pickerModal: { maxHeight: '82%', borderRadius: 20, backgroundColor: mobileTheme.surface, overflow: 'hidden' },
+  dialogOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 44,
+    backgroundColor: 'rgba(2, 6, 23, 0.58)',
+  },
+  dialogBackdropPressTarget: { ...StyleSheet.absoluteFillObject },
+  dialogCard: {
+    width: '100%',
+    maxWidth: 430,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 22,
+    backgroundColor: mobileTheme.surface,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 18,
+  },
+  pickerDialog: { height: '68%', maxHeight: 590 },
+  detailDialog: { maxHeight: '78%' },
+  dialogListViewport: { flexShrink: 1 },
+  dialogFooter: {
+    padding: 12,
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: mobileTheme.border,
+  },
+  dialogCloseButton: {
+    minWidth: 92,
+    minHeight: 42,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 21,
+    backgroundColor: mobileTheme.surface,
+  },
+  dialogPrimaryButton: { borderColor: mobileTheme.purple, backgroundColor: mobileTheme.purple },
+  dialogCloseText: { color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
+  dialogPrimaryText: { color: '#ffffff' },
   pickerList: { padding: 10 },
   pickerOption: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: mobileTheme.border },
   pickerOptionSelected: { borderRadius: 10, borderBottomColor: 'transparent', backgroundColor: mobileTheme.purpleSoft },
   pickerOptionText: { color: mobileTheme.text, fontSize: 13, fontWeight: '700' },
   pickerOptionTextSelected: { color: mobileTheme.purple },
-  detailModal: { maxHeight: '82%', borderRadius: 20, backgroundColor: mobileTheme.surface, overflow: 'hidden' },
   detailBody: { padding: 18 },
   detailEyebrow: { color: mobileTheme.textMuted, fontSize: 10, fontWeight: '800' },
   detailTitle: { marginTop: 5, marginBottom: 12, color: mobileTheme.text, fontSize: 18, fontWeight: '800' },
@@ -938,7 +1153,8 @@ const styles = StyleSheet.create({
   detailEvidence: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: mobileTheme.border },
   detailEvidenceImage: { width: '100%', marginTop: 8, aspectRatio: 4 / 3, borderRadius: 10, backgroundColor: mobileTheme.background },
   detailEvidenceMeta: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 10 },
-  resolveModal: { padding: 18, borderRadius: 20, backgroundColor: mobileTheme.surface },
+  resolveModal: { backgroundColor: mobileTheme.surface },
+  resolveContent: { padding: 18, paddingTop: 4 },
   resolveCopy: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 12, lineHeight: 18 },
   resolveActions: { marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   cancelButton: { minHeight: 44, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 22 },

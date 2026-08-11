@@ -1,15 +1,17 @@
 const cors = require('cors')
 const express = require('express')
-const path = require('path')
+const { corsOptions } = require('./config/cors')
+const { uploadRoot } = require('./config/uploads')
 const createSystemController = require('./controllers/systemController')
 const createSystemRoutes = require('./routes/systemRoutes')
 const flespiService = require('./services/flespiService')
 
 const app = express()
 
-app.use(cors())
+app.disable('x-powered-by')
+app.use(cors(corsOptions))
 app.use(express.json())
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads'), {
+app.use('/uploads', express.static(uploadRoot, {
 	dotfiles: 'deny',
 	fallthrough: false,
 	index: false,

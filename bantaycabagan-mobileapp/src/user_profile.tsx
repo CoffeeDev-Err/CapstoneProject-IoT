@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, TextInput, View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { Modal, TextInput, View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 export default function UserProfile({ navigation }: any) {
@@ -82,13 +82,15 @@ export default function UserProfile({ navigation }: any) {
       </ScrollView>
 
       {/* --- REPORT MODAL --- */}
-      <Modal visible={reportModalVisible} transparent animationType="fade">
+      <Modal
+        visible={reportModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReportModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setReportModalVisible(false)} />
           <View style={styles.modalContainer}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setReportModalVisible(false)}>
-              <Icon name="close" size={22} color="#fff" />
-            </TouchableOpacity>
-
             <Text style={styles.modalTitle}>Report</Text>
 
             <Text style={styles.fieldLabel}>Report Type</Text>
@@ -116,13 +118,15 @@ export default function UserProfile({ navigation }: any) {
       </Modal>
 
       {/* --- ALERT MODAL --- */}
-      <Modal visible={alertModalVisible} transparent animationType="fade">
+      <Modal
+        visible={alertModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAlertModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAlertModalVisible(false)} />
           <View style={styles.modalContainer}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setAlertModalVisible(false)}>
-              <Icon name="close" size={22} color="#fff" />
-            </TouchableOpacity>
-
             <Text style={styles.modalTitle}>Alert</Text>
 
             <Text style={styles.fieldLabel}>Report</Text>
@@ -298,13 +302,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 14,
     color: '#000',
-  },
-  closeBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    padding: 5,
-    zIndex: 1,
   },
   submitBtn: {
     backgroundColor: '#2d2da8',
