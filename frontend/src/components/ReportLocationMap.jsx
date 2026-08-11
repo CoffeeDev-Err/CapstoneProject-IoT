@@ -51,13 +51,15 @@ function FitReportMap({ positions }) {
 }
 
 function ReportLocationMap({ incident, markerLabel = 'Reported location', routePoints = [] }) {
+  const latitude = incident?.latitude
+  const longitude = incident?.longitude
   const incidentPosition = useMemo(
     () => (
-      isValidCoordinate(incident?.latitude, incident?.longitude)
-        ? [Number(incident.latitude), Number(incident.longitude)]
+      isValidCoordinate(latitude, longitude)
+        ? [Number(latitude), Number(longitude)]
         : null
     ),
-    [incident?.latitude, incident?.longitude],
+    [latitude, longitude],
   )
   const routePositions = useMemo(
     () => routePoints

@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
+import { SwipeDismissSheet } from './SwipeDismissSheet';
 import {
   confirmPasswordChange,
   requestPasswordChange,
@@ -33,13 +31,15 @@ type Props = {
   onChanged: () => void;
 };
 
+type SheetClose = (afterClose?: () => void) => void;
+
 export default function ChangePasswordModal({
   visible,
   token,
   onClose,
   onChanged,
 }: Props) {
-  const { colors, isDark } = useMobileTheme();
+  const { isDark } = useMobileTheme();
   const [step, setStep] = useState<'password' | 'verify'>('password');
   const [currentPassword, setCurrentPassword] = useState('');
   const [code, setCode] = useState('');
@@ -75,7 +75,7 @@ export default function ChangePasswordModal({
     }
   };
 
-  const updatePassword = async () => {
+  const updatePassword = async (close: SheetClose) => {
     if (!challenge) return;
     if (!isStrongPassword(newPassword)) {
       setError('Use 10+ characters with upper, lower, number, and symbol.');
@@ -89,7 +89,7 @@ export default function ChangePasswordModal({
     setError('');
     try {
       await confirmPasswordChange(token, challenge.challengeId, code, newPassword);
-      onChanged();
+      close(onChanged);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Request failed.');
     } finally {
@@ -98,10 +98,13 @@ export default function ChangePasswordModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.sheet, isDark && darkStyles.sheet]}>
+    <SwipeDismissSheet
+      visible={visible}
+      onClose={onClose}
+      sheetStyle={[styles.sheet, isDark && darkStyles.sheet]}
+    >
+      {({ close }) => (
+        <View style={styles.content}>
           <View style={styles.header}>
             <View>
               <Text style={[styles.title, isDark && darkStyles.text]}>Change Password</Text>
@@ -111,9 +114,6 @@ export default function ChangePasswordModal({
                   : `Enter the code sent to ${challenge?.maskedEmail}.`}
               </Text>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Icon name="close" size={22} color={colors.textMuted} />
-            </TouchableOpacity>
           </View>
 
           {step === 'password' ? (
@@ -152,7 +152,7 @@ export default function ChangePasswordModal({
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <TouchableOpacity
             style={[styles.submit, pending && styles.disabled]}
-            onPress={step === 'password' ? requestCode : updatePassword}
+            onPress={step === 'password' ? requestCode : () => updatePassword(close)}
             disabled={pending}
           >
             {pending
@@ -160,8 +160,8 @@ export default function ChangePasswordModal({
               : <Text style={styles.submitText}>{step === 'password' ? 'Send Code' : 'Update Password'}</Text>}
           </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+      )}
+    </SwipeDismissSheet>
   );
 }
 
@@ -182,27 +182,18 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 22,
-    backgroundColor: 'rgba(17,17,47,0.55)',
-  },
   sheet: {
-    borderRadius: 8,
-    padding: 20,
     backgroundColor: mobileTheme.surface,
   },
+  content: { padding: 20, paddingTop: 4 },
   header: {
     marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
     gap: 12,
   },
   title: { color: mobileTheme.text, fontSize: 20, fontWeight: '800' },
   subtitle: { maxWidth: 280, marginTop: 4, color: mobileTheme.textMuted, fontSize: 12, lineHeight: 18 },
-  closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   field: { marginBottom: 13 },
   label: { marginBottom: 6, color: mobileTheme.textMuted, fontSize: 12, fontWeight: '700' },
   input: {

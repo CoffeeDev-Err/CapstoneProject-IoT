@@ -1,7 +1,13 @@
+require('dotenv').config()
+
+const fs = require('fs')
 const http = require('http')
+const path = require('path')
+const express = require('express')
 const mongoose = require('mongoose')
 const { Server } = require('socket.io')
 const app = require('./app')
+const { corsOptions } = require('./config/cors')
 const connectDB = require('./config/db')
 const createAccountController = require('./controllers/accountController')
 const createAnalyticsController = require('./controllers/analyticsController')
@@ -47,7 +53,6 @@ const {
 	updateMockLocations,
 } = personnelService
 const seedDatabase = require('./services/seedService')
-require('dotenv').config()
 
 const PORT = process.env.PORT || 4000
 const GPS_UPDATE_INTERVAL_MS = 2500
@@ -63,10 +68,7 @@ const DEPLOYMENT_STATUS_INTERVAL_MS = Math.max(
 
 const server = http.createServer(app)
 const io = new Server(server, {
-	cors: {
-		origin: '*',
-		methods: ['GET', 'POST'],
-	},
+	cors: corsOptions,
 })
 
 const operationalService = createOperationalService({ io })
@@ -107,6 +109,30 @@ app.use('/api/notifications', createNotificationRoutes({
 }))
 app.use('/api/personnel', createPersonnelRoutes(personnelController))
 app.use('/api', createSystemRoutes(systemController))
+
+if (process.env.NODE_ENV === 'production') {
+	const frontendDirectory = path.resolve(__dirname, '../../frontend/dist')
+	const frontendIndex = path.join(frontendDirectory, 'index.html')
+
+	if (fs.existsSync(frontendIndex)) {
+		app.use(express.static(frontendDirectory, {
+			index: false,
+			maxAge: '1h',
+		}))
+		app.use((req, res, next) => {
+			if (
+				req.method !== 'GET'
+				|| req.path.startsWith('/api/')
+				|| req.path.startsWith('/uploads/')
+				|| !req.accepts('html')
+			) return next()
+			return res.sendFile(frontendIndex)
+		})
+	} else {
+		console.warn(`Frontend build not found at ${frontendDirectory}`)
+	}
+}
+
 app.use(errorHandler)
 
 io.use(async (socket, next) => {

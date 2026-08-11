@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { useAuth } from '../context/AuthContext';
@@ -28,10 +27,9 @@ const formatAccountDate = (value?: string, includeTime = false) => {
 };
 
 export default function OfficerProfileScreen() {
-  const navigation = useNavigation<any>();
   const { currentOfficer, deployments } = useOperationalContext();
   const { clearSession, logout, token, user } = useAuth();
-  const { colors, isDark, toggleTheme } = useMobileTheme();
+  const { isDark, toggleTheme } = useMobileTheme();
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const assignment = deployments.find((item) => item.isCurrentShift !== false);
   const profile = user?.profile;
@@ -50,31 +48,7 @@ export default function OfficerProfileScreen() {
     : 'Not scheduled';
 
   return (
-    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
-      <View style={[styles.topBar, isDark && styles.topBarDark]}>
-        <View style={styles.topBarIdentity}>
-          <Image
-            source={require('../../assets/pnp-logo.png')}
-            style={styles.topBarLogo}
-            resizeMode="contain"
-          />
-          <View style={styles.topBarCopy}>
-            <Text style={[styles.topBarAgency, isDark && styles.textDark]}>
-              Philippine National Police
-            </Text>
-            <Text style={[styles.topBarStation, isDark && styles.mutedDark]}>Cabagan Station</Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          accessibilityLabel="Back to map"
-          style={styles.accountBackButton}
-          onPress={() => navigation.navigate('Map')}
-        >
-          <Icon name="chevron-left" size={20} color={colors.textMuted} />
-          <Text style={[styles.topBarTitle, { color: colors.text }]}>My Account</Text>
-        </TouchableOpacity>
-      </View>
-
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.identity}>
           <Image source={{ uri: officer.photoUrl }} style={styles.avatar} />
@@ -226,30 +200,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     fontFamily: mobileFontFamily,
   },
-  topBar: {
-    height: 54,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: mobileTheme.borderSoft,
-    backgroundColor: '#ffffff',
-    justifyContent: 'space-between',
-  },
-  topBarDark: { borderBottomColor: '#22314a', backgroundColor: '#0b1528' },
-  topBarLogo: { width: 24, height: 30 },
-  topBarIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  topBarCopy: { flex: 1 },
-  topBarAgency: { color: mobileTheme.text, fontSize: 10, fontWeight: '800' },
-  topBarStation: { marginTop: 1, color: mobileTheme.textMuted, fontSize: 9 },
-  accountBackButton: {
-    minWidth: 96,
-    height: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  topBarTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '700' },
   content: { paddingBottom: 110 },
   identity: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 26, paddingBottom: 24 },
   avatar: {

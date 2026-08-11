@@ -1,6 +1,5 @@
 import { AUTH_TOKEN_KEY } from './auth'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { API_URL } from './runtime'
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem(AUTH_TOKEN_KEY)

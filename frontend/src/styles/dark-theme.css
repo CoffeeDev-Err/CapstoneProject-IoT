@@ -770,6 +770,10 @@
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.22);
 }
 [data-theme="dark"] .account-field span { color: #94a3b8; }
+[data-theme="dark"] .account-photo-control {
+  border-color: #334155;
+  background: #0f172a;
+}
 [data-theme="dark"] .field-error { color: #fbbf24; }
 [data-theme="dark"] .account-table-meta { color: #94a3b8; }
 [data-theme="dark"] .account-table-wrap {

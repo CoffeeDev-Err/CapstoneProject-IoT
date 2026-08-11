@@ -3,8 +3,9 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
+import { NotificationBellButton } from './NotificationBellButton';
 
-export function PolicePageHeader() {
+export function PolicePageHeader({ onOpenNotifications }: { onOpenNotifications?: () => void }) {
   const { colors, isDark } = useMobileTheme();
 
   return (
@@ -18,6 +19,7 @@ export function PolicePageHeader() {
         <Text style={[styles.title, { color: colors.text }]}>Philippine National Police</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>Cabagan Police Station</Text>
       </View>
+      {onOpenNotifications && <NotificationBellButton onPress={onOpenNotifications} />}
     </View>
   );
 }

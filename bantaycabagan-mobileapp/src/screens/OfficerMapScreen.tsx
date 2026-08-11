@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import type { WebViewMessageEvent } from 'react-native-webview';
-import { PolicePageHeader } from '../components/PolicePageHeader';
+import { SwipeDismissCard } from '../components/SwipeDismissSheet';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
@@ -563,8 +563,7 @@ export default function OfficerMapScreen() {
   });
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
-      <PolicePageHeader />
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={[]}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
       {Platform.OS === 'web' && React.createElement('style', {
         dangerouslySetInnerHTML: {
@@ -730,15 +729,12 @@ export default function OfficerMapScreen() {
       )}
 
       {selectedOfficer && (
-        <View style={styles.officerSheet}>
-          <TouchableOpacity
-            accessibilityLabel="Close officer profile"
-            style={styles.profileClose}
-            onPress={() => setSelectedOfficerId(null)}
-          >
-            <Icon name="close" size={20} color="#ffffff" />
-          </TouchableOpacity>
-
+        <SwipeDismissCard
+          key={selectedOfficer.id}
+          style={styles.officerSheet}
+          onClose={() => setSelectedOfficerId(null)}
+        >
+          <View style={styles.officerSheetContent}>
           <View style={styles.officerHeader}>
             <View style={styles.profilePhotoWrap}>
               {selectedOfficerHasActiveBackup && (
@@ -817,7 +813,8 @@ export default function OfficerMapScreen() {
               </Text>
             </View>
           </View>
-        </View>
+          </View>
+        </SwipeDismissCard>
       )}
       </View>
     </SafeAreaView>
@@ -980,7 +977,7 @@ const styles = StyleSheet.create({
     right: 20,
     bottom: 104,
     left: 20,
-    padding: 16,
+    padding: 0,
     borderRadius: 18,
     backgroundColor: mobileTheme.navy,
     shadowColor: '#000000',
@@ -989,20 +986,8 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 12,
   },
-  profileClose: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    zIndex: 2,
-  },
+  officerSheetContent: { padding: 16, paddingTop: 8 },
   officerHeader: {
-    paddingRight: 34,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

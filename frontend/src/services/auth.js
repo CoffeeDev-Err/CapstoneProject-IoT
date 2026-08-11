@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { API_URL } from './runtime'
+
 export const AUTH_TOKEN_KEY = 'bantaycabagan_auth_token'
 export const AUTH_USER_KEY = 'bantaycabagan_auth_user'
 

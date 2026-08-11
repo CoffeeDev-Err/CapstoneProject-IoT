@@ -1,10 +1,34 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  Platform,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { mobileTheme } from '../constants/mobileTheme';
 
 const STORAGE_KEY = 'bantaycabagan-mobile-theme';
+const THEME_REVEAL_DURATION = 460;
+const THEME_SETTLE_DURATION = 140;
+const THEME_REVEAL_EASING = Easing.bezier(0.22, 1, 0.36, 1);
 
 const darkTheme = {
   ...mobileTheme,
@@ -45,7 +69,18 @@ const storeTheme = async (value: 'dark' | 'light') => {
 };
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { height, width } = useWindowDimensions();
   const [isDark, setIsDark] = useState(false);
+  const [revealTargetDark, setRevealTargetDark] = useState(false);
+  const revealScale = useSharedValue(0.001);
+  const revealOpacity = useSharedValue(0);
+  const transitionRunningRef = useRef(false);
+  const revealDiameter = Math.ceil(Math.hypot(width, height)) + 8;
+
+  const revealAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: revealOpacity.value,
+    transform: [{ scale: revealScale.value }],
+  }));
 
   useEffect(() => {
     readStoredTheme()
@@ -53,21 +88,75 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .catch(() => undefined);
   }, []);
 
-  const toggleTheme = () => {
-    setIsDark((current) => {
-      const next = !current;
-      storeTheme(next ? 'dark' : 'light').catch(() => undefined);
-      return next;
+  const finishTransition = useCallback(() => {
+    transitionRunningRef.current = false;
+    revealScale.value = 0.001;
+  }, [revealScale]);
+
+  const applyRevealedTheme = useCallback((nextDark: boolean) => {
+    setIsDark(nextDark);
+    storeTheme(nextDark ? 'dark' : 'light').catch(() => undefined);
+
+    requestAnimationFrame(() => {
+      revealOpacity.value = withTiming(0, {
+        duration: THEME_SETTLE_DURATION,
+        easing: Easing.out(Easing.quad),
+      }, (finished) => {
+        if (finished) runOnJS(finishTransition)();
+      });
     });
-  };
+  }, [finishTransition, revealOpacity]);
+
+  const toggleTheme = useCallback(() => {
+    if (transitionRunningRef.current) return;
+    transitionRunningRef.current = true;
+
+    const nextDark = !isDark;
+    setRevealTargetDark(nextDark);
+    cancelAnimation(revealScale);
+    cancelAnimation(revealOpacity);
+    revealScale.value = 0.001;
+    revealOpacity.value = 1;
+
+    requestAnimationFrame(() => {
+      revealScale.value = withTiming(1, {
+        duration: THEME_REVEAL_DURATION,
+        easing: THEME_REVEAL_EASING,
+      }, (finished) => {
+        if (finished) runOnJS(applyRevealedTheme)(nextDark);
+        else runOnJS(finishTransition)();
+      });
+    });
+  }, [applyRevealedTheme, finishTransition, isDark, revealOpacity, revealScale]);
 
   const value = useMemo(() => ({
     colors: isDark ? darkTheme : mobileTheme,
     isDark,
     toggleTheme,
-  }), [isDark]);
+  }), [isDark, toggleTheme]);
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      <View style={styles.themeRoot}>
+        {children}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.themeReveal,
+            {
+              width: revealDiameter,
+              height: revealDiameter,
+              left: (width - revealDiameter) / 2,
+              top: (height - revealDiameter) / 2,
+              borderRadius: revealDiameter / 2,
+              backgroundColor: revealTargetDark ? darkTheme.background : mobileTheme.background,
+            },
+            revealAnimatedStyle,
+          ]}
+        />
+      </View>
+    </ThemeContext.Provider>
+  );
 }
 
 export function useMobileTheme() {
@@ -75,3 +164,12 @@ export function useMobileTheme() {
   if (!value) throw new Error('useMobileTheme must be used inside ThemeProvider.');
   return value;
 }
+
+const styles = StyleSheet.create({
+  themeRoot: { flex: 1 },
+  themeReveal: {
+    position: 'absolute',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+});

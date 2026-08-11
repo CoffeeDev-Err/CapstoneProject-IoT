@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { CheckCircle2, Download, Route, X, XCircle } from 'lucide-react'
 import ReportLocationMap from './ReportLocationMap'
 import { getReportRoute } from '../services/operations'
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { API_URL } from '../services/runtime'
 
 const resolveEvidenceUrl = (assetUrl) => {
   if (!assetUrl) return ''

@@ -1,5 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 import { AUTH_TOKEN_KEY } from './auth'
+import { API_URL } from './runtime'
 
 const request = async (path, options) => {
   const isMultipart = options?.body instanceof FormData
