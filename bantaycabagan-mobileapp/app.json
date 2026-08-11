@@ -1,16 +1,18 @@
 {
   "expo": {
-    "name": "bantaycabagan-mobileapp",
+    "name": "GeoSentri",
     "slug": "bantaycabagan-system",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/geosentri-app-icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "backgroundColor": "#F5F7FB",
+    "primaryColor": "#246BFD",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/geosentri-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F5F7FB"
     },
     "ios": {
       "supportsTablet": true
@@ -18,27 +20,34 @@
     "android": {
       "package": "com.bantaycabagan.mobileapp",
       "googleServicesFile": "./google-services.json",
+      "icon": "./assets/geosentri-app-icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/geosentri-adaptive-foreground.png",
+        "monochromeImage": "./assets/notification-icon.png",
+        "backgroundColor": "#071326"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/geosentri-app-icon.png"
     },
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#246BFD",
+          "defaultChannel": "officer-alerts"
+        }
+      ],
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Allow GeoSentri to use the camera for police report evidence."
+          "cameraPermission": "Allow GeoSentri to use the camera for police report evidence.",
+          "microphonePermission": false
         }
       ]
     ],
