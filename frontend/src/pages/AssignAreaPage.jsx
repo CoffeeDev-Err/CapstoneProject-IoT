@@ -553,7 +553,7 @@ function AssignAreaPage() {
 
     commitAssignments(
       assignments.filter((item) => item.id !== assignmentId),
-      `${assignmentId} deleted from deployment assignments.`
+      `${assignmentToDelete?.personnelName || 'Personnel'} removed from deployment assignments.`
     )
 
     if (editingAssignmentId === assignmentId) {
@@ -642,13 +642,13 @@ function AssignAreaPage() {
     <div className="page-container fade-in p-3 p-md-4">
       <header className="page-header mb-4">
         <div>
-          <h2 className="page-title">Assign Area</h2>
-          <p className="page-subtitle">Assign patrol areas and manage deployment assignments</p>
+          <h2 className="page-title">Deployment Management</h2>
+          <p className="page-subtitle">Assign personnel to patrol areas and shifts</p>
         </div>
       </header>
 
       <div className="widget-card deployment-form-card slide-up mb-3">
-        <h3 className="widget-title mb-3">Supervisor Deployment Assignment</h3>
+        <h3 className="widget-title mb-3">Assign Personnel</h3>
 
         <form className="assignment-form" onSubmit={handleAssignPersonnel}>
           <fieldset className="assignment-mode-selector mb-3" disabled={isSaving}>

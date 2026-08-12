@@ -35,6 +35,7 @@ const serializeAccount = (user, profile, device) => ({
 	officialEmail: user.email || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role === 'officer' ? 'Officer' : 'Supervisor',
+	isMockAccount: Boolean(user.isMockAccount),
 	accountStatus: user.status === 'active' ? 'Active' : 'Inactive',
 	forcePasswordReset: user.forcePasswordReset,
 	imei: device?.imei || '',
@@ -46,7 +47,11 @@ const serializeAccount = (user, profile, device) => ({
 
 const validateAccountPayload = (
 	payload,
-	{ requirePassword = true, requirePersonnel = true } = {},
+	{
+		requirePassword = true,
+		requirePersonnel = true,
+		requireDevice = requirePersonnel,
+	} = {},
 ) => {
 	const requiredFields = requirePersonnel
 		? [
@@ -55,8 +60,10 @@ const validateAccountPayload = (
 			['rank', 'Rank'],
 			['loginId', 'Login ID'],
 			['officialEmail', 'Official email'],
-			['imei', 'GPS device ID'],
-			['flespiDeviceId', 'Flespi device'],
+			...(requireDevice ? [
+				['imei', 'GPS device ID'],
+				['flespiDeviceId', 'Flespi device'],
+			] : []),
 		]
 		: [
 			['loginId', 'Login ID'],
@@ -89,6 +96,12 @@ const validateAccountPayload = (
 	const officialEmail = String(payload.officialEmail || '').trim().toLowerCase()
 	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail)) {
 		throw createHttpError('Enter a valid official email address.')
+	}
+
+	const hasImei = Boolean(String(payload.imei || '').trim())
+	const hasFlespiDeviceId = Boolean(String(payload.flespiDeviceId || '').trim())
+	if (hasImei !== hasFlespiDeviceId) {
+		throw createHttpError('Select both parts of a registered GPS device.')
 	}
 }
 
@@ -234,6 +247,7 @@ const createAccountService = ({ io, personnelService }) => {
 		validateAccountPayload(payload, {
 			requirePassword: false,
 			requirePersonnel: !isSupervisor,
+			requireDevice: !isSupervisor && !user.isMockAccount,
 		})
 
 		if (isSupervisor) {
@@ -273,13 +287,18 @@ const createAccountService = ({ io, personnelService }) => {
 		if (!profile) throw createHttpError('Personnel profile not found.', 404)
 
 		let assignment = currentAssignment
-		const deviceChanged = (
-			!currentAssignment
-			|| currentAssignment.imei !== String(payload.imei)
-			|| currentAssignment.flespiDeviceId !== String(payload.flespiDeviceId)
-		)
+		const requestedImei = String(payload.imei || '').trim()
+		const requestedFlespiDeviceId = String(payload.flespiDeviceId || '').trim()
+		const wantsDevice = Boolean(requestedImei && requestedFlespiDeviceId)
+		const deviceChanged = wantsDevice
+			? (
+				!currentAssignment
+				|| currentAssignment.imei !== requestedImei
+				|| currentAssignment.flespiDeviceId !== requestedFlespiDeviceId
+			)
+			: Boolean(currentAssignment)
 
-		if (deviceChanged) {
+		if (deviceChanged && wantsDevice) {
 			const device = await validateRegisteredDevice(payload)
 			if (currentAssignment) {
 				currentAssignment.status = 'released'
@@ -294,6 +313,11 @@ const createAccountService = ({ io, personnelService }) => {
 				deviceName: device.name,
 				assignedBy: 'supervisor',
 			})
+		} else if (deviceChanged && user.isMockAccount) {
+			currentAssignment.status = 'released'
+			currentAssignment.unassignedAt = new Date()
+			await currentAssignment.save()
+			assignment = null
 		}
 
 		profile.fullName = String(payload.fullName).trim()

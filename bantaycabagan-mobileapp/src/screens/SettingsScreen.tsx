@@ -15,7 +15,7 @@ export const SettingsScreen = ({ onReload }: SettingsScreenProps) => {
       <View style={styles.card}>
         <Text style={styles.itemTitle}>Shared API</Text>
         <Text style={styles.itemDescription}>
-          Personnel and operations are loaded from the BantayCabagan server.
+          Personnel and operations are loaded from the GeoSentri server.
         </Text>
       </View>
 

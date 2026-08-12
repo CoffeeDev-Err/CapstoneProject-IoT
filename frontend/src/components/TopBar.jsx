@@ -231,8 +231,8 @@ function TopBar({
     <header className="top-bar">
       {/* ── Left: system branding ── */}
       <div className="topbar-left">
-        <h1>BantayCabagan</h1>
-        <p>IoT-Based Real-Time GPS Monitoring for Police Personnel</p>
+        <h1>Philippine National Police</h1>
+        <p>Cabagan Police Station Operations Portal</p>
       </div>
 
       {/* ── Right: status pill + theme + notifications + supervisor profile ── */}

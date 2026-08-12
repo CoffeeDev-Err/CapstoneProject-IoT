@@ -171,27 +171,13 @@
   grid-column: 1 / -1;
 }
 
-.account-photo-control {
+.account-photo-actions {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  width: fit-content;
-  max-width: 100%;
-  min-height: 0;
-  padding: 0.7rem;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: var(--bg-secondary);
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
 }
 
-@media (max-width: 560px) {
-  .account-photo-control {
-    width: 100%;
-  }
-}
-
-.account-photo-preview,
-.account-photo-placeholder,
 .account-table-avatar {
   flex: 0 0 auto;
   width: 60px;
@@ -202,7 +188,6 @@
   background: var(--bg-primary);
 }
 
-.account-photo-placeholder,
 .account-table-avatar--fallback {
   display: inline-flex;
   align-items: center;
@@ -210,13 +195,6 @@
   background: var(--color-primary);
   color: #ffffff;
   font-weight: 800;
-}
-
-.account-photo-copy {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 0.35rem;
 }
 
 .account-photo-picker {

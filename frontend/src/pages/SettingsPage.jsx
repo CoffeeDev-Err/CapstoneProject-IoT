@@ -177,7 +177,7 @@ function SettingsPage() {
   }, [accountSearch, createdAccounts])
 
   const assignedImeiToAccount = useMemo(
-    () => new Map(createdAccounts.map((account) => [account.imei, account])),
+    () => new Map(createdAccounts.filter((account) => account.imei).map((account) => [account.imei, account])),
     [createdAccounts]
   )
 
@@ -186,6 +186,8 @@ function SettingsPage() {
     [createdAccounts, editingAccountId]
   )
   const isEditingSupervisor = editingAccount?.role === 'Supervisor'
+  const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
+  const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
@@ -266,9 +268,9 @@ function SettingsPage() {
         errors.badgeNumber = 'Badge number is required.'
       }
 
-      if (!accountForm.imei.trim()) {
+      if (requiresGpsDevice && !accountForm.imei.trim()) {
         errors.imei = 'GPS device ID is required.'
-      } else if (!flespiDevices.some((device) => device.imei === accountForm.imei)) {
+      } else if (accountForm.imei.trim() && !flespiDevices.some((device) => device.imei === accountForm.imei)) {
         errors.imei = 'Select a device ID registered in Flespi.'
       }
 
@@ -282,7 +284,7 @@ function SettingsPage() {
         errors.badgeNumber = 'Badge number already exists.'
       }
 
-      const duplicateImei = createdAccounts.some(
+      const duplicateImei = accountForm.imei.trim() && createdAccounts.some(
         (account) => account.id !== editingAccountId && account.imei === accountForm.imei.trim()
       )
       if (duplicateImei) {
@@ -522,15 +524,6 @@ function SettingsPage() {
       <div className="settings-grid row g-3 mx-0">
         <div className="col-12">
           <div className="widget-card slide-up account-management-card">
-            <div className="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
-              <div>
-                <h3 className="widget-title mb-1">Account Management (Supervisor Only)</h3>
-                <p className="settings-hint mb-0">
-                  Create mobile login accounts for officers. Signup remains disabled on mobile for security.
-                </p>
-              </div>
-            </div>
-
             <div className="account-view-nav mb-3" role="tablist" aria-label="Account management views">
               <button
                 type="button"
@@ -572,8 +565,7 @@ function SettingsPage() {
 	                  <div className="account-form-grid">
 	                <div className="account-field account-field--full account-photo-field">
 	                  <span>Profile Photo</span>
-	                  <div className="account-photo-control">
-	                    <div className="account-photo-copy">
+	                  <div className="account-photo-actions">
 	                      <label className="account-action-btn account-photo-picker">
 	                        {profilePhotoPreview ? 'Change Photo' : 'Choose Photo'}
 	                        <input
@@ -583,9 +575,8 @@ function SettingsPage() {
 	                        />
 	                      </label>
 	                      <small className="settings-hint">JPEG, PNG, or WebP. Maximum 5 MB.</small>
-	                      {formErrors.profilePhoto && <small className="field-error">{formErrors.profilePhoto}</small>}
-	                    </div>
 	                  </div>
+	                  {formErrors.profilePhoto && <small className="field-error">{formErrors.profilePhoto}</small>}
 	                </div>
 	                {!isEditingSupervisor && (
 	                  <>
@@ -624,8 +615,9 @@ function SettingsPage() {
 	                  </>
 	                )}
 
+                {!isEditingSupervisor && (
                 <div className="account-field account-field--wide">
-                  <span>Registered GPS Device *</span>
+                  <span>Registered GPS Device {requiresGpsDevice ? '*' : '(Optional)'}</span>
                   <div className="account-password-row">
                     <select
                       className={`settings-input w-100 ${formErrors.imei ? 'settings-input--error' : ''}`}
@@ -676,6 +668,7 @@ function SettingsPage() {
                   )}
                   {formErrors.imei && <small className="field-error">{formErrors.imei}</small>}
                 </div>
+                )}
 
                 <label className="account-field">
                   <span>Login ID *</span>
@@ -736,8 +729,8 @@ function SettingsPage() {
                     <button
                       type="submit"
                       className="account-submit-btn"
-	                      disabled={accountRequestPending || (!isEditingSupervisor && (devicesLoading || flespiDevices.length === 0))}
-	                      title={!isEditingSupervisor && flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
+	                      disabled={accountRequestPending || (requiresGpsDevice && (devicesLoading || flespiDevices.length === 0))}
+	                      title={requiresGpsDevice && flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
                     >
                       {accountRequestPending
                         ? 'Saving...'
@@ -826,6 +819,8 @@ function SettingsPage() {
 	                            <td>
 	                              {account.role === 'Supervisor' ? (
 	                                <span className="text-body-secondary">Not required</span>
+	                              ) : account.isMockAccount && !account.imei ? (
+	                                <span className="text-body-secondary">No GPS device assigned</span>
 	                              ) : (
 	                                <>
 	                                  <span>{getDeviceCode(account, index)} | {account.flespiDeviceName || 'Registered GPS'}</span>
