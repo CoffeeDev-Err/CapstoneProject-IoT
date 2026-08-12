@@ -41,6 +41,8 @@ import type {
 
 const CABAGAN_CENTER: [number, number] = [121.7653, 17.4269];
 const PATROL_RADIUS_METERS = 320;
+const STREET_FOCUS_ZOOM = 18;
+const SATELLITE_FOCUS_ZOOM = 16.5;
 
 const createCircleFeature = (longitude: number, latitude: number, radiusMeters: number) => {
   const coordinates: [number, number][] = [];
@@ -164,12 +166,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
       if (!member) return;
       cameraRef.current?.flyTo({
         center: [Number(member.longitude), Number(member.latitude)],
-        zoom: 18,
+        // Global satellite imagery around Cabagan has less native detail than
+        // vector streets. Avoid over-zooming its raster pixels when locating.
+        zoom: mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
         pitch: enable3D ? 52 : 0,
         duration: 720,
       });
     },
-  }), [enable3D, personnel]);
+  }), [enable3D, mapMode, personnel]);
 
   useEffect(() => {
     if (!hasMapTilerApiKey) {
