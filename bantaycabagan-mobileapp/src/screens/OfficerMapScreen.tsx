@@ -864,7 +864,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    alignItems: 'stretch',
+    alignItems: 'flex-start',
     gap: 8,
   },
   deploymentPill: {
@@ -888,10 +888,10 @@ const styles = StyleSheet.create({
   liveText: { color: mobileTheme.success, fontSize: 10, fontWeight: '800' },
   offlineText: { color: mobileTheme.warning },
   mapModeControl: {
-    width: 129,
-    height: 42,
+    width: 42,
+    height: 129,
     padding: 3,
-    flexDirection: 'row',
+    flexDirection: 'column',
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
     shadowColor: '#1c1c4d',
@@ -901,8 +901,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   mapModeButton: {
-    width: 41,
-    height: 36,
+    width: 36,
+    height: 41,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 11,
