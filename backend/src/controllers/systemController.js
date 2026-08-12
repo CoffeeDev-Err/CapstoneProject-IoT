@@ -1,6 +1,6 @@
 const createSystemController = (flespiService) => ({
 	getHealth: (_req, res) => {
-		res.json({ status: 'ok', service: 'BantayCabagan backend' })
+		res.json({ status: 'ok', service: 'GeoSentri backend' })
 	},
 
 	getFlespiDevices: async (req, res) => {

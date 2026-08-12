@@ -174,7 +174,7 @@ function LoginPage() {
               <img src={pnpLogo} alt="Philippine National Police seal" className="login-brand__logo" />
             </span>
             <div>
-              <strong>BantayCabagan</strong>
+              <strong>GeoSentri</strong>
               <span>Cabagan Police Station Operations Portal</span>
             </div>
           </div>

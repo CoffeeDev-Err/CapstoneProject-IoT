@@ -175,7 +175,7 @@ export const usePersonnelRealtime = () => {
 
     const onConnect = () => {
       setIsConnected(true)
-      setStatusMessage('Connected to BantayCabagan realtime server.')
+      setStatusMessage('Connected to GeoSentri realtime server.')
       addNotification({
         type: 'success',
         title: 'Realtime Connected',

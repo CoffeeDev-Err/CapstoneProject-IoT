@@ -30,6 +30,7 @@ const userSchema = new mongoose.Schema({
 	role: { type: String, enum: ['supervisor', 'officer'], default: 'officer' },
 	personnelId: { type: String, trim: true },
 	photoUrl: { type: String, trim: true, default: '' },
+	isMockAccount: { type: Boolean, default: false },
 	status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 	forcePasswordReset: { type: Boolean, default: true },
 	lastLoginAt: Date,

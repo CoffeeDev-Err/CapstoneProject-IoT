@@ -24,6 +24,23 @@ const gpsOfficerFullName = String(
 	process.env.DEMO_OFFICER_FULL_NAME || 'GPS-Linked Officer',
 ).trim()
 
+const mockOfficerEnabled = String(
+	process.env.ENABLE_MOCK_OFFICER || '',
+).trim().toLowerCase() === 'true'
+const mockOfficerPersonnelId = String(
+	process.env.MOCK_OFFICER_PERSONNEL_ID || 'psms-002',
+).trim()
+const mockOfficerFullName = String(
+	process.env.MOCK_OFFICER_FULL_NAME || 'Backup Officer',
+).trim()
+
+const buildEmailAlias = (email, alias) => {
+	const [localPart, domain] = String(email || '').trim().toLowerCase().split('@')
+	if (!localPart || !domain) return ''
+	const baseLocalPart = localPart.split('+')[0]
+	return `${baseLocalPart}+${alias}@${domain}`
+}
+
 const seedPersonnel = [
 	{
 		personnelId: gpsOfficerPersonnelId,
@@ -35,9 +52,9 @@ const seedPersonnel = [
 		photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
 	},
 	{
-		personnelId: 'psms-002',
+		personnelId: mockOfficerPersonnelId,
 		badgeNumber: 'P-1002',
-		fullName: 'GerryBoy Aggabao',
+		fullName: mockOfficerFullName,
 		rank: 'Police Staff Sergeant',
 		dutyStatus: 'Monitoring',
 		defaultLocationName: 'Cabagan Municipal Hall',
@@ -46,7 +63,7 @@ const seedPersonnel = [
 ]
 
 const seedLocations = [
-	['psms-002', 'Cabagan Municipal Hall', 121.7683, 17.4213],
+	[mockOfficerPersonnelId, 'Cabagan Municipal Hall', 121.7683, 17.4213],
 ]
 
 const LEGACY_SEEDED_PERSONNEL_IDS = ['pltc-003']
@@ -85,7 +102,9 @@ const removeLegacySeedData = async () => {
 		GpsDeviceAssignment.deleteMany({
 			personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS },
 		}),
-		Deployment.deleteMany({ assignmentId: 'ASG-DEMO-2' }),
+		Deployment.deleteMany({
+			assignmentId: { $in: ['ASG-DEMO-2', 'ASG-MOCK-BACKUP'] },
+		}),
 		Report.deleteMany({
 			reportNumber: { $in: ['RPT-MOB-001', 'RPT-MOB-002'] },
 		}),
@@ -217,6 +236,56 @@ const seedDatabase = async (models) => {
 		}
 	}
 
+	if (mockOfficerEnabled) {
+		const mockLoginId = String(
+			process.env.MOCK_OFFICER_LOGIN_ID || 'officer.mock',
+		).trim().toLowerCase()
+		const mockPassword = String(
+			process.env.MOCK_OFFICER_TEMP_PASSWORD || 'MockOfficer!2026',
+		)
+		const mockEmail = String(
+			process.env.MOCK_OFFICER_EMAIL
+			|| buildEmailAlias(
+				process.env.GMAIL_USER || process.env.DEMO_OFFICER_EMAIL,
+				'mock-officer',
+			),
+		).trim().toLowerCase()
+
+		if (!mockEmail) {
+			throw new Error(
+				'MOCK_OFFICER_EMAIL or a base GMAIL_USER/DEMO_OFFICER_EMAIL is required when ENABLE_MOCK_OFFICER=true.',
+			)
+		}
+
+		const existingMockOfficer = await findProvisionedUser({
+			username: mockLoginId,
+			email: mockEmail,
+			personnelId: mockOfficerPersonnelId,
+		})
+		if (existingMockOfficer && existingMockOfficer.role !== 'officer') {
+			throw new Error('The configured mock officer identity belongs to a non-officer account.')
+		}
+		if (!existingMockOfficer) {
+			await User.create({
+				username: mockLoginId,
+				email: mockEmail,
+				emailVerifiedAt: new Date(),
+				passwordHash: await hashPassword(mockPassword),
+				role: 'officer',
+				personnelId: mockOfficerPersonnelId,
+				isMockAccount: true,
+				status: 'active',
+				forcePasswordReset: false,
+			})
+			console.log(`Created mock officer account: ${mockLoginId}`)
+		} else {
+			existingMockOfficer.personnelId = mockOfficerPersonnelId
+			existingMockOfficer.isMockAccount = true
+			if (!existingMockOfficer.email) existingMockOfficer.email = mockEmail
+			await existingMockOfficer.save()
+		}
+	}
+
 	await Promise.all(seedPersonnel.map((profile) => (
 		Personnel.updateOne(
 			{ personnelId: profile.personnelId },
@@ -242,6 +311,12 @@ const seedDatabase = async (models) => {
 			{ upsert: true },
 		)
 	)))
+	if (mockOfficerEnabled) {
+		await Personnel.updateOne(
+			{ personnelId: mockOfficerPersonnelId, fullName: 'GerryBoy Aggabao' },
+			{ $set: { fullName: mockOfficerFullName } },
+		)
+	}
 
 	await configureDemoGpsAssignment(officerPersonnelId)
 
@@ -298,6 +373,35 @@ const seedDatabase = async (models) => {
 			{ upsert: true },
 		),
 	])
+
+	if (mockOfficerEnabled) {
+		await Deployment.updateOne(
+			{ assignmentId: 'ASG-CENTRO-002' },
+			{
+				$set: {
+					groupId: 'GRP-CENTRO-002',
+					personnelId: mockOfficerPersonnelId,
+					personnelName: mockOfficerFullName,
+					rank: 'Police Staff Sergeant',
+					barangayCode: 'CENTRO',
+					patrolArea: 'Cabagan Municipal Hall',
+					instructions: 'Maintain visibility around the municipal hall perimeter.',
+					assignedBy: 'seed',
+					status: 'active',
+					location: point(121.7683, 17.4213),
+				},
+				$unset: {
+					shiftStart: '',
+					shiftEnd: '',
+				},
+				$setOnInsert: {
+					assignmentId: 'ASG-CENTRO-002',
+					assignedAt: new Date(),
+				},
+			},
+			{ upsert: true },
+		)
+	}
 
 }
 

@@ -147,7 +147,7 @@ export default function LoginScreen() {
               accessibilityLabel="Philippine National Police seal"
             />
             <View>
-              <Text style={styles.brandName}>BantayCabagan</Text>
+              <Text style={styles.brandName}>GeoSentri</Text>
               <Text style={styles.brandCaption}>Police Personnel Portal</Text>
             </View>
           </View>
