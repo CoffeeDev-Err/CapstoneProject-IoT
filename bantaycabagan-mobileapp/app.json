@@ -33,6 +33,7 @@
       "favicon": "./assets/geosentri-app-icon.png"
     },
     "plugins": [
+      "@maplibre/maplibre-react-native",
       "expo-font",
       "expo-secure-store",
       [
