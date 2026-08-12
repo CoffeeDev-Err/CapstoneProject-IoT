@@ -20,22 +20,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
-import type { WebViewMessageEvent } from 'react-native-webview';
+import OfficerMapCanvas, {
+  type OfficerMapCanvasHandle,
+  type OfficerMapPerson,
+} from '../components/OfficerMapCanvas';
 import { SwipeDismissCard } from '../components/SwipeDismissSheet';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { LivePersonnel } from '../types/operations';
 
-type MapPersonnel = LivePersonnel & {
-  emergencyActive?: boolean;
-};
-
 type MapMode = 'street' | 'satellite';
 
 type MapCommand =
-  | { type: 'update-personnel'; personnel: MapPersonnel[] }
+  | { type: 'update-personnel'; personnel: OfficerMapPerson[] }
   | { type: 'focus-officer'; officerId: string }
   | { type: 'set-map-mode'; mode: MapMode };
 
@@ -85,7 +83,7 @@ export default function OfficerMapScreen() {
     currentPersonnelId,
     isConnected,
   } = useOperationalContext();
-  const nativeMapRef = useRef<WebView>(null);
+  const nativeMapRef = useRef<OfficerMapCanvasHandle>(null);
   const webMapRef = useRef<any>(null);
   const emergencyPulse = useRef(new Animated.Value(0)).current;
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,6 +91,7 @@ export default function OfficerMapScreen() {
   const [backupActionPending, setBackupActionPending] = useState(false);
   const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('street');
+  const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
   const assignment = deployments.find((item) => item.isCurrentShift !== false);
   const canRequestBackup = Boolean(assignment && currentOfficer.isOnDuty !== false);
@@ -132,7 +131,7 @@ export default function OfficerMapScreen() {
     && (task.status === 'open' || task.status === 'full')
   )), [currentPersonnelId, tasks]);
 
-  const mapPersonnel = useMemo<MapPersonnel[]>(() => (
+  const mapPersonnel = useMemo<OfficerMapPerson[]>(() => (
     visiblePersonnel.map((member) => ({
       ...member,
       emergencyActive: emergencyPersonnelIds.has(member.id),
@@ -381,17 +380,11 @@ export default function OfficerMapScreen() {
   }, [assignment, currentPersonnelId, isDark, personnelRosterKey]);
 
   const sendMapCommand = useCallback((command: MapCommand) => {
-    if (Platform.OS === 'web') {
-      webMapRef.current?.contentWindow?.postMessage({
-        source: 'bantay-map-command',
-        command,
-      }, '*');
-      return;
-    }
-
-    nativeMapRef.current?.injectJavaScript(
-      `window.handleMapCommand(${JSON.stringify(command)});true;`,
-    );
+    if (Platform.OS !== 'web') return;
+    webMapRef.current?.contentWindow?.postMessage({
+      source: 'bantay-map-command',
+      command,
+    }, '*');
   }, []);
 
   const syncPersonnel = useCallback(() => {
@@ -404,11 +397,13 @@ export default function OfficerMapScreen() {
   }, [mapMode, sendMapCommand, syncPersonnel]);
 
   useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
     const timer = setTimeout(syncPersonnel, 120);
     return () => clearTimeout(timer);
   }, [syncPersonnel]);
 
   useEffect(() => {
+    if (Platform.OS !== 'web') return;
     sendMapCommand({ type: 'set-map-mode', mode: mapMode });
   }, [mapMode, sendMapCommand]);
 
@@ -417,20 +412,6 @@ export default function OfficerMapScreen() {
       setSelectedOfficerId(payload.officerId);
     }
   }, []);
-
-  const handleNativeMessage = (event: WebViewMessageEvent) => {
-    try {
-      handleMapEvent(JSON.parse(event.nativeEvent.data));
-    } catch {
-      // Ignore messages that do not belong to the map bridge.
-    }
-  };
-
-  const handleShouldStartMapLoad = useCallback(({ url }: { url: string }) => (
-    url === 'about:blank'
-    || url.startsWith('data:text/html')
-    || url.startsWith('file://')
-  ), []);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
@@ -445,7 +426,11 @@ export default function OfficerMapScreen() {
   }, [handleMapEvent]);
 
   const focusOfficer = (officerId: string) => {
-    sendMapCommand({ type: 'focus-officer', officerId });
+    if (Platform.OS === 'web') {
+      sendMapCommand({ type: 'focus-officer', officerId });
+      return;
+    }
+    nativeMapRef.current?.focusOfficer(officerId);
   };
 
   const handleSearch = () => {
@@ -586,16 +571,16 @@ export default function OfficerMapScreen() {
         {Platform.OS === 'web' ? (
           <WebMapFrame ref={webMapRef} html={mapHtml} onLoad={handleMapLoad} />
         ) : (
-          <WebView
+          <OfficerMapCanvas
             ref={nativeMapRef}
-            source={{ html: mapHtml }}
-            style={styles.map}
-            javaScriptEnabled
-            domStorageEnabled
-            originWhitelist={['*']}
-            onShouldStartLoadWithRequest={handleShouldStartMapLoad}
-            onLoad={handleMapLoad}
-            onMessage={handleNativeMessage}
+            assignment={assignment}
+            currentPersonnelId={currentPersonnelId}
+            emergencyPulse={emergencyPulse}
+            enable3D={threeDEnabled}
+            isDark={isDark}
+            mapMode={mapMode}
+            personnel={mapPersonnel}
+            onOfficerPress={setSelectedOfficerId}
           />
         )}
       </View>
@@ -680,6 +665,18 @@ export default function OfficerMapScreen() {
                 name="satellite-alt"
                 size={20}
                 color={mapMode === 'satellite' ? '#ffffff' : colors.textMuted}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel={threeDEnabled ? 'Disable 3D terrain' : 'Enable 3D terrain'}
+              accessibilityState={{ selected: threeDEnabled }}
+              style={[styles.mapModeButton, threeDEnabled && styles.mapModeButtonActive]}
+              onPress={() => setThreeDEnabled((enabled) => !enabled)}
+            >
+              <Icon
+                name="3d-rotation"
+                size={20}
+                color={threeDEnabled ? '#ffffff' : colors.textMuted}
               />
             </TouchableOpacity>
           </View>
@@ -891,7 +888,7 @@ const styles = StyleSheet.create({
   liveText: { color: mobileTheme.success, fontSize: 10, fontWeight: '800' },
   offlineText: { color: mobileTheme.warning },
   mapModeControl: {
-    width: 88,
+    width: 129,
     height: 42,
     padding: 3,
     flexDirection: 'row',

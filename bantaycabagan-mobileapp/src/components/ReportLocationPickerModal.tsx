@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import ReportLocationMap from './ReportLocationMap';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
 
@@ -52,57 +52,6 @@ export function ReportLocationPickerModal({
     );
   }, [initialCoordinates, initialLatitude, initialLongitude, visible]);
 
-  const html = useMemo(() => `<!doctype html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-      html, body, #map { width: 100%; height: 100%; margin: 0; background: #dce5ef; }
-      .leaflet-control-attribution { font: 9px system-ui, sans-serif; }
-      .incident-pin { width: 20px; height: 20px; border: 3px solid white; border-radius: 50% 50% 50% 0; background: #ef4444; box-shadow: 0 2px 8px rgba(15,23,42,.35); transform: rotate(-45deg); }
-    </style>
-  </head>
-  <body>
-    <div id="map"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-      const initial = [${initialCoordinates.latitude}, ${initialCoordinates.longitude}];
-      const hasInitialPin = ${isCoordinate(initialLatitude) && isCoordinate(initialLongitude)};
-      const map = L.map('map', { zoomControl: true }).setView(initial, hasInitialPin ? 17 : 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-      const icon = L.divIcon({ className: '', html: '<div class="incident-pin"></div>', iconSize: [26, 26], iconAnchor: [13, 26] });
-      let marker = hasInitialPin ? L.marker(initial, { icon, draggable: true }).addTo(map) : null;
-      const send = (latlng) => window.ReactNativeWebView.postMessage(JSON.stringify({ latitude: latlng.lat, longitude: latlng.lng }));
-      const place = (latlng) => {
-        if (!marker) {
-          marker = L.marker(latlng, { icon, draggable: true }).addTo(map);
-          marker.on('dragend', () => send(marker.getLatLng()));
-        } else {
-          marker.setLatLng(latlng);
-        }
-        send(latlng);
-      };
-      map.on('click', (event) => place(event.latlng));
-      if (marker) marker.on('dragend', () => send(marker.getLatLng()));
-    </script>
-  </body>
-</html>`, [initialCoordinates, initialLatitude, initialLongitude]);
-
-  const handleMessage = (event: WebViewMessageEvent) => {
-    try {
-      const coordinates = JSON.parse(event.nativeEvent.data) as Coordinates;
-      if (isCoordinate(coordinates.latitude) && isCoordinate(coordinates.longitude)) {
-        setSelectedCoordinates(coordinates);
-      }
-    } catch {
-      // Ignore malformed messages from the embedded map.
-    }
-  };
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={[styles.screen, isDark && styles.screenDark]}>
@@ -117,14 +66,12 @@ export function ReportLocationPickerModal({
         </View>
 
         <View style={styles.mapFrame}>
-          <WebView
+          <ReportLocationMap
             key={`${initialCoordinates.latitude}:${initialCoordinates.longitude}:${visible}`}
-            source={{ html }}
-            originWhitelist={['*']}
-            javaScriptEnabled
-            domStorageEnabled
-            onMessage={handleMessage}
-            style={styles.map}
+            initialCoordinates={initialCoordinates}
+            selectedCoordinates={selectedCoordinates}
+            isDark={isDark}
+            onSelect={setSelectedCoordinates}
           />
         </View>
 
@@ -165,7 +112,6 @@ const styles = StyleSheet.create({
   textDark: { color: '#f8fafc' },
   mutedDark: { color: '#9eabc0' },
   mapFrame: { flex: 1, overflow: 'hidden' },
-  map: { flex: 1, backgroundColor: '#dce5ef' },
   footer: { padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: mobileTheme.border, backgroundColor: mobileTheme.surface },
   coordinateCopy: { minHeight: 42 },
   coordinateLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
