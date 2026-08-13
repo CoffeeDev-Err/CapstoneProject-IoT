@@ -269,9 +269,9 @@
 }
 
 .account-action-btn:hover:not(:disabled) {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #ffffff;
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #334155;
   transform: none;
   box-shadow: none;
 }
@@ -379,7 +379,13 @@
   white-space: nowrap;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.45rem;
+}
+
+.account-actions-cell {
+  min-width: 13rem;
+  vertical-align: middle;
 }
 
 .account-table-btn {
@@ -414,27 +420,27 @@
 }
 
 .account-table-btn--edit {
-  border-color: #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
 }
 
 .account-table-btn--edit:hover {
-  background: #ffffff;
-  border-color: var(--color-primary);
-  color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: #ffffff;
   box-shadow: none;
 }
 
 .account-table-btn--delete {
-  border-color: var(--color-danger-border);
-  background: #ffffff;
-  color: var(--color-danger-dark);
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #ffffff;
 }
 
 .account-table-btn--delete:hover {
-  border-color: var(--color-danger);
-  background: #ffffff;
-  color: var(--color-danger-dark);
+  border-color: var(--color-danger-dark);
+  background: var(--color-danger-dark);
+  color: #ffffff;
   box-shadow: none;
 }

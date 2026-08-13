@@ -199,14 +199,14 @@ function TopBar({
   }, [dropdownOpen, notificationOpen])
 
   const toggleNotificationDropdown = () => {
-    setNotificationOpen((prevOpen) => {
-      const nextOpen = !prevOpen
-      if (nextOpen) {
-        onReadAllNotifications?.()
-        setDropdownOpen(false)
-      }
-      return nextOpen
-    })
+    const nextOpen = !notificationOpen
+
+    setNotificationOpen(nextOpen)
+
+    if (nextOpen) {
+      onReadAllNotifications?.()
+      setDropdownOpen(false)
+    }
   }
 
   const handleRequestClearNotifications = () => {

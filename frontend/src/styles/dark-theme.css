@@ -773,6 +773,24 @@
   color: #94a3b8;
 }
 
+[data-theme="dark"] .deployment-view-nav {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+[data-theme="dark"] .deployment-view-tab {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .deployment-view-tab:hover,
+[data-theme="dark"] .deployment-view-tab--active {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .deployment-view-count {
+  background: #1e293b;
+}
+
 [data-theme="dark"] .deployment-status--scheduled {
   border-color: #1d4ed8;
   background: #172554;
@@ -797,28 +815,29 @@
   color: #fecaca;
 }
 [data-theme="dark"] .assignment-edit-btn {
-  border-color: #475569;
-  background: transparent;
-  color: #cbd5e1;
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
 }
 [data-theme="dark"] .assignment-edit-btn:hover {
-  border-color: #3b82f6;
-  background: transparent;
-  color: #93c5fd;
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
 }
 [data-theme="dark"] .assignment-delete-btn,
 [data-theme="dark"] .assignment-remove-btn {
-  border-color: #7f1d1d;
-  background: transparent;
-  color: #fca5a5;
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
 }
 [data-theme="dark"] .assignment-delete-btn:hover,
 [data-theme="dark"] .assignment-remove-btn:hover {
-  border-color: #dc2626;
-  background: transparent;
-  color: #fca5a5;
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #ffffff;
 }
 
+[data-theme="dark"] .assignment-group-row td,
 [data-theme="dark"] .assignment-group-cell {
   background: #17253a;
   border-bottom-color: #334155;
@@ -833,27 +852,27 @@
 }
 
 [data-theme="dark"] .assignment-group-edit-btn {
-  border-color: #475569;
-  background: transparent;
-  color: #cbd5e1;
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
 }
 
 [data-theme="dark"] .assignment-group-edit-btn:hover {
-  border-color: #3b82f6;
-  background: transparent;
-  color: #93c5fd;
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 [data-theme="dark"] .assignment-group-delete-btn {
-  border-color: #7f1d1d;
-  background: transparent;
-  color: #fca5a5;
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
 }
 
 [data-theme="dark"] .assignment-group-delete-btn:hover {
-  border-color: #dc2626;
-  background: transparent;
-  color: #fca5a5;
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #ffffff;
 }
 
 @media (max-width: 1260px) {
@@ -931,9 +950,9 @@
   color: #cbd5e1;
 }
 [data-theme="dark"] .account-action-btn:hover {
-  border-color: #3b82f6;
-  background: #2563eb;
-  color: #ffffff;
+  border-color: #64748b;
+  background: #1e293b;
+  color: #f1f5f9;
 }
 [data-theme="dark"] .account-checkbox-row { color: #cbd5e1; }
 [data-theme="dark"] .account-submit-btn {
@@ -964,24 +983,24 @@
   outline-color: rgba(96, 165, 250, 0.45);
 }
 [data-theme="dark"] .account-table-btn--edit {
-  border-color: #475569;
-  background: transparent;
-  color: #cbd5e1;
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
 }
 [data-theme="dark"] .account-table-btn--edit:hover {
-  border-color: #3b82f6;
-  background: transparent;
-  color: #93c5fd;
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
 }
 [data-theme="dark"] .account-table-btn--delete {
-  border-color: #7f1d1d;
-  background: transparent;
-  color: #fca5a5;
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
 }
 [data-theme="dark"] .account-table-btn--delete:hover {
-  border-color: #dc2626;
-  background: transparent;
-  color: #fca5a5;
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #ffffff;
 }
 [data-theme="dark"] .account-view-nav {
   border-color: #334155;
