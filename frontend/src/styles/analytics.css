@@ -418,18 +418,18 @@
 }
 
 .priority-level--high {
-  background: #ffedd5;
-  color: #9a3412;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .priority-level--moderate {
-  background: #fef3c7;
-  color: #92400e;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .priority-level--low {
-  background: #dcfce7;
-  color: #166534;
+  background: #dbeafe;
+  color: #1e3a5f;
 }
 
 .barangay-drilldown {

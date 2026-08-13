@@ -18,7 +18,13 @@
 import { Circle, MapContainer, Polygon, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
+import 'leaflet.markercluster'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
 import { CABAGAN_BOUNDARY_COORDS, CABAGAN_CENTER } from '../utils/cabaganGeofence'
+import {
+  MARKER_ANIMATION_DURATION_MS,
+  interpolateLatLng,
+} from '../utils/mapMotion'
 
 const OUTER_MASK_BOUNDS = [
   [18.2, 120.8],
@@ -28,14 +34,14 @@ const OUTER_MASK_BOUNDS = [
 ]
 
 const OUTSIDE_MASK_STYLE = {
-  fillColor: '#d97706',
+  fillColor: '#dc2626',
   fillOpacity: 0.12,
   stroke: false,
   fillRule: 'evenodd',
 }
 
 const GEOFENCE_BORDER_STYLE = {
-  color: '#d97706',
+  color: '#dc2626',
   weight: 2,
   fillOpacity: 0,
   dashArray: '8 7',
@@ -143,32 +149,37 @@ function FocusPersonnelOnLocate({ focusTarget }) {
 /**
  * Converts the current personnel status to a visual marker class.
  * Requested mapping:
- *   On Duty / On Patrol  -> green border
- *   Ongoing Case         -> red border
+ *   On Duty / On Patrol  -> royal-blue border
+ *   Active operation     -> cyan-blue border
+ *   Emergency / boundary -> red border
  * Extra mappings are included so the current sample statuses still render
  * meaningfully without changing the backend vocabulary.
  */
 const getMarkerStatusClass = (status = '') => {
   const normalized = status.toLowerCase()
 
-  if (normalized.includes('on duty') || normalized.includes('on patrol')) {
+  if (normalized.includes('emergency') || normalized.includes('backup') || normalized.includes('alert')) {
+    return 'police-marker--critical'
+  }
+
+  if (normalized.includes('ongoing case') || normalized.includes('responding') || normalized.includes('operation') || normalized.includes('dispatch')) {
+    return 'police-marker--operation'
+  }
+
+  if (normalized.includes('on duty') || normalized.includes('on patrol') || normalized.includes('monitor')) {
     return 'police-marker--on-duty'
-  }
-
-  if (normalized.includes('ongoing case') || normalized.includes('responding') || normalized.includes('alert')) {
-    return 'police-marker--ongoing-case'
-  }
-
-  if (normalized.includes('monitor')) {
-    return 'police-marker--monitoring'
   }
 
   return 'police-marker--default'
 }
 
 const getMarkerClass = (member) => {
-  if (member.isInsideCabagan === false) {
+  if (member.isInsideCabagan === false || member.emergencyActive) {
     return 'police-marker--out-of-boundary'
+  }
+
+  if (member.operationActive) {
+    return 'police-marker--operation'
   }
 
   return getMarkerStatusClass(member.status)
@@ -203,14 +214,24 @@ const createPoliceMarkerIcon = (member) => {
   })
 }
 
+const getClusterTone = (markers) => {
+  const members = markers.map((marker) => marker.options.personnel)
+  if (members.some((member) => member?.isInsideCabagan === false || member?.emergencyActive)) {
+    return 'personnel-cluster--critical'
+  }
+  if (members.some((member) => member?.operationActive)) {
+    return 'personnel-cluster--operation'
+  }
+  return 'personnel-cluster--duty'
+}
+
 /**
  * SmoothMarker
  * Creates a Leaflet marker imperatively and animates it between GPS updates
  * using requestAnimationFrame + ease-out interpolation instead of teleporting.
  * Must be rendered inside a <MapContainer> so useMap() is available.
  */
-function SmoothMarker({ member, onSelect }) {
-  const map = useMap()
+function SmoothMarker({ clusterGroup, member, onSelect }) {
   const markerRef = useRef(null)
   const animFrameRef = useRef(null)
   const currentPosRef = useRef([member.latitude, member.longitude])
@@ -219,31 +240,55 @@ function SmoothMarker({ member, onSelect }) {
   const icon = useMemo(
     () => createPoliceMarkerIcon(member),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [member.status, member.isInsideCabagan, member.photoUrl, member.name],
+    [
+      member.status,
+      member.isInsideCabagan,
+      member.emergencyActive,
+      member.operationActive,
+      member.photoUrl,
+      member.name,
+    ],
   )
 
   // Mount: create the raw Leaflet marker once and add it to the map
   useEffect(() => {
-    const marker = L.marker(currentPosRef.current, { icon })
-    marker.addTo(map)
+    const marker = L.marker(currentPosRef.current, { icon, personnel: member })
+    marker.addTo(clusterGroup)
     markerRef.current = marker
 
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
-      marker.remove()
+      clusterGroup.removeLayer(marker)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Intentionally runs once on mount only
 
   // Sync icon when status or boundary flag changes
   useEffect(() => {
-    markerRef.current?.setIcon(icon)
-  }, [icon])
+    if (!markerRef.current) return
+    markerRef.current.options.personnel = {
+      ...markerRef.current.options.personnel,
+      status: member.status,
+      isInsideCabagan: member.isInsideCabagan,
+      emergencyActive: member.emergencyActive,
+      operationActive: member.operationActive,
+    }
+    markerRef.current.setIcon(icon)
+    clusterGroup.refreshClusters(markerRef.current)
+  }, [
+    clusterGroup,
+    icon,
+    member.emergencyActive,
+    member.isInsideCabagan,
+    member.operationActive,
+    member.status,
+  ])
 
   // Keep the click handler pointing at the latest member object
   useEffect(() => {
     const marker = markerRef.current
     if (!marker) return
+    marker.options.personnel = member
     marker.off('click')
     marker.on('click', () => onSelect(member))
   }, [member, onSelect])
@@ -259,20 +304,21 @@ function SmoothMarker({ member, onSelect }) {
     // No movement — skip animation
     if (from[0] === to[0] && from[1] === to[1]) return
 
-    // Duration is slightly under the 1.5 s server broadcast interval so the
-    // marker is always visibly moving and reaches the target before the next update
-    const DURATION = 1400
-
+    // Short enough to stay responsive while still hiding abrupt GPS jumps.
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
     const startTime = performance.now()
+    let lastRenderedAt = 0
 
     const tick = (now) => {
-      const t = Math.min((now - startTime) / DURATION, 1)
-      const ease = 1 - (1 - t) ** 3 // ease-out cubic — fast start, smooth finish
-      const lat = from[0] + (to[0] - from[0]) * ease
-      const lng = from[1] + (to[1] - from[1]) * ease
-      currentPosRef.current = [lat, lng]
-      marker.setLatLng([lat, lng])
+      const t = Math.min((now - startTime) / MARKER_ANIMATION_DURATION_MS, 1)
+      if (t < 1 && now - lastRenderedAt < 1000 / 30) {
+        animFrameRef.current = requestAnimationFrame(tick)
+        return
+      }
+      lastRenderedAt = now
+      const nextPosition = interpolateLatLng(from, to, t)
+      currentPosRef.current = nextPosition
+      marker.setLatLng(nextPosition)
       if (t < 1) {
         animFrameRef.current = requestAnimationFrame(tick)
       }
@@ -286,6 +332,40 @@ function SmoothMarker({ member, onSelect }) {
   }, [member.latitude, member.longitude])
 
   return null
+}
+
+function ClusteredPersonnelMarkers({ personnel, onSelect }) {
+  const map = useMap()
+  const clusterGroup = useMemo(() => L.markerClusterGroup({
+    animate: true,
+    animateAddingMarkers: true,
+    chunkedLoading: true,
+    disableClusteringAtZoom: 18,
+    maxClusterRadius: 56,
+    removeOutsideVisibleBounds: true,
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    spiderLegPolylineOptions: { color: '#2563eb', opacity: 0.55, weight: 1.5 },
+    iconCreateFunction: (cluster) => L.divIcon({
+      className: 'personnel-cluster-shell',
+      html: `<div class="personnel-cluster ${getClusterTone(cluster.getAllChildMarkers())}"><span>${cluster.getChildCount()}</span></div>`,
+      iconSize: [46, 46],
+    }),
+  }), [])
+
+  useEffect(() => {
+    map.addLayer(clusterGroup)
+    return () => map.removeLayer(clusterGroup)
+  }, [clusterGroup, map])
+
+  return personnel.map((member) => (
+    <SmoothMarker
+      key={member.id}
+      clusterGroup={clusterGroup}
+      member={member}
+      onSelect={onSelect}
+    />
+  ))
 }
 
 function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTarget, layoutVersion = 0 }) {
@@ -372,14 +452,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
           />
         ))}
 
-        {/* SmoothMarker animates each officer between GPS updates via rAF */}
-        {personnel.map((member) => (
-          <SmoothMarker
-            key={member.id}
-            member={member}
-            onSelect={onSelectPersonnel}
-          />
-        ))}
+        <ClusteredPersonnelMarkers personnel={personnel} onSelect={onSelectPersonnel} />
       </MapContainer>
     </section>
   )

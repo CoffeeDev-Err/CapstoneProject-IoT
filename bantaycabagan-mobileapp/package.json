@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "node scripts/typecheck.cjs",
-    "check": "npm run typecheck"
+    "test:map": "node scripts/map-behavior-check.cjs",
+    "check": "npm run typecheck && npm run test:map"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

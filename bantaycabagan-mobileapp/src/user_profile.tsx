@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f2',
   },
   header: {
-    backgroundColor: '#2d2da8',
+    backgroundColor: '#1d4ed8',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#2d2da8',
+    borderColor: '#1d4ed8',
     marginBottom: 10,
   },
   name: {
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   },
   role: {
     fontSize: 22,
-    color: '#6b28f1',
+    color: '#2563eb',
     fontWeight: 'bold',
   },
   divider: {
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   badge: {
-    backgroundColor: '#2d2da8',
+    backgroundColor: '#1d4ed8',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 10,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   reportBtn: {
-    backgroundColor: '#2d2da8',
+    backgroundColor: '#1d4ed8',
     paddingVertical: 14,
     borderRadius: 25,
     alignItems: 'center',
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '85%',
-    backgroundColor: '#000033',
+    backgroundColor: '#172554',
     padding: 20,
     borderRadius: 20,
   },
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   submitBtn: {
-    backgroundColor: '#2d2da8',
+    backgroundColor: '#1d4ed8',
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 10,
@@ -341,14 +341,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   changeBtn: {
-    backgroundColor: '#2d2da8',
+    backgroundColor: '#1d4ed8',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 20,
   },
   changeText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   logoutBtn: {
-    backgroundColor: '#2d2da8',
+    backgroundColor: '#1d4ed8',
     paddingVertical: 12,
     paddingHorizontal: 18,
     borderRadius: 20,

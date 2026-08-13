@@ -31,7 +31,27 @@ function MonitoringPage() {
     outOfBoundaryPersonnel,
     stalePersonnel,
     deployments,
+    tasks,
   } = usePersonnelContext()
+
+  const mapPersonnel = useMemo(() => {
+    const emergencyIds = new Set()
+    const operationIds = new Set()
+    tasks
+      .filter((task) => task.status === 'open' || task.status === 'full')
+      .forEach((task) => {
+        if (task.type === 'backup') emergencyIds.add(task.requested_by)
+        else operationIds.add(task.requested_by)
+        const responders = task.accepted_by || []
+        responders.forEach((personnelId) => operationIds.add(personnelId))
+      })
+
+    return activePersonnel.map((member) => ({
+      ...member,
+      emergencyActive: emergencyIds.has(member.id),
+      operationActive: operationIds.has(member.id),
+    }))
+  }, [activePersonnel, tasks])
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
@@ -102,7 +122,7 @@ function MonitoringPage() {
           />
         </aside>
         <PersonnelMap
-          personnel={activePersonnel}
+          personnel={mapPersonnel}
           deployments={deployments}
           onSelectPersonnel={handleSelectPersonnel}
           focusTarget={focusTarget}

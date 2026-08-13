@@ -30,7 +30,7 @@ import {
   readAllNotifications,
   readNotification,
 } from '../services/notifications'
-import { getDeployments, getReports } from '../services/operations'
+import { getDeployments, getReports, getTasks } from '../services/operations'
 import { getPersonnel } from '../services/personnel'
 import { socket } from '../services/socket'
 import { resolveApiAssetUrl } from '../services/apiAssets'
@@ -85,6 +85,7 @@ export const usePersonnelRealtime = () => {
   // Report records stay available app-wide so mobile status events update analytics immediately.
   const [reports, setReports] = useState([])
   const [deployments, setDeployments] = useState([])
+  const [tasks, setTasks] = useState([])
 
   const refreshReports = useCallback(async () => {
     const reportPayload = await getReports()
@@ -361,13 +362,31 @@ export const usePersonnelRealtime = () => {
       })
     }
 
+    const upsertTask = (payload) => {
+      if (!payload?.id) return
+      setTasks((current) => {
+        const existingIndex = current.findIndex((task) => task.id === payload.id)
+        if (existingIndex < 0) return [payload, ...current]
+        return current.map((task) => task.id === payload.id ? { ...task, ...payload } : task)
+      })
+    }
+
+    const onTasksBootstrap = (payload) => {
+      if (Array.isArray(payload)) setTasks(payload)
+    }
+
     const onTaskCreated = (payload) => {
+      upsertTask(payload)
       addNotification({
         type: 'emergency',
         title: payload.type === 'backup' ? 'Backup Request' : 'Urgent Task',
         message: `${payload.title} at ${payload.location}.`,
         timestamp: payload.created_at,
       })
+    }
+
+    const onTaskUpdated = (payload) => {
+      upsertTask(payload)
     }
 
     const onReportUpdated = (payload) => {
@@ -428,18 +447,22 @@ export const usePersonnelRealtime = () => {
     socket.on('report:updated', onReportUpdated)
     socket.on('deployments:bootstrap', onDeploymentsBootstrap)
     socket.on('deployments:updated', onDeploymentsUpdated)
+    socket.on('tasks:bootstrap', onTasksBootstrap)
     socket.on('task:created', onTaskCreated)
+    socket.on('task:updated', onTaskUpdated)
     socket.on('personnel:inactivity', onPersonnelInactivity)
 
     Promise.all([
       getPersonnel(),
       getReports(),
       getDeployments(),
+      getTasks(),
     ])
-      .then(([personnelPayload, reportPayload, deploymentPayload]) => {
+      .then(([personnelPayload, reportPayload, deploymentPayload, taskPayload]) => {
         onBootstrap(personnelPayload)
         onReportsBootstrap(reportPayload)
         onDeploymentsBootstrap(deploymentPayload)
+        onTasksBootstrap(taskPayload)
       })
       .catch(() => {})
 
@@ -460,7 +483,9 @@ export const usePersonnelRealtime = () => {
       socket.off('report:updated', onReportUpdated)
       socket.off('deployments:bootstrap', onDeploymentsBootstrap)
       socket.off('deployments:updated', onDeploymentsUpdated)
+      socket.off('tasks:bootstrap', onTasksBootstrap)
       socket.off('task:created', onTaskCreated)
+      socket.off('task:updated', onTaskUpdated)
       socket.off('personnel:inactivity', onPersonnelInactivity)
     }
   }, [addNotification]) // Subscribe once and keep notification handler current
@@ -491,6 +516,7 @@ export const usePersonnelRealtime = () => {
     activePersonnel,
     reports,
     deployments,
+    tasks,
     personnelCount,
     outOfBoundaryPersonnel,
     stalePersonnel,

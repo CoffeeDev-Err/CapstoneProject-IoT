@@ -25,6 +25,10 @@ export const getDeployments = () => (
   getCollection('/api/deployments?limit=100', 'Unable to load deployments.')
 )
 
+export const getTasks = () => (
+  getCollection('/api/tasks?view=active&limit=100', 'Unable to load active operations.')
+)
+
 export const getManageableDeployments = () => (
   getCollection(
     '/api/deployments?view=manageable&limit=100',

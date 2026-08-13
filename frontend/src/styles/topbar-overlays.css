@@ -50,9 +50,9 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #22c55e;
+  background: #2563eb;
   border: 2px solid #ffffff;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
 }
 
 .notification-dropdown {
@@ -237,8 +237,8 @@
 }
 
 .notification-item--unread {
-  border-left: 3px solid #22c55e;
-  background: #f8fffb;
+  border-left: 3px solid #2563eb;
+  background: #f8fafc;
 }
 
 .notification-item__meta {
@@ -270,18 +270,18 @@
 }
 
 .notification-type-pill--emergency {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .notification-type-pill--warning {
-  background: #fef3c7;
-  color: #b45309;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .notification-type-pill--success {
-  background: #dcfce7;
-  color: #166534;
+  background: #dbeafe;
+  color: #1e3a5f;
 }
 
 .notification-type-pill--system {

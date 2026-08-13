@@ -26,6 +26,7 @@ import OfficerMapCanvas, {
 } from '../components/OfficerMapCanvas';
 import { SwipeDismissCard } from '../components/SwipeDismissSheet';
 import { mobileTheme } from '../constants/mobileTheme';
+import { isInsideCabagan } from '../constants/cabaganGeofence';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { LivePersonnel } from '../types/operations';
@@ -120,6 +121,16 @@ export default function OfficerMapScreen() {
       ))
       .forEach((task) => {
         ids.add(task.requested_by);
+      });
+    return ids;
+  }, [tasks]);
+
+  const operationPersonnelIds = useMemo(() => {
+    const ids = new Set<string>();
+    tasks
+      .filter((task) => task.status === 'open' || task.status === 'full')
+      .forEach((task) => {
+        if (task.type !== 'backup') ids.add(task.requested_by);
         task.accepted_by.forEach((personnelId) => ids.add(personnelId));
       });
     return ids;
@@ -135,11 +146,15 @@ export default function OfficerMapScreen() {
     visiblePersonnel.map((member) => ({
       ...member,
       emergencyActive: emergencyPersonnelIds.has(member.id),
+      operationActive: operationPersonnelIds.has(member.id),
+      outsideBoundary: !isInsideCabagan(Number(member.latitude), Number(member.longitude)),
     }))
-  ), [emergencyPersonnelIds, visiblePersonnel]);
+  ), [emergencyPersonnelIds, operationPersonnelIds, visiblePersonnel]);
 
   const currentOfficerHasActiveBackup = emergencyPersonnelIds.has(currentPersonnelId);
-  const hasEmergencyParticipants = emergencyPersonnelIds.size > 0;
+  const hasCriticalPersonnel = mapPersonnel.some((member) => (
+    member.emergencyActive || member.outsideBoundary
+  ));
 
   const selectedOfficer = selectedOfficerId
     ? visiblePersonnel.find((member) => member.id === selectedOfficerId) || null
@@ -150,7 +165,7 @@ export default function OfficerMapScreen() {
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
 
   useEffect(() => {
-    if (!hasEmergencyParticipants) {
+    if (!hasCriticalPersonnel) {
       emergencyPulse.stopAnimation();
       emergencyPulse.setValue(0);
       return undefined;
@@ -174,7 +189,7 @@ export default function OfficerMapScreen() {
     );
     animation.start();
     return () => animation.stop();
-  }, [emergencyPulse, hasEmergencyParticipants]);
+  }, [emergencyPulse, hasCriticalPersonnel]);
 
   const mapHtml = useMemo(() => {
     const latitude = assignment?.latitude || 17.4239;
@@ -184,10 +199,10 @@ export default function OfficerMapScreen() {
     const initialPersonnel = JSON.stringify(mapPersonnel);
     const controlBackground = isDark ? '#0b1528' : '#ffffff';
     const controlBorder = isDark ? '#2a3a56' : '#d9dee8';
-    const controlText = isDark ? '#f8fafc' : '#1c1c4d';
+    const controlText = isDark ? '#f8fafc' : '#172554';
     const popupBackground = isDark ? '#0b1528' : '#ffffff';
     const popupText = isDark ? '#f8fafc' : '#17172f';
-    const popupMuted = isDark ? '#9eabc0' : '#686982';
+    const popupMuted = isDark ? '#9eabc0' : '#64748b';
 
     return `
       <!doctype html>
@@ -205,15 +220,15 @@ export default function OfficerMapScreen() {
             .leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important;border-color:${controlBorder}!important;background:${controlBackground}!important;color:${controlText}!important}
             .leaflet-control-zoom a:hover{background:${isDark ? '#132442' : '#f1f5f9'}!important}
             .officer-pin{position:relative;width:52px;height:62px;display:flex;flex-direction:column;align-items:center}
-            .officer-photo{width:42px;height:42px;border:3px solid #6b28f1;border-radius:50%;object-fit:cover;background:#fff;box-shadow:0 4px 10px rgba(28,28,77,.28)}
-            .officer-photo.current{border-color:#27c93f}
+            .officer-photo{width:42px;height:42px;border:3px solid #2563eb;border-radius:50%;object-fit:cover;background:#fff;box-shadow:0 4px 10px rgba(15,23,42,.28)}
+            .officer-photo.current{border-color:#2563eb}
             .officer-photo.emergency{border-color:#ff2f3d;animation:emergency-ring 1.15s ease-in-out infinite}
-            .officer-arrow{width:0;height:0;margin-top:-2px;border-left:10px solid transparent;border-right:10px solid transparent;border-top:15px solid #6b28f1}
-            .officer-arrow.current{border-top-color:#27c93f}
+            .officer-arrow{width:0;height:0;margin-top:-2px;border-left:10px solid transparent;border-right:10px solid transparent;border-top:15px solid #2563eb}
+            .officer-arrow.current{border-top-color:#2563eb}
             .officer-arrow.emergency{border-top-color:#ff2f3d}
             @keyframes emergency-ring{
-              0%,100%{box-shadow:0 0 0 0 rgba(255,47,61,.72),0 4px 10px rgba(28,28,77,.28)}
-              50%{box-shadow:0 0 0 7px rgba(255,47,61,0),0 4px 10px rgba(28,28,77,.28)}
+              0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.72),0 4px 10px rgba(15,23,42,.28)}
+              50%{box-shadow:0 0 0 7px rgba(220,38,38,0),0 4px 10px rgba(15,23,42,.28)}
             }
             .officer-popup{min-width:132px;font-family:Arial,sans-serif}
             .officer-popup strong{display:block;color:${popupText};font-size:13px}
@@ -260,9 +275,9 @@ export default function OfficerMapScreen() {
             L.control.zoom({position:'topright'}).addTo(map);
             L.circle([${latitude},${longitude}],{
               radius:320,
-              color:'#6b28f1',
+              color:'#2563eb',
               weight:2,
-              fillColor:'#6b28f1',
+              fillColor:'#2563eb',
               fillOpacity:.08,
               dashArray:'7 6'
             }).addTo(map).bindTooltip(${patrolArea});
@@ -764,7 +779,7 @@ export default function OfficerMapScreen() {
           </View>
 
           <View style={styles.locationRow}>
-            <Icon name="place" size={18} color="#b89aff" />
+            <Icon name="place" size={18} color="#93c5fd" />
             <Text style={styles.locationText} numberOfLines={2}>
               {selectedOfficer.locationName}
             </Text>
@@ -820,7 +835,7 @@ export default function OfficerMapScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#ffffff' },
-  container: { flex: 1, backgroundColor: '#e8e7ec' },
+  container: { flex: 1, backgroundColor: '#e2e8f0' },
   mapWrap: { ...StyleSheet.absoluteFillObject },
   map: { flex: 1, backgroundColor: '#e2e5e8' },
   emergencyOverlay: {
@@ -837,7 +852,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     borderRadius: 15,
     backgroundColor: mobileTheme.surface,
-    shadowColor: '#1c1c4d',
+    shadowColor: '#172554',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.2,
     shadowRadius: 9,
@@ -857,7 +872,7 @@ const styles = StyleSheet.create({
     outlineWidth: 0,
     outlineColor: 'transparent',
   },
-  connectionDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#27c93f' },
+  connectionDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#2563eb' },
   connectionDotOffline: { backgroundColor: mobileTheme.warning },
   topUtilityRow: {
     minHeight: 44,
@@ -876,7 +891,7 @@ const styles = StyleSheet.create({
     gap: 7,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#1c1c4d',
+    shadowColor: '#172554',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.14,
     shadowRadius: 8,
@@ -894,7 +909,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#1c1c4d',
+    shadowColor: '#172554',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.14,
     shadowRadius: 8,
@@ -921,10 +936,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     borderWidth: 1,
-    borderColor: '#d5d2e4',
+    borderColor: '#cbd5e1',
     borderRadius: 16,
     backgroundColor: mobileTheme.surface,
-    shadowColor: '#1c1c4d',
+    shadowColor: '#172554',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.16,
     shadowRadius: 9,
@@ -1007,17 +1022,17 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderWidth: 3,
-    borderColor: '#27c93f',
+    borderColor: '#2563eb',
     borderRadius: 31,
     backgroundColor: '#ffffff',
   },
   profilePhotoEmergency: { borderColor: mobileTheme.danger },
   officerIdentity: { flex: 1 },
   profileName: { color: '#ffffff', fontSize: 17, fontWeight: '800' },
-  profileRank: { marginTop: 3, color: '#b89aff', fontSize: 12, fontWeight: '700' },
+  profileRank: { marginTop: 3, color: '#93c5fd', fontSize: 12, fontWeight: '700' },
   statusRow: { marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#27c93f' },
-  statusText: { color: '#d9d9e6', fontSize: 11, fontWeight: '700' },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2563eb' },
+  statusText: { color: '#e2e8f0', fontSize: 11, fontWeight: '700' },
   locationRow: {
     minHeight: 52,
     marginTop: 13,

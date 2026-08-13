@@ -253,7 +253,7 @@ function TopBar({
           {isDark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
         </button>
 
-        {/* Notifications — appears before profile and shows unread green dot */}
+        {/* Notifications — appears before profile and shows an unread blue dot */}
         <div className="notification-wrapper" ref={notificationRef}>
           <button
             type="button"

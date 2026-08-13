@@ -838,7 +838,7 @@ function SettingsPage() {
                             <td>
                               <span
                                 className="status-badge"
-                                style={{ '--status-color': account.accountStatus === 'Active' ? '#16a34a' : '#64748b' }}
+                                style={{ '--status-color': account.accountStatus === 'Active' ? '#2563eb' : '#64748b' }}
                               >
                                 {account.accountStatus}
                               </span>

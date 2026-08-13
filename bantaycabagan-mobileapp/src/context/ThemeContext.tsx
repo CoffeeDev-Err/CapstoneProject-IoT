@@ -41,8 +41,8 @@ const darkTheme = {
   textMuted: '#9eabc0',
   blueSoft: '#132442',
   purpleSoft: '#132442',
-  successSoft: '#0b3024',
-  warningSoft: '#38270d',
+  successSoft: '#172554',
+  warningSoft: '#172554',
   dangerSoft: '#3a151d',
   offline: '#64748b',
 };
