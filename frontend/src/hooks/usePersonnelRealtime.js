@@ -35,6 +35,7 @@ import { getPersonnel } from '../services/personnel'
 import { socket } from '../services/socket'
 import { resolveApiAssetUrl } from '../services/apiAssets'
 import { isInsideCabagan } from '../utils/cabaganGeofence'
+import { useAuth } from '../context/useAuth'
 
 const personnelPhotos = {
   'pcpl-001': policePersonnel1,
@@ -70,6 +71,7 @@ const MAX_NOTIFICATIONS = 25
  * Prevents an empty map flash on initial page load.
  */
 export const usePersonnelRealtime = () => {
+  const { token } = useAuth()
   // Full live officer list — replaced every time the server emits an update
   const [personnel, setPersonnel] = useState([])
 
@@ -151,6 +153,7 @@ export const usePersonnelRealtime = () => {
   }
 
   useEffect(() => {
+    if (!token) return undefined
     getNotifications()
       .then((history) => {
         setNotifications((current) => {
@@ -169,9 +172,16 @@ export const usePersonnelRealtime = () => {
         })
       })
       .catch(() => {})
-  }, [])
+  }, [token])
 
   useEffect(() => {
+    if (!token) {
+      socket.disconnect()
+      return undefined
+    }
+
+    socket.auth = { token }
+    if (!socket.connected) socket.connect()
     // ── Event handlers ──────────────────────────────────────────────────────
 
     const onConnect = () => {
@@ -487,8 +497,9 @@ export const usePersonnelRealtime = () => {
       socket.off('task:created', onTaskCreated)
       socket.off('task:updated', onTaskUpdated)
       socket.off('personnel:inactivity', onPersonnelInactivity)
+      socket.disconnect()
     }
-  }, [addNotification]) // Subscribe once and keep notification handler current
+  }, [addNotification, token])
 
   // Derive the count from the array so consumers don't have to compute it
   const activePersonnel = useMemo(
@@ -520,7 +531,7 @@ export const usePersonnelRealtime = () => {
     personnelCount,
     outOfBoundaryPersonnel,
     stalePersonnel,
-    isConnected,
+    isConnected: Boolean(token && isConnected),
     statusMessage,
     notifications,
     unreadNotificationCount,

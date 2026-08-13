@@ -1,30 +1,7 @@
-import { AUTH_TOKEN_KEY } from './auth'
-import { API_URL } from './runtime'
-
-const request = async (path, options) => {
-  const isMultipart = options?.body instanceof FormData
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      ...(!isMultipart ? { 'Content-Type': 'application/json' } : {}),
-      Authorization: `Bearer ${localStorage.getItem(AUTH_TOKEN_KEY) || ''}`,
-      ...options?.headers,
-    },
-  })
-  const payload = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    const error = new Error(payload.message || 'Unable to complete the account request.')
-    error.code = payload.code
-    error.field = payload.field
-    throw error
-  }
-
-  return payload
-}
+import { apiRequest } from './apiClient'
 
 export const getAccounts = async () => {
-  const payload = await request('/api/accounts')
+  const payload = await apiRequest('/api/accounts')
   return Array.isArray(payload.accounts) ? payload.accounts : []
 }
 
@@ -40,7 +17,7 @@ const createRequestBody = (account, profilePhoto) => {
 }
 
 export const createAccount = async (account, profilePhoto) => {
-  const payload = await request('/api/accounts', {
+  const payload = await apiRequest('/api/accounts', {
     method: 'POST',
     body: createRequestBody(account, profilePhoto),
   })
@@ -48,7 +25,7 @@ export const createAccount = async (account, profilePhoto) => {
 }
 
 export const updateAccount = async (accountId, account, profilePhoto) => {
-  const payload = await request(`/api/accounts/${accountId}`, {
+  const payload = await apiRequest(`/api/accounts/${accountId}`, {
     method: 'PUT',
     body: createRequestBody(account, profilePhoto),
   })
@@ -56,5 +33,5 @@ export const updateAccount = async (accountId, account, profilePhoto) => {
 }
 
 export const deactivateAccount = async (accountId) => (
-  request(`/api/accounts/${accountId}`, { method: 'DELETE' })
+  apiRequest(`/api/accounts/${accountId}`, { method: 'DELETE' })
 )

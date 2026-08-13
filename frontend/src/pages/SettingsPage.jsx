@@ -332,7 +332,7 @@ function SettingsPage() {
       && /[^A-Za-z0-9]/.test(passwordValue)
 
     if ((!editingAccountId || passwordValue) && !passwordRulesPassed) {
-      errors.temporaryPassword = 'Use at least 10 chars with upper, lower, number, and symbol.'
+      errors.temporaryPassword = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.'
     }
 
     if (!isEditingSupervisor && accountForm.mobileNumber.trim() && !/^\+?\d{10,14}$/.test(accountForm.mobileNumber.trim())) {

@@ -1,24 +1,7 @@
-import { API_URL } from './runtime'
+import { apiRequest } from './apiClient'
+export { AUTH_TOKEN_KEY, AUTH_USER_KEY } from './sessionKeys'
 
-export const AUTH_TOKEN_KEY = 'bantaycabagan_auth_token'
-export const AUTH_USER_KEY = 'bantaycabagan_auth_user'
-
-const request = async (path, options = {}) => {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const error = new Error(payload.message || 'Unable to complete authentication.')
-    error.code = payload.code
-    throw error
-  }
-  return payload
-}
+const request = (path, options = {}) => apiRequest(path, { auth: false, ...options })
 
 export const beginLogin = (username, password) => request('/api/auth/login', {
   method: 'POST',

@@ -1,12 +1,7 @@
-import { API_URL } from './runtime'
+import { apiRequest } from './apiClient'
 
 export const getPersonnel = async () => {
-  const response = await fetch(`${API_URL}/api/personnel?limit=100`)
-  const payload = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    throw new Error(payload.message || 'Unable to load personnel.')
-  }
+  const payload = await apiRequest('/api/personnel?limit=100')
 
   return Array.isArray(payload.data) ? payload.data : []
 }
@@ -22,14 +17,9 @@ export const getPersonnelLocationHistory = async ({
     to,
     limit: String(limit),
   })
-  const response = await fetch(
-    `${API_URL}/api/personnel/${encodeURIComponent(personnelId)}/location-history?${query}`,
+  const payload = await apiRequest(
+    `/api/personnel/${encodeURIComponent(personnelId)}/location-history?${query}`,
   )
-  const payload = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    throw new Error(payload.message || 'Unable to load officer route history.')
-  }
 
   return {
     points: Array.isArray(payload.data) ? payload.data : [],

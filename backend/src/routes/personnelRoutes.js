@@ -1,13 +1,15 @@
 const express = require('express')
 const asyncHandler = require('../middleware/asyncHandler')
+const createAuthorization = require('../middleware/authorization')
 
-const createPersonnelRoutes = (controller) => {
+const createPersonnelRoutes = ({ authService, controller }) => {
 	const router = express.Router()
+	const { authenticate, supervisorOnly } = createAuthorization(authService)
 
-	router.get('/', asyncHandler(controller.getPersonnel))
-	router.get('/:personnelId', asyncHandler(controller.getPersonnelMember))
-	router.patch('/:personnelId/status', asyncHandler(controller.updateDutyStatus))
-	router.get('/:personnelId/location-history', asyncHandler(controller.getLocationHistory))
+	router.get('/', authenticate, asyncHandler(controller.getPersonnel))
+	router.get('/:personnelId', authenticate, asyncHandler(controller.getPersonnelMember))
+	router.patch('/:personnelId/status', ...supervisorOnly, asyncHandler(controller.updateDutyStatus))
+	router.get('/:personnelId/location-history', ...supervisorOnly, asyncHandler(controller.getLocationHistory))
 
 	return router
 }

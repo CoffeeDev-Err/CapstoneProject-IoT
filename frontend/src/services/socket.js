@@ -27,7 +27,7 @@ import { SOCKET_URL } from './runtime'
  */
 export const socket = io(SOCKET_URL, {
   transports: ['polling', 'websocket'],
-  autoConnect: true,
+  autoConnect: false,
 })
 
 /**

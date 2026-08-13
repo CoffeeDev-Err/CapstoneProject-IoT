@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import VerificationCodeInput from './components/VerificationCodeInput';
 import { mobileTheme } from './constants/mobileTheme';
 import { useAuth } from './context/AuthContext';
 import {
@@ -34,6 +35,9 @@ const isStrongPassword = (value: string) => (
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 );
+
+const PASSWORD_REQUIREMENTS = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.';
+const COMPLETE_CODE_MESSAGE = 'Enter the complete 6-digit verification code.';
 
 export default function LoginScreen() {
   const { establishSession } = useAuth();
@@ -63,6 +67,8 @@ export default function LoginScreen() {
   };
 
   const submitLogin = () => run(async () => {
+    if (!loginId.trim()) throw new Error('Enter your Login ID.');
+    if (!password) throw new Error('Enter your password.');
     const response = await beginLogin(loginId.trim(), password);
     setChallenge(response);
     setCode('');
@@ -71,11 +77,13 @@ export default function LoginScreen() {
 
   const submitVerification = () => run(async () => {
     if (!challenge) return;
+    if (code.length !== 6) throw new Error(COMPLETE_CODE_MESSAGE);
     const session = await verifyLoginCode(challenge.challengeId, code);
     await establishSession(session);
   });
 
   const submitForgot = () => run(async () => {
+    if (!identifier.trim()) throw new Error('Enter your Login ID or official email.');
     const response = await requestPasswordReset(identifier.trim());
     if (response.challengeId) {
       setChallenge(response);
@@ -88,11 +96,14 @@ export default function LoginScreen() {
 
   const submitReset = () => run(async () => {
     if (!challenge) return;
+    if (code.length !== 6) throw new Error(COMPLETE_CODE_MESSAGE);
+    if (!newPassword) throw new Error('Enter a new password.');
     if (!isStrongPassword(newPassword)) {
-      throw new Error('Use 10+ characters with upper, lower, number, and symbol.');
+      throw new Error(PASSWORD_REQUIREMENTS);
     }
+    if (!confirmPassword) throw new Error('Confirm your new password.');
     if (newPassword !== confirmPassword) {
-      throw new Error('New passwords do not match.');
+      throw new Error('The new password and confirmation do not match.');
     }
     await resetPassword(challenge.challengeId, code, newPassword);
     setMode('login');
@@ -192,7 +203,12 @@ export default function LoginScreen() {
 
             {mode === 'verify' && (
               <>
-                <CodeField value={code} onChangeText={setCode} />
+                <VerificationCodeInput
+                  value={code}
+                  onChangeText={setCode}
+                  dark
+                  invalid={Boolean(error)}
+                />
                 <Feedback error={error} message={message} debugCode={challenge?.debugCode} />
                 <SubmitButton label="Verify and Continue" pending={pending} onPress={submitVerification} />
                 <TextButton label="Resend code" onPress={resend} disabled={pending} />
@@ -217,7 +233,7 @@ export default function LoginScreen() {
 
             {mode === 'reset' && (
               <>
-                <CodeField value={code} onChangeText={setCode} />
+                <VerificationCodeInput value={code} onChangeText={setCode} dark />
                 <Field
                   label="New Password"
                   value={newPassword}
@@ -225,6 +241,7 @@ export default function LoginScreen() {
                   secureTextEntry
                   autoComplete="new-password"
                 />
+                <Text style={styles.passwordRequirements}>{PASSWORD_REQUIREMENTS}</Text>
                 <Field
                   label="Confirm New Password"
                   value={confirmPassword}
@@ -234,6 +251,7 @@ export default function LoginScreen() {
                 />
                 <Feedback error={error} message={message} debugCode={challenge?.debugCode} />
                 <SubmitButton label="Reset Password" pending={pending} onPress={submitReset} />
+                <TextButton label="Resend code" onPress={resend} disabled={pending} />
                 <TextButton label="Cancel" onPress={backToLogin} />
               </>
             )}
@@ -280,21 +298,6 @@ function Field({
         ) : null}
       </View>
     </View>
-  );
-}
-
-function CodeField({ value, onChangeText }: { value: string; onChangeText: (value: string) => void }) {
-  return (
-    <Field
-      label="Verification Code"
-      value={value}
-      onChangeText={(nextValue) => onChangeText(nextValue.replace(/\D/g, '').slice(0, 6))}
-      keyboardType="number-pad"
-      autoComplete="one-time-code"
-      maxLength={6}
-      placeholder="000000"
-      style={styles.codeInput}
-    />
   );
 }
 
@@ -348,8 +351,8 @@ function Feedback({
   return (
     <>
       {debugCode ? <Text style={styles.debug}>Development code: {debugCode}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {message ? <Text style={styles.success}>{message}</Text> : null}
+      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      {message ? <Text style={styles.success} accessibilityRole="alert">{message}</Text> : null}
     </>
   );
 }
@@ -432,7 +435,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 19,
   },
-  codeInput: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  passwordRequirements: {
+    marginTop: -7,
+    marginBottom: 14,
+    color: '#93a4bd',
+    fontSize: 11,
+    lineHeight: 17,
+  },
   textActionRight: { alignSelf: 'flex-end', marginTop: -2, marginBottom: 18 },
   textButton: { alignSelf: 'center', padding: 9 },
   textAction: { color: '#72a7ff', fontSize: 13, fontWeight: '700' },

@@ -18,11 +18,16 @@ const errorHandler = (error, _req, res, _next) => {
 	if (status >= 500 && !expectedConfigurationError) {
 		console.error(error)
 	}
+	const exposeMessage = status < 500
+		|| expectedConfigurationError
+		|| process.env.NODE_ENV !== 'production'
 
 	return res.status(status).json({
 		success: false,
 		code: error.code || 'INTERNAL_SERVER_ERROR',
-		message: error.message || 'Unable to complete the request.',
+		message: exposeMessage
+			? (error.message || 'Unable to complete the request.')
+			: 'Unable to complete the request.',
 	})
 }
 

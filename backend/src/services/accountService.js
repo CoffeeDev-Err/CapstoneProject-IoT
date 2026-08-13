@@ -78,11 +78,11 @@ const validateAccountPayload = (
 
 	const password = String(payload.temporaryPassword || '')
 	if (requirePassword && !password) {
-		throw createHttpError('Temporary password is required.')
+		throw createHttpError('Enter a temporary password.')
 	}
 	if (password && !isStrongPassword(password)) {
 		throw createHttpError(
-			'Password must have at least 10 characters with upper, lower, number, and symbol.',
+			'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.',
 		)
 	}
 

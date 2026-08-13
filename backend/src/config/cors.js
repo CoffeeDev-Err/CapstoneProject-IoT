@@ -7,7 +7,7 @@ const allowedOrigins = parseAllowedOrigins()
 
 const isAllowedOrigin = (origin) => (
 	!origin
-	|| allowedOrigins.length === 0
+	|| (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production')
 	|| allowedOrigins.includes(origin.replace(/\/$/, ''))
 )
 
@@ -19,6 +19,8 @@ const corsOptions = {
 		return callback(error)
 	},
 	methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+	allowedHeaders: ['Authorization', 'Content-Type', 'X-API-Key'],
+	maxAge: 600,
 }
 
 module.exports = {

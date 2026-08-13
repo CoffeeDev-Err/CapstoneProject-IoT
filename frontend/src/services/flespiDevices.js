@@ -1,15 +1,8 @@
-import { API_URL } from './runtime'
+import { apiRequest } from './apiClient'
 
 export const getRegisteredFlespiDevices = async ({ refresh = false } = {}) => {
   const query = refresh ? '?refresh=true' : ''
-  const response = await fetch(`${API_URL}/api/flespi/devices${query}`)
-  const payload = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    const error = new Error(payload.message || 'Unable to load registered GPS devices.')
-    error.code = payload.code || 'FLESPI_REQUEST_FAILED'
-    throw error
-  }
+  const payload = await apiRequest(`/api/flespi/devices${query}`)
 
   return Array.isArray(payload.devices) ? payload.devices : []
 }

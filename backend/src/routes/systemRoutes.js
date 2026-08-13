@@ -1,11 +1,13 @@
 const express = require('express')
 const asyncHandler = require('../middleware/asyncHandler')
+const createAuthorization = require('../middleware/authorization')
 
-const createSystemRoutes = (controller) => {
+const createSystemRoutes = ({ authService, controller }) => {
 	const router = express.Router()
+	const { supervisorOnly } = createAuthorization(authService)
 
 	router.get('/health', controller.getHealth)
-	router.get('/flespi/devices', asyncHandler(controller.getFlespiDevices))
+	router.get('/flespi/devices', ...supervisorOnly, asyncHandler(controller.getFlespiDevices))
 
 	return router
 }

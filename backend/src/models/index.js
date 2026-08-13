@@ -326,6 +326,7 @@ const authSessionSchema = new mongoose.Schema({
 	timestamps: true,
 })
 authSessionSchema.index({ userId: 1, expiresAt: -1 })
+authSessionSchema.index({ refreshTokenHash: 1 }, { unique: true })
 authSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
 
 const emailVerificationSchema = new mongoose.Schema({

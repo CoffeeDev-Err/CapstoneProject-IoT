@@ -96,19 +96,19 @@ app.use('/api/accounts', createAccountRoutes({
 	authService,
 	controller: accountController,
 }))
-app.use('/api/analytics', createAnalyticsRoutes(analyticsController))
-app.use('/api/audit-logs', createAuditRoutes(auditController))
+app.use('/api/analytics', createAnalyticsRoutes({ authService, controller: analyticsController }))
+app.use('/api/audit-logs', createAuditRoutes({ authService, controller: auditController }))
 app.use('/api/auth', createAuthRoutes({ authService, controller: authController }))
-app.use('/api/barangays', createBarangayRoutes(barangayController))
-app.use('/api/dashboard', createDashboardRoutes(analyticsController))
-app.use('/api/gps-devices', createGpsDeviceRoutes(gpsDeviceController))
+app.use('/api/barangays', createBarangayRoutes({ authService, controller: barangayController }))
+app.use('/api/dashboard', createDashboardRoutes({ authService, controller: analyticsController }))
+app.use('/api/gps-devices', createGpsDeviceRoutes({ authService, controller: gpsDeviceController }))
 app.use('/api/locations', createLocationRoutes(personnelController))
 app.use('/api/notifications', createNotificationRoutes({
 	authService,
 	controller: notificationController,
 }))
-app.use('/api/personnel', createPersonnelRoutes(personnelController))
-app.use('/api', createSystemRoutes(systemController))
+app.use('/api/personnel', createPersonnelRoutes({ authService, controller: personnelController }))
+app.use('/api', createSystemRoutes({ authService, controller: systemController }))
 
 if (process.env.NODE_ENV === 'production') {
 	const frontendDirectory = path.resolve(__dirname, '../../frontend/dist')
@@ -137,7 +137,6 @@ app.use(errorHandler)
 
 io.use(async (socket, next) => {
 	const token = String(socket.handshake.auth?.token || '')
-	if (!token) return next()
 	try {
 		socket.data.auth = await authService.authenticate(token)
 		return next()
@@ -159,6 +158,17 @@ io.on('connection', async (socket) => {
 
 	socket.on('emergency:request', async ({ id } = {}) => {
 		try {
+			const requestingUser = socket.data.auth?.user
+			if (
+				requestingUser?.role === 'officer'
+				&& requestingUser.personnelId !== id
+			) {
+				socket.emit('emergency:status', {
+					success: false,
+					message: 'Backup can only be requested for your assigned profile.',
+				})
+				return
+			}
 			const member = await getPersonnelMember(id)
 			if (!member) {
 				socket.emit('emergency:status', {
