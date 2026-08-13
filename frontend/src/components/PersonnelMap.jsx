@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import Supercluster from 'supercluster'
+import '../services/configureMapLibre'
 import MapAttribution from './MapAttribution'
 import MapStyleControls from './MapStyleControls'
 import { useDocumentTheme } from '../hooks/useDocumentTheme'
@@ -22,6 +23,7 @@ import {
   featureCollection,
   setGeoJsonSourceData,
 } from '../utils/mapLibreLayers'
+import { addMobileLikeNavigationControls } from '../utils/mapNavigation'
 import {
   MARKER_ANIMATION_DURATION_MS,
   interpolateLatLng,
@@ -285,12 +287,15 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
       zoom: LIVE_MAP_DEFAULT_ZOOM,
       maxZoom: 20,
       maxPitch: 65,
+      dragRotate: true,
+      touchZoomRotate: true,
+      touchPitch: true,
       antialias: true,
       attributionControl: false,
       fadeDuration: 200,
     })
     mapRef.current = map
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left')
+    const removeNavigationListeners = addMobileLikeNavigationControls(map)
 
     const handleStyleLoad = () => {
       addOperationalLayers(map, deploymentDataRef.current)
@@ -313,6 +318,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
     const markerStates = markerStatesRef.current
 
     return () => {
+      removeNavigationListeners()
       resizeObserver.disconnect()
       window.removeEventListener('focus-live-map', handleFocusLiveMap)
       markerStates.forEach((state) => {
@@ -408,7 +414,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
     if (styleSignatureRef.current === signature) return
     styleSignatureRef.current = signature
     setMapReady(false)
-    map.setStyle(getMapTilerWebStyleUrl(mapMode, isDark), { diff: true })
+    map.setStyle(getMapTilerWebStyleUrl(mapMode, isDark), { diff: false })
   }, [isDark, mapMode])
 
   useEffect(() => {

@@ -236,7 +236,7 @@
 
 .login-submit-btn:hover,
 .login-submit-btn:focus-visible {
-  background: #3677ff;
+  background: #2864e8;
   color: #ffffff;
   transform: translateY(-1px);
 }
@@ -354,6 +354,11 @@
   color: var(--text-secondary);
   font-size: 1.5rem;
   line-height: 1;
+}
+
+.auth-modal__close:hover {
+  background: #eff6ff;
+  color: var(--color-primary);
 }
 
 .auth-modal form {

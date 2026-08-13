@@ -151,13 +151,24 @@
 }
 
 .analytics-segmented-control button:hover {
-  color: var(--text-primary);
+  background: transparent;
+  color: var(--color-primary-dark);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-skip-ink: none;
 }
 
 .analytics-segmented-control button.is-active {
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--color-primary-dark);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-skip-ink: none;
 }
 
 .analytics-segmented-control--compact {
@@ -281,9 +292,12 @@
   transition: background var(--transition-base), color var(--transition-base);
 }
 
-.barangay-bar-row:hover,
+.barangay-bar-row:hover {
+  background: #eff6ff;
+}
+
 .barangay-bar-row.is-selected {
-  background: var(--bg-secondary);
+  background: #dbeafe;
   color: var(--text-primary);
 }
 
@@ -353,9 +367,12 @@
   border-top: 1px solid var(--border-color-light);
 }
 
-.barangay-priority-row:hover,
+.barangay-priority-row:hover {
+  background: #eff6ff;
+}
+
 .barangay-priority-row.is-selected {
-  background: var(--bg-secondary);
+  background: #dbeafe;
 }
 
 .barangay-priority-row__rank {

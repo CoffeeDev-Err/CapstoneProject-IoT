@@ -255,9 +255,9 @@
 }
 
 .report-action-btn--secondary:hover {
-  border-color: #94a3b8;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  border-color: var(--color-primary);
+  background: var(--bg-primary);
+  color: var(--color-primary-dark);
 }
 
 .report-action-btn--primary {
@@ -267,8 +267,8 @@
 }
 
 .report-action-btn--primary:hover {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
 }
 
 .report-pagination {
@@ -312,12 +312,18 @@
 }
 
 .report-page-btn:hover:not(:disabled) {
-  border-color: var(--color-primary-light);
-  background: var(--bg-secondary);
+  border-color: var(--color-primary);
+  background: var(--bg-primary);
   color: var(--color-primary-dark);
 }
 
 .report-page-btn.is-active {
+  border-color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  color: #ffffff;
+}
+
+.report-page-btn.is-active:hover:not(:disabled) {
   border-color: var(--color-primary-dark);
   background: var(--color-primary-dark);
   color: #ffffff;
@@ -344,7 +350,7 @@
 }
 
 .report-generate-btn:hover {
-  background: var(--color-primary);
+  background: var(--color-primary-dark);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -358,5 +364,5 @@
 }
 
 .report-generate-btn--assign:hover {
-  background: var(--color-primary-dark);
+  background: var(--color-primary);
 }

@@ -22,9 +22,9 @@
 }
 
 .assignment-inline-btn:hover:not(:disabled) {
-  background: #eff6ff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
+  background: var(--bg-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
   transform: none;
   box-shadow: none;
 }
@@ -113,9 +113,9 @@
 }
 
 .assignment-group-menu-trigger:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: var(--bg-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
   box-shadow: none;
   transform: none;
 }
@@ -169,9 +169,9 @@
 }
 
 .assignment-group-edit-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #ffffff;
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
   transform: none;
   box-shadow: none;
 }
@@ -183,8 +183,9 @@
 }
 
 .assignment-group-delete-btn:hover {
-  background: var(--color-danger-soft);
+  background: #ffffff;
   border-color: var(--color-danger);
+  color: var(--color-danger-dark);
   transform: none;
   box-shadow: none;
 }
@@ -206,9 +207,9 @@
 }
 
 .assignment-edit-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #ffffff;
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
   transform: none;
   box-shadow: none;
 }
@@ -232,8 +233,9 @@
 
 .assignment-delete-btn:hover,
 .assignment-remove-btn:hover {
-  background: var(--color-danger-soft);
+  background: #ffffff;
   border-color: var(--color-danger);
+  color: var(--color-danger-dark);
   transform: none;
   box-shadow: none;
 }

@@ -57,7 +57,7 @@
 }
 
 .side-panel-collapse-btn:hover {
-  background: rgba(35, 56, 90, 0.9);
+  background: rgba(31, 45, 70, 0.8);
   border-color: var(--text-secondary);
   color: var(--border-color-light);
   transform: scale(1.05);
@@ -181,11 +181,16 @@
 }
 
 .list-item-btn:hover {
-  border-color: var(--color-primary-light);
-  background: #eff6ff;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   transform: translateX(4px);
   box-shadow: var(--shadow-xs);
-  color: var(--color-primary);
+  color: #ffffff;
+}
+
+.list-item-btn:hover small,
+.list-item-btn:hover .list-item-info .text-body-secondary {
+  color: #dbeafe !important;
 }
 
 .list-item-btn small {
@@ -214,6 +219,7 @@
   overflow: hidden;
   border-radius: 12px;
   background: #dce5ef;
+  transition: background-color 180ms ease;
 }
 
 .map-view .maplibregl-canvas {
@@ -225,10 +231,11 @@
   z-index: 6;
   top: 1.1rem;
   right: 1.1rem;
+  width: 44px;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.25rem;
+  gap: 0;
+  padding: 3px;
   border: 1px solid rgba(148, 163, 184, 0.42);
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.94);
@@ -237,12 +244,15 @@
 }
 
 .map-style-button {
-  min-width: 88px;
-  min-height: 38px;
-  padding: 0 0.65rem;
+  width: 36px;
+  min-width: 36px;
+  min-height: 40px;
+  padding: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.45rem;
+  justify-content: center;
+  gap: 1px;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -255,7 +265,7 @@
 
 .map-style-button:hover {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--color-primary-dark);
 }
 
 .map-style-button:active {
@@ -263,14 +273,29 @@
 }
 
 .map-style-button.is-active {
-  background: #2563eb;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
 .map-style-button svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
+}
+
+.map-style-button span {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: nowrap;
+  border: 0;
+  font-size: 0.56rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
 }
 
 .map-style-control--compact {
@@ -279,22 +304,75 @@
 }
 
 .map-style-control--compact .map-style-button {
-  min-width: 36px;
-  width: 36px;
   min-height: 36px;
-  padding: 0;
-  justify-content: center;
 }
 
-.map-style-control--compact .map-style-button span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
+.map-mobile-compass {
+  /* The map canvas is inset by the panel padding; compensate so this aligns
+     with the sibling display control, which is positioned from the panel. */
+  margin-top: 9.75rem !important;
+  margin-right: 0.55rem !important;
+  width: 44px;
+  padding: 3px;
+  border-radius: 13px !important;
+  box-sizing: border-box;
+  opacity: 1;
+  transform: scale(1);
+  visibility: visible;
+  transition: opacity 160ms ease, transform 160ms ease, visibility 0s;
+}
+
+.map-mobile-compass.is-facing-north {
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.86);
+  visibility: hidden;
+  transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
+}
+
+.map-mobile-compass .maplibregl-ctrl-compass {
+  width: 36px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.map-mobile-compass .maplibregl-ctrl-compass .maplibregl-ctrl-icon {
+  width: 36px;
+  height: 40px;
+}
+
+.map-view .maplibregl-ctrl-group,
+.report-location-map__canvas .maplibregl-ctrl-group {
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.18);
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.map-view .maplibregl-ctrl-group button + button,
+.report-location-map__canvas .maplibregl-ctrl-group button + button {
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+.map-view .maplibregl-ctrl-group button:not(:disabled):hover,
+.report-location-map__canvas .maplibregl-ctrl-group button:not(:disabled):hover {
+  background: #eff6ff;
+}
+
+.map-view .maplibregl-ctrl-group button:not(:disabled):hover .maplibregl-ctrl-icon,
+.report-location-map__canvas .maplibregl-ctrl-group button:not(:disabled):hover .maplibregl-ctrl-icon {
+  filter: invert(35%) sepia(96%) saturate(2395%) hue-rotate(216deg) brightness(91%);
+}
+
+.map-view .maplibregl-ctrl-icon,
+.report-location-map__canvas .maplibregl-ctrl-icon {
+  transition: filter 180ms ease, opacity 180ms ease;
+}
+
+.report-location-map__stage .map-mobile-compass {
+  margin-top: 8.2rem !important;
 }
 
 .maptiler-credit {
@@ -314,6 +392,7 @@
   font-weight: 700;
   text-decoration: none;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
 .maptiler-credit:hover {
@@ -574,7 +653,7 @@
 .profile-map-card__close:hover {
   color: #ffffff;
   border-color: #4c6080;
-  background: #1d2c45;
+  background: #17243a;
 }
 
 .profile-map-card__header {
@@ -693,7 +772,7 @@
 }
 
 .profile-map-card__locate:hover {
-  background: #1d4ed8;
+  background: #2563eb;
 }
 
 .profile-map-card__locate:disabled {
@@ -816,7 +895,9 @@
 }
 
 .secondary-btn:hover {
-  background: var(--border-color-light);
+  border-color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   transform: translateY(-1px);
   box-shadow: var(--shadow-xs);
 }
@@ -828,7 +909,7 @@
 }
 
 .locate-btn:hover {
-  background: var(--color-primary-dark);
+  background: var(--color-primary);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -887,8 +968,9 @@
 }
 
 .confirm-btn--cancel:hover {
-  border-color: #94a3b8;
-  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   transform: none;
   box-shadow: none;
 }
@@ -902,7 +984,7 @@
 
 .confirm-btn--danger:hover {
   border-color: var(--color-danger-dark);
-  background: var(--color-danger-dark);
+  background: var(--color-danger);
   transform: none;
   box-shadow: none;
 }
@@ -916,7 +998,7 @@
 
 .confirm-btn--primary:hover {
   border-color: var(--color-primary-dark);
-  background: var(--color-primary-dark);
+  background: var(--color-primary);
   transform: none;
   box-shadow: none;
 }

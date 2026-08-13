@@ -30,6 +30,18 @@ const mapConfigSource = fs.readFileSync(
   path.join(projectRoot, 'src', 'services', 'mapTilerWeb.js'),
   'utf8',
 )
+const mapLibreSetupSource = fs.readFileSync(
+  path.join(projectRoot, 'src', 'services', 'configureMapLibre.js'),
+  'utf8',
+)
+const mapNavigationSource = fs.readFileSync(
+  path.join(projectRoot, 'src', 'utils', 'mapNavigation.js'),
+  'utf8',
+)
+const darkThemeSource = fs.readFileSync(
+  path.join(projectRoot, 'src', 'styles', 'dark-theme.css'),
+  'utf8',
+)
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
 
 assert.equal(MARKER_ANIMATION_DURATION_MS, 700, 'Web marker interpolation must remain at 700ms')
@@ -57,6 +69,30 @@ assert.match(mapControlsSource, /Use satellite map/, 'Satellite map control must
 assert.match(mapControlsSource, /Enable 3D terrain/, '3D terrain control must remain available')
 assert.match(mapConfigSource, /streets-v4-dark/, 'Dark street style must remain configured')
 assert.match(mapConfigSource, /hybrid-v4-dark/, 'Dark satellite style must remain configured')
+assert.match(
+  mapLibreSetupSource,
+  /maplibre-gl-worker\.mjs\?worker&url/,
+  'Vite must bundle the MapLibre v6 worker so vector and GeoJSON layers render',
+)
+assert.match(personnelMapSource, /diff: false/, 'Personnel style swaps must fully reload operational layers')
+assert.match(reportMapSource, /diff: false/, 'Report style swaps must fully reload route layers')
+assert.match(
+  reportMapSource,
+  /mapCenterLatitude, mapCenterLongitude/,
+  'Route data updates must not remount the map through an unstable coordinate array',
+)
+assert.match(
+  reportMapSource,
+  /getMapTilerWebStyleUrl\(currentMapMode, currentIsDark\)/,
+  'A recreated route map must preserve its selected map style and theme',
+)
+assert.match(mapNavigationSource, /dragRotate\.enable/, 'Desktop drag rotation must be enabled')
+assert.match(mapNavigationSource, /touchZoomRotate\.enableRotation/, 'Touch rotation must be enabled')
+assert.match(mapNavigationSource, /is-facing-north/, 'Compass must hide when the map faces north like mobile')
+assert.match(darkThemeSource, /report-location-map__canvas/, 'Route map canvas must support dark mode')
+assert.match(darkThemeSource, /maplibregl-ctrl-group/, 'Native map controls must support dark mode')
+assert.match(darkThemeSource, /maptiler-credit/, 'Map attribution must remain readable in dark mode')
+assert.match(darkThemeSource, /personnel-table thead/, 'Personnel table header must support dark mode')
 assert.match(mapLayersSource, /setTerrain/, '3D terrain must be applied through MapLibre')
 assert.match(mapLayersSource, /fill-extrusion/, '3D building extrusion must remain configured')
 

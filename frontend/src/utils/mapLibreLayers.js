@@ -51,10 +51,24 @@ export const setGeoJsonSourceData = (map, sourceId, data) => {
   if (source?.setData) source.setData(data)
 }
 
-const firstSymbolLayerId = (map) => map.getStyle()?.layers?.find((layer) => layer.type === 'symbol')?.id
+const firstSymbolLayerId = (map) => map.getStyle()?.layers?.find(
+  (layer) => layer.type === 'symbol' && map.getLayer(layer.id),
+)?.id
+
+const addLayerBelowLabels = (map, layer) => {
+  const beforeLayerId = firstSymbolLayerId(map)
+  if (beforeLayerId) map.addLayer(layer, beforeLayerId)
+  else map.addLayer(layer)
+}
+
+const findVectorBasemapSource = (map) => {
+  const sources = map.getStyle()?.sources || {}
+  return ['maptiler_planet_v4', 'maptiler_planet', 'openmaptiles']
+    .find((sourceId) => sources[sourceId]?.type === 'vector')
+}
 
 export const applyThreeDimensionalTerrain = (map, enabled) => {
-  if (!map?.isStyleLoaded()) return
+  if (!map?.getStyle()) return false
 
   if (!enabled) {
     map.setTerrain(null)
@@ -62,7 +76,7 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
     if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID)
     if (map.getSource(TERRAIN_SOURCE_ID)) map.removeSource(TERRAIN_SOURCE_ID)
     map.easeTo({ pitch: 0, duration: 550 })
-    return
+    return true
   }
 
   if (!map.getSource(TERRAIN_SOURCE_ID)) {
@@ -76,10 +90,8 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
   }
 
   map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.12 })
-  const beforeLayerId = firstSymbolLayerId(map)
-
   if (!map.getLayer(HILLSHADE_LAYER_ID)) {
-    map.addLayer({
+    addLayerBelowLabels(map, {
       id: HILLSHADE_LAYER_ID,
       type: 'hillshade',
       source: TERRAIN_SOURCE_ID,
@@ -88,14 +100,15 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
         'hillshade-shadow-color': '#071326',
         'hillshade-highlight-color': '#d8e8ff',
       },
-    }, beforeLayerId)
+    })
   }
 
-  if (map.getSource('openmaptiles') && !map.getLayer(BUILDINGS_LAYER_ID)) {
-    map.addLayer({
+  const basemapSourceId = findVectorBasemapSource(map)
+  if (basemapSourceId && !map.getLayer(BUILDINGS_LAYER_ID)) {
+    addLayerBelowLabels(map, {
       id: BUILDINGS_LAYER_ID,
       type: 'fill-extrusion',
-      source: 'openmaptiles',
+      source: basemapSourceId,
       'source-layer': 'building',
       minzoom: 15,
       paint: {
@@ -104,8 +117,9 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
         'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
         'fill-extrusion-opacity': 0.72,
       },
-    }, beforeLayerId)
+    })
   }
 
   map.easeTo({ pitch: 52, duration: 650 })
+  return true
 }
