@@ -75,14 +75,24 @@
 }
 
 .account-view-tab:hover {
-  background: var(--border-color-light);
-  color: var(--text-primary);
+  background: transparent;
+  color: var(--color-primary-dark);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-skip-ink: none;
 }
 
 .account-view-tab--active {
-  background: var(--color-primary);
-  color: #ffffff;
-  box-shadow: var(--shadow-xs);
+  background: transparent;
+  color: var(--color-primary-dark);
+  box-shadow: none;
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-skip-ink: none;
 }
 
 .account-create-section {
@@ -259,9 +269,9 @@
 }
 
 .account-action-btn:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
   transform: none;
   box-shadow: none;
 }
@@ -275,7 +285,7 @@
 
 .account-submit-btn:hover:not(:disabled) {
   border-color: var(--color-primary-dark);
-  background: var(--color-primary-dark);
+  background: var(--color-primary);
   transform: none;
   box-shadow: 0 8px 18px -12px rgba(37, 99, 235, 0.8);
 }
@@ -410,9 +420,9 @@
 }
 
 .account-table-btn--edit:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #ffffff;
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
   box-shadow: none;
 }
 
@@ -424,7 +434,7 @@
 
 .account-table-btn--delete:hover {
   border-color: var(--color-danger);
-  background: var(--color-danger-soft);
-  color: var(--color-danger-strong);
+  background: #ffffff;
+  color: var(--color-danger-dark);
   box-shadow: none;
 }

@@ -251,7 +251,7 @@ function ReportDetailDrawer({
                 disabled={validationState?.isSaving || report.validation_status === 'rejected'}
               >
                 <XCircle aria-hidden="true" />
-                Reject
+                {report.validation_status === 'rejected' ? 'Rejected' : 'Reject'}
               </button>
               <button
                 type="button"
@@ -260,7 +260,11 @@ function ReportDetailDrawer({
                 disabled={validationState?.isSaving || report.validation_status === 'validated'}
               >
                 <CheckCircle2 aria-hidden="true" />
-                {validationState?.isSaving ? 'Saving...' : 'Validate report'}
+                {validationState?.isSaving
+                  ? 'Saving...'
+                  : report.validation_status === 'validated'
+                    ? 'Validated'
+                    : 'Validate report'}
               </button>
             </div>
             {(validationState?.message || validationState?.error) && (

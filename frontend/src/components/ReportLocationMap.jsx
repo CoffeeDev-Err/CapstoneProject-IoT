@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
+import '../services/configureMapLibre'
 import MapAttribution from './MapAttribution'
 import MapStyleControls from './MapStyleControls'
 import { useDocumentTheme } from '../hooks/useDocumentTheme'
@@ -12,6 +13,7 @@ import {
   featureCollection,
   setGeoJsonSourceData,
 } from '../utils/mapLibreLayers'
+import { addMobileLikeNavigationControls } from '../utils/mapNavigation'
 
 const isValidCoordinate = (latitude, longitude) => (
   latitude !== null
@@ -29,7 +31,6 @@ const isValidCoordinate = (latitude, longitude) => (
 )
 
 const addReportRouteLayer = (map, data) => {
-  const firstSymbolLayerId = map.getStyle()?.layers?.find((layer) => layer.type === 'symbol')?.id
   if (!map.getSource('geosentri-report-route')) {
     map.addSource('geosentri-report-route', { type: 'geojson', data })
   } else {
@@ -47,7 +48,7 @@ const addReportRouteLayer = (map, data) => {
         'line-width': 4,
         'line-opacity': 0.88,
       },
-    }, firstSymbolLayerId)
+    })
   }
 }
 
@@ -73,11 +74,21 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
   const positionsRef = useRef([])
   const pointMarkersRef = useRef([])
   const threeDRef = useRef(false)
+  const mapModeRef = useRef('street')
+  const isDarkRef = useRef(initialIsDark)
   const styleSignatureRef = useRef(`street:${initialIsDark ? 'dark' : 'light'}`)
   const [mapMode, setMapMode] = useState('street')
   const [threeDEnabled, setThreeDEnabled] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const isDark = useDocumentTheme()
+
+  useEffect(() => {
+    mapModeRef.current = mapMode
+  }, [mapMode])
+
+  useEffect(() => {
+    isDarkRef.current = isDark
+  }, [isDark])
 
   const incidentPosition = useMemo(() => (
     isValidCoordinate(incident?.latitude, incident?.longitude)
@@ -93,6 +104,8 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     incidentPosition ? [...routePositions, incidentPosition] : routePositions
   ), [incidentPosition, routePositions])
   const mapCenter = incidentPosition || routePositions[routePositions.length - 1] || null
+  const mapCenterLatitude = mapCenter?.[0] ?? null
+  const mapCenterLongitude = mapCenter?.[1] ?? null
 
   const routeData = useMemo(() => featureCollection(
     routePositions.length > 1
@@ -163,21 +176,33 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
   }, [incidentPosition, markerLabel, routePositions])
 
   useEffect(() => {
-    if (!hasMapTilerWebApiKey || !containerRef.current || !mapCenter) return undefined
+    if (
+      !hasMapTilerWebApiKey
+      || !containerRef.current
+      || mapCenterLatitude === null
+      || mapCenterLongitude === null
+    ) return undefined
+
+    const currentMapMode = mapModeRef.current
+    const currentIsDark = isDarkRef.current
+    styleSignatureRef.current = `${currentMapMode}:${currentIsDark ? 'dark' : 'light'}`
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: getMapTilerWebStyleUrl('street', initialIsDark),
-      center: [mapCenter[1], mapCenter[0]],
+      style: getMapTilerWebStyleUrl(currentMapMode, currentIsDark),
+      center: [mapCenterLongitude, mapCenterLatitude],
       zoom: 17,
       maxZoom: 20,
       maxPitch: 65,
+      dragRotate: true,
+      touchZoomRotate: true,
+      touchPitch: true,
       antialias: true,
       attributionControl: false,
       fadeDuration: 180,
     })
     mapRef.current = map
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left')
+    const removeNavigationListeners = addMobileLikeNavigationControls(map)
 
     const handleStyleLoad = () => {
       addReportRouteLayer(map, routeDataRef.current)
@@ -194,13 +219,14 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     resizeObserver.observe(containerRef.current)
 
     return () => {
+      removeNavigationListeners()
       resizeObserver.disconnect()
       pointMarkersRef.current.forEach((marker) => marker.remove())
       pointMarkersRef.current = []
       map.remove()
       mapRef.current = null
     }
-  }, [fitReportMap, initialIsDark, mapCenter])
+  }, [fitReportMap, initialIsDark, mapCenterLatitude, mapCenterLongitude])
 
   useEffect(() => {
     routeDataRef.current = routeData
@@ -220,7 +246,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     if (styleSignatureRef.current === signature) return
     styleSignatureRef.current = signature
     setMapReady(false)
-    map.setStyle(getMapTilerWebStyleUrl(mapMode, isDark), { diff: true })
+    map.setStyle(getMapTilerWebStyleUrl(mapMode, isDark), { diff: false })
   }, [isDark, mapMode])
 
   useEffect(() => {
