@@ -9,6 +9,11 @@ const DEPLOYMENT_MODES = {
   SCHEDULE_LATER: 'schedule_later',
 }
 
+const DEPLOYMENT_LIST_VIEWS = {
+  ACTIVE_NOW: 'active_now',
+  SCHEDULED_LATER: 'scheduled_later',
+}
+
 const patrolAreas = [
   ...CABAGAN_BARANGAYS.map((barangay) => `Barangay ${barangay}`),
   'Cabagan Public Market Zone',
@@ -155,6 +160,7 @@ function AssignAreaPage() {
   const [pendingDeleteAssignment, setPendingDeleteAssignment] = useState(null)
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
   const [deploymentSearch, setDeploymentSearch] = useState('')
+  const [activeDeploymentView, setActiveDeploymentView] = useState(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
   const [openGroupMenuId, setOpenGroupMenuId] = useState(null)
   const [assignMessage, setAssignMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -222,10 +228,26 @@ function AssignAreaPage() {
     return patrolAreas.filter((area) => area.toLowerCase().includes(searchQuery))
   }, [patrolAreaSearch])
 
+  const deploymentViewCounts = useMemo(() => assignments.reduce((counts, assignment) => {
+    if (assignment.status === 'scheduled') {
+      counts.scheduled += 1
+    } else if (assignment.status === 'active') {
+      counts.active += 1
+    }
+
+    return counts
+  }, { active: 0, scheduled: 0 }), [assignments])
+
+  const visibleAssignments = useMemo(() => assignments.filter((assignment) => (
+    activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+      ? assignment.status === 'scheduled'
+      : assignment.status === 'active'
+  )), [activeDeploymentView, assignments])
+
   const groupedAssignments = useMemo(() => {
     const groupsMap = new Map()
 
-    assignments.forEach((assignment) => {
+    visibleAssignments.forEach((assignment) => {
       const groupId = resolveGroupId(assignment)
 
       if (!groupsMap.has(groupId)) {
@@ -240,7 +262,7 @@ function AssignAreaPage() {
     })
 
     return Array.from(groupsMap.values())
-  }, [assignments])
+  }, [visibleAssignments])
 
   const filteredGroupedAssignments = useMemo(() => {
     const query = deploymentSearch.trim().toLowerCase()
@@ -430,6 +452,9 @@ function AssignAreaPage() {
         `${nextGroupAssignments.length} personnel reassigned to ${assignmentForm.patrolArea.trim()}.`
       )
       if (!saved) return
+      setActiveDeploymentView(deploymentStatus === 'scheduled'
+        ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+        : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
       setEditingGroupId(null)
       setEditingAssignmentId(null)
       resetAssignmentForm()
@@ -467,6 +492,9 @@ function AssignAreaPage() {
         `${selectedMember.name} reassigned to ${assignmentForm.patrolArea.trim()}.`
       )
       if (!saved) return
+      setActiveDeploymentView(deploymentStatus === 'scheduled'
+        ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+        : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
       setEditingAssignmentId(null)
       setEditingGroupId(null)
       resetAssignmentForm()
@@ -495,6 +523,9 @@ function AssignAreaPage() {
 
     const saved = await commitAssignments([...newAssignments, ...assignments], feedback)
     if (!saved) return
+    setActiveDeploymentView(deploymentStatus === 'scheduled'
+      ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+      : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
     resetAssignmentForm()
   }
 
@@ -876,14 +907,52 @@ function AssignAreaPage() {
           />
         </div>
 
-        {assignments.length === 0 ? (
-          <p className="text-body-secondary mb-0 small">No deployment assignments yet.</p>
-        ) : filteredGroupedAssignments.length === 0 ? (
-          <p className="text-body-secondary mb-0 small">
-            No deployment group matched "{deploymentSearch}".
-          </p>
-        ) : (
-          <table className="personnel-table table align-middle mb-0">
+        <div className="deployment-view-nav mb-3" role="tablist" aria-label="Deployment list views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW}
+            aria-controls="deployment-list-panel"
+            className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? ' deployment-view-tab--active' : ''}`}
+            onClick={() => {
+              setActiveDeploymentView(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
+              setOpenGroupMenuId(null)
+            }}
+          >
+            Active Now
+            <span className="deployment-view-count">{deploymentViewCounts.active}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER}
+            aria-controls="deployment-list-panel"
+            className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? ' deployment-view-tab--active' : ''}`}
+            onClick={() => {
+              setActiveDeploymentView(DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER)
+              setOpenGroupMenuId(null)
+            }}
+          >
+            Scheduled Later
+            <span className="deployment-view-count">{deploymentViewCounts.scheduled}</span>
+          </button>
+        </div>
+
+        <div id="deployment-list-panel" role="tabpanel" className="deployment-list-panel">
+          {assignments.length === 0 ? (
+            <p className="text-body-secondary mb-0 small">No deployment assignments yet.</p>
+          ) : visibleAssignments.length === 0 ? (
+            <p className="text-body-secondary mb-0 small">
+              {activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+                ? 'No deployments are scheduled for later.'
+                : 'No deployments are active now.'}
+            </p>
+          ) : filteredGroupedAssignments.length === 0 ? (
+            <p className="text-body-secondary mb-0 small">
+              No deployment group matched "{deploymentSearch}".
+            </p>
+          ) : (
+            <table className="personnel-table assignment-list-table table align-middle mb-0">
             <thead>
               <tr className="assignment-group-table">
                 <th>Assignment ID</th>
@@ -958,29 +1027,32 @@ function AssignAreaPage() {
                         </span>
                       </td>
                       <td>{formatDateTime(assignment.assignedAt)}</td>
-                      <td className="assignment-table-actions">
-                        <button
-                          type="button"
-                          className="assignment-edit-btn"
-                          onClick={() => handleEditAssignment(assignment)}
-                        >
-                          Re-assign
-                        </button>
-                        <button
-                          type="button"
-                          className="assignment-delete-btn"
-                          onClick={() => handleRequestDeleteAssignment(assignment)}
-                        >
-                          Delete
-                        </button>
+                      <td className="assignment-actions-cell">
+                        <div className="assignment-table-actions">
+                          <button
+                            type="button"
+                            className="assignment-edit-btn"
+                            onClick={() => handleEditAssignment(assignment)}
+                          >
+                            Re-assign
+                          </button>
+                          <button
+                            type="button"
+                            className="assignment-delete-btn"
+                            onClick={() => handleRequestDeleteAssignment(assignment)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </Fragment>
               ))}
             </tbody>
-          </table>
-        )}
+            </table>
+          )}
+        </div>
       </div>
 
       <ConfirmModal

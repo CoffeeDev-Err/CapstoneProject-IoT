@@ -13,6 +13,7 @@
   color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 700;
+  font-weight: 700;
   min-height: 40px;
   padding: 0.55rem 0.8rem;
   cursor: pointer;
@@ -50,16 +51,84 @@
   width: min(22rem, 100%);
 }
 
+.deployment-view-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xs);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.deployment-view-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 0;
+  border-radius: 9px;
+  padding: 0.5rem 0.85rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.844rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.deployment-view-tab:hover,
+.deployment-view-tab--active {
+  color: var(--color-primary-dark);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-skip-ink: none;
+}
+
+.deployment-view-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45rem;
+  min-height: 1.45rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.deployment-list-panel {
+  min-width: 0;
+}
+
+.assignment-list-table th:last-child {
+  min-width: 13.25rem;
+  text-align: center;
+}
+
 .assignment-table-actions {
   white-space: nowrap;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
 }
 
+.assignment-actions-cell {
+  min-width: 13.25rem;
+  vertical-align: middle;
+}
+
 .assignment-group-row td {
-  border-bottom: 1px solid #1e3a5f;
-  background: #0f172a;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
 }
 
 .assignment-group-cell {
@@ -73,14 +142,14 @@
 
 .assignment-group-label {
   display: block;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.84rem;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
 .assignment-group-meta {
-  color: #bfdbfe;
+  color: var(--text-secondary);
   font-size: 0.73rem;
   font-weight: 600;
 }
@@ -88,7 +157,7 @@
 .assignment-group-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 0.45rem;
 }
@@ -103,6 +172,7 @@
   color: var(--text-secondary);
   border-radius: 8px;
   min-height: 40px;
+  min-width: 8.6rem;
   padding: 0.55rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 700;
@@ -122,8 +192,9 @@
 
 .assignment-group-menu-dropdown {
   position: absolute;
-  left: 0;
+  left: 50%;
   top: calc(100% + 0.34rem);
+  transform: translateX(-50%);
   z-index: 20;
   display: grid;
   gap: 0.4rem;
@@ -144,7 +215,9 @@
 
 .assignment-group-actions-cell {
   padding: 0.75rem 0.9rem;
-  min-width: 0;
+  min-width: 13.25rem;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .assignment-group-edit-btn,
@@ -163,37 +236,37 @@
 }
 
 .assignment-group-edit-btn {
-  border-color: #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
 }
 
 .assignment-group-edit-btn:hover {
-  background: #ffffff;
-  border-color: var(--color-primary);
-  color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: #ffffff;
   transform: none;
   box-shadow: none;
 }
 
 .assignment-group-delete-btn {
-  border-color: var(--color-danger-border);
-  background: #ffffff;
-  color: var(--color-danger-dark);
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #ffffff;
 }
 
 .assignment-group-delete-btn:hover {
-  background: #ffffff;
-  border-color: var(--color-danger);
-  color: var(--color-danger-dark);
+  background: var(--color-danger-dark);
+  border-color: var(--color-danger-dark);
+  color: #ffffff;
   transform: none;
   box-shadow: none;
 }
 
 .assignment-edit-btn {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
   border-radius: 8px;
   min-height: 40px;
   min-width: 96px;
@@ -207,18 +280,18 @@
 }
 
 .assignment-edit-btn:hover {
-  background: #ffffff;
-  border-color: var(--color-primary);
-  color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: #ffffff;
   transform: none;
   box-shadow: none;
 }
 
 .assignment-delete-btn,
 .assignment-remove-btn {
-  border: 1px solid var(--color-danger-border);
-  background: #ffffff;
-  color: var(--color-danger-dark);
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger);
+  color: #ffffff;
   border-radius: 8px;
   min-height: 40px;
   min-width: 96px;
@@ -233,9 +306,9 @@
 
 .assignment-delete-btn:hover,
 .assignment-remove-btn:hover {
-  background: #ffffff;
-  border-color: var(--color-danger);
-  color: var(--color-danger-dark);
+  background: var(--color-danger-dark);
+  border-color: var(--color-danger-dark);
+  color: #ffffff;
   transform: none;
   box-shadow: none;
 }
@@ -254,4 +327,16 @@
 .assignment-delete-btn:focus-visible,
 .assignment-remove-btn:focus-visible {
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16);
+}
+
+@media (max-width: 720px) {
+  .deployment-view-nav {
+    display: flex;
+    width: 100%;
+  }
+
+  .deployment-view-tab {
+    flex: 1;
+    padding-inline: 0.55rem;
+  }
 }

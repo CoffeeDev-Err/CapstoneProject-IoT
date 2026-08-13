@@ -844,23 +844,25 @@ function SettingsPage() {
                               </span>
                             </td>
                             <td>{formatDateTime(account.createdAt)}</td>
-                            <td className="account-table-actions">
-                              <button
-                                type="button"
-                                className="account-table-btn account-table-btn--edit"
-                                onClick={() => handleEditAccount(account.id)}
-                                disabled={accountRequestPending}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="account-table-btn account-table-btn--delete"
-                                onClick={() => handleDeleteAccount(account.id)}
-                                disabled={accountRequestPending || account.accountStatus === 'Inactive'}
-                              >
-                                Delete
-                              </button>
+                            <td className="account-actions-cell">
+                              <div className="account-table-actions">
+                                <button
+                                  type="button"
+                                  className="account-table-btn account-table-btn--edit"
+                                  onClick={() => handleEditAccount(account.id)}
+                                  disabled={accountRequestPending}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="account-table-btn account-table-btn--delete"
+                                  onClick={() => handleDeleteAccount(account.id)}
+                                  disabled={accountRequestPending || account.accountStatus === 'Inactive'}
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
