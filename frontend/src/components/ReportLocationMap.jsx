@@ -1,12 +1,17 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as maplibregl from 'maplibre-gl'
+import MapAttribution from './MapAttribution'
+import MapStyleControls from './MapStyleControls'
+import { useDocumentTheme } from '../hooks/useDocumentTheme'
 import {
-  CircleMarker,
-  MapContainer,
-  Polyline,
-  TileLayer,
-  Tooltip,
-  useMap,
-} from 'react-leaflet'
+  getMapTilerWebStyleUrl,
+  hasMapTilerWebApiKey,
+} from '../services/mapTilerWeb'
+import {
+  applyThreeDimensionalTerrain,
+  featureCollection,
+  setGeoJsonSourceData,
+} from '../utils/mapLibreLayers'
 
 const isValidCoordinate = (latitude, longitude) => (
   latitude !== null
@@ -23,55 +28,206 @@ const isValidCoordinate = (latitude, longitude) => (
   && Number(longitude) <= 180
 )
 
-function FitReportMap({ positions }) {
-  const map = useMap()
+const addReportRouteLayer = (map, data) => {
+  const firstSymbolLayerId = map.getStyle()?.layers?.find((layer) => layer.type === 'symbol')?.id
+  if (!map.getSource('geosentri-report-route')) {
+    map.addSource('geosentri-report-route', { type: 'geojson', data })
+  } else {
+    setGeoJsonSourceData(map, 'geosentri-report-route', data)
+  }
+  if (!map.getLayer('geosentri-report-route-line')) {
+    map.addLayer({
+      id: 'geosentri-report-route-line',
+      type: 'line',
+      source: 'geosentri-report-route',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#2563eb',
+        'line-width': 4,
+        'line-opacity': 0.88,
+      },
+    }, firstSymbolLayerId)
+  }
+}
 
-  useEffect(() => {
-    const resizeTimer = window.setTimeout(() => {
-      map.invalidateSize()
-
-      if (positions.length > 1) {
-        map.fitBounds(positions, {
-          padding: [28, 28],
-          maxZoom: 17,
-          animate: true,
-        })
-        return
-      }
-
-      if (positions.length === 1) {
-        map.setView(positions[0], 17, { animate: true })
-      }
-    }, 120)
-
-    return () => window.clearTimeout(resizeTimer)
-  }, [map, positions])
-
-  return null
+const createPointMarker = ({ className, label, title }) => {
+  const element = document.createElement('div')
+  element.className = `report-map-marker ${className}`
+  element.title = title
+  element.setAttribute('aria-label', title)
+  if (label) {
+    const caption = document.createElement('span')
+    caption.className = 'report-map-marker__label'
+    caption.textContent = label
+    element.append(caption)
+  }
+  return element
 }
 
 function ReportLocationMap({ incident, markerLabel = 'Reported location', routePoints = [] }) {
-  const latitude = incident?.latitude
-  const longitude = incident?.longitude
-  const incidentPosition = useMemo(
-    () => (
-      isValidCoordinate(latitude, longitude)
-        ? [Number(latitude), Number(longitude)]
-        : null
-    ),
-    [latitude, longitude],
-  )
-  const routePositions = useMemo(
-    () => routePoints
-      .filter((point) => isValidCoordinate(point.latitude, point.longitude))
-      .map((point) => [Number(point.latitude), Number(point.longitude)]),
-    [routePoints],
-  )
-  const mapPositions = useMemo(
-    () => incidentPosition ? [...routePositions, incidentPosition] : routePositions,
-    [incidentPosition, routePositions],
-  )
+  const containerRef = useRef(null)
+  const mapRef = useRef(null)
+  const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
+  const routeDataRef = useRef(featureCollection())
+  const positionsRef = useRef([])
+  const pointMarkersRef = useRef([])
+  const threeDRef = useRef(false)
+  const styleSignatureRef = useRef(`street:${initialIsDark ? 'dark' : 'light'}`)
+  const [mapMode, setMapMode] = useState('street')
+  const [threeDEnabled, setThreeDEnabled] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
+  const isDark = useDocumentTheme()
+
+  const incidentPosition = useMemo(() => (
+    isValidCoordinate(incident?.latitude, incident?.longitude)
+      ? [Number(incident.latitude), Number(incident.longitude)]
+      : null
+  ), [incident])
+
+  const routePositions = useMemo(() => routePoints
+    .filter((point) => isValidCoordinate(point.latitude, point.longitude))
+    .map((point) => [Number(point.latitude), Number(point.longitude)]), [routePoints])
+
+  const mapPositions = useMemo(() => (
+    incidentPosition ? [...routePositions, incidentPosition] : routePositions
+  ), [incidentPosition, routePositions])
   const mapCenter = incidentPosition || routePositions[routePositions.length - 1] || null
+
+  const routeData = useMemo(() => featureCollection(
+    routePositions.length > 1
+      ? [{
+        type: 'Feature',
+        properties: { kind: 'route' },
+        geometry: {
+          type: 'LineString',
+          coordinates: routePositions.map(([latitude, longitude]) => [longitude, latitude]),
+        },
+      }]
+      : [],
+  ), [routePositions])
+
+  const fitReportMap = useCallback((animate = true) => {
+    const map = mapRef.current
+    const positions = positionsRef.current
+    if (!map || positions.length === 0) return
+    const lngLatPositions = positions.map(([latitude, longitude]) => [longitude, latitude])
+
+    if (lngLatPositions.length === 1) {
+      map.easeTo({ center: lngLatPositions[0], zoom: 17, duration: animate ? 650 : 0 })
+      return
+    }
+
+    const bounds = lngLatPositions.reduce(
+      (currentBounds, position) => currentBounds.extend(position),
+      new maplibregl.LngLatBounds(lngLatPositions[0], lngLatPositions[0]),
+    )
+    map.fitBounds(bounds, { padding: 28, maxZoom: 17, duration: animate ? 650 : 0 })
+  }, [])
+
+  const renderPointMarkers = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+    pointMarkersRef.current.forEach((marker) => marker.remove())
+    pointMarkersRef.current = []
+
+    if (routePositions.length > 0) {
+      pointMarkersRef.current.push(new maplibregl.Marker({
+        element: createPointMarker({
+          className: 'report-map-marker--start',
+          title: 'Route start',
+        }),
+      }).setLngLat([routePositions[0][1], routePositions[0][0]]).addTo(map))
+    }
+
+    if (routePositions.length > 1) {
+      const lastPosition = routePositions[routePositions.length - 1]
+      pointMarkersRef.current.push(new maplibregl.Marker({
+        element: createPointMarker({
+          className: 'report-map-marker--end',
+          title: 'Route end',
+        }),
+      }).setLngLat([lastPosition[1], lastPosition[0]]).addTo(map))
+    }
+
+    if (incidentPosition) {
+      pointMarkersRef.current.push(new maplibregl.Marker({
+        element: createPointMarker({
+          className: 'report-map-marker--incident',
+          label: markerLabel,
+          title: markerLabel,
+        }),
+        anchor: 'center',
+      }).setLngLat([incidentPosition[1], incidentPosition[0]]).addTo(map))
+    }
+  }, [incidentPosition, markerLabel, routePositions])
+
+  useEffect(() => {
+    if (!hasMapTilerWebApiKey || !containerRef.current || !mapCenter) return undefined
+
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: getMapTilerWebStyleUrl('street', initialIsDark),
+      center: [mapCenter[1], mapCenter[0]],
+      zoom: 17,
+      maxZoom: 20,
+      maxPitch: 65,
+      antialias: true,
+      attributionControl: false,
+      fadeDuration: 180,
+    })
+    mapRef.current = map
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left')
+
+    const handleStyleLoad = () => {
+      addReportRouteLayer(map, routeDataRef.current)
+      applyThreeDimensionalTerrain(map, threeDRef.current)
+      setMapReady(true)
+      window.setTimeout(() => {
+        map.resize()
+        fitReportMap(false)
+      }, 120)
+    }
+    map.on('style.load', handleStyleLoad)
+
+    const resizeObserver = new ResizeObserver(() => map.resize())
+    resizeObserver.observe(containerRef.current)
+
+    return () => {
+      resizeObserver.disconnect()
+      pointMarkersRef.current.forEach((marker) => marker.remove())
+      pointMarkersRef.current = []
+      map.remove()
+      mapRef.current = null
+    }
+  }, [fitReportMap, initialIsDark, mapCenter])
+
+  useEffect(() => {
+    routeDataRef.current = routeData
+    positionsRef.current = mapPositions
+    const map = mapRef.current
+    if (!map) return
+    if (map.isStyleLoaded()) setGeoJsonSourceData(map, 'geosentri-report-route', routeData)
+    renderPointMarkers()
+    const timer = window.setTimeout(() => fitReportMap(true), 120)
+    return () => window.clearTimeout(timer)
+  }, [fitReportMap, mapPositions, renderPointMarkers, routeData])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const signature = `${mapMode}:${isDark ? 'dark' : 'light'}`
+    if (styleSignatureRef.current === signature) return
+    styleSignatureRef.current = signature
+    setMapReady(false)
+    map.setStyle(getMapTilerWebStyleUrl(mapMode, isDark), { diff: true })
+  }, [isDark, mapMode])
+
+  useEffect(() => {
+    threeDRef.current = threeDEnabled
+    const map = mapRef.current
+    if (map?.isStyleLoaded()) applyThreeDimensionalTerrain(map, threeDEnabled)
+  }, [threeDEnabled])
 
   if (!mapCenter) {
     return (
@@ -81,59 +237,28 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     )
   }
 
+  if (!hasMapTilerWebApiKey) {
+    return (
+      <div className="report-location-map__empty">
+        Add VITE_MAPTILER_API_KEY to display the report location and route.
+      </div>
+    )
+  }
+
   return (
     <div className="report-location-map">
-      <MapContainer
-        center={mapCenter}
-        zoom={17}
-        scrollWheelZoom
-        className="report-location-map__canvas"
-      >
-        <FitReportMap positions={mapPositions} />
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      <div className="report-location-map__stage">
+        <div ref={containerRef} className="report-location-map__canvas" aria-label="Reported location and officer route map" />
+        <MapStyleControls
+          compact
+          mapMode={mapMode}
+          threeDEnabled={threeDEnabled}
+          onMapModeChange={setMapMode}
+          onThreeDChange={setThreeDEnabled}
         />
-
-        {routePositions.length > 1 && (
-          <Polyline
-            positions={routePositions}
-            pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.85 }}
-          />
-        )}
-
-        {routePositions.length > 0 && (
-          <CircleMarker
-            center={routePositions[0]}
-            radius={6}
-            pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 }}
-          >
-            <Tooltip direction="top">Route start</Tooltip>
-          </CircleMarker>
-        )}
-
-        {routePositions.length > 1 && (
-          <CircleMarker
-            center={routePositions[routePositions.length - 1]}
-            radius={6}
-            pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 }}
-          >
-            <Tooltip direction="top">Route end</Tooltip>
-          </CircleMarker>
-        )}
-
-        {incidentPosition && (
-          <CircleMarker
-            center={incidentPosition}
-            radius={9}
-            pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#dc2626', fillOpacity: 1 }}
-          >
-            <Tooltip permanent direction="top">
-              {markerLabel}
-            </Tooltip>
-          </CircleMarker>
-        )}
-      </MapContainer>
+        <MapAttribution />
+        {!mapReady && <div className="map-style-loading map-style-loading--compact" role="status">Loading…</div>}
+      </div>
 
       <div className="report-location-map__legend" aria-label="Map legend">
         {incidentPosition && (

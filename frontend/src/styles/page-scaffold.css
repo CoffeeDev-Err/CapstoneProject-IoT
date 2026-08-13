@@ -21,3 +21,12 @@
   font-weight: 500;
   letter-spacing: 0.01em;
 }
+
+.route-page-loading {
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}

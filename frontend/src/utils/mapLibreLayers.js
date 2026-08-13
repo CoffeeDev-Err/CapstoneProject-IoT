@@ -1,0 +1,111 @@
+import { CABAGAN_BOUNDARY_COORDS } from './cabaganGeofence'
+import { getMapTilerWebTerrainUrl } from '../services/mapTilerWeb'
+
+const TERRAIN_SOURCE_ID = 'geosentri-terrain'
+const HILLSHADE_LAYER_ID = 'geosentri-terrain-hillshade'
+const BUILDINGS_LAYER_ID = 'geosentri-3d-buildings'
+
+const closeRing = (coordinates) => {
+  if (coordinates.length === 0) return coordinates
+  const [firstLongitude, firstLatitude] = coordinates[0]
+  const [lastLongitude, lastLatitude] = coordinates[coordinates.length - 1]
+  return firstLongitude === lastLongitude && firstLatitude === lastLatitude
+    ? coordinates
+    : [...coordinates, coordinates[0]]
+}
+
+export const cabaganBoundaryLngLat = closeRing(
+  CABAGAN_BOUNDARY_COORDS.map(([latitude, longitude]) => [longitude, latitude]),
+)
+
+export const cabaganBoundaryFeature = {
+  type: 'Feature',
+  properties: { name: 'Cabagan Geofence Boundary' },
+  geometry: { type: 'Polygon', coordinates: [cabaganBoundaryLngLat] },
+}
+
+export const createCircleFeature = (longitude, latitude, radiusMeters, properties = {}) => {
+  const coordinates = []
+  const latitudeRadius = radiusMeters / 111_320
+  const longitudeRadius = radiusMeters / (111_320 * Math.cos(latitude * Math.PI / 180))
+
+  for (let index = 0; index <= 64; index += 1) {
+    const angle = index / 64 * Math.PI * 2
+    coordinates.push([
+      longitude + Math.cos(angle) * longitudeRadius,
+      latitude + Math.sin(angle) * latitudeRadius,
+    ])
+  }
+
+  return {
+    type: 'Feature',
+    properties,
+    geometry: { type: 'Polygon', coordinates: [coordinates] },
+  }
+}
+
+export const featureCollection = (features = []) => ({ type: 'FeatureCollection', features })
+
+export const setGeoJsonSourceData = (map, sourceId, data) => {
+  const source = map.getSource(sourceId)
+  if (source?.setData) source.setData(data)
+}
+
+const firstSymbolLayerId = (map) => map.getStyle()?.layers?.find((layer) => layer.type === 'symbol')?.id
+
+export const applyThreeDimensionalTerrain = (map, enabled) => {
+  if (!map?.isStyleLoaded()) return
+
+  if (!enabled) {
+    map.setTerrain(null)
+    if (map.getLayer(BUILDINGS_LAYER_ID)) map.removeLayer(BUILDINGS_LAYER_ID)
+    if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID)
+    if (map.getSource(TERRAIN_SOURCE_ID)) map.removeSource(TERRAIN_SOURCE_ID)
+    map.easeTo({ pitch: 0, duration: 550 })
+    return
+  }
+
+  if (!map.getSource(TERRAIN_SOURCE_ID)) {
+    map.addSource(TERRAIN_SOURCE_ID, {
+      type: 'raster-dem',
+      url: getMapTilerWebTerrainUrl(),
+      tileSize: 512,
+      maxzoom: 14,
+      encoding: 'mapbox',
+    })
+  }
+
+  map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.12 })
+  const beforeLayerId = firstSymbolLayerId(map)
+
+  if (!map.getLayer(HILLSHADE_LAYER_ID)) {
+    map.addLayer({
+      id: HILLSHADE_LAYER_ID,
+      type: 'hillshade',
+      source: TERRAIN_SOURCE_ID,
+      paint: {
+        'hillshade-exaggeration': 0.32,
+        'hillshade-shadow-color': '#071326',
+        'hillshade-highlight-color': '#d8e8ff',
+      },
+    }, beforeLayerId)
+  }
+
+  if (map.getSource('openmaptiles') && !map.getLayer(BUILDINGS_LAYER_ID)) {
+    map.addLayer({
+      id: BUILDINGS_LAYER_ID,
+      type: 'fill-extrusion',
+      source: 'openmaptiles',
+      'source-layer': 'building',
+      minzoom: 15,
+      paint: {
+        'fill-extrusion-color': '#b8c4d6',
+        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
+        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+        'fill-extrusion-opacity': 0.72,
+      },
+    }, beforeLayerId)
+  }
+
+  map.easeTo({ pitch: 52, duration: 650 })
+}
