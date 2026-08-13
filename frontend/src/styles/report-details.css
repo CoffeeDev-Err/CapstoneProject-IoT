@@ -235,9 +235,62 @@
   background: var(--bg-secondary);
 }
 
+.report-location-map__stage {
+  position: relative;
+  overflow: hidden;
+}
+
 .report-location-map__canvas {
   width: 100%;
   height: 240px;
+  background: #dce5ef;
+}
+
+.report-location-map__stage .maptiler-credit {
+  left: 0.45rem;
+  bottom: 0.45rem;
+}
+
+.report-map-marker {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.32);
+}
+
+.report-map-marker--start {
+  background: #2563eb;
+}
+
+.report-map-marker--end {
+  background: #2563eb;
+}
+
+.report-map-marker--incident {
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+  background: #dc2626;
+}
+
+.report-map-marker__label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: 180px;
+  padding: 0.28rem 0.45rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #17213a;
+  font-size: 0.64rem;
+  font-weight: 750;
+  line-height: 1.2;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.24);
+  pointer-events: none;
 }
 
 .report-location-map__empty {

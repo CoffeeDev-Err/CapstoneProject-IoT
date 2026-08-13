@@ -4,7 +4,7 @@
  * The primary operational screen for supervisors. Assembled from three
  * child components:
  *   ─ SidePanel    (left) — metrics, status, and clickable officer list
- *   ─ PersonnelMap (center) — full-width Leaflet map with live GPS markers
+ *   ─ PersonnelMap (center) — full-width MapLibre map with live GPS markers
  *   ─ ProfileModal (overlay) — officer details
  *
  * State:

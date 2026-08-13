@@ -445,6 +445,37 @@
 [data-theme="dark"] .report-route-history span {
   color: #94a3b8;
 }
+[data-theme="dark"] .map-style-control {
+  border-color: rgba(71, 85, 105, 0.85);
+  background: rgba(15, 23, 42, 0.94);
+}
+[data-theme="dark"] .map-style-button {
+  color: #94a3b8;
+}
+[data-theme="dark"] .map-style-button:hover {
+  background: #1e293b;
+  color: #60a5fa;
+}
+[data-theme="dark"] .map-style-button.is-active {
+  background: #2563eb;
+  color: #ffffff;
+}
+[data-theme="dark"] .map-style-loading {
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+}
+[data-theme="dark"] .map-config-state {
+  border-color: #475569;
+  background: #071326;
+  color: #94a3b8;
+}
+[data-theme="dark"] .map-config-state strong {
+  color: #f8fafc;
+}
+[data-theme="dark"] .report-map-marker__label {
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+}
 [data-theme="dark"] .report-route-history strong {
   color: #f1f5f9;
 }
@@ -958,7 +989,7 @@
 [data-theme="dark"] .connection-pill.online  { background: #172554; color: #60a5fa; }
 [data-theme="dark"] .connection-pill.offline { background: #172554; color: #3b82f6; }
 
-/* Keep modal above Leaflet panes/controls regardless of duplicate style blocks */
+/* Keep modal above MapLibre panes/controls regardless of duplicate style blocks */
 .modal-backdrop {
   z-index: 10000 !important;
 }
@@ -981,15 +1012,12 @@
 
 .map-panel,
 .map-view,
-.leaflet-container {
+.maplibregl-map {
   position: relative;
   z-index: 1;
 }
 
-.leaflet-pane,
-.leaflet-top,
-.leaflet-bottom,
-.leaflet-control {
+.maplibregl-control-container {
   z-index: 2 !important;
 }
 

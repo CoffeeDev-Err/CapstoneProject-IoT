@@ -14,15 +14,14 @@
   "dependencies": {
     "bootstrap": "^5.3.8",
     "chart.js": "^4.5.1",
-    "leaflet": "^1.9.4",
-    "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^1.28.0",
+    "maplibre-gl": "^6.3.0",
     "react": "^19.2.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.0",
-    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.13.0",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "supercluster": "^9.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
