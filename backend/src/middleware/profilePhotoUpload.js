@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto')
 const fs = require('fs')
 const multer = require('multer')
 const { getUploadDirectory } = require('../config/uploads')
+const validateUploadedImage = require('./validateUploadedImage')
 
 const uploadDirectory = getUploadDirectory('profile-photos')
 fs.mkdirSync(uploadDirectory, { recursive: true })
@@ -35,7 +36,13 @@ const upload = multer({
 
 const uploadProfilePhoto = (req, res, next) => {
 	upload.single('profile_photo')(req, res, (error) => {
-		if (!error) return next()
+		if (!error) {
+			validateUploadedImage(
+				req,
+				'Profile photo content must be a valid JPEG, PNG, or WebP image.',
+			).then(() => next(), next)
+			return
+		}
 
 		if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
 			error.message = 'Profile photo must be 5 MB or smaller.'

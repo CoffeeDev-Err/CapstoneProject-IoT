@@ -22,6 +22,7 @@ const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const OTP_DURATION_MS = 10 * 60 * 1000
 const OTP_RATE_WINDOW_MS = 15 * 60 * 1000
 const OTP_RATE_LIMIT = 3
+const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000
 const hashToken = (token) => createHash('sha256').update(token).digest('hex')
 
 const serializeUser = (user, profile) => ({
@@ -86,7 +87,7 @@ const createVerificationChallenge = async (
 	})
 	if (recentCount >= OTP_RATE_LIMIT) {
 		throw createAuthError(
-			'Too many verification codes requested. Try again in 15 minutes.',
+			'Too many verification codes were requested. Please wait 15 minutes before trying again.',
 			429,
 			'OTP_RATE_LIMITED',
 		)
@@ -127,30 +128,47 @@ const consumeChallenge = async (
 	code,
 	{ purposes, userId } = {},
 ) => {
+	if (!challengeId || !/^\d{6}$/.test(String(code || ''))) {
+		throw createAuthError(
+			'Enter the complete 6-digit verification code.',
+			400,
+			'INVALID_OTP_INPUT',
+		)
+	}
 	let challenge
 	try {
 		challenge = await EmailVerification.findById(challengeId).select('+otpHash')
 	} catch {
-		throw createAuthError('Verification challenge is invalid.', 400, 'INVALID_OTP')
+		throw createAuthError(
+			'This verification request is no longer valid. Request a new code.',
+			400,
+			'INVALID_OTP',
+		)
 	}
 	const acceptedPurposes = Array.isArray(purposes) ? purposes : [purposes].filter(Boolean)
 	const belongsToUser = !userId || String(challenge?.userId) === String(userId)
 	if (
 		!challenge
 		|| challenge.consumedAt
-		|| challenge.expiresAt <= new Date()
 		|| !belongsToUser
 		|| (acceptedPurposes.length > 0 && !acceptedPurposes.includes(challenge.purpose))
 	) {
 		throw createAuthError(
-			'Verification code is invalid or expired.',
+			'This verification request is no longer valid. Request a new code.',
 			400,
 			'INVALID_OTP',
 		)
 	}
+	if (challenge.expiresAt <= new Date()) {
+		throw createAuthError(
+			'This verification code has expired. Request a new code.',
+			400,
+			'EXPIRED_OTP',
+		)
+	}
 	if (challenge.attempts >= challenge.maxAttempts) {
 		throw createAuthError(
-			'Verification attempt limit reached. Request a new code.',
+			'Too many incorrect attempts. Request a new code to continue.',
 			429,
 			'OTP_ATTEMPTS_EXCEEDED',
 		)
@@ -159,7 +177,11 @@ const consumeChallenge = async (
 		challenge.attempts += 1
 		if (challenge.attempts >= challenge.maxAttempts) challenge.consumedAt = new Date()
 		await challenge.save()
-		throw createAuthError('Incorrect verification code.', 400, 'INVALID_OTP')
+		throw createAuthError(
+			'The verification code is incorrect. Check the code and try again.',
+			400,
+			'INVALID_OTP',
+		)
 	}
 
 	challenge.consumedAt = new Date()
@@ -253,10 +275,18 @@ const resendVerification = async (
 	try {
 		previous = await EmailVerification.findById(challengeId)
 	} catch {
-		throw createAuthError('Verification challenge is invalid.', 400, 'INVALID_OTP')
+		throw createAuthError(
+			'This verification request is no longer valid. Start again to request a new code.',
+			400,
+			'INVALID_OTP',
+		)
 	}
 	if (!previous) {
-		throw createAuthError('Verification challenge is invalid.', 400, 'INVALID_OTP')
+		throw createAuthError(
+			'This verification request is no longer valid. Start again to request a new code.',
+			400,
+			'INVALID_OTP',
+		)
 	}
 	const user = await User.findOne({ _id: previous.userId, status: 'active' })
 	if (!user) throw createAuthError('Account is inactive or unavailable.')
@@ -307,7 +337,7 @@ const resetPassword = async (
 ) => {
 	if (!isStrongPassword(String(newPassword || ''))) {
 		throw createAuthError(
-			'New password must have at least 10 characters with upper, lower, number, and symbol.',
+			'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.',
 			400,
 			'WEAK_PASSWORD',
 		)
@@ -343,8 +373,15 @@ const authenticate = async (token) => {
 
 	const user = await User.findOne({ _id: session.userId, status: 'active' })
 	if (!user) throw createAuthError('Account is inactive or unavailable.')
-	session.lastUsedAt = new Date()
-	await session.save()
+	const lastUsedAt = session.lastUsedAt?.getTime() || 0
+	if (Date.now() - lastUsedAt >= SESSION_TOUCH_INTERVAL_MS) {
+		const touchedAt = new Date()
+		await AuthSession.updateOne(
+			{ _id: session._id },
+			{ $set: { lastUsedAt: touchedAt } },
+		)
+		session.lastUsedAt = touchedAt
+	}
 	return { session, user }
 }
 
@@ -365,9 +402,16 @@ const requestPasswordChange = async (
 	{ current_password: currentPassword, device_name: deviceName } = {},
 	{ requestIp } = {},
 ) => {
+	if (!String(currentPassword || '')) {
+		throw createAuthError(
+			'Enter your current password.',
+			400,
+			'CURRENT_PASSWORD_REQUIRED',
+		)
+	}
 	const securedUser = await User.findById(user._id).select('+passwordHash')
 	if (!securedUser || !(await verifyPassword(String(currentPassword || ''), securedUser.passwordHash))) {
-		throw createAuthError('Current password is incorrect.')
+		throw createAuthError('The current password is incorrect. Try again.')
 	}
 	return createVerificationChallenge(securedUser, 'change_password', {
 		deviceName,
@@ -379,18 +423,24 @@ const changePassword = async (user, payload = {}) => {
 	const newPassword = String(payload.new_password || '')
 	if (!isStrongPassword(newPassword)) {
 		throw createAuthError(
-			'New password must have at least 10 characters with upper, lower, number, and symbol.',
+			'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.',
 			400,
 			'WEAK_PASSWORD',
+		)
+	}
+	const securedUser = await User.findById(user._id).select('+passwordHash')
+	if (!securedUser) throw createAuthError('Account is unavailable.')
+	if (await verifyPassword(newPassword, securedUser.passwordHash)) {
+		throw createAuthError(
+			'Your new password must be different from your current password.',
+			400,
+			'PASSWORD_REUSED',
 		)
 	}
 	await consumeChallenge(payload.challenge_id, payload.code, {
 		purposes: ['change_password'],
 		userId: user._id,
 	})
-
-	const securedUser = await User.findById(user._id).select('+passwordHash')
-	if (!securedUser) throw createAuthError('Account is unavailable.')
 	securedUser.passwordHash = await hashPassword(newPassword)
 	securedUser.forcePasswordReset = false
 	await Promise.all([

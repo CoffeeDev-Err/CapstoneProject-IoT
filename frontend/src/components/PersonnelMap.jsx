@@ -235,7 +235,10 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
         ? 'personnel-cluster--critical'
         : (feature.properties.operation > 0 ? 'personnel-cluster--operation' : 'personnel-cluster--duty')
       element.className = 'personnel-cluster-shell maplibre-personnel-cluster'
-      element.innerHTML = `<span class="personnel-cluster ${tone}">${feature.properties.point_count}</span>`
+      const badge = document.createElement('span')
+      badge.className = `personnel-cluster ${tone}`
+      badge.textContent = String(feature.properties.point_count)
+      element.append(badge)
       element.setAttribute('aria-label', `Zoom to ${feature.properties.point_count} grouped officers`)
       element.addEventListener('click', () => {
         const zoom = Math.min(index.getClusterExpansionZoom(feature.properties.cluster_id), 18)

@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto')
 const fs = require('fs')
 const multer = require('multer')
 const { getUploadDirectory } = require('../config/uploads')
+const validateUploadedImage = require('./validateUploadedImage')
 
 const uploadDirectory = getUploadDirectory('report-evidence')
 fs.mkdirSync(uploadDirectory, { recursive: true })
@@ -36,7 +37,13 @@ const upload = multer({
 
 const uploadReportEvidence = (req, _res, next) => {
 	upload.single('evidence_photo')(req, _res, (error) => {
-		if (!error) return next()
+		if (!error) {
+			validateUploadedImage(
+				req,
+				'Photo evidence content must be a valid JPEG, PNG, or WebP image.',
+			).then(() => next(), next)
+			return
+		}
 
 		if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
 			error.message = 'Photo evidence must be 5 MB or smaller.'

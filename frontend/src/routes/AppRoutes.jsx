@@ -19,15 +19,15 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import ProtectedRoute from '../components/ProtectedRoute'
-import AnalyticsPage from '../pages/AnalyticsPage'
-import AssignAreaPage from '../pages/AssignAreaPage'
-import DashboardPage from '../pages/DashboardPage'
-import LoginPage from '../pages/LoginPage'
-import PersonnelPage from '../pages/PersonnelPage'
-import SettingsPage from '../pages/SettingsPage'
 
+const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
+const AssignAreaPage = lazy(() => import('../pages/AssignAreaPage'))
+const DashboardPage = lazy(() => import('../pages/DashboardPage'))
+const LoginPage = lazy(() => import('../pages/LoginPage'))
 const MonitoringPage = lazy(() => import('../pages/MonitoringPage'))
+const PersonnelPage = lazy(() => import('../pages/PersonnelPage'))
 const ReportsPage = lazy(() => import('../pages/ReportsPage'))
+const SettingsPage = lazy(() => import('../pages/SettingsPage'))
 
 const withPageLoader = (page) => (
   <Suspense fallback={<div className="route-page-loading" role="status">Loading page…</div>}>
@@ -46,16 +46,16 @@ function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={withPageLoader(<MonitoringPage />)} />
-          <Route path="/monitoring" element={<DashboardPage/>} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/assign-area" element={<AssignAreaPage />} />
-          <Route path="/personnel" element={<PersonnelPage />} />
+          <Route path="/monitoring" element={withPageLoader(<DashboardPage />)} />
+          <Route path="/analytics" element={withPageLoader(<AnalyticsPage />)} />
+          <Route path="/assign-area" element={withPageLoader(<AssignAreaPage />)} />
+          <Route path="/personnel" element={withPageLoader(<PersonnelPage />)} />
           <Route path="/reports" element={withPageLoader(<ReportsPage />)} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={withPageLoader(<SettingsPage />)} />
         </Route>
       </Route>
 
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={withPageLoader(<LoginPage />)} />
 
       {/* Redirect any unrecognised path back to the dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />

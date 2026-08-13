@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import pnpLogo from '../assets/pnp-logo.png'
+import VerificationCodeInput from '../components/VerificationCodeInput'
 import { useAuth } from '../context/useAuth'
 import {
   beginLogin,
@@ -18,6 +19,9 @@ const isStrongPassword = (value) => (
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 )
+
+const PASSWORD_REQUIREMENTS = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.'
+const COMPLETE_CODE_MESSAGE = 'Enter the complete 6-digit verification code.'
 
 function LoginPage() {
   const [mode, setMode] = useState('login')
@@ -43,6 +47,14 @@ function LoginPage() {
   const handleLogin = async (event) => {
     event.preventDefault()
     clearFeedback()
+    if (!accountId.trim()) {
+      setError('Enter your Login ID.')
+      return
+    }
+    if (!password) {
+      setError('Enter your password.')
+      return
+    }
     setPending(true)
     try {
       const nextChallenge = await beginLogin(accountId.trim(), password)
@@ -59,6 +71,10 @@ function LoginPage() {
   const handleVerifyLogin = async (event) => {
     event.preventDefault()
     clearFeedback()
+    if (code.length !== 6) {
+      setError(COMPLETE_CODE_MESSAGE)
+      return
+    }
     setPending(true)
     try {
       const session = await verifyLoginCode(challenge.challengeId, code)
@@ -74,6 +90,10 @@ function LoginPage() {
   const handleForgotPassword = async (event) => {
     event.preventDefault()
     clearFeedback()
+    if (!identifier.trim()) {
+      setError('Enter your Login ID or official email.')
+      return
+    }
     setPending(true)
     try {
       const nextChallenge = await requestPasswordReset(identifier.trim())
@@ -94,12 +114,24 @@ function LoginPage() {
   const handleResetPassword = async (event) => {
     event.preventDefault()
     clearFeedback()
+    if (code.length !== 6) {
+      setError(COMPLETE_CODE_MESSAGE)
+      return
+    }
+    if (!newPassword) {
+      setError('Enter a new password.')
+      return
+    }
     if (!isStrongPassword(newPassword)) {
-      setError('Use at least 10 characters with upper, lower, number, and symbol.')
+      setError(PASSWORD_REQUIREMENTS)
+      return
+    }
+    if (!confirmPassword) {
+      setError('Confirm your new password.')
       return
     }
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match.')
+      setError('The new password and confirmation do not match.')
       return
     }
     setPending(true)
@@ -187,7 +219,7 @@ function LoginPage() {
             </div>
 
             {mode === 'login' && (
-              <form onSubmit={handleLogin} className="login-form">
+              <form onSubmit={handleLogin} className="login-form" noValidate>
               <label className="login-field">
                 <span className="login-label">Login ID</span>
                 <input
@@ -225,8 +257,8 @@ function LoginPage() {
             )}
 
             {mode === 'otp' && (
-              <form onSubmit={handleVerifyLogin} className="login-form">
-              <CodeField code={code} setCode={setCode} />
+              <form onSubmit={handleVerifyLogin} className="login-form" noValidate>
+              <VerificationCodeInput value={code} onChange={setCode} autoFocus invalid={Boolean(error)} />
               {challenge?.debugCode && (
                 <p className="auth-debug-code">Development code: {challenge.debugCode}</p>
               )}
@@ -242,7 +274,7 @@ function LoginPage() {
             )}
 
             {mode === 'forgot' && (
-              <form onSubmit={handleForgotPassword} className="login-form">
+              <form onSubmit={handleForgotPassword} className="login-form" noValidate>
               <label className="login-field">
                 <span className="login-label">Login ID or Official Email</span>
                 <input
@@ -262,8 +294,8 @@ function LoginPage() {
             )}
 
             {mode === 'reset' && (
-              <form onSubmit={handleResetPassword} className="login-form">
-              <CodeField code={code} setCode={setCode} />
+              <form onSubmit={handleResetPassword} className="login-form" noValidate>
+              <VerificationCodeInput value={code} onChange={setCode} autoFocus />
               <PasswordField
                 label="New Password"
                 value={newPassword}
@@ -271,6 +303,7 @@ function LoginPage() {
                 autoComplete="new-password"
                 required
               />
+              <p className="password-requirements">{PASSWORD_REQUIREMENTS}</p>
               <PasswordField
                 label="Confirm New Password"
                 value={confirmPassword}
@@ -283,6 +316,9 @@ function LoginPage() {
               )}
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Reset Password" />
+              <button type="button" className="login-text-action login-text-action--center" onClick={handleResend} disabled={pending}>
+                Resend code
+              </button>
               <button type="button" className="login-text-action login-text-action--center" onClick={goToLogin}>
                 Cancel
               </button>
@@ -317,24 +353,6 @@ function PasswordField({ label, ...inputProps }) {
           {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
         </button>
       </span>
-    </label>
-  )
-}
-
-function CodeField({ code, setCode }) {
-  return (
-    <label className="login-field">
-      <span className="login-label">Verification Code</span>
-      <input
-        inputMode="numeric"
-        className="form-control form-control-lg fs-6 login-input login-code-input"
-        placeholder="000000"
-        value={code}
-        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-        maxLength={6}
-        autoComplete="one-time-code"
-        required
-      />
     </label>
   )
 }

@@ -1,11 +1,11 @@
 const express = require('express')
 const asyncHandler = require('../middleware/asyncHandler')
-const createAuthenticateSession = require('../middleware/authenticateSession')
+const createAuthorization = require('../middleware/authorization')
 const uploadReportEvidence = require('../middleware/reportEvidenceUpload')
 
 const createOperationalRoutes = ({ authService, controller }) => {
 	const router = express.Router()
-	const authenticate = createAuthenticateSession(authService)
+	const { authenticate, officerOnly, supervisorOnly } = createAuthorization(authService)
 	const requireOfficer = (req, res, next) => {
 		if (req.auth.user.role !== 'officer' || !req.auth.user.personnelId) {
 			return res.status(403).json({
@@ -15,7 +15,7 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		}
 		return next()
 	}
-	const officerOnly = [authenticate, requireOfficer]
+	const authenticatedOfficerOnly = [...officerOnly, requireOfficer]
 	const requireSupervisor = (req, res, next) => {
 		if (req.auth.user.role !== 'supervisor') {
 			return res.status(403).json({
@@ -25,59 +25,59 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		}
 		return next()
 	}
-	const supervisorOnly = [authenticate, requireSupervisor]
+	const authenticatedSupervisorOnly = [...supervisorOnly, requireSupervisor]
 
 	router.get(
 		'/operations/bootstrap',
-		...officerOnly,
+		...authenticatedOfficerOnly,
 		asyncHandler(controller.getBootstrap),
 	)
-	router.get('/tasks', asyncHandler(controller.getTasks))
-	router.post('/tasks', ...officerOnly, asyncHandler(controller.createTask))
-	router.get('/tasks/:taskId', asyncHandler(controller.getTask))
+	router.get('/tasks', authenticate, asyncHandler(controller.getTasks))
+	router.post('/tasks', ...authenticatedOfficerOnly, asyncHandler(controller.createTask))
+	router.get('/tasks/:taskId', authenticate, asyncHandler(controller.getTask))
 	router.post(
 		'/tasks/:taskId/accept',
-		...officerOnly,
+		...authenticatedOfficerOnly,
 		asyncHandler(controller.acceptTask),
 	)
 	router.patch(
 		'/tasks/:taskId/cancel',
-		...officerOnly,
+		...authenticatedOfficerOnly,
 		asyncHandler(controller.cancelTask),
 	)
-	router.patch('/tasks/:taskId/complete', asyncHandler(controller.completeTask))
-	router.get('/reports', asyncHandler(controller.getReports))
+	router.patch('/tasks/:taskId/complete', ...authenticatedSupervisorOnly, asyncHandler(controller.completeTask))
+	router.get('/reports', authenticate, asyncHandler(controller.getReports))
 	router.post(
 		'/reports',
-		...officerOnly,
+		...authenticatedOfficerOnly,
 		uploadReportEvidence,
 		asyncHandler(controller.submitReport),
 	)
 	router.get(
 		'/reports/:reportId/route',
-		...supervisorOnly,
+		...authenticatedSupervisorOnly,
 		asyncHandler(controller.getReportRoute),
 	)
-	router.get('/reports/:reportId', asyncHandler(controller.getReport))
+	router.get('/reports/:reportId', authenticate, asyncHandler(controller.getReport))
 	router.patch(
 		'/reports/:reportId/resolve',
-		...officerOnly,
+		...authenticatedOfficerOnly,
 		asyncHandler(controller.resolveReport),
 	)
 	router.patch(
 		'/reports/:reportId/validation',
-		...supervisorOnly,
+		...authenticatedSupervisorOnly,
 		asyncHandler(controller.updateReportValidation),
 	)
-	router.get('/deployments', asyncHandler(controller.getDeployments))
-	router.put('/deployments', asyncHandler(controller.replaceDeployments))
-	router.get('/deployments/:assignmentId', asyncHandler(controller.getDeployment))
+	router.get('/deployments', authenticate, asyncHandler(controller.getDeployments))
+	router.put('/deployments', ...authenticatedSupervisorOnly, asyncHandler(controller.replaceDeployments))
+	router.get('/deployments/:assignmentId', authenticate, asyncHandler(controller.getDeployment))
 	router.patch(
 		'/deployments/:assignmentId/acknowledge',
-		...officerOnly,
+		...authenticatedOfficerOnly,
 		asyncHandler(controller.acknowledgeDeployment),
 	)
-	router.patch('/deployments/:assignmentId/status', asyncHandler(controller.updateDeploymentStatus))
+	router.patch('/deployments/:assignmentId/status', ...authenticatedSupervisorOnly, asyncHandler(controller.updateDeploymentStatus))
 
 	return router
 }
