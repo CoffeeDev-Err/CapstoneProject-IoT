@@ -106,7 +106,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
           <CircleMarker
             center={routePositions[0]}
             radius={6}
-            pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#16a34a', fillOpacity: 1 }}
+            pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 }}
           >
             <Tooltip direction="top">Route start</Tooltip>
           </CircleMarker>

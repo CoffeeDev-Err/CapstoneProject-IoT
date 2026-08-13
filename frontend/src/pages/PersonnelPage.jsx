@@ -14,7 +14,7 @@ import { usePersonnelContext } from '../context/usePersonnelContext'
 
 /** Maps normalized duty status strings to badge colours. */
 const dutyStatusColor = {
-  'On Duty': '#16a34a',
+  'On Duty': '#2563eb',
   'Off Duty': '#94a3b8',
 }
 

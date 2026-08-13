@@ -45,3 +45,21 @@ export const CABAGAN_BOUNDARY_FEATURE = {
   },
 };
 
+export const isInsideCabagan = (latitude: number, longitude: number) => {
+  let inside = false;
+  for (
+    let current = 0, previous = CABAGAN_BOUNDARY_LAT_LNG.length - 1;
+    current < CABAGAN_BOUNDARY_LAT_LNG.length;
+    previous = current, current += 1
+  ) {
+    const [currentLatitude, currentLongitude] = CABAGAN_BOUNDARY_LAT_LNG[current];
+    const [previousLatitude, previousLongitude] = CABAGAN_BOUNDARY_LAT_LNG[previous];
+    const intersects = (currentLatitude > latitude) !== (previousLatitude > latitude)
+      && longitude < (previousLongitude - currentLongitude)
+        * (latitude - currentLatitude)
+        / (previousLatitude - currentLatitude)
+        + currentLongitude;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+};

@@ -70,7 +70,7 @@ export default function UserMaps({ navigation }: any) {
         width: 50px;
         height: 50px;
         border-radius: 50%;
-        border: 4px solid #1de60b;
+        border: 4px solid #3b82f6;
         overflow: hidden;
         background: white;
         z-index: 2;
@@ -88,7 +88,7 @@ export default function UserMaps({ navigation }: any) {
         height: 0;
         border-left: 12px solid transparent;
         border-right: 12px solid transparent;
-        border-top: 18px solid #1de60b;
+        border-top: 18px solid #3b82f6;
         margin-top: -2px;
       }
 
@@ -109,7 +109,7 @@ export default function UserMaps({ navigation }: any) {
       /* 📦 MODAL CARD */
   /* 📦 MODAL CARD (UPDATED RESPONSIVE) */
   .modal-card {
-    background: #000033;
+    background: #172554;
     padding: 25px;
     border-radius: 20px;
 
@@ -134,7 +134,7 @@ export default function UserMaps({ navigation }: any) {
         width: 80px;
         height: 80px;
         border-radius: 50%;
-        border: 3px solid #1de60b;
+        border: 3px solid #3b82f6;
         margin-bottom: 10px;
       }
 
@@ -151,7 +151,7 @@ export default function UserMaps({ navigation }: any) {
 
       .popup-role {
     font-size: 14px;
-    color: #8755b6;
+    color: #60a5fa;
     margin-bottom: 10px;
     font-weight: 600;
   }
@@ -177,7 +177,7 @@ export default function UserMaps({ navigation }: any) {
     width: 95px;
     height: 95px;
     border-radius: 50%;
-    border: 3px solid #1de60b;
+    border: 3px solid #3b82f6;
     margin-bottom: 10px;
   }
 /* 👮 NAME (BIGGER) */
@@ -192,7 +192,7 @@ export default function UserMaps({ navigation }: any) {
 /* 🟣 ROLE (BIGGER BUT LESS THAN NAME) */
 .popup-role {
   font-size: 18px;   /* increased */
-  color: #a56bff;
+  color: #60a5fa;
   margin-bottom: 14px;
   font-weight: 600;
   text-align: center;
@@ -554,7 +554,7 @@ onPress={() => navigation.navigate('UserProfile')}
 
 
     alertTextDuty: {
-  color: '#6b28f1',
+  color: '#2563eb',
   fontSize: 25,
   fontWeight: 'bold',
   marginBottom: 8,
@@ -569,7 +569,7 @@ onPress={() => navigation.navigate('UserProfile')}
   marginBottom: 12,
 
   borderWidth: 2,           // 👈 ADD
-  borderColor: '#6b28f1',
+  borderColor: '#2563eb',
 
 },
 
@@ -597,13 +597,13 @@ statusBadge: {
 },
 
 statusText: {
-  color: '#6b28f1',
+  color: '#2563eb',
   fontSize: 12,
   fontWeight: '600',
 },
 
 locationLabel: {
-  color: '#6b28f1',
+  color: '#2563eb',
   fontSize: 12,
 },
 
@@ -637,7 +637,7 @@ timeText: {
 locateButton: {
   alignSelf: 'flex-end',   // 👈 pushes to right
   marginTop: 10,
-  backgroundColor: '#6b28f1',
+  backgroundColor: '#2563eb',
   paddingHorizontal: 14,
   paddingVertical: 6,
   borderRadius: 15,
@@ -697,11 +697,11 @@ tabButton: {
   paddingVertical: 10,
   marginHorizontal: 5,
   borderRadius: 20,
-  backgroundColor: '#d1cdda',
+  backgroundColor: '#cbd5e1',
   alignItems: 'center',
 
   borderWidth: 1.5,
-  borderColor: '#6b28f1',
+  borderColor: '#2563eb',
 
   // ✅ SHADOW (iOS)
   shadowColor: '#000',
@@ -716,17 +716,17 @@ tabButton: {
 activeTabButton: {
   backgroundColor: '#ffffff', // 👈 active = white
     borderWidth: 1.5,          // ✅ ADD THIS
-  borderColor: '#1c1c4d',    // ✅ OUTLINE COLOR
+  borderColor: '#172554',    // ✅ OUTLINE COLOR
 },
 
 tabText: {
-  color: '#1c1c4d', // 👈 text color
+  color: '#172554', // 👈 text color
   fontWeight: '600',
   fontSize: 15,
 },
 
 activeTabText: {
-  color: '#1c1c4d', // same but keeps consistency
+  color: '#172554', // same but keeps consistency
 },
 
 taskOverlay: {
@@ -753,7 +753,7 @@ taskModal: {
 taskTitle: {
   fontSize: 30,
   fontWeight: 'bold',
-  color: '#1c1c4d',
+  color: '#172554',
   marginTop: 20,
   marginBottom: 50,
   marginLeft: 10,
@@ -797,7 +797,7 @@ taskClose: {
       alignSelf: 'center',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      backgroundColor: '#2d2da8',
+      backgroundColor: '#1d4ed8',
       paddingVertical: 12,
       paddingHorizontal: 35,
       borderRadius: 30,

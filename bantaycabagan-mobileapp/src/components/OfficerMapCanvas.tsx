@@ -6,6 +6,8 @@ import type { GeoSentriMapMode } from '../services/mapTilerConfig';
 
 export type OfficerMapPerson = LivePersonnel & {
   emergencyActive?: boolean;
+  operationActive?: boolean;
+  outsideBoundary?: boolean;
 };
 
 export type OfficerMapCanvasHandle = {
@@ -40,4 +42,3 @@ const styles = StyleSheet.create({
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e5e8' },
   fallbackText: { maxWidth: 280, color: '#475569', textAlign: 'center' },
 });
-

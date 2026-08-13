@@ -284,15 +284,15 @@
 }
 
 .auth-success {
-  border: 1px solid #166534;
-  background: #09251b;
-  color: #bbf7d0;
+  border: 1px solid #1e3a5f;
+  background: #172554;
+  color: #bfdbfe;
 }
 
 .auth-debug-code {
-  border: 1px solid #854d0e;
-  background: #2c2008;
-  color: #fde68a;
+  border: 1px solid #1d4ed8;
+  background: #172554;
+  color: #bfdbfe;
   text-align: center;
   font-weight: 700;
 }

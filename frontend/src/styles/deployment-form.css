@@ -165,7 +165,7 @@
 }
 
 .assignment-mode-status--start .assignment-mode-status__dot {
-  background: #15803d;
+  background: #1d4ed8;
 }
 
 .assignment-grid {
@@ -498,9 +498,9 @@
 }
 
 .deployment-status--active {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .deployment-status--completed {

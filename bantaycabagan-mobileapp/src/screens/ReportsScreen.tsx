@@ -955,7 +955,7 @@ const styles = StyleSheet.create({
     gap: 6,
     borderRadius: 50,
     backgroundColor: mobileTheme.purple,
-    shadowColor: '#1c1c4d',
+    shadowColor: '#172554',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,

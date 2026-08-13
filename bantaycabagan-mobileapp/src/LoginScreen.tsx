@@ -260,7 +260,7 @@ function Field({
           {...props}
           secureTextEntry={secureTextEntry && !passwordVisible}
           style={[styles.input, secureTextEntry && styles.passwordInput, style]}
-          placeholderTextColor="#999aab"
+          placeholderTextColor="#94a3b8"
         />
         {secureTextEntry ? (
           <TouchableOpacity

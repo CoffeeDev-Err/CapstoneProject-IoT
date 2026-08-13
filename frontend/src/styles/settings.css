@@ -41,7 +41,7 @@
 
 .settings-input--error {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.16);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 .account-form {
@@ -291,9 +291,9 @@
 .account-feedback {
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
-  border: 1px solid #86efac;
-  background: #f0fdf4;
-  color: #15803d;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
   font-size: 0.844rem;
   font-weight: 700;
   letter-spacing: 0.01em;

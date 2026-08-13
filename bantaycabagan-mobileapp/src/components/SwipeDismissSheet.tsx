@@ -532,7 +532,7 @@ const DragHandle = ({
 export function SwipeDismissSheet({
   children,
   containerStyle,
-  handleColor = '#cbc8d8',
+  handleColor = '#cbd5e1',
   onClose,
   sheetStyle,
   tapOutsideToClose = true,

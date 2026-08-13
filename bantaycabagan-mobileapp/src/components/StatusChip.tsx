@@ -10,7 +10,7 @@ type StatusChipProps = {
 const STATUS_THEME: Record<PersonnelStatus, { label: string; background: string; text: string }> = {
   IN_FIELD: {
     label: 'In Field',
-    background: '#DCFCE7',
+    background: '#DBEAFE',
     text: COLORS.online,
   },
   AT_BASE: {

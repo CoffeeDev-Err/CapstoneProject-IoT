@@ -21,7 +21,7 @@ import {
   Camera,
   GeoJSONSource,
   Layer,
-  Map,
+  Map as MapLibreMap,
   Marker,
   type CameraRef,
   type MapRef,
@@ -33,6 +33,13 @@ import {
   hasMapTilerApiKey,
   loadMapTilerStyle,
 } from '../services/mapTilerConfig';
+import {
+  CLUSTER_MAX_ZOOM,
+  clusterPersonnel,
+  interpolatePosition,
+  markerTone,
+  markerToneColor,
+} from '../utils/officerMapMath';
 import type {
   OfficerMapCanvasHandle,
   OfficerMapCanvasProps,
@@ -43,6 +50,51 @@ const CABAGAN_CENTER: [number, number] = [121.7653, 17.4269];
 const PATROL_RADIUS_METERS = 320;
 const STREET_FOCUS_ZOOM = 18;
 const SATELLITE_FOCUS_ZOOM = 16.5;
+const MARKER_ANIMATION_DURATION = 700;
+const ANIMATION_FRAME_INTERVAL = 1000 / 30;
+
+const useInterpolatedPersonnel = (personnel: OfficerMapPerson[]) => {
+  const [interpolated, setInterpolated] = useState(personnel);
+  const currentPositions = useRef(new globalThis.Map<string, [number, number]>());
+  const animationFrame = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
+    const starts = new globalThis.Map<string, [number, number]>();
+    personnel.forEach((member) => {
+      const target: [number, number] = [Number(member.longitude), Number(member.latitude)];
+      starts.set(member.id, currentPositions.current.get(member.id) || target);
+    });
+    const startedAt = Date.now();
+    let lastRenderedAt = 0;
+
+    const tick = () => {
+      const now = Date.now();
+      const progress = Math.min((now - startedAt) / MARKER_ANIMATION_DURATION, 1);
+      if (progress < 1 && now - lastRenderedAt < ANIMATION_FRAME_INTERVAL) {
+        animationFrame.current = requestAnimationFrame(tick);
+        return;
+      }
+      lastRenderedAt = now;
+      const next = personnel.map((member) => {
+        const start = starts.get(member.id)!;
+        const target: [number, number] = [Number(member.longitude), Number(member.latitude)];
+        const position = interpolatePosition(start, target, progress);
+        currentPositions.current.set(member.id, position);
+        return { ...member, longitude: position[0], latitude: position[1] };
+      });
+      setInterpolated(next);
+      if (progress < 1) animationFrame.current = requestAnimationFrame(tick);
+    };
+
+    animationFrame.current = requestAnimationFrame(tick);
+    return () => {
+      if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
+    };
+  }, [personnel]);
+
+  return interpolated;
+};
 
 const createCircleFeature = (longitude: number, latitude: number, radiusMeters: number) => {
   const coordinates: [number, number][] = [];
@@ -79,7 +131,8 @@ function PersonnelMarker({
   onPress: () => void;
 }) {
   const isCurrent = member.id === currentPersonnelId;
-  const borderColor = member.emergencyActive ? '#ff2f3d' : (isCurrent ? '#27c93f' : '#6b28f1');
+  const tone = markerTone(member);
+  const borderColor = markerToneColor(tone);
   const pulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
   const pulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
 
@@ -92,7 +145,7 @@ function PersonnelMarker({
     >
       <View style={styles.markerRoot}>
         <View style={styles.markerPhotoWrap}>
-          {member.emergencyActive && (
+          {tone === 'critical' && (
             <Animated.View
               pointerEvents="none"
               style={[
@@ -101,10 +154,12 @@ function PersonnelMarker({
               ]}
             />
           )}
-          <Image
-            source={{ uri: member.photoUrl }}
-            style={[styles.markerPhoto, { borderColor }]}
-          />
+          <View style={[styles.markerCurrentRing, isCurrent && styles.markerCurrentRingVisible]}>
+            <Image
+              source={{ uri: member.photoUrl }}
+              style={[styles.markerPhoto, { borderColor }]}
+            />
+          </View>
         </View>
         <View style={[styles.markerArrow, { borderTopColor: borderColor }]} />
       </View>
@@ -128,6 +183,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   const [mapStyle, setMapStyle] = useState<string | StyleSpecification | null>(null);
   const [styleError, setStyleError] = useState<string | null>(null);
   const [styleLoading, setStyleLoading] = useState(false);
+  const [mapZoom, setMapZoom] = useState(14.5);
+  const interpolatedPersonnel = useInterpolatedPersonnel(personnel);
+  const clusteredPersonnel = useMemo(
+    () => clusterPersonnel(interpolatedPersonnel, mapZoom),
+    [interpolatedPersonnel, mapZoom],
+  );
+  const clusterPulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
+  const clusterPulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
 
   const deploymentCenter = useMemo<[number, number]>(() => ([
     Number.isFinite(assignment?.longitude) ? Number(assignment?.longitude) : CABAGAN_CENTER[0],
@@ -225,7 +288,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
 
   return (
     <View style={styles.mapRoot}>
-      <Map
+      <MapLibreMap
         ref={mapRef}
         style={styles.map}
         mapStyle={mapStyle}
@@ -243,6 +306,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         attribution={false}
         logo={false}
         onDidFinishLoadingMap={fitInitialPersonnel}
+        onRegionDidChange={(event) => setMapZoom(event.nativeEvent.zoom)}
       >
         <Camera
           ref={cameraRef}
@@ -260,14 +324,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
             id="geosentri-patrol-fill"
             type="fill"
             source="geosentri-patrol-area"
-            paint={{ 'fill-color': '#6b28f1', 'fill-opacity': 0.08 }}
+            paint={{ 'fill-color': '#2563EB', 'fill-opacity': 0.08 }}
           />
           <Layer
             id="geosentri-patrol-line"
             type="line"
             source="geosentri-patrol-area"
             paint={{
-              'line-color': '#6b28f1',
+              'line-color': '#2563EB',
               'line-width': 2,
               'line-dasharray': [3, 2.5],
             }}
@@ -294,16 +358,44 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
           />
         </GeoJSONSource>
 
-        {personnel.map((member) => (
+        {clusteredPersonnel.map((cluster) => cluster.members.length > 1 ? (
+          <Marker
+            key={`cluster-${cluster.id}`}
+            id={`cluster-${cluster.id}`}
+            lngLat={[cluster.longitude, cluster.latitude]}
+            anchor="center"
+            onPress={() => cameraRef.current?.flyTo({
+              center: [cluster.longitude, cluster.latitude],
+              zoom: Math.min(mapZoom + 2, CLUSTER_MAX_ZOOM),
+              pitch: enable3D ? 52 : 0,
+              duration: 650,
+            })}
+          >
+            <View style={styles.clusterMarkerRoot}>
+              {cluster.tone === 'critical' && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.clusterMarkerPulse,
+                    { opacity: clusterPulseOpacity, transform: [{ scale: clusterPulseScale }] },
+                  ]}
+                />
+              )}
+              <View style={[styles.clusterMarker, { backgroundColor: markerToneColor(cluster.tone) }]}>
+                <Text style={styles.clusterMarkerText}>{cluster.members.length}</Text>
+              </View>
+            </View>
+          </Marker>
+        ) : (
           <PersonnelMarker
-            key={member.id}
-            member={member}
+            key={cluster.members[0].id}
+            member={cluster.members[0]}
             currentPersonnelId={currentPersonnelId}
             emergencyPulse={emergencyPulse}
-            onPress={() => onOfficerPress(member.id)}
+            onPress={() => onOfficerPress(cluster.members[0].id)}
           />
         ))}
-      </Map>
+      </MapLibreMap>
 
       {styleLoading && (
         <View pointerEvents="none" style={styles.styleLoader}>
@@ -344,14 +436,16 @@ const styles = StyleSheet.create({
   mapFallbackText: { marginTop: 6, color: '#64748b', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   mapFallbackTextDark: { color: '#9eabc0' },
   markerRoot: { width: 54, height: 63, alignItems: 'center', justifyContent: 'flex-start' },
-  markerPhotoWrap: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
+  markerPhotoWrap: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
+  markerCurrentRing: { padding: 2, borderWidth: 2, borderColor: 'transparent', borderRadius: 25 },
+  markerCurrentRingVisible: { borderColor: '#FFFFFF' },
   markerPhoto: { width: 42, height: 42, borderWidth: 3, borderRadius: 21, backgroundColor: '#ffffff' },
   markerPulse: {
     position: 'absolute',
     width: 44,
     height: 44,
     borderWidth: 3,
-    borderColor: '#ff2f3d',
+    borderColor: '#DC2626',
     borderRadius: 22,
   },
   markerArrow: {
@@ -364,6 +458,29 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
   },
+  clusterMarker: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    borderRadius: 23,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 7,
+  },
+  clusterMarkerRoot: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center' },
+  clusterMarkerPulse: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderWidth: 3,
+    borderColor: '#DC2626',
+    borderRadius: 24,
+  },
+  clusterMarkerText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   styleLoader: {
     position: 'absolute',
     top: 202,
