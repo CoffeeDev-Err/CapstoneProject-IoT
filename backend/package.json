@@ -3,15 +3,20 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node scripts/start-production.js",
+    "dev": "nodemon scripts/start-development.js",
     "lint": "eslint src",
-    "check": "npm run lint"
+    "test:validation": "node scripts/account-validation-check.js",
+    "test:security": "node scripts/operational-security-check.js",
+    "test:s3": "node scripts/s3-smoke-check.js",
+    "check": "npm run lint && npm run test:validation && npm run test:security"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1110.0",
+    "@aws-sdk/s3-request-presigner": "^3.1110.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",

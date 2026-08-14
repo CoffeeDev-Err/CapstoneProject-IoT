@@ -14,13 +14,14 @@ import {
 
 const isStrongPassword = (value) => (
   value.length >= 10
+  && value.length <= 128
   && /[A-Z]/.test(value)
   && /[a-z]/.test(value)
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 )
 
-const PASSWORD_REQUIREMENTS = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.'
+const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.'
 const COMPLETE_CODE_MESSAGE = 'Enter the complete 6-digit verification code.'
 
 function LoginPage() {
@@ -229,6 +230,7 @@ function LoginPage() {
                   value={accountId}
                   onChange={(event) => setAccountId(event.target.value)}
                   autoComplete="username"
+                  maxLength={50}
                   required
                 />
               </label>
@@ -238,6 +240,7 @@ function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
+                maxLength={128}
                 required
               />
               <button
@@ -282,6 +285,7 @@ function LoginPage() {
                   className="form-control form-control-lg fs-6 login-input"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
+                  maxLength={254}
                   required
                 />
               </label>
@@ -301,6 +305,7 @@ function LoginPage() {
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 autoComplete="new-password"
+                maxLength={128}
                 required
               />
               <p className="password-requirements">{PASSWORD_REQUIREMENTS}</p>
@@ -309,6 +314,7 @@ function LoginPage() {
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 autoComplete="new-password"
+                maxLength={128}
                 required
               />
               {challenge?.debugCode && (

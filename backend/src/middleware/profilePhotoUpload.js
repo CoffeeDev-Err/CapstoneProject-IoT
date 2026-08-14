@@ -1,11 +1,5 @@
-const { randomUUID } = require('crypto')
-const fs = require('fs')
 const multer = require('multer')
-const { getUploadDirectory } = require('../config/uploads')
 const validateUploadedImage = require('./validateUploadedImage')
-
-const uploadDirectory = getUploadDirectory('profile-photos')
-fs.mkdirSync(uploadDirectory, { recursive: true })
 
 const extensionByMimeType = {
 	'image/jpeg': '.jpg',
@@ -14,12 +8,7 @@ const extensionByMimeType = {
 }
 
 const upload = multer({
-	storage: multer.diskStorage({
-		destination: uploadDirectory,
-		filename: (_req, file, callback) => {
-			callback(null, `${randomUUID()}${extensionByMimeType[file.mimetype]}`)
-		},
-	}),
+	storage: multer.memoryStorage(),
 	limits: {
 		fileSize: 5 * 1024 * 1024,
 		files: 1,

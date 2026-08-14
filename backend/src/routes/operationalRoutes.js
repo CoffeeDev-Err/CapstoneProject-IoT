@@ -16,6 +16,17 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		return next()
 	}
 	const authenticatedOfficerOnly = [...officerOnly, requireOfficer]
+	const requireOperationalIdentity = (req, res, next) => {
+		if (
+			req.auth.user.role === 'supervisor'
+			|| (req.auth.user.role === 'officer' && req.auth.user.personnelId)
+		) return next()
+		return res.status(403).json({
+			success: false,
+			message: 'A linked operational identity is required.',
+		})
+	}
+	const authenticatedOperationalRead = [authenticate, requireOperationalIdentity]
 	const requireSupervisor = (req, res, next) => {
 		if (req.auth.user.role !== 'supervisor') {
 			return res.status(403).json({
@@ -32,9 +43,9 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		...authenticatedOfficerOnly,
 		asyncHandler(controller.getBootstrap),
 	)
-	router.get('/tasks', authenticate, asyncHandler(controller.getTasks))
+	router.get('/tasks', ...authenticatedOperationalRead, asyncHandler(controller.getTasks))
 	router.post('/tasks', ...authenticatedOfficerOnly, asyncHandler(controller.createTask))
-	router.get('/tasks/:taskId', authenticate, asyncHandler(controller.getTask))
+	router.get('/tasks/:taskId', ...authenticatedOperationalRead, asyncHandler(controller.getTask))
 	router.post(
 		'/tasks/:taskId/accept',
 		...authenticatedOfficerOnly,
@@ -46,7 +57,7 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		asyncHandler(controller.cancelTask),
 	)
 	router.patch('/tasks/:taskId/complete', ...authenticatedSupervisorOnly, asyncHandler(controller.completeTask))
-	router.get('/reports', authenticate, asyncHandler(controller.getReports))
+	router.get('/reports', ...authenticatedOperationalRead, asyncHandler(controller.getReports))
 	router.post(
 		'/reports',
 		...authenticatedOfficerOnly,
@@ -58,7 +69,7 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		...authenticatedSupervisorOnly,
 		asyncHandler(controller.getReportRoute),
 	)
-	router.get('/reports/:reportId', authenticate, asyncHandler(controller.getReport))
+	router.get('/reports/:reportId', ...authenticatedOperationalRead, asyncHandler(controller.getReport))
 	router.patch(
 		'/reports/:reportId/resolve',
 		...authenticatedOfficerOnly,
@@ -69,9 +80,9 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		...authenticatedSupervisorOnly,
 		asyncHandler(controller.updateReportValidation),
 	)
-	router.get('/deployments', authenticate, asyncHandler(controller.getDeployments))
+	router.get('/deployments', ...authenticatedOperationalRead, asyncHandler(controller.getDeployments))
 	router.put('/deployments', ...authenticatedSupervisorOnly, asyncHandler(controller.replaceDeployments))
-	router.get('/deployments/:assignmentId', authenticate, asyncHandler(controller.getDeployment))
+	router.get('/deployments/:assignmentId', ...authenticatedOperationalRead, asyncHandler(controller.getDeployment))
 	router.patch(
 		'/deployments/:assignmentId/acknowledge',
 		...authenticatedOfficerOnly,

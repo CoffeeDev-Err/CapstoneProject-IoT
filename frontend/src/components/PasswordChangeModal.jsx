@@ -5,13 +5,14 @@ import VerificationCodeInput from './VerificationCodeInput'
 
 const strongPassword = (value) => (
   value.length >= 10
+  && value.length <= 128
   && /[A-Z]/.test(value)
   && /[a-z]/.test(value)
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 )
 
-const PASSWORD_REQUIREMENTS = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.'
+const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.'
 
 function PasswordChangeModal({ open, token, onClose, onChanged }) {
   const [step, setStep] = useState('password')
@@ -140,6 +141,7 @@ function PasswordChangeModal({ open, token, onClose, onChanged }) {
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               autoComplete="current-password"
+              maxLength={128}
               autoFocus
             />
           ) : (
@@ -155,12 +157,14 @@ function PasswordChangeModal({ open, token, onClose, onChanged }) {
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 autoComplete="new-password"
+                maxLength={128}
               />
               <ModalPasswordField
                 label="Confirm New Password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 autoComplete="new-password"
+                maxLength={128}
               />
               <p className="password-requirements">{PASSWORD_REQUIREMENTS}</p>
               {challenge?.debugCode && (

@@ -18,7 +18,16 @@ const matchesImageSignature = (buffer, mimeType) => {
 }
 
 const validateUploadedImage = async (req, message) => {
-	if (!req.file?.path) return
+	if (!req.file) return
+	if (req.file.buffer) {
+		if (matchesImageSignature(req.file.buffer.subarray(0, 12), req.file.mimetype)) return
+		req.file = undefined
+		const error = new Error(message)
+		error.status = 400
+		error.code = 'INVALID_IMAGE_CONTENT'
+		throw error
+	}
+	if (!req.file.path) return
 	let handle
 	let isValid = false
 	let readError

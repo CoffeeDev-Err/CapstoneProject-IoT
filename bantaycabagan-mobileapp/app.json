@@ -6,14 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/geosentri-app-icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "backgroundColor": "#F5F7FB",
     "primaryColor": "#246BFD",
-    "splash": {
-      "image": "./assets/geosentri-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F5F7FB"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -26,7 +20,6 @@
         "monochromeImage": "./assets/notification-icon.png",
         "backgroundColor": "#071326"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -36,6 +29,15 @@
       "@maplibre/maplibre-react-native",
       "expo-font",
       "expo-secure-store",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/geosentri-logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#F5F7FB"
+        }
+      ],
       [
         "expo-notifications",
         {

@@ -1,10 +1,15 @@
+const {
+	deleteStoredMedia,
+	storeUploadedMedia,
+} = require('../services/mediaStorageService')
+
 const createOperationalController = (operationalService) => ({
 	getTasks: async (req, res) => {
-		res.json(await operationalService.listTasks(req.query))
+		res.json(await operationalService.listTasks(req.query, req.auth.user))
 	},
 
 	getTask: async (req, res) => {
-		const task = await operationalService.getTask(req.params.taskId)
+		const task = await operationalService.getTask(req.params.taskId, req.auth.user)
 		if (!task) {
 			return res.status(404).json({ success: false, message: 'Task not found.' })
 		}
@@ -14,7 +19,7 @@ const createOperationalController = (operationalService) => ({
 	getBootstrap: async (req, res) => {
 		const personnelId = req.auth.user.personnelId
 		const [taskPayload, deployments, upcomingDeployment] = await Promise.all([
-			operationalService.listTasks({ view: 'active', limit: 100 }),
+			operationalService.listTasks({ view: 'active', limit: 100 }, req.auth.user),
 			operationalService.loadDeployments(personnelId),
 			operationalService.getUpcomingDeployment(personnelId),
 		])
@@ -29,6 +34,7 @@ const createOperationalController = (operationalService) => ({
 	createTask: async (req, res) => {
 		const task = await operationalService.createTask({
 			...req.body,
+			type: 'backup',
 			requested_by: req.auth.user.personnelId,
 		})
 		res.status(201).json({ success: true, task })
@@ -51,16 +57,16 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	completeTask: async (req, res) => {
-		const result = await operationalService.completeTask(req.params.taskId, req.body)
+		const result = await operationalService.completeTask(req.params.taskId)
 		res.status(result.status).json(result.body)
 	},
 
 	getReports: async (req, res) => {
-		res.json(await operationalService.listReports(req.query))
+		res.json(await operationalService.listReports(req.query, req.auth.user))
 	},
 
 	getReport: async (req, res) => {
-		const report = await operationalService.getReport(req.params.reportId)
+		const report = await operationalService.getReport(req.params.reportId, req.auth.user)
 		if (!report) {
 			return res.status(404).json({ success: false, message: 'Report not found.' })
 		}
@@ -76,23 +82,32 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	submitReport: async (req, res) => {
-		const report = await operationalService.submitReport({
-			...req.body,
-			personnel_id: req.auth.user.personnelId,
-			...(req.file && {
-				evidence_photo: {
-					path: `/uploads/report-evidence/${req.file.filename}`,
-					originalName: req.file.originalname,
-					mimeType: req.file.mimetype,
-					size: req.file.size,
-					cameraFacing: req.body.evidence_camera_facing === 'front'
-						? 'front'
-						: 'back',
-					capturedAt: req.body.evidence_captured_at || new Date(),
-				},
-			}),
-		})
-		res.status(201).json({ success: true, report })
+		let storedEvidence
+		try {
+			storedEvidence = req.file
+				? await storeUploadedMedia(req.file, 'report-evidence')
+				: undefined
+			const report = await operationalService.submitReport({
+				...req.body,
+				personnel_id: req.auth.user.personnelId,
+				...(req.file && storedEvidence && {
+					evidence_photo: {
+						path: storedEvidence,
+						originalName: req.file.originalname,
+						mimeType: req.file.mimetype,
+						size: req.file.size,
+						cameraFacing: req.body.evidence_camera_facing === 'front'
+							? 'front'
+							: 'back',
+						capturedAt: req.body.evidence_captured_at || new Date(),
+					},
+				}),
+			})
+			return res.status(201).json({ success: true, report })
+		} catch (error) {
+			if (storedEvidence) await deleteStoredMedia(storedEvidence).catch(() => {})
+			throw error
+		}
 	},
 
 	resolveReport: async (req, res) => {
@@ -115,11 +130,14 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	getDeployments: async (req, res) => {
-		res.json(await operationalService.listDeployments(req.query))
+		res.json(await operationalService.listDeployments(req.query, req.auth.user))
 	},
 
 	getDeployment: async (req, res) => {
-		const deployment = await operationalService.getDeployment(req.params.assignmentId)
+		const deployment = await operationalService.getDeployment(
+			req.params.assignmentId,
+			req.auth.user,
+		)
 		if (!deployment) {
 			return res.status(404).json({
 				success: false,
@@ -138,10 +156,13 @@ const createOperationalController = (operationalService) => ({
 	},
 
 	replaceDeployments: async (req, res) => {
-		const assignments = Array.isArray(req.body?.assignments)
-			? req.body.assignments
-			: []
-		const deployments = await operationalService.replaceDeployments(assignments)
+		if (!Array.isArray(req.body?.assignments)) {
+			const error = new Error('assignments must be an array.')
+			error.status = 400
+			error.code = 'INVALID_DEPLOYMENT_PAYLOAD'
+			throw error
+		}
+		const deployments = await operationalService.replaceDeployments(req.body.assignments)
 		res.json({ success: true, deployments })
 	},
 

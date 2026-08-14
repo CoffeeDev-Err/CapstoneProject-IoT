@@ -21,13 +21,14 @@ import {
 
 const isStrongPassword = (value: string) => (
   value.length >= 10
+  && value.length <= 128
   && /[A-Z]/.test(value)
   && /[a-z]/.test(value)
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 );
 
-const PASSWORD_REQUIREMENTS = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.';
+const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.';
 
 type Props = {
   visible: boolean;
@@ -170,6 +171,7 @@ export default function ChangePasswordModal({
               value={currentPassword}
               onChangeText={setCurrentPassword}
               secureTextEntry
+              maxLength={128}
             />
           ) : (
             <>
@@ -184,6 +186,7 @@ export default function ChangePasswordModal({
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry
+                maxLength={128}
               />
               <Text style={[styles.passwordRequirements, isDark && darkStyles.muted]}>
                 {PASSWORD_REQUIREMENTS}
@@ -193,6 +196,7 @@ export default function ChangePasswordModal({
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
+                maxLength={128}
               />
               {challenge?.debugCode && (
                 <Text style={styles.debugCode}>Development code: {challenge.debugCode}</Text>

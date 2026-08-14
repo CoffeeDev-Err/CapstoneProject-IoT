@@ -9,18 +9,40 @@ const {
 	User,
 } = require('../models')
 const { hashPassword, isStrongPassword } = require('../utils/password')
+const {
+	FIELD_LIMITS,
+	normalizeBadgeNumber,
+	normalizeEmail,
+	normalizeHumanName,
+	normalizeLoginId,
+	normalizeMobileNumber,
+	validateBadgeNumber,
+	validateFullName,
+	validateLoginId,
+	validateMobileNumber,
+	validateOfficialEmail,
+	validateRank,
+} = require('../utils/accountValidation')
 const { fetchRegisteredDevices } = require('./flespiService')
+const { toMediaAccessPath } = require('./mediaStorageService')
 const { createNotification } = require('./notificationService')
 
 const normalizeStatus = (status) => (
 	String(status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active'
 )
 
-const createHttpError = (message, status = 400, code) => {
+const createHttpError = (message, status = 400, code, field) => {
 	const error = new Error(message)
 	error.status = status
 	if (code) error.code = code
+	if (field) error.field = field
 	return error
+}
+
+const assertValidField = (field, message) => {
+	if (message) {
+		throw createHttpError(message, 400, 'INVALID_ACCOUNT_FIELD', field)
+	}
 }
 
 const serializeAccount = (user, profile, device) => ({
@@ -30,7 +52,7 @@ const serializeAccount = (user, profile, device) => ({
 	badgeNumber: profile?.badgeNumber || '',
 	rank: profile?.rank || '',
 	mobileNumber: profile?.mobileNumber || '',
-	photoUrl: profile?.photoUrl || user.photoUrl || '',
+	photoUrl: toMediaAccessPath(profile?.photoUrl || user.photoUrl || ''),
 	loginId: user.username,
 	officialEmail: user.email || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
@@ -51,6 +73,7 @@ const validateAccountPayload = (
 		requirePassword = true,
 		requirePersonnel = true,
 		requireDevice = requirePersonnel,
+		existingLoginId = '',
 	} = {},
 ) => {
 	const requiredFields = requirePersonnel
@@ -72,30 +95,37 @@ const validateAccountPayload = (
 
 	for (const [field, label] of requiredFields) {
 		if (!String(payload[field] || '').trim()) {
-			throw createHttpError(`${label} is required.`)
+			throw createHttpError(`${label} is required.`, 400, 'INVALID_ACCOUNT_FIELD', field)
 		}
 	}
 
+	if (requirePersonnel) {
+		assertValidField('fullName', validateFullName(payload.fullName))
+		assertValidField('badgeNumber', validateBadgeNumber(payload.badgeNumber))
+		assertValidField('rank', validateRank(payload.rank))
+		assertValidField('mobileNumber', validateMobileNumber(payload.mobileNumber))
+	}
+	assertValidField('loginId', validateLoginId(payload.loginId, {
+		accountType: requirePersonnel ? 'officer' : 'supervisor',
+		existingLoginId,
+	}))
+	assertValidField('officialEmail', validateOfficialEmail(payload.officialEmail))
+
 	const password = String(payload.temporaryPassword || '')
 	if (requirePassword && !password) {
-		throw createHttpError('Enter a temporary password.')
+		throw createHttpError('Enter a temporary password.', 400, 'INVALID_ACCOUNT_FIELD', 'temporaryPassword')
 	}
 	if (password && !isStrongPassword(password)) {
 		throw createHttpError(
-			'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.',
+			`Use 10-${FIELD_LIMITS.password} characters, including an uppercase letter, lowercase letter, number, and symbol.`,
+			400,
+			'INVALID_ACCOUNT_FIELD',
+			'temporaryPassword',
 		)
 	}
 
-	const mobileNumber = String(payload.mobileNumber || '').trim()
-	if (mobileNumber && !/^\+?\d{10,14}$/.test(mobileNumber)) {
-		throw createHttpError(
-			'Mobile number must use 10-14 digits with an optional + prefix.',
-		)
-	}
-
-	const officialEmail = String(payload.officialEmail || '').trim().toLowerCase()
-	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail)) {
-		throw createHttpError('Enter a valid official email address.')
+	if (payload.accountStatus && !['active', 'inactive'].includes(String(payload.accountStatus).toLowerCase())) {
+		throw createHttpError('Select a valid account status.', 400, 'INVALID_ACCOUNT_FIELD', 'accountStatus')
 	}
 
 	const hasImei = Boolean(String(payload.imei || '').trim())
@@ -126,10 +156,12 @@ const createAccountService = ({ io, personnelService }) => {
 	const broadcastAccountData = async (identity) => {
 		io.emit('accounts:updated')
 		if (identity?.personnelId) {
-			io.emit('personnel:identity-updated', identity)
+			io.to('role:supervisor').emit('personnel:identity-updated', identity)
+			io.to(`personnel:${identity.personnelId}`).emit('personnel:identity-updated', identity)
 		}
 		if (personnelService) {
-			io.emit(
+			personnelService.emitPersonnelCollection(
+				io,
 				'personnel:update',
 				await personnelService.getPersonnelWithLocations(),
 			)
@@ -163,6 +195,16 @@ const createAccountService = ({ io, personnelService }) => {
 		))
 	}
 
+	const getAccountPhotoReference = async (accountId) => {
+		const user = await User.findById(accountId).select('role personnelId photoUrl').lean()
+		if (!user) throw createHttpError('Account not found.', 404)
+		if (user.role !== 'officer' || !user.personnelId) return user.photoUrl || ''
+		const profile = await Personnel.findOne({ personnelId: user.personnelId })
+			.select('photoUrl')
+			.lean()
+		return profile?.photoUrl || user.photoUrl || ''
+	}
+
 	const createAccount = async (payload, { ipAddress } = {}) => {
 		validateAccountPayload(payload)
 		const device = await validateRegisteredDevice(payload)
@@ -175,10 +217,10 @@ const createAccountService = ({ io, personnelService }) => {
 		try {
 			const profile = await Personnel.create({
 				personnelId,
-				badgeNumber: payload.badgeNumber,
-				fullName: payload.fullName,
+				badgeNumber: normalizeBadgeNumber(payload.badgeNumber),
+				fullName: normalizeHumanName(payload.fullName),
 				rank: payload.rank,
-				mobileNumber: payload.mobileNumber || '',
+				mobileNumber: normalizeMobileNumber(payload.mobileNumber),
 				photoUrl: payload.photoUrl || '',
 				dutyStatus: 'Off Duty',
 				status: 'active',
@@ -195,8 +237,8 @@ const createAccountService = ({ io, personnelService }) => {
 				assignedAt: new Date(),
 			})
 			const user = await User.create({
-				username: String(payload.loginId).trim().toLowerCase(),
-				email: String(payload.officialEmail).trim().toLowerCase(),
+				username: normalizeLoginId(payload.loginId),
+				email: normalizeEmail(payload.officialEmail),
 				passwordHash: await hashPassword(payload.temporaryPassword),
 				role: 'officer',
 				personnelId,
@@ -248,11 +290,12 @@ const createAccountService = ({ io, personnelService }) => {
 			requirePassword: false,
 			requirePersonnel: !isSupervisor,
 			requireDevice: !isSupervisor && !user.isMockAccount,
+			existingLoginId: user.username,
 		})
 
 		if (isSupervisor) {
-			user.username = String(payload.loginId).trim().toLowerCase()
-			const nextEmail = String(payload.officialEmail).trim().toLowerCase()
+			user.username = normalizeLoginId(payload.loginId)
+			const nextEmail = normalizeEmail(payload.officialEmail)
 			if (user.email !== nextEmail) {
 				user.email = nextEmail
 				user.emailVerifiedAt = null
@@ -320,15 +363,15 @@ const createAccountService = ({ io, personnelService }) => {
 			assignment = null
 		}
 
-		profile.fullName = String(payload.fullName).trim()
-		profile.badgeNumber = String(payload.badgeNumber).trim()
+		profile.fullName = normalizeHumanName(payload.fullName)
+		profile.badgeNumber = normalizeBadgeNumber(payload.badgeNumber)
 		profile.rank = String(payload.rank).trim()
-		profile.mobileNumber = String(payload.mobileNumber || '').trim()
+		profile.mobileNumber = normalizeMobileNumber(payload.mobileNumber)
 		if (payload.photoUrl) profile.photoUrl = payload.photoUrl
 		profile.status = normalizeStatus(payload.accountStatus)
 
-		user.username = String(payload.loginId).trim().toLowerCase()
-		const nextEmail = String(payload.officialEmail).trim().toLowerCase()
+		user.username = normalizeLoginId(payload.loginId)
+		const nextEmail = normalizeEmail(payload.officialEmail)
 		if (user.email !== nextEmail) {
 			user.email = nextEmail
 			user.emailVerifiedAt = null
@@ -376,7 +419,7 @@ const createAccountService = ({ io, personnelService }) => {
 			personnelId: user.personnelId,
 			name: profile.fullName,
 			rank: profile.rank,
-			photoUrl: profile.photoUrl,
+			photoUrl: toMediaAccessPath(profile.photoUrl),
 		})
 		return serializeAccount(user, profile, assignment)
 	}
@@ -415,6 +458,7 @@ const createAccountService = ({ io, personnelService }) => {
 	return {
 		createAccount,
 		deactivateAccount,
+		getAccountPhotoReference,
 		loadAccounts,
 		updateAccount,
 	}

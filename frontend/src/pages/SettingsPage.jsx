@@ -15,26 +15,23 @@ import {
 } from '../services/accounts'
 import { getRegisteredFlespiDevices } from '../services/flespiDevices'
 import { resolveApiAssetUrl } from '../services/apiAssets'
+import {
+  ACCOUNT_FIELD_LIMITS,
+  POLICE_RANKS,
+  normalizeBadgeNumber,
+  normalizeEmail,
+  normalizeHumanName,
+  normalizeLoginId,
+  normalizeMobileNumber,
+  validateBadgeNumber,
+  validateFullName,
+  validateLoginId,
+  validateMobileNumber,
+  validateOfficialEmail,
+  validateRank,
+} from '../utils/accountValidation'
 
-const rankOptions = [
-  'Patrolman',
-  'Patrolwoman',
-  'Police Corporal',
-  'Police Staff Sergeant',
-  'Police Master Sergeant',
-  'Police Senior Master Sergeant',
-  'Police Chief Master Sergeant',
-  'Police Executive Master Sergeant',
-  'Police Lieutenant',
-  'Police Captain',
-  'Police Major',
-  'Police Lieutenant Colonel',
-  'Police Colonel',
-  'Police Brigadier General',
-  'Police Major General',
-  'Police Lieutenant General',
-  'Police General'   
-]
+const rankOptions = POLICE_RANKS
 
 const createTempPassword = (length = 12) => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?'
@@ -227,6 +224,16 @@ function SettingsPage() {
     })
   }
 
+  const handleFieldBlur = (field) => () => {
+    const nextError = validateAccountForm()[field]
+    setFormErrors((prev) => {
+      const nextErrors = { ...prev }
+      if (nextError) nextErrors[field] = nextError
+      else delete nextErrors[field]
+      return nextErrors
+    })
+  }
+
   const handleProfilePhotoChange = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -260,13 +267,14 @@ function SettingsPage() {
     const errors = {}
 
     if (!isEditingSupervisor) {
-      if (!accountForm.fullName.trim()) {
-        errors.fullName = 'Full name is required.'
-      }
-
-      if (!accountForm.badgeNumber.trim()) {
-        errors.badgeNumber = 'Badge number is required.'
-      }
+      const fullNameError = validateFullName(accountForm.fullName)
+      const badgeNumberError = validateBadgeNumber(accountForm.badgeNumber)
+      const rankError = validateRank(accountForm.rank)
+      const mobileNumberError = validateMobileNumber(accountForm.mobileNumber)
+      if (fullNameError) errors.fullName = fullNameError
+      if (badgeNumberError) errors.badgeNumber = badgeNumberError
+      if (rankError) errors.rank = rankError
+      if (mobileNumberError) errors.mobileNumber = mobileNumberError
 
       if (requiresGpsDevice && !accountForm.imei.trim()) {
         errors.imei = 'GPS device ID is required.'
@@ -280,7 +288,7 @@ function SettingsPage() {
           && account.badgeNumber.toLowerCase() === accountForm.badgeNumber.trim().toLowerCase()
         )
       )
-      if (duplicateBadge) {
+      if (!errors.badgeNumber && duplicateBadge) {
         errors.badgeNumber = 'Badge number already exists.'
       }
 
@@ -292,9 +300,11 @@ function SettingsPage() {
       }
     }
 
-    if (!accountForm.loginId.trim()) {
-      errors.loginId = 'Login ID is required.'
-    }
+    const loginIdError = validateLoginId(accountForm.loginId, {
+      accountType: isEditingSupervisor ? 'supervisor' : 'officer',
+      existingLoginId: editingAccount?.loginId || '',
+    })
+    if (loginIdError) errors.loginId = loginIdError
 
     const duplicateLogin = createdAccounts.some(
       (account) => (
@@ -302,16 +312,13 @@ function SettingsPage() {
         && account.loginId.toLowerCase() === accountForm.loginId.trim().toLowerCase()
       )
     )
-    if (duplicateLogin) {
+    if (!errors.loginId && duplicateLogin) {
       errors.loginId = 'Login ID already exists.'
     }
 
-    const normalizedEmail = accountForm.officialEmail.trim().toLowerCase()
-    if (!normalizedEmail) {
-      errors.officialEmail = 'Official email is required for verification.'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      errors.officialEmail = 'Enter a valid email address.'
-    }
+    const normalizedEmail = normalizeEmail(accountForm.officialEmail)
+    const emailError = validateOfficialEmail(normalizedEmail)
+    if (emailError) errors.officialEmail = emailError
 
     const duplicateEmail = createdAccounts.some(
       (account) => (
@@ -319,24 +326,21 @@ function SettingsPage() {
         && account.officialEmail?.toLowerCase() === normalizedEmail
       )
     )
-    if (duplicateEmail) {
+    if (!errors.officialEmail && duplicateEmail) {
       errors.officialEmail = 'Official email already belongs to another account.'
     }
 
     const passwordValue = accountForm.temporaryPassword
     const passwordRulesPassed =
       passwordValue.length >= 10
+      && passwordValue.length <= ACCOUNT_FIELD_LIMITS.password
       && /[A-Z]/.test(passwordValue)
       && /[a-z]/.test(passwordValue)
       && /\d/.test(passwordValue)
       && /[^A-Za-z0-9]/.test(passwordValue)
 
     if ((!editingAccountId || passwordValue) && !passwordRulesPassed) {
-      errors.temporaryPassword = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.'
-    }
-
-    if (!isEditingSupervisor && accountForm.mobileNumber.trim() && !/^\+?\d{10,14}$/.test(accountForm.mobileNumber.trim())) {
-      errors.mobileNumber = 'Use 10-14 digits, optional + prefix.'
+      errors.temporaryPassword = `Use 10-${ACCOUNT_FIELD_LIMITS.password} characters, including an uppercase letter, lowercase letter, number, and symbol.`
     }
 
     return errors
@@ -454,23 +458,23 @@ function SettingsPage() {
 
     const normalizedPayload = isEditingSupervisor
       ? {
-          loginId: accountForm.loginId.trim(),
-          officialEmail: accountForm.officialEmail.trim().toLowerCase(),
+          loginId: normalizeLoginId(accountForm.loginId),
+          officialEmail: normalizeEmail(accountForm.officialEmail),
           temporaryPassword: accountForm.temporaryPassword,
           accountStatus: editingAccount?.accountStatus || 'Active',
         }
       : {
-          fullName: accountForm.fullName.trim(),
-          badgeNumber: accountForm.badgeNumber.trim(),
+          fullName: normalizeHumanName(accountForm.fullName),
+          badgeNumber: normalizeBadgeNumber(accountForm.badgeNumber),
           imei: accountForm.imei.trim(),
           flespiDeviceId: accountForm.flespiDeviceId,
           flespiDeviceName: accountForm.flespiDeviceName,
           rank: accountForm.rank,
           role: 'Officer',
-          loginId: accountForm.loginId.trim(),
-          officialEmail: accountForm.officialEmail.trim().toLowerCase(),
+          loginId: normalizeLoginId(accountForm.loginId),
+          officialEmail: normalizeEmail(accountForm.officialEmail),
           temporaryPassword: accountForm.temporaryPassword,
-          mobileNumber: accountForm.mobileNumber.trim(),
+          mobileNumber: normalizeMobileNumber(accountForm.mobileNumber),
           accountStatus: 'Active',
           forcePasswordReset: true,
         }
@@ -500,9 +504,15 @@ function SettingsPage() {
         const fieldMap = {
           username: 'loginId',
           email: 'officialEmail',
+          fullName: 'fullName',
           badgeNumber: 'badgeNumber',
           imei: 'imei',
           personnelId: 'badgeNumber',
+          loginId: 'loginId',
+          officialEmail: 'officialEmail',
+          rank: 'rank',
+          mobileNumber: 'mobileNumber',
+          temporaryPassword: 'temporaryPassword',
         }
         const formField = fieldMap[error.field]
         if (formField) setFormErrors((prev) => ({ ...prev, [formField]: error.message }))
@@ -556,7 +566,7 @@ function SettingsPage() {
 
             {activeAccountView === 'create' && (
               <div className="account-create-section">
-	                <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount}>
+                <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount} noValidate>
 	                  {isEditingSupervisor && (
 	                    <p className="settings-hint account-role-note">
 	                      Supervisor accounts are for web monitoring and administration. A badge, field rank, mobile number, and GPS device are not required.
@@ -586,7 +596,11 @@ function SettingsPage() {
                     className={`settings-input w-100 ${formErrors.fullName ? 'settings-input--error' : ''}`}
                     value={accountForm.fullName}
                     onChange={handleFieldChange('fullName')}
+                    onBlur={handleFieldBlur('fullName')}
                     placeholder="Enter full legal name"
+                    maxLength={ACCOUNT_FIELD_LIMITS.fullName}
+                    autoComplete="name"
+                    aria-invalid={Boolean(formErrors.fullName)}
                   />
                   {formErrors.fullName && <small className="field-error">{formErrors.fullName}</small>}
                 </label>
@@ -597,20 +611,31 @@ function SettingsPage() {
                     className={`settings-input w-100 ${formErrors.badgeNumber ? 'settings-input--error' : ''}`}
                     value={accountForm.badgeNumber}
                     onChange={handleFieldChange('badgeNumber')}
+                    onBlur={handleFieldBlur('badgeNumber')}
                     placeholder="e.g., PC-104"
+                    maxLength={ACCOUNT_FIELD_LIMITS.badgeNumber}
+                    autoCapitalize="characters"
+                    aria-invalid={Boolean(formErrors.badgeNumber)}
                   />
                   {formErrors.badgeNumber && <small className="field-error">{formErrors.badgeNumber}</small>}
                 </label>
 
                 <label className="account-field">
 	                  <span>Rank *</span>
-                  <select className="settings-input w-100" value={accountForm.rank} onChange={handleFieldChange('rank')}>
+                  <select
+                    className={`settings-input w-100 ${formErrors.rank ? 'settings-input--error' : ''}`}
+                    value={accountForm.rank}
+                    onChange={handleFieldChange('rank')}
+                    onBlur={handleFieldBlur('rank')}
+                    aria-invalid={Boolean(formErrors.rank)}
+                  >
                     {rankOptions.map((rank) => (
                       <option key={rank} value={rank}>
                         {rank}
                       </option>
                     ))}
-	                  </select>
+                  </select>
+                  {formErrors.rank && <small className="field-error">{formErrors.rank}</small>}
 	                </label>
 	                  </>
 	                )}
@@ -676,8 +701,21 @@ function SettingsPage() {
                     className={`settings-input w-100 ${formErrors.loginId ? 'settings-input--error' : ''}`}
                     value={accountForm.loginId}
                     onChange={handleFieldChange('loginId')}
-                    placeholder="e.g., juan.delacruz"
+                    onBlur={handleFieldBlur('loginId')}
+                    placeholder={isEditingSupervisor ? 'e.g., supervisor' : 'Enter 4-20 digits'}
+                    inputMode={isEditingSupervisor ? 'text' : 'numeric'}
+                    maxLength={ACCOUNT_FIELD_LIMITS.loginId}
+                    autoComplete="username"
+                    spellCheck="false"
+                    aria-invalid={Boolean(formErrors.loginId)}
                   />
+                  {!formErrors.loginId && !isEditingSupervisor && (
+                    <small className="settings-hint">
+                      {editingAccount?.loginId && !/^\d{4,20}$/.test(editingAccount.loginId)
+                        ? 'Existing legacy Login ID remains valid. Use 4-20 digits if you replace it.'
+                        : 'Use 4-20 digits only.'}
+                    </small>
+                  )}
                   {formErrors.loginId && <small className="field-error">{formErrors.loginId}</small>}
                 </label>
 
@@ -688,7 +726,12 @@ function SettingsPage() {
                     className={`settings-input w-100 ${formErrors.officialEmail ? 'settings-input--error' : ''}`}
                     value={accountForm.officialEmail}
                     onChange={handleFieldChange('officialEmail')}
+                    onBlur={handleFieldBlur('officialEmail')}
                     placeholder="e.g., juan.delacruz@pnp.gov.ph"
+                    maxLength={ACCOUNT_FIELD_LIMITS.email}
+                    autoComplete="email"
+                    spellCheck="false"
+                    aria-invalid={Boolean(formErrors.officialEmail)}
                   />
                   {formErrors.officialEmail && <small className="field-error">{formErrors.officialEmail}</small>}
                 </label>
@@ -700,7 +743,12 @@ function SettingsPage() {
                       className={`settings-input w-100 ${formErrors.temporaryPassword ? 'settings-input--error' : ''}`}
                       value={accountForm.temporaryPassword}
                       onChange={handleFieldChange('temporaryPassword')}
+                      onBlur={handleFieldBlur('temporaryPassword')}
                       placeholder={editingAccountId ? 'Leave blank to keep the current password' : ''}
+                      maxLength={ACCOUNT_FIELD_LIMITS.password}
+                      autoComplete="new-password"
+                      spellCheck="false"
+                      aria-invalid={Boolean(formErrors.temporaryPassword)}
                     />
                     <button type="button" className="account-action-btn" onClick={handleGenerateTemporaryPassword}>
                       Regenerate
@@ -716,9 +764,14 @@ function SettingsPage() {
 	                    <span>Mobile Number</span>
 	                    <input
 	                      className={`settings-input w-100 ${formErrors.mobileNumber ? 'settings-input--error' : ''}`}
-	                      value={accountForm.mobileNumber}
-	                      onChange={handleFieldChange('mobileNumber')}
-	                      placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                      value={accountForm.mobileNumber}
+                      onChange={handleFieldChange('mobileNumber')}
+                      onBlur={handleFieldBlur('mobileNumber')}
+                      placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                      inputMode="tel"
+                      maxLength={18}
+                      autoComplete="tel"
+                      aria-invalid={Boolean(formErrors.mobileNumber)}
 	                    />
 	                    {formErrors.mobileNumber && <small className="field-error">{formErrors.mobileNumber}</small>}
 	                  </label>

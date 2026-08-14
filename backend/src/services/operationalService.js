@@ -1,5 +1,6 @@
 const { createHash, randomUUID } = require('crypto')
 const {
+	CurrentLocation,
 	Deployment,
 	LocationHistory,
 	Personnel,
@@ -8,7 +9,9 @@ const {
 } = require('../models')
 const {
 	barangayNameFromCode,
+	distanceInMeters,
 	getAreaCoordinates,
+	isValidCoordinates,
 	normalizeBarangayCode,
 	point,
 	readCoordinates,
@@ -23,22 +26,34 @@ const {
 	escapeRegex,
 	parsePagination,
 } = require('../utils/query')
-const { getPersonnelMember, getPersonnelWithLocations } = require('./personnelService')
+const { isInsideCabagan } = require('../utils/cabaganGeofence')
+const { getLocationStaleThresholdMs } = require('../utils/locationFreshness')
+const {
+	OPERATIONAL_LIMITS,
+	createValidationError,
+	validateDate,
+	validateDeploymentId,
+	validateOptionalNumber,
+	validatePatrolArea,
+	validateReportType,
+	validateText,
+} = require('../utils/operationalValidation')
+const {
+	emitPersonnelCollection,
+	getPersonnelMember,
+	getPersonnelWithLocations,
+} = require('./personnelService')
 const { createNotification, deliverNotification } = require('./notificationService')
+const { toMediaAccessPath } = require('./mediaStorageService')
 
 const asDate = (value, fallback = new Date()) => {
 	const date = value ? new Date(value) : fallback
 	return Number.isNaN(date.getTime()) ? fallback : date
 }
 
-const optionalDate = (value) => {
-	if (!value) return undefined
-	const date = new Date(value)
-	return Number.isNaN(date.getTime()) ? undefined : date
-}
-
 const REPORT_ROUTE_BEFORE_MS = 30 * 60 * 1000
 const REPORT_ROUTE_AFTER_MS = 15 * 60 * 1000
+const REPORT_GPS_MAX_DISTANCE_METERS = 100
 const MANAGEABLE_DEPLOYMENT_STATUSES = ['scheduled', 'active']
 const DEPLOYMENT_STATUSES = [...MANAGEABLE_DEPLOYMENT_STATUSES, 'completed', 'cancelled']
 
@@ -137,7 +152,7 @@ const serializeReport = (report, personnelById = new Map()) => ({
 	}),
 	...(report.evidencePhoto?.path && {
 		evidence_photo: {
-			url: report.evidencePhoto.path,
+			url: toMediaAccessPath(report.evidencePhoto.path),
 			mime_type: report.evidencePhoto.mimeType,
 			size: report.evidencePhoto.size,
 			camera_facing: report.evidencePhoto.cameraFacing,
@@ -188,6 +203,29 @@ const createNotFoundResult = (resource) => ({
 const appendFilterCondition = (filter, condition) => {
 	filter.$and = [...(filter.$and || []), condition]
 }
+
+const isSupervisorActor = (actor) => !actor || actor.role === 'supervisor'
+
+const getOfficerPersonnelId = (actor) => (
+	actor?.role === 'officer' ? String(actor.personnelId || '').trim() : ''
+)
+
+const taskParticipantFilter = (personnelId) => ({
+	$or: [
+		{ requestedBy: personnelId },
+		{ 'responders.personnelId': personnelId },
+	],
+})
+
+const taskParticipantIds = (task) => [...new Set([
+	task.requestedBy,
+	...(task.responders || []).map((responder) => responder.personnelId),
+])].filter((personnelId) => personnelId && personnelId !== 'supervisor')
+
+const canOfficerReadTask = (task, personnelId, isOnDuty) => (
+	taskParticipantIds(task).includes(personnelId)
+	|| (Boolean(isOnDuty) && ['open', 'full'].includes(task.status))
+)
 
 const encodeCursor = (document, dateField) => Buffer.from(JSON.stringify({
 	date: document[dateField]?.toISOString(),
@@ -252,6 +290,55 @@ const loadPersonnelMap = async (personnelIds = []) => {
 }
 
 const createOperationalService = ({ io }) => {
+	const emitToSupervisorAndPersonnel = (eventName, payload, personnelId) => {
+		io.to('role:supervisor').emit(eventName, payload)
+		if (personnelId) io.to(`personnel:${personnelId}`).emit(eventName, payload)
+	}
+
+	const emitDeploymentCollection = (eventName, deployments) => {
+		io.to('role:supervisor').emit(eventName, deployments)
+		const personnelIds = [...new Set(
+			deployments.map((deployment) => deployment.personnelId).filter(Boolean),
+		)]
+		for (const personnelId of personnelIds) {
+			io.to(`personnel:${personnelId}`).emit(
+				eventName,
+				deployments.filter((deployment) => deployment.personnelId === personnelId),
+			)
+		}
+	}
+
+	const getOnDutyPersonnelIds = (now = new Date()) => Deployment.distinct('personnelId', {
+		status: 'active',
+		$and: activeShiftConditions(now),
+	})
+
+	const isOfficerOnDuty = async (personnelId, now = new Date()) => Boolean(
+		personnelId
+		&& await Deployment.exists({
+			personnelId,
+			status: 'active',
+			$and: activeShiftConditions(now),
+		}),
+	)
+
+	const emitTaskToAuthorizedOfficers = async (
+		eventName,
+		payload,
+		task,
+		activePersonnelIds,
+	) => {
+		io.to('role:supervisor').emit(eventName, payload)
+		const visiblePersonnelIds = new Set(taskParticipantIds(task))
+		if (['open', 'full'].includes(task.status)) {
+			const eligiblePersonnelIds = activePersonnelIds || await getOnDutyPersonnelIds()
+			eligiblePersonnelIds.forEach((personnelId) => visiblePersonnelIds.add(personnelId))
+		}
+		for (const personnelId of visiblePersonnelIds) {
+			io.to(`personnel:${personnelId}`).emit(eventName, payload)
+		}
+	}
+
 	const captureReportRouteSnapshot = async (report) => {
 		const { from, to } = getReportRouteWindow(report)
 		const history = await LocationHistory.find({
@@ -385,8 +472,8 @@ const createOperationalService = ({ io }) => {
 				loadDeployments(),
 				getPersonnelWithLocations(),
 			])
-			io.emit('deployments:updated', deployments)
-			io.emit('personnel:update', personnel)
+			emitDeploymentCollection('deployments:updated', deployments)
+			emitPersonnelCollection(io, 'personnel:update', personnel)
 			io.emit('dashboard:updated')
 		}
 
@@ -460,29 +547,46 @@ const createOperationalService = ({ io }) => {
 		await deployment.save()
 		const personnelById = await loadPersonnelMap([personnelId])
 		const serialized = serializeDeployment(deployment, personnelById)
-		io.emit('deployment:acknowledged', serialized)
+		emitToSupervisorAndPersonnel(
+			'deployment:acknowledged',
+			serialized,
+			deployment.personnelId,
+		)
 		return { status: 200, body: { success: true, deployment: serialized } }
 	}
 
-	const listTasks = async (query = {}) => {
+	const listTasks = async (query = {}, actor) => {
 		const pagination = parsePagination(query)
 		const filter = {}
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		const officerIsOnDuty = officerPersonnelId && query.view === 'active'
+			? await isOfficerOnDuty(officerPersonnelId)
+			: false
 		if (query.view === 'active') {
 			filter.status = { $in: ['open', 'full'] }
 		} else if (query.view === 'history') {
 			filter.status = { $in: ['completed', 'cancelled'] }
-		} else if (query.view === 'accepted' && query.personnel_id) {
+		} else if (query.view === 'accepted' && (officerPersonnelId || query.personnel_id)) {
 			filter.status = { $in: ['open', 'full'] }
-			filter['responders.personnelId'] = String(query.personnel_id)
+			filter['responders.personnelId'] = officerPersonnelId || String(query.personnel_id)
 		} else if (['open', 'full', 'completed', 'cancelled'].includes(query.status)) {
 			filter.status = query.status
 		}
 		if (['backup', 'urgent'].includes(query.type)) filter.type = query.type
-		if (query.personnel_id && query.view !== 'accepted') {
-			filter.$or = [
-				{ requestedBy: String(query.personnel_id) },
-				{ 'responders.personnelId': String(query.personnel_id) },
-			]
+		if (
+			officerPersonnelId
+			&& query.view === 'active'
+			&& !officerIsOnDuty
+		) {
+			appendFilterCondition(filter, taskParticipantFilter(officerPersonnelId))
+		} else if (officerPersonnelId && query.view !== 'active' && query.view !== 'accepted') {
+			appendFilterCondition(filter, taskParticipantFilter(officerPersonnelId))
+		} else if (
+			isSupervisorActor(actor)
+			&& query.personnel_id
+			&& query.view !== 'accepted'
+		) {
+			appendFilterCondition(filter, taskParticipantFilter(String(query.personnel_id)))
 		}
 		if (query.search) {
 			const pattern = new RegExp(escapeRegex(query.search), 'i')
@@ -530,14 +634,19 @@ const createOperationalService = ({ io }) => {
 		}
 	}
 
-	const getTask = async (taskId) => {
+	const getTask = async (taskId, actor) => {
 		const task = await Task.findOne({ taskId }).lean()
 		if (!task) return null
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		if (officerPersonnelId) {
+			const officerIsOnDuty = await isOfficerOnDuty(officerPersonnelId)
+			if (!canOfficerReadTask(task, officerPersonnelId, officerIsOnDuty)) return null
+		}
 		const personnelById = await loadPersonnelMap([task.requestedBy])
 		return serializeTask(task, personnelById)
 	}
 
-	const completeTask = async (taskId, payload = {}) => {
+	const completeTask = async (taskId) => {
 		const task = await Task.findOne({ taskId })
 		if (!task) return createNotFoundResult('Task')
 		if (task.status === 'cancelled') {
@@ -547,7 +656,7 @@ const createOperationalService = ({ io }) => {
 			}
 		}
 		task.status = 'completed'
-		task.completedAt = asDate(payload.completed_at)
+		task.completedAt = new Date()
 		await task.save()
 		const personnelById = await loadPersonnelMap([task.requestedBy])
 		const serialized = serializeTask(task, personnelById)
@@ -567,7 +676,7 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', taskId: task.taskId },
 			dedupeKey: `task:${task.taskId}:completed`,
 		})))
-		io.emit('task:updated', serialized)
+		await emitTaskToAuthorizedOfficers('task:updated', serialized, task)
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
@@ -620,15 +729,17 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', taskId: task.taskId },
 			dedupeKey: `task:${task.taskId}:cancelled`,
 		})))
-		io.emit('task:updated', serialized)
+		await emitTaskToAuthorizedOfficers('task:updated', serialized, task)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
-	const listReports = async (query = {}) => {
+	const listReports = async (query = {}, actor) => {
 		const pagination = parsePagination(query)
 		const filter = {}
-		if (query.personnel_id) filter.submittedBy = String(query.personnel_id)
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		if (officerPersonnelId) filter.submittedBy = officerPersonnelId
+		else if (query.personnel_id) filter.submittedBy = String(query.personnel_id)
 		if (query.report_type) filter.reportType = String(query.report_type).toLowerCase()
 		if (query.category === 'incident') filter.isIncident = true
 		if (query.category === 'routine') filter.isIncident = false
@@ -686,8 +797,12 @@ const createOperationalService = ({ io }) => {
 		}
 	}
 
-	const getReport = async (reportId) => {
-		const report = await Report.findOne({ reportNumber: reportId }).lean()
+	const getReport = async (reportId, actor) => {
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		const report = await Report.findOne({
+			reportNumber: reportId,
+			...(officerPersonnelId ? { submittedBy: officerPersonnelId } : {}),
+		}).lean()
 		if (!report) return null
 		const personnelById = await loadPersonnelMap([report.submittedBy])
 		return serializeReport(report, personnelById)
@@ -749,15 +864,17 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Reports', reportId: report.reportNumber },
 			dedupeKey: `report:${report.reportNumber}:validation:${validationStatus}`,
 		})
-		io.emit('report:updated', serialized)
+		emitToSupervisorAndPersonnel('report:updated', serialized, report.submittedBy)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, report: serialized } }
 	}
 
-	const listDeployments = async (query = {}) => {
+	const listDeployments = async (query = {}, actor) => {
 		const pagination = parsePagination(query)
 		const filter = {}
-		if (query.personnel_id) filter.personnelId = String(query.personnel_id)
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		if (officerPersonnelId) filter.personnelId = officerPersonnelId
+		else if (query.personnel_id) filter.personnelId = String(query.personnel_id)
 		if (query.barangay) filter.barangayCode = normalizeBarangayCode(query.barangay)
 		if (query.view === 'manageable') {
 			filter.status = { $in: MANAGEABLE_DEPLOYMENT_STATUSES }
@@ -785,8 +902,12 @@ const createOperationalService = ({ io }) => {
 		}
 	}
 
-	const getDeployment = async (assignmentId) => {
-		const deployment = await Deployment.findOne({ assignmentId }).lean()
+	const getDeployment = async (assignmentId, actor) => {
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		const deployment = await Deployment.findOne({
+			assignmentId,
+			...(officerPersonnelId ? { personnelId: officerPersonnelId } : {}),
+		}).lean()
 		if (!deployment) return null
 		const personnelById = await loadPersonnelMap([deployment.personnelId])
 		return serializeDeployment(deployment, personnelById)
@@ -823,7 +944,7 @@ const createOperationalService = ({ io }) => {
 			data: { destination: status === 'active' ? 'Map' : 'Tasks', assignmentId },
 			dedupeKey: `deployment:${assignmentId}:status:${status}`,
 		})
-		io.emit('deployments:updated', activeDeployments)
+		emitDeploymentCollection('deployments:updated', activeDeployments)
 		return {
 			status: 200,
 			body: {
@@ -834,15 +955,19 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const createTask = async (payload = {}) => {
-		const taskType = payload.type === 'urgent' ? 'urgent' : 'backup'
+		const taskType = String(payload.type || '').trim().toLowerCase()
+		if (!['backup', 'urgent'].includes(taskType)) {
+			throw createValidationError('Task type must be backup or urgent.', 'type')
+		}
+		let activeDeployment
 		if (taskType === 'backup') {
 			const personnelId = String(payload.requested_by || '').trim()
-			const activeDeployment = personnelId
+			activeDeployment = personnelId
 				? await Deployment.findOne({
 					personnelId,
 					status: 'active',
 					$and: activeShiftConditions(new Date()),
-				}).select('_id').lean()
+				}).select('patrolArea').lean()
 				: null
 
 			if (!activeDeployment) {
@@ -858,19 +983,87 @@ const createOperationalService = ({ io }) => {
 		const requester = payload.requested_by
 			? await getPersonnelMember(payload.requested_by)
 			: null
-		const coordinates = {
-			latitude: Number(payload.latitude ?? requester?.latitude ?? 17.4239),
-			longitude: Number(payload.longitude ?? requester?.longitude ?? 121.7681),
+		if (taskType === 'backup' && !requester) {
+			throw createValidationError('The requesting officer is unavailable.', 'requested_by')
 		}
+		if (
+			taskType === 'backup'
+			&& (
+				requester.latitude === null
+				|| requester.longitude === null
+				|| requester.isLocationStale
+			)
+		) {
+			throw createValidationError(
+				'A current GPS location is required before requesting backup.',
+				'location',
+				'CURRENT_LOCATION_REQUIRED',
+			)
+		}
+		const coordinates = taskType === 'backup'
+			? {
+				latitude: Number(requester?.latitude),
+				longitude: Number(requester?.longitude),
+			}
+			: {
+				latitude: Number(payload.latitude),
+				longitude: Number(payload.longitude),
+			}
+		if (!isValidCoordinates(coordinates.latitude, coordinates.longitude)) {
+			const error = new Error('Valid latitude and longitude are required for the task location.')
+			error.status = 400
+			error.code = 'INVALID_TASK_COORDINATES'
+			throw error
+		}
+		const title = taskType === 'backup'
+			? `Backup requested by ${requester.name}`
+			: validateText(payload.title, {
+				field: 'title',
+				label: 'Task title',
+				maxLength: OPERATIONAL_LIMITS.taskTitle,
+				required: true,
+				allowNewlines: false,
+			})
+		const description = taskType === 'backup'
+			? 'Additional personnel assistance requested from the officer current location.'
+			: validateText(payload.description, {
+				field: 'description',
+				label: 'Task description',
+				maxLength: OPERATIONAL_LIMITS.taskDescription,
+			})
+		const locationName = taskType === 'backup'
+			? (requester.locationName || activeDeployment.patrolArea)
+			: validateText(payload.location, {
+				field: 'location',
+				label: 'Task location',
+				maxLength: OPERATIONAL_LIMITS.taskLocation,
+				required: true,
+				allowNewlines: false,
+			})
+		const requiredResponders = taskType === 'backup'
+			? 3
+			: validateOptionalNumber(payload.required_responders ?? 3, {
+				field: 'required_responders',
+				label: 'Required responders',
+				min: 1,
+				max: 5,
+			})
+		if (!Number.isInteger(requiredResponders)) {
+			throw createValidationError(
+				'Required responders must be a whole number between 1 and 5.',
+				'required_responders',
+			)
+		}
+
 		const task = await Task.create({
 			taskId: `TSK-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`,
 			type: taskType,
-			title: payload.title || 'Backup requested',
-			description: payload.description || 'Additional personnel assistance requested.',
+			title,
+			description,
 			requestedBy: payload.requested_by || 'supervisor',
-			requesterName: requester?.name || payload.requester_name || 'Duty Supervisor',
-			requiredResponders: Math.max(1, Math.min(5, Number(payload.required_responders) || 3)),
-			locationName: payload.location || requester?.locationName || 'Location unavailable',
+			requesterName: requester?.name || 'Duty Supervisor',
+			requiredResponders,
+			locationName,
 			location: point(coordinates.longitude, coordinates.latitude),
 			status: 'open',
 		})
@@ -900,7 +1093,12 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', taskId: task.taskId },
 			dedupeKey: `task:${task.taskId}:created`,
 		})))
-		io.emit('task:created', serialized)
+		await emitTaskToAuthorizedOfficers(
+			'task:created',
+			serialized,
+			task,
+			eligiblePersonnelIds,
+		)
 		io.emit('dashboard:updated')
 		return serialized
 	}
@@ -908,6 +1106,15 @@ const createOperationalService = ({ io }) => {
 	const acceptTask = async (taskId, personnelId) => {
 		if (!personnelId) {
 			return { status: 400, body: { success: false, message: 'Personnel ID is required.' } }
+		}
+		if (!await isOfficerOnDuty(personnelId)) {
+			return {
+				status: 403,
+				body: {
+					success: false,
+					message: 'Only officers on an active deployment may accept this task.',
+				},
+			}
 		}
 
 		const acceptedAt = new Date()
@@ -989,7 +1196,7 @@ const createOperationalService = ({ io }) => {
 				dedupeKey: `task:${task.taskId}:accepted:${personnelId}`,
 			})
 		}
-		io.emit('task:updated', serialized)
+		await emitTaskToAuthorizedOfficers('task:updated', serialized, task)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, task: serialized } }
 	}
@@ -1003,7 +1210,8 @@ const createOperationalService = ({ io }) => {
 			error.status = 400
 			throw error
 		}
-		const reportType = String(payload.report_type || 'incident').toLowerCase()
+		const now = new Date()
+		const reportType = validateReportType(payload.report_type)
 		const isIncident = reportType === 'incident'
 		const selectedBarangay = findCabaganBarangay(payload.barangay)
 		if (!selectedBarangay) {
@@ -1014,60 +1222,162 @@ const createOperationalService = ({ io }) => {
 			throw error
 		}
 
-		const title = String(payload.title || '').trim()
-		const description = String(payload.description || '').trim()
-		const locationName = String(payload.location || '').trim()
-		if (!title || !description || !locationName) {
-			const error = new Error('Title, description, and exact incident location are required.')
-			error.status = 400
-			throw error
+		const title = validateText(payload.title, {
+			field: 'title',
+			label: 'Report title',
+			maxLength: OPERATIONAL_LIMITS.reportTitle,
+			required: true,
+			allowNewlines: false,
+		})
+		const description = validateText(payload.description, {
+			field: 'description',
+			label: 'Report description',
+			maxLength: OPERATIONAL_LIMITS.reportDescription,
+			required: true,
+		})
+		const locationName = validateText(payload.location, {
+			field: 'location',
+			label: 'Exact incident location',
+			maxLength: OPERATIONAL_LIMITS.reportLocation,
+			required: true,
+			allowNewlines: false,
+		})
+		const locationSource = String(payload.location_source || '').trim().toLowerCase()
+		if (!['gps', 'manual'].includes(locationSource)) {
+			throw createValidationError(
+				'Location source must be gps or manual.',
+				'location_source',
+			)
+		}
+		const occurredAt = validateDate(payload.occurred_at || now, {
+			field: 'occurred_at',
+			label: 'Incident date and time',
+			min: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
+			max: new Date(now.getTime() + 5 * 60 * 1000),
+		})
+		const severity = validateOptionalNumber(payload.severity ?? (isIncident ? 2 : 1), {
+			field: 'severity',
+			label: 'Severity',
+			min: 1,
+			max: 5,
+		})
+		if (!Number.isInteger(severity)) {
+			throw createValidationError('Severity must be a whole number from 1 to 5.', 'severity')
 		}
 
-		const locationSource = payload.location_source === 'gps' ? 'gps' : 'manual'
+		const [activeDeployment, currentLocation] = await Promise.all([
+			Deployment.findOne({
+				personnelId: officer.id,
+				status: 'active',
+				$and: activeShiftConditions(now),
+			}).select('patrolArea').lean(),
+			CurrentLocation.findOne({ personnelId: officer.id }).lean(),
+		])
+		const currentCoordinates = currentLocation?.location?.coordinates
+		const hasCurrentCoordinates = Array.isArray(currentCoordinates)
+			&& currentCoordinates.length === 2
+			&& isValidCoordinates(Number(currentCoordinates[1]), Number(currentCoordinates[0]))
+		const currentRecordedAt = new Date(currentLocation?.recordedAt || 0)
+		const currentAgeMs = now.getTime() - currentRecordedAt.getTime()
+		const hasFreshCurrentLocation = hasCurrentCoordinates
+			&& Number.isFinite(currentAgeMs)
+			&& currentAgeMs >= -5 * 60 * 1000
+			&& currentAgeMs <= getLocationStaleThresholdMs()
+
 		const hasLatitude = payload.latitude !== null
 			&& payload.latitude !== undefined
 			&& payload.latitude !== ''
 		const hasLongitude = payload.longitude !== null
 			&& payload.longitude !== undefined
 			&& payload.longitude !== ''
-		const suppliedLatitude = hasLatitude ? Number(payload.latitude) : NaN
-		const suppliedLongitude = hasLongitude ? Number(payload.longitude) : NaN
-		const hasSuppliedCoordinates = hasLatitude
+		const suppliedLatitude = hasLatitude ? Number(payload.latitude) : undefined
+		const suppliedLongitude = hasLongitude ? Number(payload.longitude) : undefined
+		const hasValidSuppliedCoordinates = hasLatitude
 			&& hasLongitude
-			&& Number.isFinite(suppliedLatitude)
-			&& Number.isFinite(suppliedLongitude)
-		if (locationSource === 'gps' && !hasSuppliedCoordinates) {
-			const error = new Error(
-				'Current GPS coordinates are unavailable. Enter the incident location manually.',
-			)
+			&& isValidCoordinates(suppliedLatitude, suppliedLongitude)
+		if ((hasLatitude || hasLongitude) && !hasValidSuppliedCoordinates) {
+			const error = new Error('Enter a valid latitude and longitude, or leave both coordinates empty.')
 			error.status = 400
+			error.code = 'INVALID_REPORT_COORDINATES'
 			throw error
+		}
+		if (locationSource === 'gps' && !hasFreshCurrentLocation) {
+			throw createValidationError(
+				'Your server-verified GPS location is unavailable or stale. Use a manual incident location.',
+				'location_source',
+				'CURRENT_LOCATION_UNAVAILABLE',
+			)
+		}
+		if (locationSource === 'gps' && !hasValidSuppliedCoordinates) {
+			throw createValidationError(
+				'Include the current device coordinates when using the GPS location source.',
+				'location',
+				'REPORT_GPS_COORDINATES_REQUIRED',
+			)
+		}
+		if (
+			locationSource === 'gps'
+			&& distanceInMeters(
+				currentCoordinates,
+				[suppliedLongitude, suppliedLatitude],
+			) > REPORT_GPS_MAX_DISTANCE_METERS
+		) {
+			throw createValidationError(
+				`The submitted coordinates are more than ${REPORT_GPS_MAX_DISTANCE_METERS} meters from the latest server-verified GPS reading.`,
+				'location',
+				'REPORT_GPS_LOCATION_MISMATCH',
+			)
+		}
+		const latitude = locationSource === 'gps'
+			? Number(currentCoordinates[1])
+			: suppliedLatitude
+		const longitude = locationSource === 'gps'
+			? Number(currentCoordinates[0])
+			: suppliedLongitude
+		const hasReportCoordinates = isValidCoordinates(latitude, longitude)
+		if (hasReportCoordinates && !isInsideCabagan(latitude, longitude)) {
+			throw createValidationError(
+				'The selected incident coordinates must be inside Cabagan.',
+				'location',
+				'OUTSIDE_CABAGAN_REPORT_LOCATION',
+			)
+		}
+		let evidencePhoto = payload.evidence_photo
+		if (evidencePhoto) {
+			evidencePhoto = {
+				...evidencePhoto,
+				capturedAt: validateDate(evidencePhoto.capturedAt || now, {
+					field: 'evidence_captured_at',
+					label: 'Evidence capture time',
+					max: new Date(now.getTime() + 5 * 60 * 1000),
+				}),
+			}
 		}
 		const report = await Report.create({
 			reportNumber: `RPT-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`,
 			submittedBy: officer.id,
 			officerName: officer.name,
-			submittedAt: asDate(payload.date_time),
-			incidentAt: asDate(payload.occurred_at),
-			assignedArea: payload.assigned_area || 'Unassigned area',
+			submittedAt: now,
+			incidentAt: occurredAt,
+			assignedArea: activeDeployment?.patrolArea || 'Unassigned area',
 			barangayCode: selectedBarangay.code,
 			reportType,
 			isIncident,
-			severity: Math.max(1, Math.min(5, Number(payload.severity) || (isIncident ? 2 : 1))),
+			severity,
 			validationStatus: 'pending',
 			caseStatus: isIncident ? 'open' : 'not_applicable',
 			title,
 			description,
 			locationName,
 			locationSource,
-			...(hasSuppliedCoordinates && {
-				location: point(suppliedLongitude, suppliedLatitude),
+			...(hasReportCoordinates && {
+				location: point(longitude, latitude),
 			}),
-			...(locationSource === 'gps' && hasSuppliedCoordinates && {
-				submittedFrom: point(suppliedLongitude, suppliedLatitude),
+			...(hasFreshCurrentLocation && {
+				submittedFrom: point(currentCoordinates[0], currentCoordinates[1]),
 			}),
-			...(payload.evidence_photo && {
-				evidencePhoto: payload.evidence_photo,
+			...(evidencePhoto && {
+				evidencePhoto,
 			}),
 		})
 		await captureReportRouteSnapshot(report)
@@ -1081,7 +1391,7 @@ const createOperationalService = ({ io }) => {
 			referenceType: 'report',
 			referenceId: report.reportNumber,
 		})
-		io.emit('report:submitted', serialized)
+		emitToSupervisorAndPersonnel('report:submitted', serialized, report.submittedBy)
 		io.emit('dashboard:updated')
 		return serialized
 	}
@@ -1112,9 +1422,13 @@ const createOperationalService = ({ io }) => {
 
 		report.caseStatus = 'resolved'
 		report.resolution = {
-			resolvedAt: asDate(payload.resolved_at),
+			resolvedAt: new Date(),
 			resolvedBy: payload.resolved_by || report.submittedBy,
-			notes: String(payload.resolution_notes || '').trim(),
+			notes: validateText(payload.resolution_notes, {
+				field: 'resolution_notes',
+				label: 'Resolution notes',
+				maxLength: OPERATIONAL_LIMITS.resolutionNotes,
+			}),
 		}
 		await report.save()
 		const serialized = serializeReport(report)
@@ -1126,19 +1440,79 @@ const createOperationalService = ({ io }) => {
 			referenceType: 'report',
 			referenceId: report.reportNumber,
 		})
-		io.emit('report:resolved', serialized)
+		emitToSupervisorAndPersonnel('report:resolved', serialized, report.submittedBy)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, report: serialized } }
 	}
 
 	const replaceDeployments = async (payload = []) => {
 		const now = new Date()
-		const normalizedAssignments = payload.map((assignment) => ({
+		if (!Array.isArray(payload)) {
+			throw createValidationError('assignments must be an array.', 'assignments')
+		}
+		if (payload.length > OPERATIONAL_LIMITS.deploymentBatch) {
+			throw createValidationError(
+				`A maximum of ${OPERATIONAL_LIMITS.deploymentBatch} assignments may be saved at once.`,
+				'assignments',
+			)
+		}
+		const preliminarilyNormalized = payload.map((assignment) => {
+			if (!assignment || typeof assignment !== 'object' || Array.isArray(assignment)) {
+				throw createValidationError('Each deployment must be an object.', 'assignments')
+			}
+			const status = String(assignment.status || '').trim().toLowerCase()
+			if (!MANAGEABLE_DEPLOYMENT_STATUSES.includes(status)) {
+				throw createValidationError(
+					'Deployment status must be active or scheduled.',
+					'status',
+				)
+			}
+			const personnelId = String(assignment.personnelId || '').trim()
+			if (!/^[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])?$/i.test(personnelId)) {
+				throw createValidationError('Select a valid personnel account.', 'personnelId')
+			}
+			return {
+				id: validateDeploymentId(assignment.id),
+				groupId: validateDeploymentId(assignment.groupId || assignment.id, 'groupId'),
+				personnelId,
+				patrolArea: validatePatrolArea(assignment.patrolArea),
+				shiftStart: validateDate(assignment.shiftStart, {
+					field: 'shiftStart',
+					label: 'Shift start',
+				}),
+				shiftEnd: validateDate(assignment.shiftEnd, {
+					field: 'shiftEnd',
+					label: 'Shift end',
+				}),
+				notes: validateText(assignment.notes, {
+					field: 'notes',
+					label: 'Deployment instructions',
+					maxLength: OPERATIONAL_LIMITS.deploymentInstructions,
+				}),
+				status,
+			}
+		})
+		const requestedPersonnelIds = [...new Set(
+			preliminarilyNormalized.map((assignment) => assignment.personnelId),
+		)]
+		const personnelProfiles = await Personnel.find({
+			personnelId: { $in: requestedPersonnelIds },
+			status: 'active',
+		}).select('personnelId fullName rank').lean()
+		const personnelById = new Map(
+			personnelProfiles.map((profile) => [profile.personnelId, profile]),
+		)
+		const missingPersonnelId = requestedPersonnelIds.find((id) => !personnelById.has(id))
+		if (missingPersonnelId) {
+			throw createValidationError(
+				'One or more selected personnel accounts are inactive or unavailable.',
+				'personnelId',
+			)
+		}
+		const normalizedAssignments = preliminarilyNormalized.map((assignment) => ({
 			...assignment,
-			id: String(assignment.id),
-			status: assignment.status === 'scheduled' ? 'scheduled' : 'active',
-			shiftStart: optionalDate(assignment.shiftStart),
-			shiftEnd: optionalDate(assignment.shiftEnd),
+			personnelName: personnelById.get(assignment.personnelId).fullName,
+			rank: personnelById.get(assignment.personnelId).rank,
 		}))
 		const assignmentIds = normalizedAssignments.map((item) => item.id)
 
@@ -1152,7 +1526,7 @@ const createOperationalService = ({ io }) => {
 		for (const assignment of normalizedAssignments) {
 			const { shiftStart, shiftEnd } = assignment
 
-			if (!shiftStart || !shiftEnd || shiftEnd <= shiftStart) {
+			if (shiftEnd <= shiftStart) {
 				const error = new Error('Each deployment requires a valid shift end later than its shift start.')
 				error.status = 400
 				error.code = 'INVALID_DEPLOYMENT_SHIFT'
@@ -1164,6 +1538,27 @@ const createOperationalService = ({ io }) => {
 				error.status = 400
 				error.code = 'INVALID_SCHEDULED_DEPLOYMENT_START'
 				throw error
+			}
+			if (assignment.status === 'active' && shiftStart > new Date(now.getTime() + 5 * 60 * 1000)) {
+				throw createValidationError(
+					'An active deployment cannot start in the future.',
+					'shiftStart',
+			)
+			}
+			if (shiftEnd <= now) {
+				throw createValidationError('Shift end must be in the future.', 'shiftEnd')
+			}
+			if (shiftEnd.getTime() - shiftStart.getTime() > 24 * 60 * 60 * 1000) {
+				throw createValidationError(
+					'A deployment shift must not exceed 24 hours.',
+					'shiftEnd',
+			)
+			}
+			if (shiftStart > new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)) {
+				throw createValidationError(
+					'A deployment cannot be scheduled more than one year ahead.',
+					'shiftStart',
+				)
 			}
 		}
 
@@ -1207,6 +1602,7 @@ const createOperationalService = ({ io }) => {
 		if (normalizedAssignments.length > 0) {
 			await Deployment.bulkWrite(normalizedAssignments.map((assignment) => {
 				const fallback = getAreaCoordinates(assignment.patrolArea)
+				const previous = previousById.get(assignment.id)
 				return {
 					updateOne: {
 						filter: { assignmentId: String(assignment.id) },
@@ -1222,7 +1618,7 @@ const createOperationalService = ({ io }) => {
 								shiftEnd: assignment.shiftEnd,
 								instructions: assignment.notes || '',
 								assignedBy: assignment.assignedBy || 'supervisor',
-								assignedAt: asDate(assignment.assignedAt),
+								assignedAt: previous?.assignedAt || now,
 								location: point(
 									assignment.longitude ?? fallback.longitude,
 									assignment.latitude ?? fallback.latitude,
@@ -1299,15 +1695,15 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', assignmentId: deployment.assignmentId },
 			dedupeKey: `deployment:${deployment.assignmentId}:cancelled`,
 		})))
-		io.emit('deployments:updated', activeDeployments)
+		emitDeploymentCollection('deployments:updated', activeDeployments)
 		io.emit('dashboard:updated')
 		return manageablePayload.data
 	}
 
-	const registerSocket = async (socket) => {
+	const registerSocket = async (socket, actor) => {
 		const [taskPayload, deployments] = await Promise.all([
-			listTasks({ view: 'active', limit: 100 }),
-			loadDeployments(),
+			listTasks({ view: 'active', limit: 100 }, actor),
+			loadDeployments(getOfficerPersonnelId(actor) || undefined),
 		])
 		socket.emit('tasks:bootstrap', taskPayload.data)
 		socket.emit('deployments:bootstrap', deployments)
@@ -1341,3 +1737,5 @@ const createOperationalService = ({ io }) => {
 }
 
 module.exports = createOperationalService
+module.exports.canOfficerReadTask = canOfficerReadTask
+module.exports.taskParticipantIds = taskParticipantIds

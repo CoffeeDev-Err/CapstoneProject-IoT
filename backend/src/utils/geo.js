@@ -23,6 +23,34 @@ const point = (longitude, latitude) => ({
 	coordinates: [Number(longitude), Number(latitude)],
 })
 
+const isValidCoordinates = (latitude, longitude) => (
+	Number.isFinite(latitude)
+	&& Number.isFinite(longitude)
+	&& latitude >= -90
+	&& latitude <= 90
+	&& longitude >= -180
+	&& longitude <= 180
+)
+
+const distanceInMeters = (first = [], second = []) => {
+	if (
+		first.length !== 2
+		|| second.length !== 2
+		|| !first.every(Number.isFinite)
+		|| !second.every(Number.isFinite)
+	) return Number.POSITIVE_INFINITY
+	const toRadians = (value) => (value * Math.PI) / 180
+	const [firstLongitude, firstLatitude] = first
+	const [secondLongitude, secondLatitude] = second
+	const latitudeDelta = toRadians(secondLatitude - firstLatitude)
+	const longitudeDelta = toRadians(secondLongitude - firstLongitude)
+	const a = Math.sin(latitudeDelta / 2) ** 2
+		+ Math.cos(toRadians(firstLatitude))
+		* Math.cos(toRadians(secondLatitude))
+		* Math.sin(longitudeDelta / 2) ** 2
+	return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 const readCoordinates = (location) => ({
 	latitude: location?.coordinates?.[1] ?? DEFAULT_LATITUDE,
 	longitude: location?.coordinates?.[0] ?? DEFAULT_LONGITUDE,
@@ -48,7 +76,9 @@ module.exports = {
 	DEFAULT_LATITUDE,
 	DEFAULT_LONGITUDE,
 	barangayNameFromCode,
+	distanceInMeters,
 	getAreaCoordinates,
+	isValidCoordinates,
 	normalizeBarangayCode,
 	point,
 	readCoordinates,
