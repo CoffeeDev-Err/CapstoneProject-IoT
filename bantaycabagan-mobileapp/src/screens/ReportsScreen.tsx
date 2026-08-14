@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
     paddingVertical: 44,
     backgroundColor: 'rgba(2, 6, 23, 0.58)',
   },
-  dialogBackdropPressTarget: { ...StyleSheet.absoluteFillObject },
+  dialogBackdropPressTarget: { ...StyleSheet.absoluteFill },
   dialogCard: {
     width: '100%',
     maxWidth: 430,

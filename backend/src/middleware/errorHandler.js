@@ -14,6 +14,9 @@ const errorHandler = (error, _req, res, _next) => {
 	const expectedConfigurationError = [
 		'FLESPI_NOT_CONFIGURED',
 		'GPS_INGEST_NOT_CONFIGURED',
+		'S3_CONFIGURATION_INCOMPLETE',
+		'S3_NOT_CONFIGURED',
+		'MEDIA_SIGNING_NOT_CONFIGURED',
 	].includes(error.code)
 	if (status >= 500 && !expectedConfigurationError) {
 		console.error(error)
@@ -25,6 +28,7 @@ const errorHandler = (error, _req, res, _next) => {
 	return res.status(status).json({
 		success: false,
 		code: error.code || 'INTERNAL_SERVER_ERROR',
+		...(error.field ? { field: error.field } : {}),
 		message: exposeMessage
 			? (error.message || 'Unable to complete the request.')
 			: 'Unable to complete the request.',

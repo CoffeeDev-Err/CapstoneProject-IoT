@@ -12,14 +12,14 @@ repository.
 - Node.js version: 22.x
 - Framework: Express.js, or `Other` if Express is not auto-detected
 - Build command: `npm run build`
-- Entry file: `backend/src/server.js`
+- Entry file: `backend/scripts/start-production.js`
 - Start command, if requested: `npm start`
 
 Do not set `PORT`. Hostinger provides the application port at runtime.
 
 The root npm workspace installs both `backend` and `frontend` dependencies. The
 build command creates `frontend/dist`; the Express server serves that dashboard
-in production as well as `/api`, `/uploads`, and Socket.IO.
+in production as well as `/api`, the signed media gateway, and Socket.IO.
 
 ## Required environment variables
 
@@ -30,6 +30,7 @@ the local `.env` file.
 NODE_ENV=production
 MONGO_URI=<mongodb-atlas-connection-string>
 ALLOWED_ORIGINS=https://<production-domain>
+TRUST_PROXY=1
 OTP_SECRET=<long-random-secret>
 GPS_INGEST_API_KEY=<different-long-random-secret>
 FLESPI_TOKEN=<restricted-flespi-token>
@@ -40,16 +41,28 @@ EMAIL_DELIVERY_MODE=gmail
 GMAIL_USER=<notification-email>
 GMAIL_APP_PASSWORD=<google-app-password>
 EMAIL_FROM=<sender-name-and-address>
+AWS_REGION=ap-southeast-1
+AWS_S3_BUCKET=<private-s3-bucket-name>
+AWS_ACCESS_KEY_ID=<dedicated-iam-access-key>
+AWS_SECRET_ACCESS_KEY=<dedicated-iam-secret-key>
+S3_SIGNED_URL_TTL_SECONDS=900
+MEDIA_URL_SIGNING_SECRET=<separate-long-random-secret>
 ```
 
 Add the remaining seed/demo variables from `backend/.env.example` only when they
 are intentionally needed. Production supervisor and officer passwords must not
 use the example values.
 
-For the first defense deployment, uploads use `backend/uploads`. Before regular
-police use, configure `UPLOAD_DIR` to a backed-up persistent location outside the
-deployment output or move evidence storage to an object-storage service. Verify
-file persistence after a Hostinger redeployment before relying on it.
+The production start command validates these settings before connecting to the
+database. Startup intentionally fails when origins, proxy depth, OTP/GPS secrets,
+or Gmail OTP delivery are missing or unsafe. `OTP_SECRET` and
+`GPS_INGEST_API_KEY` must be different random values with at least 32 characters.
+
+When all AWS variables are configured, new profile photos and report evidence
+use the private S3 bucket. Existing `/uploads/...` records remain readable.
+Keep Block Public Access enabled and use only the restricted
+`geosentri-backend-s3` IAM credentials. See `docs/S3_MEDIA_STORAGE.md` for the
+permission test and key-rotation procedure.
 
 ## Mobile production build
 

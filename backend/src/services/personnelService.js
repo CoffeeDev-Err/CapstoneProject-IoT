@@ -5,25 +5,27 @@ const {
 	LocationHistory,
 	Personnel,
 } = require('../models')
-const { point, readCoordinates } = require('../utils/geo')
+const { distanceInMeters, point, readCoordinates } = require('../utils/geo')
 const {
 	buildDateRange,
 	createPaginationMeta,
 	escapeRegex,
 	parsePagination,
 } = require('../utils/query')
+const {
+	OPERATIONAL_LIMITS,
+	createValidationError,
+	validateOptionalNumber,
+	validateText,
+} = require('../utils/operationalValidation')
 const { createNotification, deliverNotification } = require('./notificationService')
 const { getLocalLocationName } = require('./reverseGeocodingService')
 const { getLocationFreshness } = require('../utils/locationFreshness')
 const { isInsideCabagan } = require('../utils/cabaganGeofence')
+const { toMediaAccessPath } = require('./mediaStorageService')
 
 const HISTORY_SAMPLE_INTERVAL_MS = 30_000
 const MAX_MOCK_OFFSET = 0.002
-const toOptionalNumber = (value) => {
-	if (value === null || value === undefined || value === '') return undefined
-	const parsed = Number(value)
-	return Number.isFinite(parsed) ? parsed : undefined
-}
 const mockAnchors = new Map([
 	['psms-002', [121.7683, 17.4213]],
 ])
@@ -36,20 +38,6 @@ const currentShiftFilter = (now = new Date(), extra = {}) => ({
 	],
 	...extra,
 })
-
-const distanceInMeters = (first = [], second = []) => {
-	if (first.length !== 2 || second.length !== 2) return Number.POSITIVE_INFINITY
-	const toRadians = (value) => (value * Math.PI) / 180
-	const [firstLongitude, firstLatitude] = first
-	const [secondLongitude, secondLatitude] = second
-	const latitudeDelta = toRadians(secondLatitude - firstLatitude)
-	const longitudeDelta = toRadians(secondLongitude - firstLongitude)
-	const a = Math.sin(latitudeDelta / 2) ** 2
-		+ Math.cos(toRadians(firstLatitude))
-		* Math.cos(toRadians(secondLatitude))
-		* Math.sin(longitudeDelta / 2) ** 2
-	return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
 
 const serializePersonnel = (profile, currentLocation, options = {}) => {
 	const coordinates = currentLocation?.location?.coordinates
@@ -81,8 +69,10 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 		status: isOnDuty ? 'On Duty' : 'Off Duty',
 		isOnDuty,
 		isVisibleOnMap: isOnDuty && hasCurrentLocation,
-		mobileNumber: profile.mobileNumber,
-		photoUrl: profile.photoUrl,
+		...(options.includePrivateDetails !== false && {
+			mobileNumber: profile.mobileNumber,
+		}),
+		photoUrl: toMediaAccessPath(profile.photoUrl),
 		lastUpdated: (
 			currentLocation?.recordedAt
 			|| currentLocation?.updatedAt
@@ -106,6 +96,37 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 	}
 }
 
+const getOfficerPersonnelId = (actor) => (
+	actor?.role === 'officer' ? String(actor.personnelId || '').trim() : ''
+)
+
+const withoutPrivatePersonnelDetails = (member) => {
+	const { mobileNumber: _mobileNumber, ...safeMember } = member
+	return safeMember
+}
+
+const scopePersonnelForActor = (personnel = [], actor) => {
+	if (!actor || actor.role === 'supervisor') return personnel
+	const officerPersonnelId = getOfficerPersonnelId(actor)
+	if (!officerPersonnelId) return []
+	return personnel
+		.filter((member) => member.id === officerPersonnelId || member.isOnDuty)
+		.map(withoutPrivatePersonnelDetails)
+}
+
+const emitPersonnelCollection = (io, eventName, personnel = []) => {
+	io.to('role:supervisor').emit(eventName, personnel)
+	for (const member of personnel) {
+		io.to(`personnel:${member.id}`).emit(
+			eventName,
+			scopePersonnelForActor(personnel, {
+				role: 'officer',
+				personnelId: member.id,
+			}),
+		)
+	}
+}
+
 const getPersonnelWithLocations = async () => {
 	const now = new Date()
 	const [profiles, locations, onDutyPersonnelIds] = await Promise.all([
@@ -125,19 +146,35 @@ const getPersonnelWithLocations = async () => {
 	))
 }
 
-const getPersonnelMember = async (personnelId) => {
+const getPersonnelMember = async (personnelId, actor) => {
+	const officerPersonnelId = getOfficerPersonnelId(actor)
+	if (officerPersonnelId && officerPersonnelId !== personnelId) return null
 	const [profile, location, deployment] = await Promise.all([
 		Personnel.findOne({ personnelId, status: 'active' }).lean(),
 		CurrentLocation.findOne({ personnelId }).lean(),
 		Deployment.findOne(currentShiftFilter(new Date(), { personnelId })).select('_id').lean(),
 	])
 
-	return profile ? serializePersonnel(profile, location, { isOnDuty: Boolean(deployment) }) : null
+	return profile ? serializePersonnel(profile, location, {
+		isOnDuty: Boolean(deployment),
+		includePrivateDetails: !officerPersonnelId,
+	}) : null
 }
 
-const listPersonnel = async (query = {}) => {
+const listPersonnel = async (query = {}, actor) => {
 	const pagination = parsePagination(query)
-	const filter = query.include_inactive === 'true' ? {} : { status: 'active' }
+	const officerPersonnelId = getOfficerPersonnelId(actor)
+	const visibleOnDutyPersonnelIds = officerPersonnelId
+		? await Deployment.distinct('personnelId', currentShiftFilter(new Date()))
+		: null
+	const filter = !officerPersonnelId && query.include_inactive === 'true'
+		? {}
+		: { status: 'active' }
+	if (officerPersonnelId) {
+		filter.personnelId = {
+			$in: [...new Set([...visibleOnDutyPersonnelIds, officerPersonnelId])],
+		}
+	}
 	if (query.duty_status) filter.dutyStatus = String(query.duty_status)
 	if (query.search) {
 		const pattern = new RegExp(escapeRegex(query.search), 'i')
@@ -158,13 +195,15 @@ const listPersonnel = async (query = {}) => {
 		Personnel.countDocuments(filter),
 	])
 	const personnelIds = profiles.map((profile) => profile.personnelId)
-	const [locations, onDutyPersonnelIds] = await Promise.all([
+	const [locations, queriedOnDutyPersonnelIds] = await Promise.all([
 		CurrentLocation.find({ personnelId: { $in: personnelIds } }).lean(),
-		Deployment.distinct('personnelId', currentShiftFilter(new Date(), {
-			personnelId: { $in: personnelIds },
-		})),
+		visibleOnDutyPersonnelIds
+			? Promise.resolve(visibleOnDutyPersonnelIds)
+			: Deployment.distinct('personnelId', currentShiftFilter(new Date(), {
+				personnelId: { $in: personnelIds },
+			})),
 	])
-	const onDutySet = new Set(onDutyPersonnelIds)
+	const onDutySet = new Set(queriedOnDutyPersonnelIds)
 	const locationByPersonnel = new Map(
 		locations.map((location) => [location.personnelId, location]),
 	)
@@ -173,6 +212,7 @@ const listPersonnel = async (query = {}) => {
 		data: profiles.map((profile) => (
 			serializePersonnel(profile, locationByPersonnel.get(profile.personnelId), {
 				isOnDuty: onDutySet.has(profile.personnelId),
+				includePrivateDetails: !officerPersonnelId,
 			})
 		)),
 		pagination: createPaginationMeta({ ...pagination, total }),
@@ -226,19 +266,30 @@ const getLocationHistory = async (personnelId, query = {}) => {
 }
 
 const ingestLocation = async (payload = {}) => {
-	let personnelId = String(payload.personnel_id || '').trim()
-	let assignment
-	if (!personnelId && payload.imei) {
-		assignment = await GpsDeviceAssignment.findOne({
-			imei: String(payload.imei).trim(),
-			status: 'active',
-		}).lean()
-		personnelId = assignment?.personnelId || ''
+	const imei = String(payload.imei || '').trim()
+	if (!/^\d{8,20}$/.test(imei)) {
+		throw createValidationError(
+			'An assigned 8-20 digit GPS IMEI is required.',
+			'imei',
+			'ASSIGNED_IMEI_REQUIRED',
+		)
 	}
-	if (!personnelId) {
-		const error = new Error('A valid personnel_id or assigned IMEI is required.')
-		error.status = 400
-		throw error
+	const assignment = await GpsDeviceAssignment.findOne({ imei, status: 'active' }).lean()
+	if (!assignment) {
+		throw createValidationError(
+			'This GPS IMEI is not assigned to an active personnel account.',
+			'imei',
+			'GPS_ASSIGNMENT_NOT_FOUND',
+		)
+	}
+	const personnelId = assignment.personnelId
+	const requestedPersonnelId = String(payload.personnel_id || '').trim()
+	if (requestedPersonnelId && requestedPersonnelId !== personnelId) {
+		throw createValidationError(
+			'The submitted personnel ID does not match the assigned GPS device.',
+			'personnel_id',
+			'GPS_PERSONNEL_MISMATCH',
+		)
 	}
 
 	const [profile, activeDeployment] = await Promise.all([
@@ -274,9 +325,37 @@ const ingestLocation = async (payload = {}) => {
 	}
 
 	const source = payload.source === 'mock' ? 'mock' : 'gps'
-	const speed = toOptionalNumber(payload.speed)
-	const heading = toOptionalNumber(payload.heading)
-	const batteryLevel = toOptionalNumber(payload.battery_level)
+	if (recordedAt > new Date(Date.now() + 5 * 60 * 1000)) {
+		throw createValidationError(
+			'recorded_at cannot be more than five minutes in the future.',
+			'recorded_at',
+		)
+	}
+	if (source === 'gps' && getLocationFreshness({ recordedAt, source }).isLocationStale) {
+		throw createValidationError(
+			'The GPS reading is too old to update the live location.',
+			'recorded_at',
+			'STALE_GPS_READING',
+		)
+	}
+	const speed = validateOptionalNumber(payload.speed, {
+		field: 'speed', label: 'Speed', min: 0, max: 300,
+	})
+	const heading = validateOptionalNumber(payload.heading, {
+		field: 'heading', label: 'Heading', min: 0, max: 359.999,
+	})
+	const batteryLevel = validateOptionalNumber(payload.battery_level, {
+		field: 'battery_level', label: 'Battery level', min: 0, max: 100,
+	})
+	const accuracy = validateOptionalNumber(payload.accuracy, {
+		field: 'accuracy', label: 'GPS accuracy', min: 0.1, max: 5000,
+	})
+	const submittedLocationName = validateText(payload.location_name, {
+		field: 'location_name',
+		label: 'Location name',
+		maxLength: OPERATIONAL_LIMITS.locationName,
+		allowNewlines: false,
+	})
 	const current = await CurrentLocation.findOne({ personnelId })
 	if (
 		current?.recordedAt
@@ -284,7 +363,7 @@ const ingestLocation = async (payload = {}) => {
 		&& recordedAt <= current.recordedAt
 	) {
 		const isSameReading = recordedAt.getTime() === current.recordedAt.getTime()
-		const refreshedLocationName = String(payload.location_name || '').trim()
+		const refreshedLocationName = submittedLocationName
 		const telemetryChanged = isSameReading && (
 			(speed !== undefined && speed !== current.speed)
 			|| (heading !== undefined && heading !== current.heading)
@@ -324,12 +403,6 @@ const ingestLocation = async (payload = {}) => {
 		}
 	}
 
-	if (!assignment) {
-		assignment = await GpsDeviceAssignment.findOne({
-			personnelId,
-			status: 'active',
-		}).lean()
-	}
 	const movementThreshold = Math.max(5, Number(process.env.MOVEMENT_THRESHOLD_METERS) || 20)
 	const hasMoved = !current
 		|| current.source !== source
@@ -338,9 +411,9 @@ const ingestLocation = async (payload = {}) => {
 	const nextLocation = {
 		personnelId,
 		deviceAssignmentId: assignment?.assignmentId,
-		locationName: String(payload.location_name || current?.locationName || profile.defaultLocationName),
+		locationName: submittedLocationName || current?.locationName || profile.defaultLocationName,
 		location: point(longitude, latitude),
-		accuracy: Number.isFinite(Number(payload.accuracy)) ? Number(payload.accuracy) : undefined,
+		accuracy,
 		speed,
 		heading,
 		batteryLevel,
@@ -615,13 +688,15 @@ const updateMockLocations = async ({ sampleHistory = false } = {}) => {
 }
 
 module.exports = {
+	emitPersonnelCollection,
+	evaluatePersonnelGeofences,
+	evaluatePersonnelInactivity,
 	getPersonnelMember,
 	getPersonnelWithLocations,
 	getLocationHistory,
 	ingestLocation,
 	listPersonnel,
-	evaluatePersonnelGeofences,
-	evaluatePersonnelInactivity,
+	scopePersonnelForActor,
 	serializePersonnel,
 	updateMockLocations,
 	updateDutyStatus,

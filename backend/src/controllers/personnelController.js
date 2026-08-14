@@ -1,10 +1,13 @@
 const createPersonnelController = ({ io, personnelService }) => ({
 	getPersonnel: async (req, res) => {
-		res.json(await personnelService.listPersonnel(req.query))
+		res.json(await personnelService.listPersonnel(req.query, req.auth.user))
 	},
 
 	getPersonnelMember: async (req, res) => {
-		const personnel = await personnelService.getPersonnelMember(req.params.personnelId)
+		const personnel = await personnelService.getPersonnelMember(
+			req.params.personnelId,
+			req.auth.user,
+		)
 		if (!personnel) {
 			return res.status(404).json({
 				success: false,
@@ -25,7 +28,11 @@ const createPersonnelController = ({ io, personnelService }) => ({
 				message: 'Personnel not found.',
 			})
 		}
-		io.emit('personnel:update', await personnelService.getPersonnelWithLocations())
+		personnelService.emitPersonnelCollection(
+			io,
+			'personnel:update',
+			await personnelService.getPersonnelWithLocations(),
+		)
 		return res.json({ success: true, personnel })
 	},
 
@@ -43,9 +50,16 @@ const createPersonnelController = ({ io, personnelService }) => ({
 	},
 
 	ingestLocation: async (req, res) => {
-		const result = await personnelService.ingestLocation(req.body)
+		const result = await personnelService.ingestLocation({
+			...req.body,
+			source: 'gps',
+		})
 		if (result.accepted) {
-			io.emit('personnel:update', await personnelService.getPersonnelWithLocations())
+			personnelService.emitPersonnelCollection(
+				io,
+				'personnel:update',
+				await personnelService.getPersonnelWithLocations(),
+			)
 		}
 		res.status(result.accepted ? 202 : 200).json({
 			success: true,

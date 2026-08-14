@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:map": "node scripts/map-behavior-check.mjs",
-    "check": "npm run lint && npm run test:map && npm run build",
+    "test:validation": "node scripts/account-validation-check.mjs",
+    "check": "npm run lint && npm run test:validation && npm run test:map && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {

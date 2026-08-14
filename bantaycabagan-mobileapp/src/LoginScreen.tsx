@@ -30,13 +30,14 @@ type Mode = 'login' | 'verify' | 'forgot' | 'reset';
 
 const isStrongPassword = (value: string) => (
   value.length >= 10
+  && value.length <= 128
   && /[A-Z]/.test(value)
   && /[a-z]/.test(value)
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 );
 
-const PASSWORD_REQUIREMENTS = 'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.';
+const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.';
 const COMPLETE_CODE_MESSAGE = 'Enter the complete 6-digit verification code.';
 
 export default function LoginScreen() {
@@ -176,6 +177,7 @@ export default function LoginScreen() {
                   placeholder="Enter your Login ID"
                   autoCapitalize="none"
                   autoComplete="username"
+                  maxLength={50}
                 />
                 <Field
                   label="Password"
@@ -184,6 +186,7 @@ export default function LoginScreen() {
                   placeholder="Enter your password"
                   secureTextEntry
                   autoComplete="current-password"
+                  maxLength={128}
                 />
                 <TouchableOpacity
                   style={styles.textActionRight}
@@ -224,6 +227,7 @@ export default function LoginScreen() {
                   onChangeText={setIdentifier}
                   autoCapitalize="none"
                   autoComplete="email"
+                  maxLength={254}
                 />
                 <Feedback error={error} message={message} debugCode={undefined} />
                 <SubmitButton label="Send Reset Code" pending={pending} onPress={submitForgot} />
@@ -240,6 +244,7 @@ export default function LoginScreen() {
                   onChangeText={setNewPassword}
                   secureTextEntry
                   autoComplete="new-password"
+                  maxLength={128}
                 />
                 <Text style={styles.passwordRequirements}>{PASSWORD_REQUIREMENTS}</Text>
                 <Field
@@ -248,6 +253,7 @@ export default function LoginScreen() {
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                   autoComplete="new-password"
+                  maxLength={128}
                 />
                 <Feedback error={error} message={message} debugCode={challenge?.debugCode} />
                 <SubmitButton label="Reset Password" pending={pending} onPress={submitReset} />

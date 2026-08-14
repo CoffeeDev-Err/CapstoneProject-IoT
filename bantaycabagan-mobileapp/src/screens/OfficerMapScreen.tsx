@@ -836,13 +836,13 @@ export default function OfficerMapScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#ffffff' },
   container: { flex: 1, backgroundColor: '#e2e8f0' },
-  mapWrap: { ...StyleSheet.absoluteFillObject },
+  mapWrap: { ...StyleSheet.absoluteFill },
   map: { flex: 1, backgroundColor: '#e2e5e8' },
   emergencyOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#ef233c',
   },
-  overlay: { ...StyleSheet.absoluteFillObject, paddingHorizontal: 20 },
+  overlay: { ...StyleSheet.absoluteFill, paddingHorizontal: 20 },
   searchContainer: {
     height: 45,
     marginTop: 5,

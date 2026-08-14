@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const { OPERATIONAL_LIMITS, REPORT_TYPES } = require('../utils/operationalValidation')
 
 const pointSchema = new mongoose.Schema({
 	type: {
@@ -12,24 +13,28 @@ const pointSchema = new mongoose.Schema({
 		default: [121.7681, 17.4239],
 		required: true,
 		validate: {
-			validator: (coordinates) => (
-				Array.isArray(coordinates)
+		validator: (coordinates) => (
+			Array.isArray(coordinates)
 				&& coordinates.length === 2
 				&& coordinates.every(Number.isFinite)
-			),
-			message: 'GeoJSON coordinates must be [longitude, latitude].',
+				&& coordinates[0] >= -180
+				&& coordinates[0] <= 180
+				&& coordinates[1] >= -90
+				&& coordinates[1] <= 90
+		),
+		message: 'GeoJSON coordinates must be valid [longitude, latitude] values.',
 		},
 	},
 }, { _id: false })
 
 const userSchema = new mongoose.Schema({
-	username: { type: String, required: true, trim: true, lowercase: true },
-	email: { type: String, trim: true, lowercase: true },
+	username: { type: String, required: true, trim: true, lowercase: true, maxlength: 50 },
+	email: { type: String, trim: true, lowercase: true, maxlength: 254 },
 	emailVerifiedAt: Date,
 	passwordHash: { type: String, required: true, select: false },
 	role: { type: String, enum: ['supervisor', 'officer'], default: 'officer' },
-	personnelId: { type: String, trim: true },
-	photoUrl: { type: String, trim: true, default: '' },
+	personnelId: { type: String, trim: true, maxlength: 100 },
+	photoUrl: { type: String, trim: true, default: '', maxlength: 2048 },
 	isMockAccount: { type: Boolean, default: false },
 	status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 	forcePasswordReset: { type: Boolean, default: true },
@@ -47,14 +52,14 @@ userSchema.index({ personnelId: 1 })
 userSchema.index({ status: 1 })
 
 const personnelSchema = new mongoose.Schema({
-	personnelId: { type: String, required: true, trim: true },
-	badgeNumber: { type: String, required: true, trim: true, uppercase: true },
-	fullName: { type: String, required: true, trim: true },
-	rank: { type: String, required: true, trim: true },
-	mobileNumber: { type: String, trim: true, default: '' },
-	photoUrl: { type: String, trim: true, default: '' },
-	dutyStatus: { type: String, trim: true, default: 'Off Duty' },
-	defaultLocationName: { type: String, trim: true, default: 'Cabagan Police Station' },
+	personnelId: { type: String, required: true, trim: true, maxlength: 100 },
+	badgeNumber: { type: String, required: true, trim: true, uppercase: true, maxlength: 30 },
+	fullName: { type: String, required: true, trim: true, maxlength: 100 },
+	rank: { type: String, required: true, trim: true, maxlength: 80 },
+	mobileNumber: { type: String, trim: true, default: '', maxlength: 13 },
+	photoUrl: { type: String, trim: true, default: '', maxlength: 2048 },
+	dutyStatus: { type: String, trim: true, default: 'Off Duty', maxlength: 50 },
+	defaultLocationName: { type: String, trim: true, default: 'Cabagan Police Station', maxlength: OPERATIONAL_LIMITS.locationName },
 	status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 }, {
 	collection: 'personnel',
@@ -93,12 +98,12 @@ gpsDeviceAssignmentSchema.index({ assignedAt: -1 })
 const currentLocationSchema = new mongoose.Schema({
 	personnelId: { type: String, required: true },
 	deviceAssignmentId: String,
-	locationName: { type: String, default: 'Location unavailable' },
+	locationName: { type: String, default: 'Location unavailable', maxlength: OPERATIONAL_LIMITS.locationName },
 	location: { type: pointSchema, required: true },
-	accuracy: Number,
-	speed: Number,
-	heading: Number,
-	batteryLevel: Number,
+	accuracy: { type: Number, min: 0.1, max: 5000 },
+	speed: { type: Number, min: 0, max: 300 },
+	heading: { type: Number, min: 0, max: 359.999 },
+	batteryLevel: { type: Number, min: 0, max: 100 },
 	source: { type: String, enum: ['gps', 'mock'], default: 'mock' },
 	isSimulated: { type: Boolean, default: true },
 	recordedAt: { type: Date, required: true, default: Date.now },
@@ -120,9 +125,9 @@ const locationHistorySchema = new mongoose.Schema({
 	personnelId: { type: String, required: true },
 	deviceAssignmentId: String,
 	location: { type: pointSchema, required: true },
-	accuracy: Number,
-	speed: Number,
-	heading: Number,
+	accuracy: { type: Number, min: 0.1, max: 5000 },
+	speed: { type: Number, min: 0, max: 300 },
+	heading: { type: Number, min: 0, max: 359.999 },
 	source: { type: String, enum: ['gps', 'mock'], default: 'mock' },
 	isSimulated: { type: Boolean, default: true },
 	recordedAt: { type: Date, required: true, default: Date.now },
@@ -155,16 +160,16 @@ barangaySchema.index({ municipality: 1, name: 1 }, { unique: true })
 barangaySchema.index({ boundary: '2dsphere' }, { sparse: true })
 
 const deploymentSchema = new mongoose.Schema({
-	assignmentId: { type: String, required: true },
-	groupId: { type: String, required: true },
-	personnelId: { type: String, required: true },
-	personnelName: { type: String, required: true },
-	rank: { type: String, required: true },
+	assignmentId: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.deploymentId },
+	groupId: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.deploymentGroupId },
+	personnelId: { type: String, required: true, maxlength: 100 },
+	personnelName: { type: String, required: true, maxlength: 100 },
+	rank: { type: String, required: true, maxlength: 80 },
 	barangayCode: { type: String, trim: true, uppercase: true },
-	patrolArea: { type: String, required: true },
+	patrolArea: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.deploymentArea },
 	shiftStart: Date,
 	shiftEnd: Date,
-	instructions: { type: String, default: '' },
+	instructions: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.deploymentInstructions },
 	assignedBy: { type: String, default: 'supervisor' },
 	assignedAt: { type: Date, default: Date.now },
 	location: { type: pointSchema, required: true },
@@ -186,7 +191,7 @@ deploymentSchema.index({ personnelId: 1, shiftStart: 1, shiftEnd: 1 })
 const resolutionSchema = new mongoose.Schema({
 	resolvedAt: Date,
 	resolvedBy: String,
-	notes: { type: String, default: '' },
+	notes: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.resolutionNotes },
 }, { _id: false })
 
 const reportEvidenceSchema = new mongoose.Schema({
@@ -200,9 +205,9 @@ const reportEvidenceSchema = new mongoose.Schema({
 
 const reportRoutePointSchema = new mongoose.Schema({
 	location: { type: pointSchema, required: true },
-	accuracy: Number,
-	speed: Number,
-	heading: Number,
+	accuracy: { type: Number, min: 0.1, max: 5000 },
+	speed: { type: Number, min: 0, max: 300 },
+	heading: { type: Number, min: 0, max: 359.999 },
 	source: { type: String, enum: ['gps', 'mock'], default: 'gps' },
 	recordedAt: { type: Date, required: true },
 }, { _id: false })
@@ -211,16 +216,16 @@ const reportSchema = new mongoose.Schema({
 	reportNumber: { type: String, required: true },
 	submittedBy: { type: String, required: true },
 	officerName: { type: String, required: true },
-	assignedArea: { type: String, default: 'Unassigned area' },
+	assignedArea: { type: String, default: 'Unassigned area', maxlength: OPERATIONAL_LIMITS.deploymentArea },
 	barangayCode: { type: String, trim: true, uppercase: true, default: 'UNSPECIFIED' },
-	reportType: { type: String, required: true, lowercase: true },
+	reportType: { type: String, required: true, lowercase: true, enum: REPORT_TYPES },
 	isIncident: { type: Boolean, required: true },
 	severity: { type: Number, min: 1, max: 5, default: 1 },
 	validationStatus: { type: String, enum: ['pending', 'validated', 'rejected'], default: 'pending' },
 	caseStatus: { type: String, enum: ['open', 'resolved', 'not_applicable'], required: true },
-	title: { type: String, required: true },
-	description: { type: String, default: '' },
-	locationName: { type: String, required: true },
+	title: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.reportTitle },
+	description: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.reportDescription },
+	locationName: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.reportLocation },
 	location: pointSchema,
 	locationSource: {
 		type: String,
@@ -253,14 +258,14 @@ const responderSchema = new mongoose.Schema({
 const taskSchema = new mongoose.Schema({
 	taskId: { type: String, required: true },
 	type: { type: String, enum: ['backup', 'urgent'], default: 'backup' },
-	title: { type: String, required: true },
-	description: { type: String, default: '' },
+	title: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.taskTitle },
+	description: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.taskDescription },
 	requestedBy: { type: String, required: true },
 	requesterName: { type: String, required: true },
 	requiredResponders: { type: Number, min: 1, max: 5, default: 3 },
 	responders: { type: [responderSchema], default: [] },
 	barangayCode: { type: String, trim: true, uppercase: true },
-	locationName: { type: String, required: true },
+	locationName: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.taskLocation },
 	location: { type: pointSchema, required: true },
 	status: { type: String, enum: ['open', 'full', 'completed', 'cancelled'], default: 'open' },
 	completedAt: Date,

@@ -48,6 +48,16 @@ const NotificationContext = createContext<NotificationContextValue | null>(null)
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
+const isNotificationPermissionGranted = (
+  permission: Notifications.NotificationPermissionsStatus,
+) => {
+  const response = permission as Notifications.NotificationPermissionsStatus & {
+    status?: string;
+    granted?: boolean;
+  };
+  return response.status === 'granted' || response.granted === true;
+};
+
 const mergeNotification = (
   items: OfficerNotification[],
   incoming: OfficerNotification,
@@ -160,10 +170,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
       if (!Device.isDevice) return;
       const currentPermission = await Notifications.getPermissionsAsync();
-      const permission = currentPermission.status === 'granted'
+      const permission = isNotificationPermissionGranted(currentPermission)
         ? currentPermission
         : await Notifications.requestPermissionsAsync();
-      if (permission.status !== 'granted') return;
+      if (!isNotificationPermissionGranted(permission)) return;
 
       if (!projectId) return;
       const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;

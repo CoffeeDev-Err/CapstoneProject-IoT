@@ -17,6 +17,7 @@ const {
 	verifyCodeHash,
 } = require('../utils/verification')
 const { sendVerificationCode } = require('./emailService')
+const { toMediaAccessPath } = require('./mediaStorageService')
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const OTP_DURATION_MS = 10 * 60 * 1000
@@ -32,7 +33,7 @@ const serializeUser = (user, profile) => ({
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role,
 	personnelId: user.personnelId,
-	photoUrl: profile?.photoUrl || user.photoUrl || '',
+	photoUrl: toMediaAccessPath(profile?.photoUrl || user.photoUrl || ''),
 	forcePasswordReset: user.forcePasswordReset,
 	createdAt: user.createdAt?.toISOString(),
 	lastLoginAt: user.lastLoginAt?.toISOString(),
@@ -41,7 +42,7 @@ const serializeUser = (user, profile) => ({
 		badgeNumber: profile.badgeNumber,
 		rank: profile.rank,
 		mobileNumber: profile.mobileNumber,
-		photoUrl: profile.photoUrl || user.photoUrl || '',
+		photoUrl: toMediaAccessPath(profile.photoUrl || user.photoUrl || ''),
 		dutyStatus: profile.dutyStatus,
 	} : null,
 })
@@ -222,7 +223,13 @@ const login = async (
 	{ requestIp } = {},
 ) => {
 	const normalizedUsername = String(username || '').trim().toLowerCase()
-	if (!normalizedUsername || !password) {
+	const passwordValue = String(password || '')
+	if (
+		!normalizedUsername
+		|| !passwordValue
+		|| normalizedUsername.length > 50
+		|| passwordValue.length > 128
+	) {
 		throw createAuthError('Login ID and password are required.', 400, 'INVALID_LOGIN_INPUT')
 	}
 
@@ -230,7 +237,7 @@ const login = async (
 		username: normalizedUsername,
 		status: 'active',
 	}).select('+passwordHash')
-	if (!user || !(await verifyPassword(password, user.passwordHash))) {
+	if (!user || !(await verifyPassword(passwordValue, user.passwordHash))) {
 		throw createAuthError('Invalid Login ID or password.')
 	}
 	if (application === 'web' && user.role !== 'supervisor') {
@@ -301,7 +308,7 @@ const requestPasswordReset = async (
 	{ requestIp } = {},
 ) => {
 	const normalizedIdentifier = String(identifier || '').trim().toLowerCase()
-	if (!normalizedIdentifier) {
+	if (!normalizedIdentifier || normalizedIdentifier.length > 254) {
 		throw createAuthError(
 			'Login ID or official email is required.',
 			400,
@@ -337,7 +344,7 @@ const resetPassword = async (
 ) => {
 	if (!isStrongPassword(String(newPassword || ''))) {
 		throw createAuthError(
-			'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.',
+			'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.',
 			400,
 			'WEAK_PASSWORD',
 		)
@@ -402,7 +409,8 @@ const requestPasswordChange = async (
 	{ current_password: currentPassword, device_name: deviceName } = {},
 	{ requestIp } = {},
 ) => {
-	if (!String(currentPassword || '')) {
+	const currentPasswordValue = String(currentPassword || '')
+	if (!currentPasswordValue || currentPasswordValue.length > 128) {
 		throw createAuthError(
 			'Enter your current password.',
 			400,
@@ -410,7 +418,7 @@ const requestPasswordChange = async (
 		)
 	}
 	const securedUser = await User.findById(user._id).select('+passwordHash')
-	if (!securedUser || !(await verifyPassword(String(currentPassword || ''), securedUser.passwordHash))) {
+	if (!securedUser || !(await verifyPassword(currentPasswordValue, securedUser.passwordHash))) {
 		throw createAuthError('The current password is incorrect. Try again.')
 	}
 	return createVerificationChallenge(securedUser, 'change_password', {
@@ -423,7 +431,7 @@ const changePassword = async (user, payload = {}) => {
 	const newPassword = String(payload.new_password || '')
 	if (!isStrongPassword(newPassword)) {
 		throw createAuthError(
-			'Use at least 10 characters, including an uppercase letter, lowercase letter, number, and symbol.',
+			'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.',
 			400,
 			'WEAK_PASSWORD',
 		)

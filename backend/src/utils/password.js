@@ -11,6 +11,7 @@ const hashPassword = async (password) => {
 
 const isStrongPassword = (password) => (
 	password.length >= 10
+	&& password.length <= 128
 	&& /[A-Z]/.test(password)
 	&& /[a-z]/.test(password)
 	&& /\d/.test(password)

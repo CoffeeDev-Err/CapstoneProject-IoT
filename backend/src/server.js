@@ -1,5 +1,9 @@
 require('dotenv').config()
 
+const { validateProductionEnvironment } = require('./config/environment')
+
+validateProductionEnvironment()
+
 const fs = require('fs')
 const http = require('http')
 const path = require('path')
@@ -29,6 +33,7 @@ const createBarangayRoutes = require('./routes/barangayRoutes')
 const createDashboardRoutes = require('./routes/dashboardRoutes')
 const createGpsDeviceRoutes = require('./routes/gpsDeviceRoutes')
 const createLocationRoutes = require('./routes/locationRoutes')
+const createMediaRoutes = require('./routes/mediaRoutes')
 const createNotificationRoutes = require('./routes/notificationRoutes')
 const createOperationalRoutes = require('./routes/operationalRoutes')
 const createPersonnelRoutes = require('./routes/personnelRoutes')
@@ -46,10 +51,12 @@ const notificationService = require('./services/notificationService')
 const createOperationalService = require('./services/operationalService')
 const personnelService = require('./services/personnelService')
 const {
+	emitPersonnelCollection,
 	evaluatePersonnelInactivity,
 	evaluatePersonnelGeofences,
 	getPersonnelMember,
 	getPersonnelWithLocations,
+	scopePersonnelForActor,
 	updateMockLocations,
 } = personnelService
 const seedDatabase = require('./services/seedService')
@@ -92,6 +99,7 @@ app.use('/api', createOperationalRoutes({
 	authService,
 	controller: operationalController,
 }))
+app.use('/api/media', createMediaRoutes())
 app.use('/api/accounts', createAccountRoutes({
 	authService,
 	controller: accountController,
@@ -149,9 +157,14 @@ io.on('connection', async (socket) => {
 	try {
 		const personnelId = socket.data.auth?.user?.personnelId
 		if (personnelId) socket.join(`personnel:${personnelId}`)
+		const role = socket.data.auth?.user?.role
+		if (role) socket.join(`role:${role}`)
 		const personnel = await getPersonnelWithLocations()
-		socket.emit('personnel:bootstrap', personnel)
-		await operationalService.registerSocket(socket)
+		socket.emit(
+			'personnel:bootstrap',
+			scopePersonnelForActor(personnel, socket.data.auth?.user),
+		)
+		await operationalService.registerSocket(socket, socket.data.auth?.user)
 	} catch (error) {
 		console.error('Socket bootstrap failed:', error)
 	}
@@ -178,7 +191,7 @@ io.on('connection', async (socket) => {
 				return
 			}
 
-			io.emit('emergency:alert', {
+			io.to('role:supervisor').emit('emergency:alert', {
 				id: member.id,
 				name: member.name,
 				rank: member.rank,
@@ -230,7 +243,7 @@ const broadcastMockLocations = async () => {
 		const sampleHistory = now - lastHistorySampleAt >= HISTORY_SAMPLE_INTERVAL_MS
 		const personnel = await updateMockLocations({ sampleHistory })
 		if (sampleHistory) lastHistorySampleAt = now
-		io.emit('personnel:update', personnel)
+		emitPersonnelCollection(io, 'personnel:update', personnel)
 	} catch (error) {
 		console.error('Mock GPS update failed:', error)
 	} finally {
@@ -258,7 +271,11 @@ const broadcastFlespiLocations = async ({ deviceIds = [] } = {}) => {
 				deviceIds: selectedDeviceIds,
 			})
 			if (result.accepted > 0) {
-				io.emit('personnel:update', await getPersonnelWithLocations())
+				emitPersonnelCollection(
+					io,
+					'personnel:update',
+					await getPersonnelWithLocations(),
+				)
 			}
 		}
 	} catch (error) {
