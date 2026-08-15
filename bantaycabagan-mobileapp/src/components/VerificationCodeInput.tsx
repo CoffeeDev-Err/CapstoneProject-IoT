@@ -25,24 +25,45 @@ export default function VerificationCodeInput({
 }: Props) {
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
   const normalizedValue = value.replace(/\D/g, '').slice(0, CODE_LENGTH);
-  const activeIndex = Math.min(normalizedValue.length, CODE_LENGTH - 1);
+  const activeIndex = Math.min(
+    focused ? selection.start : normalizedValue.length,
+    CODE_LENGTH - 1,
+  );
+
+  const focusDigit = (index: number) => {
+    const start = Math.min(index, normalizedValue.length);
+    const nextSelection = {
+      start,
+      end: normalizedValue[index] ? start + 1 : start,
+    };
+
+    setSelection(nextSelection);
+    inputRef.current?.focus();
+    requestAnimationFrame(() => {
+      inputRef.current?.setNativeProps({ selection: nextSelection });
+    });
+  };
+
+  const handleChangeText = (nextValue: string) => {
+    const nextCode = nextValue.replace(/\D/g, '').slice(0, CODE_LENGTH);
+    onChangeText(nextCode);
+    setSelection({ start: nextCode.length, end: nextCode.length });
+  };
 
   return (
     <View style={styles.field}>
       <Text style={[styles.label, dark && styles.labelDark]}>Verification Code</Text>
-      <Pressable
-        style={styles.codeRow}
-        onPress={() => inputRef.current?.focus()}
-        accessibilityRole="button"
-        accessibilityLabel="Enter the six-digit verification code"
-      >
+      <View style={styles.codeRow} accessibilityLabel="Enter the six-digit verification code">
         {Array.from({ length: CODE_LENGTH }, (_, index) => {
           const isActive = focused && index === activeIndex;
           return (
-            <View
+            <Pressable
               key={index}
-              accessible={false}
+              onPress={() => focusDigit(index)}
+              accessibilityRole="button"
+              accessibilityLabel={`Verification code digit ${index + 1}`}
               style={[
                 styles.codeBox,
                 dark && styles.codeBoxDark,
@@ -53,14 +74,16 @@ export default function VerificationCodeInput({
               <Text style={[styles.codeDigit, dark && styles.codeDigitDark]}>
                 {normalizedValue[index] || ''}
               </Text>
-            </View>
+            </Pressable>
           );
         })}
-      </Pressable>
+      </View>
       <TextInput
         ref={inputRef}
         value={normalizedValue}
-        onChangeText={(nextValue) => onChangeText(nextValue.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+        selection={selection}
+        onChangeText={handleChangeText}
+        onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         keyboardType="number-pad"

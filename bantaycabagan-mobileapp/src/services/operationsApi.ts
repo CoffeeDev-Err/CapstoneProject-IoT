@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { File } from 'expo-file-system';
 import type {
   DeploymentAssignment,
   LivePersonnel,
@@ -196,11 +197,8 @@ export const submitPoliceReport = (
   });
   formData.append('evidence_camera_facing', input.evidence_photo.camera_facing);
   formData.append('evidence_captured_at', input.evidence_photo.captured_at);
-  formData.append('evidence_photo', {
-    uri: input.evidence_photo.uri,
-    name: input.evidence_photo.name,
-    type: input.evidence_photo.type,
-  } as unknown as Blob);
+  const evidenceFile = new File(input.evidence_photo.uri);
+  formData.append('evidence_photo', evidenceFile, input.evidence_photo.name);
 
   return request<{ report: PoliceReport }>('/api/reports', {
     method: 'POST',

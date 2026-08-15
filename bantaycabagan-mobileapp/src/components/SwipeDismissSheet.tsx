@@ -40,6 +40,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useMobileTheme } from '../context/ThemeContext';
 
 const OPEN_DURATION = 400;
 const CLOSE_DURATION = 400;
@@ -540,6 +541,7 @@ export function SwipeDismissSheet({
   visible,
 }: SwipeDismissSheetProps) {
   const { height: screenHeight } = useWindowDimensions();
+  const { colors } = useMobileTheme();
   const motion = useExpandableSheetMotion({
     active: visible,
     dismissDistance: screenHeight,
@@ -579,6 +581,7 @@ export function SwipeDismissSheet({
               onLayout={motion.handleSheetLayout}
               style={[
                 styles.sheet,
+                { backgroundColor: colors.surface },
                 sheetStyle,
                 motion.sheetAnimatedStyle,
               ]}

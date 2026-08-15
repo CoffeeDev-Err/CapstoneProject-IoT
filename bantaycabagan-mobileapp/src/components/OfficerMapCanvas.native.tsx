@@ -47,7 +47,6 @@ import type {
 } from './OfficerMapCanvas';
 
 const CABAGAN_CENTER: [number, number] = [121.7653, 17.4269];
-const PATROL_RADIUS_METERS = 320;
 const STREET_FOCUS_ZOOM = 16;
 const SATELLITE_FOCUS_ZOOM = 15;
 const MARKER_ANIMATION_DURATION = 700;
@@ -94,29 +93,6 @@ const useInterpolatedPersonnel = (personnel: OfficerMapPerson[]) => {
   }, [personnel]);
 
   return interpolated;
-};
-
-const createCircleFeature = (longitude: number, latitude: number, radiusMeters: number) => {
-  const coordinates: [number, number][] = [];
-  const latitudeRadius = radiusMeters / 111_320;
-  const longitudeRadius = radiusMeters / (111_320 * Math.cos(latitude * Math.PI / 180));
-
-  for (let index = 0; index <= 64; index += 1) {
-    const angle = index / 64 * Math.PI * 2;
-    coordinates.push([
-      longitude + Math.cos(angle) * longitudeRadius,
-      latitude + Math.sin(angle) * latitudeRadius,
-    ]);
-  }
-
-  return {
-    type: 'Feature' as const,
-    properties: {},
-    geometry: {
-      type: 'Polygon' as const,
-      coordinates: [coordinates],
-    },
-  };
 };
 
 function PersonnelMarker({
@@ -212,10 +188,6 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     Number.isFinite(assignment?.longitude) ? Number(assignment?.longitude) : CABAGAN_CENTER[0],
     Number.isFinite(assignment?.latitude) ? Number(assignment?.latitude) : CABAGAN_CENTER[1],
   ]), [assignment?.latitude, assignment?.longitude]);
-
-  const patrolArea = useMemo(() => (
-    createCircleFeature(deploymentCenter[0], deploymentCenter[1], PATROL_RADIUS_METERS)
-  ), [deploymentCenter]);
 
   const fitInitialPersonnel = useCallback(() => {
     if (initialFitDone.current) return;
@@ -367,25 +339,6 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
             pitch: enable3D ? 52 : 0,
           }}
         />
-
-        <GeoJSONSource id="geosentri-patrol-area" data={patrolArea}>
-          <Layer
-            id="geosentri-patrol-fill"
-            type="fill"
-            source="geosentri-patrol-area"
-            paint={{ 'fill-color': '#2563EB', 'fill-opacity': 0.08 }}
-          />
-          <Layer
-            id="geosentri-patrol-line"
-            type="line"
-            source="geosentri-patrol-area"
-            paint={{
-              'line-color': '#2563EB',
-              'line-width': 2,
-              'line-dasharray': [3, 2.5],
-            }}
-          />
-        </GeoJSONSource>
 
         <GeoJSONSource id="geosentri-cabagan-boundary" data={CABAGAN_BOUNDARY_FEATURE}>
           <Layer
