@@ -65,6 +65,8 @@ assert.match(nativeMapSource, /member\.id !== followedOfficerId/, 'The followed 
 assert.match(nativeMapSource, /mapStyleRevision/, 'Native style changes must remount MapLibre reliably')
 assert.match(officerMapScreenSource, /Following <Text/, 'Following mode must replace the officer sheet with a compact banner')
 assert.match(officerMapScreenSource, /mapControlsExpanded/, 'Mobile map controls must be collapsible')
+assert.match(officerMapScreenSource, />\s*Satellite\s*</, 'The satellite map option must have a visible label')
+assert.match(officerMapScreenSource, />\s*Terrain\s*</, 'The terrain option must have a visible label')
 assert.doesNotMatch(nativeMapSource, /geosentri-patrol-area/, 'The obsolete dashed patrol-radius guide must stay hidden')
 assert.doesNotMatch(officerMapScreenSource, /L\.circle\(/, 'The web fallback must not restore the patrol-radius guide')
 assert.match(officerMapScreenSource, /backgroundColor:\s*'#0b1528'/, 'The backup control must use the navy map-control surface')
