@@ -716,7 +716,11 @@ export default function OfficerMapScreen() {
                 <TouchableOpacity
                   accessibilityLabel="Use normal map"
                   accessibilityState={{ selected: mapMode === 'street' }}
-                  style={[styles.mapModeButton, mapMode === 'street' && styles.mapModeButtonActive]}
+                  style={[
+                    styles.mapModeButton,
+                    styles.mapModeOptionButton,
+                    mapMode === 'street' && styles.mapModeButtonActive,
+                  ]}
                   onPress={() => setMapMode('street')}
                 >
                   <Icon
@@ -724,11 +728,21 @@ export default function OfficerMapScreen() {
                     size={20}
                     color={mapMode === 'street' ? '#ffffff' : colors.textMuted}
                   />
+                  <Text style={[
+                    styles.mapModeButtonLabel,
+                    { color: mapMode === 'street' ? '#ffffff' : colors.textMuted },
+                  ]}>
+                    Map
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   accessibilityLabel="Use satellite map"
                   accessibilityState={{ selected: mapMode === 'satellite' }}
-                  style={[styles.mapModeButton, mapMode === 'satellite' && styles.mapModeButtonActive]}
+                  style={[
+                    styles.mapModeButton,
+                    styles.mapModeOptionButton,
+                    mapMode === 'satellite' && styles.mapModeButtonActive,
+                  ]}
                   onPress={() => setMapMode('satellite')}
                 >
                   <Icon
@@ -736,11 +750,21 @@ export default function OfficerMapScreen() {
                     size={20}
                     color={mapMode === 'satellite' ? '#ffffff' : colors.textMuted}
                   />
+                  <Text style={[
+                    styles.mapModeButtonLabel,
+                    { color: mapMode === 'satellite' ? '#ffffff' : colors.textMuted },
+                  ]}>
+                    Satellite
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  accessibilityLabel={threeDEnabled ? 'Disable 3D terrain' : 'Enable 3D terrain'}
+                  accessibilityLabel={threeDEnabled ? 'Disable terrain view' : 'Enable terrain view'}
                   accessibilityState={{ selected: threeDEnabled }}
-                  style={[styles.mapModeButton, threeDEnabled && styles.mapModeButtonActive]}
+                  style={[
+                    styles.mapModeButton,
+                    styles.mapModeOptionButton,
+                    threeDEnabled && styles.mapModeButtonActive,
+                  ]}
                   onPress={() => setThreeDEnabled((enabled) => !enabled)}
                 >
                   <Icon
@@ -748,6 +772,12 @@ export default function OfficerMapScreen() {
                     size={20}
                     color={threeDEnabled ? '#ffffff' : colors.textMuted}
                   />
+                  <Text style={[
+                    styles.mapModeButtonLabel,
+                    { color: threeDEnabled ? '#ffffff' : colors.textMuted },
+                  ]}>
+                    Terrain
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -1002,7 +1032,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  mapModeControlExpanded: { paddingBottom: 4 },
+  mapModeControlExpanded: {
+    width: 112,
+    paddingBottom: 4,
+  },
   mapModeButton: {
     width: 40,
     height: 40,
@@ -1010,7 +1043,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 11,
   },
-  mapModeMenuButton: { backgroundColor: 'rgba(148,163,184,0.14)' },
+  mapModeMenuButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(148,163,184,0.14)',
+  },
+  mapModeOptionButton: {
+    width: 106,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: 7,
+    paddingHorizontal: 10,
+  },
+  mapModeButtonLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
   mapModeButtonActive: {
     backgroundColor: mobileTheme.purple,
   },
