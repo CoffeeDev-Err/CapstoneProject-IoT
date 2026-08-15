@@ -206,7 +206,6 @@ export default function OfficerMapScreen() {
   const mapHtml = useMemo(() => {
     const latitude = assignment?.latitude || 17.4239;
     const longitude = assignment?.longitude || 121.7681;
-    const patrolArea = JSON.stringify(assignment?.patrolArea || 'Cabagan Police Station');
     const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
     const controlBackground = isDark ? '#0b1528' : '#ffffff';
@@ -285,15 +284,6 @@ export default function OfficerMapScreen() {
             activeBaseLayer.addTo(map);
             map.attributionControl.setPrefix(false);
             L.control.zoom({position:'topright'}).addTo(map);
-            L.circle([${latitude},${longitude}],{
-              radius:320,
-              color:'#2563eb',
-              weight:2,
-              fillColor:'#2563eb',
-              fillOpacity:.08,
-              dashArray:'7 6'
-            }).addTo(map).bindTooltip(${patrolArea});
-
             const markers={};
             const personnelById={};
             let hasFittedPersonnel=false;
@@ -682,11 +672,14 @@ export default function OfficerMapScreen() {
 
         <View style={styles.topUtilityRow}>
           {deploymentPromptVisible && (
-            <View style={styles.deploymentPill}>
-              <Icon name="place" size={17} color={mobileTheme.purple} />
+            <View style={[
+              styles.deploymentPill,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+              <Icon name="place" size={17} color={colors.blue} />
               <View style={styles.deploymentText}>
-                <Text style={styles.deploymentLabel}>CURRENT DEPLOYMENT</Text>
-                <Text style={styles.deploymentArea} numberOfLines={1}>
+                <Text style={[styles.deploymentLabel, { color: colors.textMuted }]}>CURRENT DEPLOYMENT</Text>
+                <Text style={[styles.deploymentArea, { color: colors.text }]} numberOfLines={1}>
                   {assignment?.patrolArea || 'No active assignment'}
                 </Text>
               </View>
@@ -779,13 +772,16 @@ export default function OfficerMapScreen() {
       )}
 
       {deploymentPromptVisible && !selectedOfficer && (
-        <View style={styles.assignmentCard}>
-          <View style={styles.assignmentIcon}>
-            <Icon name="place" size={23} color={mobileTheme.purple} />
+        <View style={[
+          styles.assignmentCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}>
+          <View style={[styles.assignmentIcon, { backgroundColor: colors.blueSoft }]}>
+            <Icon name="place" size={23} color={colors.blue} />
           </View>
           <View style={styles.assignmentBody}>
-            <Text style={styles.assignmentTitle}>Assigned to {assignment?.patrolArea}</Text>
-            <Text style={styles.assignmentNotes} numberOfLines={2}>
+            <Text style={[styles.assignmentTitle, { color: colors.text }]}>Assigned to {assignment?.patrolArea}</Text>
+            <Text style={[styles.assignmentNotes, { color: colors.textMuted }]} numberOfLines={2}>
               {assignment?.notes || 'Maintain visibility within the assigned area.'}
             </Text>
           </View>
@@ -810,7 +806,7 @@ export default function OfficerMapScreen() {
           accessibilityState={{ disabled: backupActionPending }}
           style={[
             styles.backupButton,
-            !activeOwnBackupRequest && !canRequestBackup && styles.backupButtonUnavailable,
+            activeOwnBackupRequest && styles.backupButtonActive,
             backupActionPending && styles.backupButtonPending,
           ]}
           onPress={activeOwnBackupRequest ? handleCancelBackupRequest : handleBackupRequest}
@@ -978,6 +974,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
+    borderWidth: 1,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
     shadowColor: '#172554',
@@ -1097,16 +1094,21 @@ const styles = StyleSheet.create({
     height: 54,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#2a3a56',
     borderRadius: 27,
-    backgroundColor: mobileTheme.danger,
-    shadowColor: '#8a1010',
+    backgroundColor: '#0b1528',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.22,
     shadowRadius: 8,
     elevation: 7,
   },
+  backupButtonActive: {
+    borderColor: '#ef4444',
+    backgroundColor: mobileTheme.danger,
+  },
   backupButtonPending: { opacity: 0.6 },
-  backupButtonUnavailable: { backgroundColor: mobileTheme.offline },
   officerSheet: {
     position: 'absolute',
     right: 20,

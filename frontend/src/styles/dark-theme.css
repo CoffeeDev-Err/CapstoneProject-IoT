@@ -1127,6 +1127,47 @@
 [data-theme="dark"] .secondary-btn:hover { background: #334155; }
 [data-theme="dark"] .profile-photo       { border-color: #3b82f6; }
 
+/* Confirmation and account dialogs */
+[data-theme="dark"] .confirm-modal,
+[data-theme="dark"] .auth-modal {
+  border-color: #334155;
+  background: #1e293b;
+  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .confirm-modal__title,
+[data-theme="dark"] .auth-modal__header h2 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .confirm-modal__message,
+[data-theme="dark"] .auth-modal__header p,
+[data-theme="dark"] .auth-field {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .confirm-btn--cancel,
+[data-theme="dark"] .auth-field input,
+[data-theme="dark"] .auth-modal .verification-code-digit {
+  border-color: #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .auth-modal__close,
+[data-theme="dark"] .auth-password-toggle {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .confirm-btn--cancel:hover,
+[data-theme="dark"] .auth-modal__close:hover,
+[data-theme="dark"] .auth-password-toggle:hover,
+[data-theme="dark"] .auth-password-toggle:focus-visible {
+  border-color: #3b82f6;
+  background: #172554;
+  color: #93c5fd;
+}
+
 /* Connection pill */
 [data-theme="dark"] .connection-pill.online  { background: #172554; color: #60a5fa; }
 [data-theme="dark"] .connection-pill.offline { background: #172554; color: #3b82f6; }

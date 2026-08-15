@@ -131,6 +131,11 @@ export default function LoginScreen() {
     setMessage('');
   };
 
+  const handleVerificationCodeChange = (nextCode: string) => {
+    setCode(nextCode);
+    if (error) setError('');
+  };
+
   const copy = {
     login: ['Officer Sign In', 'Use your assigned Login ID and password.'],
     verify: ['Verify Your Login', `Enter the code sent to ${challenge?.maskedEmail || 'your official email'}.`],
@@ -208,7 +213,7 @@ export default function LoginScreen() {
               <>
                 <VerificationCodeInput
                   value={code}
-                  onChangeText={setCode}
+                  onChangeText={handleVerificationCodeChange}
                   dark
                   invalid={Boolean(error)}
                 />
@@ -237,7 +242,7 @@ export default function LoginScreen() {
 
             {mode === 'reset' && (
               <>
-                <VerificationCodeInput value={code} onChangeText={setCode} dark />
+                <VerificationCodeInput value={code} onChangeText={handleVerificationCodeChange} dark />
                 <Field
                   label="New Password"
                   value={newPassword}
