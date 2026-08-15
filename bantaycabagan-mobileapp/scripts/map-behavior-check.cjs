@@ -67,6 +67,11 @@ assert.match(officerMapScreenSource, /Following <Text/, 'Following mode must rep
 assert.match(officerMapScreenSource, /mapControlsExpanded/, 'Mobile map controls must be collapsible')
 assert.match(officerMapScreenSource, />\s*Satellite\s*</, 'The satellite map option must have a visible label')
 assert.match(officerMapScreenSource, />\s*Terrain\s*</, 'The terrain option must have a visible label')
+assert.doesNotMatch(
+	officerMapScreenSource,
+	/mapModeControlExpanded:\s*\{[^}]*width:/,
+	'Expanded mobile map controls must retain their compact fixed width',
+)
 assert.doesNotMatch(nativeMapSource, /geosentri-patrol-area/, 'The obsolete dashed patrol-radius guide must stay hidden')
 assert.doesNotMatch(officerMapScreenSource, /L\.circle\(/, 'The web fallback must not restore the patrol-radius guide')
 assert.match(officerMapScreenSource, /backgroundColor:\s*'#0b1528'/, 'The backup control must use the navy map-control surface')
