@@ -34,6 +34,23 @@ const mockOfficerFullName = String(
 	process.env.MOCK_OFFICER_FULL_NAME || 'Backup Officer',
 ).trim()
 
+const buildMockDeploymentSeedUpdate = () => ({
+	$setOnInsert: {
+		assignmentId: 'ASG-CENTRO-002',
+		groupId: 'GRP-CENTRO-002',
+		personnelId: mockOfficerPersonnelId,
+		personnelName: mockOfficerFullName,
+		rank: 'Police Staff Sergeant',
+		barangayCode: 'CENTRO',
+		patrolArea: 'Cabagan Municipal Hall',
+		instructions: 'Maintain visibility around the municipal hall perimeter.',
+		assignedBy: 'seed',
+		assignedAt: new Date(),
+		status: 'active',
+		location: point(121.7683, 17.4213),
+	},
+})
+
 const buildEmailAlias = (email, alias) => {
 	const [localPart, domain] = String(email || '').trim().toLowerCase().split('@')
 	if (!localPart || !domain) return ''
@@ -377,28 +394,7 @@ const seedDatabase = async (models) => {
 	if (mockOfficerEnabled) {
 		await Deployment.updateOne(
 			{ assignmentId: 'ASG-CENTRO-002' },
-			{
-				$set: {
-					groupId: 'GRP-CENTRO-002',
-					personnelId: mockOfficerPersonnelId,
-					personnelName: mockOfficerFullName,
-					rank: 'Police Staff Sergeant',
-					barangayCode: 'CENTRO',
-					patrolArea: 'Cabagan Municipal Hall',
-					instructions: 'Maintain visibility around the municipal hall perimeter.',
-					assignedBy: 'seed',
-					status: 'active',
-					location: point(121.7683, 17.4213),
-				},
-				$unset: {
-					shiftStart: '',
-					shiftEnd: '',
-				},
-				$setOnInsert: {
-					assignmentId: 'ASG-CENTRO-002',
-					assignedAt: new Date(),
-				},
-			},
+			buildMockDeploymentSeedUpdate(),
 			{ upsert: true },
 		)
 	}
@@ -406,3 +402,4 @@ const seedDatabase = async (models) => {
 }
 
 module.exports = seedDatabase
+module.exports.buildMockDeploymentSeedUpdate = buildMockDeploymentSeedUpdate

@@ -226,6 +226,48 @@
   outline: none;
 }
 
+.map-follow-status {
+  position: absolute;
+  z-index: 7;
+  top: 1.1rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(70%, 430px);
+  padding: 0.45rem 0.55rem 0.45rem 0.75rem;
+  border: 1px solid rgba(147, 197, 253, 0.55);
+  border-radius: 999px;
+  background: rgba(7, 19, 38, 0.9);
+  color: #e2e8f0;
+  font-size: 0.76rem;
+  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.24);
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+}
+
+.map-follow-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-follow-status button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0.2rem 0.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.maplibre-personnel-marker.is-followed .police-marker {
+  filter: drop-shadow(0 0 7px rgba(37, 99, 235, 0.9));
+}
+
 .map-style-control {
   position: absolute;
   z-index: 6;

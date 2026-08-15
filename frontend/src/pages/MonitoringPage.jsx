@@ -55,13 +55,16 @@ function MonitoringPage() {
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
-  const [focusTarget, setFocusTarget] = useState(null)
+  const [followedPersonnelId, setFollowedPersonnelId] = useState(null)
   const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false)
   const [mapLayoutVersion, setMapLayoutVersion] = useState(0)
   const selectedPersonnel = useMemo(
     () => personnel.find((member) => member.id === selectedPersonnelId) || null,
     [personnel, selectedPersonnelId]
   )
+  const activeFollowedPersonnelId = mapPersonnel.some(
+    (member) => member.id === followedPersonnelId,
+  ) ? followedPersonnelId : null
   const effectiveStatusMessage = stalePersonnel.length > 0
     ? `${stalePersonnel.map((member) => member.name).join(', ')} ${stalePersonnel.length === 1 ? 'has' : 'have'} no current GPS fix. Last known positions are hidden.`
     : statusMessage
@@ -88,11 +91,7 @@ function MonitoringPage() {
       return
     }
 
-    setFocusTarget({
-        latitude: member.latitude,
-        longitude: member.longitude,
-        timestamp: Date.now(),
-      })
+    setFollowedPersonnelId(member.id)
 
     // Close the modal so the supervisor can immediately see the map focus result.
     setSelectedPersonnelId(null)
@@ -125,7 +124,8 @@ function MonitoringPage() {
           personnel={mapPersonnel}
           deployments={deployments}
           onSelectPersonnel={handleSelectPersonnel}
-          focusTarget={focusTarget}
+          followedPersonnelId={activeFollowedPersonnelId}
+          onStopFollowing={() => setFollowedPersonnelId(null)}
           layoutVersion={mapLayoutVersion}
         />
       </main>

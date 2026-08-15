@@ -31,8 +31,8 @@ import {
 
 const LIVE_MAP_DEFAULT_CENTER = [CABAGAN_CENTER[1], CABAGAN_CENTER[0]]
 const LIVE_MAP_DEFAULT_ZOOM = 11.8
-const STREET_FOCUS_ZOOM = 18
-const SATELLITE_FOCUS_ZOOM = 16.5
+const STREET_FOCUS_ZOOM = 16
+const SATELLITE_FOCUS_ZOOM = 15
 const PERSONNEL_CLUSTER_MAX_ZOOM = 17
 const PERSONNEL_CLUSTER_RADIUS = 56
 
@@ -96,10 +96,12 @@ const createPersonnelMarkerElement = (member, onSelect) => {
   const photo = document.createElement('img')
   photo.className = 'police-marker__photo'
   photo.alt = member.name
-  photo.src = member.photoUrl || getFallbackPhoto(member)
+  photo.dataset.intendedSource = member.photoUrl || ''
+  photo.dataset.fallbackSource = getFallbackPhoto(member)
+  photo.src = photo.dataset.intendedSource || photo.dataset.fallbackSource
   photo.addEventListener('error', () => {
-    photo.src = getFallbackPhoto(member)
-  }, { once: true })
+    if (photo.src !== photo.dataset.fallbackSource) photo.src = photo.dataset.fallbackSource
+  })
 
   photoFrame.append(photo)
   pin.append(photoFrame)
@@ -166,7 +168,14 @@ const addOperationalLayers = (map, deploymentData) => {
   }
 }
 
-function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTarget, layoutVersion = 0 }) {
+function PersonnelMap({
+  personnel,
+  deployments = [],
+  onSelectPersonnel,
+  followedPersonnelId,
+  onStopFollowing,
+  layoutVersion = 0,
+}) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
@@ -174,6 +183,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
   const clusterMarkersRef = useRef([])
   const clusterIndexRef = useRef(null)
   const personnelRef = useRef(personnel)
+  const followedPersonnelIdRef = useRef(followedPersonnelId)
   const deploymentDataRef = useRef(featureCollection())
   const threeDRef = useRef(false)
   const styleSignatureRef = useRef(`street:${initialIsDark ? 'dark' : 'light'}`)
@@ -181,6 +191,11 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
   const [threeDEnabled, setThreeDEnabled] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const isDark = useDocumentTheme()
+  const followedPersonnel = personnel.find((member) => member.id === followedPersonnelId) || null
+
+  useEffect(() => {
+    followedPersonnelIdRef.current = followedPersonnelId
+  }, [followedPersonnelId])
 
   const deploymentData = useMemo(() => {
     const groups = new Map()
@@ -249,10 +264,16 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
         .addTo(map)
       clusterMarkersRef.current.push(marker)
     })
+
+    markerStatesRef.current.forEach((state) => {
+      if (state.element.classList.contains('is-followed')) state.element.style.display = ''
+    })
   }, [clearClusterMarkers])
 
   const rebuildClusterIndex = useCallback(() => {
-    const points = personnelRef.current.filter(isValidPosition).map((member) => ({
+    const points = personnelRef.current
+      .filter((member) => isValidPosition(member) && member.id !== followedPersonnelIdRef.current)
+      .map((member) => ({
       type: 'Feature',
       properties: {
         memberId: member.id,
@@ -263,7 +284,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
         type: 'Point',
         coordinates: [Number(member.longitude), Number(member.latitude)],
       },
-    }))
+      }))
 
     clusterIndexRef.current = new Supercluster({
       radius: PERSONNEL_CLUSTER_RADIUS,
@@ -372,15 +393,27 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
       }
 
       state.member = member
+      state.element.classList.toggle('is-followed', member.id === followedPersonnelId)
       state.element.setAttribute('aria-label', `View ${member.name} on live map`)
       state.pin.className = `police-marker ${getMarkerClass(member)}`
       const nextPhoto = member.photoUrl || getFallbackPhoto(member)
-      if (state.photo.src !== nextPhoto) state.photo.src = nextPhoto
+      if (state.photo.dataset.intendedSource !== nextPhoto) {
+        state.photo.dataset.intendedSource = nextPhoto
+        state.photo.dataset.fallbackSource = getFallbackPhoto(member)
+        state.photo.src = nextPhoto
+      }
 
       const from = [...state.currentPosition]
       const target = [Number(member.latitude), Number(member.longitude)]
       if (from[0] === target[0] && from[1] === target[1]) return
       if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      if (member.id === followedPersonnelId) {
+        map.easeTo({
+          center: [target[1], target[0]],
+          duration: MARKER_ANIMATION_DURATION_MS,
+          essential: true,
+        })
+      }
       const startTime = performance.now()
       let lastRenderedAt = 0
 
@@ -402,7 +435,7 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
 
     rebuildClusterIndex()
     return undefined
-  }, [onSelectPersonnel, personnel, rebuildClusterIndex])
+  }, [followedPersonnelId, onSelectPersonnel, personnel, rebuildClusterIndex])
 
   useEffect(() => {
     deploymentDataRef.current = deploymentData
@@ -428,9 +461,10 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !focusTarget) return
-    const latitude = Number(focusTarget.latitude)
-    const longitude = Number(focusTarget.longitude)
+    const member = personnelRef.current.find((item) => item.id === followedPersonnelId)
+    if (!map || !member) return
+    const latitude = Number(member.latitude)
+    const longitude = Number(member.longitude)
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
     map.flyTo({
       center: [longitude, latitude],
@@ -439,17 +473,25 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
       duration: 1200,
       essential: true,
     })
-  }, [focusTarget, mapMode, threeDEnabled])
+  }, [followedPersonnelId, mapMode, threeDEnabled])
 
   useEffect(() => {
     if (!layoutVersion) return undefined
     const timer = window.setTimeout(() => {
       const map = mapRef.current
       map?.resize()
-      map?.jumpTo({ center: LIVE_MAP_DEFAULT_CENTER, zoom: LIVE_MAP_DEFAULT_ZOOM })
+      const member = personnelRef.current.find((item) => item.id === followedPersonnelId)
+      if (member) {
+        map?.jumpTo({
+          center: [Number(member.longitude), Number(member.latitude)],
+          zoom: mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
+        })
+      } else {
+        map?.jumpTo({ center: LIVE_MAP_DEFAULT_CENTER, zoom: LIVE_MAP_DEFAULT_ZOOM })
+      }
     }, 280)
     return () => window.clearTimeout(timer)
-  }, [layoutVersion])
+  }, [followedPersonnelId, layoutVersion, mapMode])
 
   if (!hasMapTilerWebApiKey) {
     return (
@@ -471,6 +513,12 @@ function PersonnelMap({ personnel, deployments = [], onSelectPersonnel, focusTar
         onMapModeChange={setMapMode}
         onThreeDChange={setThreeDEnabled}
       />
+      {followedPersonnel && (
+        <div className="map-follow-status" role="status">
+          <span>Following <strong>{followedPersonnel.name}</strong></span>
+          <button type="button" onClick={onStopFollowing}>Stop</button>
+        </div>
+      )}
       <MapAttribution />
       {!mapReady && <div className="map-style-loading" role="status">Loading map style…</div>}
     </section>

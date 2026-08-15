@@ -48,8 +48,8 @@ import type {
 
 const CABAGAN_CENTER: [number, number] = [121.7653, 17.4269];
 const PATROL_RADIUS_METERS = 320;
-const STREET_FOCUS_ZOOM = 18;
-const SATELLITE_FOCUS_ZOOM = 16.5;
+const STREET_FOCUS_ZOOM = 16;
+const SATELLITE_FOCUS_ZOOM = 15;
 const MARKER_ANIMATION_DURATION = 700;
 const ANIMATION_FRAME_INTERVAL = 1000 / 30;
 
@@ -122,15 +122,18 @@ const createCircleFeature = (longitude: number, latitude: number, radiusMeters: 
 function PersonnelMarker({
   currentPersonnelId,
   emergencyPulse,
+  followedOfficerId,
   member,
   onPress,
 }: {
   currentPersonnelId: string;
   emergencyPulse: Animated.Value;
+  followedOfficerId: string | null;
   member: OfficerMapPerson;
   onPress: () => void;
 }) {
   const isCurrent = member.id === currentPersonnelId;
+  const isFollowed = member.id === followedOfficerId;
   const tone = markerTone(member);
   const borderColor = markerToneColor(tone);
   const pulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
@@ -154,7 +157,11 @@ function PersonnelMarker({
               ]}
             />
           )}
-          <View style={[styles.markerCurrentRing, isCurrent && styles.markerCurrentRingVisible]}>
+          <View style={[
+            styles.markerCurrentRing,
+            isCurrent && styles.markerCurrentRingVisible,
+            isFollowed && styles.markerFollowedRing,
+          ]}>
             <Image
               source={{ uri: member.photoUrl }}
               style={[styles.markerPhoto, { borderColor }]}
@@ -172,6 +179,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   currentPersonnelId,
   emergencyPulse,
   enable3D,
+  followedOfficerId,
   isDark,
   mapMode,
   personnel,
@@ -181,13 +189,21 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   const cameraRef = useRef<CameraRef>(null);
   const initialFitDone = useRef(false);
   const [mapStyle, setMapStyle] = useState<string | StyleSpecification | null>(null);
+  const [mapStyleRevision, setMapStyleRevision] = useState(0);
   const [styleError, setStyleError] = useState<string | null>(null);
   const [styleLoading, setStyleLoading] = useState(false);
   const [mapZoom, setMapZoom] = useState(14.5);
   const interpolatedPersonnel = useInterpolatedPersonnel(personnel);
+  const followedPersonnel = useMemo(
+    () => interpolatedPersonnel.find((member) => member.id === followedOfficerId) || null,
+    [followedOfficerId, interpolatedPersonnel],
+  );
   const clusteredPersonnel = useMemo(
-    () => clusterPersonnel(interpolatedPersonnel, mapZoom),
-    [interpolatedPersonnel, mapZoom],
+    () => clusterPersonnel(
+      interpolatedPersonnel.filter((member) => member.id !== followedOfficerId),
+      mapZoom,
+    ),
+    [followedOfficerId, interpolatedPersonnel, mapZoom],
   );
   const clusterPulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
   const clusterPulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
@@ -223,6 +239,22 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     );
   }, [deploymentCenter, personnel]);
 
+  const handleMapLoaded = useCallback(() => {
+    setStyleLoading(false);
+    const followed = personnel.find((member) => member.id === followedOfficerId);
+    if (followed) {
+      cameraRef.current?.flyTo({
+        center: [Number(followed.longitude), Number(followed.latitude)],
+        zoom: mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
+        pitch: enable3D ? 52 : 0,
+        duration: 500,
+      });
+      return;
+    }
+    initialFitDone.current = false;
+    fitInitialPersonnel();
+  }, [enable3D, fitInitialPersonnel, followedOfficerId, mapMode, personnel]);
+
   useImperativeHandle(ref, () => ({
     focusOfficer: (officerId: string) => {
       const member = personnel.find((item) => item.id === officerId);
@@ -239,6 +271,17 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   }), [enable3D, mapMode, personnel]);
 
   useEffect(() => {
+    if (!followedOfficerId) return;
+    const member = personnel.find((item) => item.id === followedOfficerId);
+    if (!member) return;
+    cameraRef.current?.easeTo({
+      center: [Number(member.longitude), Number(member.latitude)],
+      pitch: enable3D ? 52 : 0,
+      duration: MARKER_ANIMATION_DURATION,
+    });
+  }, [enable3D, followedOfficerId, personnel]);
+
+  useEffect(() => {
     if (!hasMapTilerApiKey) {
       setMapStyle(null);
       setStyleError('Add EXPO_PUBLIC_MAPTILER_API_KEY to enable the cloud map.');
@@ -249,7 +292,10 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     setStyleLoading(true);
     setStyleError(null);
     loadMapTilerStyle(mapMode, isDark, enable3D, controller.signal)
-      .then(setMapStyle)
+      .then((style) => {
+        setMapStyle(style);
+        setMapStyleRevision((revision) => revision + 1);
+      })
       .catch((error) => {
         if ((error as Error).name !== 'AbortError') {
           setStyleError((error as Error).message || 'Unable to load the map style.');
@@ -289,6 +335,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   return (
     <View style={styles.mapRoot}>
       <MapLibreMap
+        key={`map-style-${mapStyleRevision}`}
         ref={mapRef}
         style={styles.map}
         mapStyle={mapStyle}
@@ -305,7 +352,9 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         compassPosition={{ top: 150, right: 12 }}
         attribution={false}
         logo={false}
-        onDidFinishLoadingMap={fitInitialPersonnel}
+        onWillStartLoadingMap={() => setStyleLoading(true)}
+        onDidFinishLoadingStyle={() => setStyleLoading(false)}
+        onDidFinishLoadingMap={handleMapLoaded}
         onRegionDidChange={(event) => setMapZoom(event.nativeEvent.zoom)}
       >
         <Camera
@@ -358,6 +407,16 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
           />
         </GeoJSONSource>
 
+        {followedPersonnel && (
+          <PersonnelMarker
+            member={followedPersonnel}
+            currentPersonnelId={currentPersonnelId}
+            emergencyPulse={emergencyPulse}
+            followedOfficerId={followedOfficerId}
+            onPress={() => onOfficerPress(followedPersonnel.id)}
+          />
+        )}
+
         {clusteredPersonnel.map((cluster) => cluster.members.length > 1 ? (
           <Marker
             key={`cluster-${cluster.id}`}
@@ -392,6 +451,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
             member={cluster.members[0]}
             currentPersonnelId={currentPersonnelId}
             emergencyPulse={emergencyPulse}
+            followedOfficerId={followedOfficerId}
             onPress={() => onOfficerPress(cluster.members[0].id)}
           />
         ))}
@@ -439,6 +499,7 @@ const styles = StyleSheet.create({
   markerPhotoWrap: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   markerCurrentRing: { padding: 2, borderWidth: 2, borderColor: 'transparent', borderRadius: 25 },
   markerCurrentRingVisible: { borderColor: '#FFFFFF' },
+  markerFollowedRing: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.2)' },
   markerPhoto: { width: 42, height: 42, borderWidth: 3, borderRadius: 21, backgroundColor: '#ffffff' },
   markerPulse: {
     position: 'absolute',

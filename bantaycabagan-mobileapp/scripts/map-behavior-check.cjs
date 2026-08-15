@@ -10,6 +10,10 @@ const nativeMapSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'components', 'OfficerMapCanvas.native.tsx'),
 	'utf8',
 )
+const officerMapScreenSource = fs.readFileSync(
+	path.join(projectRoot, 'src', 'screens', 'OfficerMapScreen.tsx'),
+	'utf8',
+)
 const output = ts.transpileModule(source, {
 	compilerOptions: {
 		module: ts.ModuleKind.CommonJS,
@@ -54,6 +58,13 @@ assert.deepEqual(
 )
 assert.match(nativeMapSource, /MARKER_ANIMATION_DURATION\s*=\s*700/, 'Mobile interpolation must remain at 700ms')
 assert.match(nativeMapSource, /cancelAnimationFrame\(animationFrame\.current\)/, 'A newer GPS update must cancel the previous animation')
+assert.match(nativeMapSource, /STREET_FOCUS_ZOOM\s*=\s*16/, 'Following must preserve street-map context')
+assert.match(nativeMapSource, /SATELLITE_FOCUS_ZOOM\s*=\s*15/, 'Following must not over-zoom satellite imagery')
+assert.match(nativeMapSource, /item\.id === followedOfficerId/, 'The camera must follow only the selected officer')
+assert.match(nativeMapSource, /member\.id !== followedOfficerId/, 'The followed officer must remain visible outside clusters')
+assert.match(nativeMapSource, /mapStyleRevision/, 'Native style changes must remount MapLibre reliably')
+assert.match(officerMapScreenSource, /Following <Text/, 'Following mode must replace the officer sheet with a compact banner')
+assert.match(officerMapScreenSource, /mapControlsExpanded/, 'Mobile map controls must be collapsible')
 
 const personnel = [
 	officer('duty', 17.4269, 121.7653),

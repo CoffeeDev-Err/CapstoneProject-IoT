@@ -927,7 +927,10 @@ const createOperationalService = ({ io }) => {
 		)
 		if (!deployment) return createNotFoundResult('Deployment')
 		await reconcileDeploymentShifts({ broadcast: false })
-		const activeDeployments = await loadDeployments()
+		const [activeDeployments, personnel] = await Promise.all([
+			loadDeployments(),
+			getPersonnelWithLocations(),
+		])
 		const personnelById = await loadPersonnelMap([deployment.personnelId])
 		const serialized = serializeDeployment(deployment, personnelById)
 		await deliverNotification({
@@ -945,6 +948,7 @@ const createOperationalService = ({ io }) => {
 			dedupeKey: `deployment:${assignmentId}:status:${status}`,
 		})
 		emitDeploymentCollection('deployments:updated', activeDeployments)
+		emitPersonnelCollection(io, 'personnel:update', personnel)
 		return {
 			status: 200,
 			body: {
@@ -1644,9 +1648,10 @@ const createOperationalService = ({ io }) => {
 		)
 
 		await reconcileDeploymentShifts({ broadcast: false })
-		const [activeDeployments, manageablePayload] = await Promise.all([
+		const [activeDeployments, manageablePayload, personnel] = await Promise.all([
 			loadDeployments(),
 			listDeployments({ view: 'manageable', limit: 100 }),
+			getPersonnelWithLocations(),
 		])
 		await createNotification({
 			title: 'Deployment Updated',
@@ -1696,6 +1701,7 @@ const createOperationalService = ({ io }) => {
 			dedupeKey: `deployment:${deployment.assignmentId}:cancelled`,
 		})))
 		emitDeploymentCollection('deployments:updated', activeDeployments)
+		emitPersonnelCollection(io, 'personnel:update', personnel)
 		io.emit('dashboard:updated')
 		return manageablePayload.data
 	}

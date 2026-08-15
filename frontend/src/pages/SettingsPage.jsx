@@ -30,6 +30,7 @@ import {
   validateOfficialEmail,
   validateRank,
 } from '../utils/accountValidation'
+import { getAccountEditCancelledMessage } from '../utils/workflowFeedback'
 
 const rankOptions = POLICE_RANKS
 
@@ -363,6 +364,14 @@ function SettingsPage() {
     setFormErrors({})
     setProfilePhoto(null)
     setProfilePhotoPreview('')
+  }
+
+  const handleCancelEditAccount = () => {
+    const accountLabel = editingAccount?.fullName || editingAccount?.loginId
+
+    resetFormToCreate()
+    setFormMessage(getAccountEditCancelledMessage(accountLabel))
+    setFormMessageKind('success')
   }
 
   const handleEditAccount = (accountId) => {
@@ -793,7 +802,7 @@ function SettingsPage() {
                       <button
                         type="button"
                         className="account-action-btn ms-2"
-                        onClick={resetFormToCreate}
+                        onClick={handleCancelEditAccount}
                       >
                         Cancel Edit
                       </button>
@@ -858,6 +867,9 @@ function SettingsPage() {
 	                                    className="account-table-avatar"
 	                                    src={resolveApiAssetUrl(account.photoUrl)}
 	                                    alt=""
+	                                    onError={(event) => {
+	                                      event.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(account.fullName || account.loginId || 'Personnel')}&background=1d4ed8&color=fff&size=64`
+	                                    }}
 	                                  />
 	                                ) : (
 	                                  <span className="account-table-avatar account-table-avatar--fallback" aria-hidden="true">

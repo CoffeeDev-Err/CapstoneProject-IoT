@@ -36,6 +36,7 @@ type MapMode = 'street' | 'satellite';
 type MapCommand =
   | { type: 'update-personnel'; personnel: OfficerMapPerson[] }
   | { type: 'focus-officer'; officerId: string }
+  | { type: 'set-followed-officer'; officerId: string | null }
   | { type: 'set-map-mode'; mode: MapMode };
 
 const webSearchInputReset = Platform.OS === 'web'
@@ -91,6 +92,8 @@ export default function OfficerMapScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [backupActionPending, setBackupActionPending] = useState(false);
   const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
+  const [followedOfficerId, setFollowedOfficerId] = useState<string | null>(null);
+  const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
@@ -162,6 +165,15 @@ export default function OfficerMapScreen() {
   const selectedOfficerHasActiveBackup = selectedOfficer
     ? emergencyPersonnelIds.has(selectedOfficer.id)
     : false;
+  const activeFollowedOfficerId = visiblePersonnel.some(
+    (member) => member.id === followedOfficerId,
+  ) ? followedOfficerId : null;
+  const followedOfficer = activeFollowedOfficerId
+    ? visiblePersonnel.find((member) => member.id === activeFollowedOfficerId) || null
+    : null;
+  const isFollowingSelectedOfficer = Boolean(
+    selectedOfficer && selectedOfficer.id === activeFollowedOfficerId,
+  );
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
 
   useEffect(() => {
@@ -285,6 +297,8 @@ export default function OfficerMapScreen() {
             const markers={};
             const personnelById={};
             let hasFittedPersonnel=false;
+            let followedOfficerId=null;
+            let currentMapMode='street';
             window.mapInstance=map;
             window.officerMarkers=markers;
             window.personnelById=personnelById;
@@ -339,6 +353,11 @@ export default function OfficerMapScreen() {
                 delete personnelById[id];
               });
 
+              if(followedOfficerId&&personnelById[followedOfficerId]){
+                const followed=personnelById[followedOfficerId];
+                map.panTo([Number(followed.latitude),Number(followed.longitude)],{animate:true,duration:.7});
+              }
+
               if(!hasFittedPersonnel&&members&&members.length){
                 const bounds=L.latLngBounds([
                   [${latitude},${longitude}],
@@ -357,10 +376,17 @@ export default function OfficerMapScreen() {
               const member=personnelById[officerId];
               const marker=markers[officerId];
               if(!member||!marker)return;
-              map.flyTo([Number(member.latitude),Number(member.longitude)],18,{duration:.8});
+              const followZoom=currentMapMode==='satellite'?15:16;
+              map.flyTo([Number(member.latitude),Number(member.longitude)],followZoom,{duration:.8});
+            };
+
+            window.setFollowedOfficer=(officerId)=>{
+              followedOfficerId=officerId||null;
+              if(followedOfficerId)window.focusOfficer(followedOfficerId);
             };
 
             window.setMapMode=(mode)=>{
+              currentMapMode=mode;
               const nextLayer=baseLayers[mode]||streetLayer;
               if(nextLayer===activeBaseLayer)return;
               map.removeLayer(activeBaseLayer);
@@ -377,6 +403,7 @@ export default function OfficerMapScreen() {
               if(!command)return;
               if(command.type==='update-personnel')window.updatePersonnel(command.personnel);
               if(command.type==='focus-officer')window.focusOfficer(command.officerId);
+              if(command.type==='set-followed-officer')window.setFollowedOfficer(command.officerId);
               if(command.type==='set-map-mode')window.setMapMode(command.mode);
             };
 
@@ -409,7 +436,8 @@ export default function OfficerMapScreen() {
   const handleMapLoad = useCallback(() => {
     syncPersonnel();
     sendMapCommand({ type: 'set-map-mode', mode: mapMode });
-  }, [mapMode, sendMapCommand, syncPersonnel]);
+    sendMapCommand({ type: 'set-followed-officer', officerId: activeFollowedOfficerId });
+  }, [activeFollowedOfficerId, mapMode, sendMapCommand, syncPersonnel]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
@@ -421,6 +449,11 @@ export default function OfficerMapScreen() {
     if (Platform.OS !== 'web') return;
     sendMapCommand({ type: 'set-map-mode', mode: mapMode });
   }, [mapMode, sendMapCommand]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    sendMapCommand({ type: 'set-followed-officer', officerId: activeFollowedOfficerId });
+  }, [activeFollowedOfficerId, sendMapCommand]);
 
   const handleMapEvent = useCallback((payload: MapEvent) => {
     if (payload.type === 'officer-selected' && payload.officerId) {
@@ -474,7 +507,20 @@ export default function OfficerMapScreen() {
 
   const handleLocateOfficer = () => {
     if (!selectedOfficer) return;
+    if (selectedOfficer.id === followedOfficerId) {
+      setFollowedOfficerId(null);
+      return;
+    }
+    setFollowedOfficerId(selectedOfficer.id);
     focusOfficer(selectedOfficer.id);
+    setSelectedOfficerId(null);
+  };
+
+  const handleStopFollowing = () => setFollowedOfficerId(null);
+
+  const handleCloseOfficer = () => {
+    if (selectedOfficerId === followedOfficerId) setFollowedOfficerId(null);
+    setSelectedOfficerId(null);
   };
 
   const handleConfirmAssignment = async () => {
@@ -592,6 +638,7 @@ export default function OfficerMapScreen() {
             currentPersonnelId={currentPersonnelId}
             emergencyPulse={emergencyPulse}
             enable3D={threeDEnabled}
+            followedOfficerId={activeFollowedOfficerId}
             isDark={isDark}
             mapMode={mapMode}
             personnel={mapPersonnel}
@@ -655,48 +702,81 @@ export default function OfficerMapScreen() {
           <View
             style={[
               styles.mapModeControl,
+              mapControlsExpanded && styles.mapModeControlExpanded,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
             <TouchableOpacity
-              accessibilityLabel="Use normal map"
-              accessibilityState={{ selected: mapMode === 'street' }}
-              style={[styles.mapModeButton, mapMode === 'street' && styles.mapModeButtonActive]}
-              onPress={() => setMapMode('street')}
+              accessibilityLabel={mapControlsExpanded ? 'Hide map options' : 'Show map options'}
+              accessibilityState={{ expanded: mapControlsExpanded }}
+              style={[styles.mapModeButton, styles.mapModeMenuButton]}
+              onPress={() => setMapControlsExpanded((expanded) => !expanded)}
             >
               <Icon
-                name="map"
+                name={mapControlsExpanded ? 'close' : 'layers'}
                 size={20}
-                color={mapMode === 'street' ? '#ffffff' : colors.textMuted}
+                color={colors.text}
               />
             </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel="Use satellite map"
-              accessibilityState={{ selected: mapMode === 'satellite' }}
-              style={[styles.mapModeButton, mapMode === 'satellite' && styles.mapModeButtonActive]}
-              onPress={() => setMapMode('satellite')}
-            >
-              <Icon
-                name="satellite-alt"
-                size={20}
-                color={mapMode === 'satellite' ? '#ffffff' : colors.textMuted}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel={threeDEnabled ? 'Disable 3D terrain' : 'Enable 3D terrain'}
-              accessibilityState={{ selected: threeDEnabled }}
-              style={[styles.mapModeButton, threeDEnabled && styles.mapModeButtonActive]}
-              onPress={() => setThreeDEnabled((enabled) => !enabled)}
-            >
-              <Icon
-                name="3d-rotation"
-                size={20}
-                color={threeDEnabled ? '#ffffff' : colors.textMuted}
-              />
-            </TouchableOpacity>
+            {mapControlsExpanded && (
+              <>
+                <TouchableOpacity
+                  accessibilityLabel="Use normal map"
+                  accessibilityState={{ selected: mapMode === 'street' }}
+                  style={[styles.mapModeButton, mapMode === 'street' && styles.mapModeButtonActive]}
+                  onPress={() => setMapMode('street')}
+                >
+                  <Icon
+                    name="map"
+                    size={20}
+                    color={mapMode === 'street' ? '#ffffff' : colors.textMuted}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityLabel="Use satellite map"
+                  accessibilityState={{ selected: mapMode === 'satellite' }}
+                  style={[styles.mapModeButton, mapMode === 'satellite' && styles.mapModeButtonActive]}
+                  onPress={() => setMapMode('satellite')}
+                >
+                  <Icon
+                    name="satellite-alt"
+                    size={20}
+                    color={mapMode === 'satellite' ? '#ffffff' : colors.textMuted}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityLabel={threeDEnabled ? 'Disable 3D terrain' : 'Enable 3D terrain'}
+                  accessibilityState={{ selected: threeDEnabled }}
+                  style={[styles.mapModeButton, threeDEnabled && styles.mapModeButtonActive]}
+                  onPress={() => setThreeDEnabled((enabled) => !enabled)}
+                >
+                  <Icon
+                    name="3d-rotation"
+                    size={20}
+                    color={threeDEnabled ? '#ffffff' : colors.textMuted}
+                  />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </SafeAreaView>
+
+      {followedOfficer && !selectedOfficer && (
+        <View style={styles.followBanner}>
+          <Icon name="near-me" size={17} color="#93c5fd" />
+          <Text style={styles.followBannerText} numberOfLines={1}>
+            Following <Text style={styles.followBannerName}>{followedOfficer.name}</Text>
+          </Text>
+          <TouchableOpacity
+            accessibilityLabel={`Stop following ${followedOfficer.name}`}
+            style={styles.followBannerStop}
+            onPress={handleStopFollowing}
+          >
+            <Text style={styles.followBannerStopText}>Stop</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {deploymentPromptVisible && !selectedOfficer && (
         <View style={styles.assignmentCard}>
@@ -744,7 +824,7 @@ export default function OfficerMapScreen() {
         <SwipeDismissCard
           key={selectedOfficer.id}
           style={styles.officerSheet}
-          onClose={() => setSelectedOfficerId(null)}
+          onClose={handleCloseOfficer}
         >
           <View style={styles.officerSheetContent}>
           <View style={styles.officerHeader}>
@@ -784,9 +864,18 @@ export default function OfficerMapScreen() {
               {selectedOfficer.locationName}
             </Text>
             {selectedOfficer.id !== currentPersonnelId && (
-              <TouchableOpacity style={styles.locateButton} onPress={handleLocateOfficer}>
-                <Icon name="my-location" size={18} color="#ffffff" />
-                <Text style={styles.locateButtonText}>Locate</Text>
+              <TouchableOpacity
+                style={[styles.locateButton, isFollowingSelectedOfficer && styles.locateButtonFollowing]}
+                onPress={handleLocateOfficer}
+              >
+                <Icon
+                  name={isFollowingSelectedOfficer ? 'location-disabled' : 'my-location'}
+                  size={18}
+                  color="#ffffff"
+                />
+                <Text style={styles.locateButtonText}>
+                  {isFollowingSelectedOfficer ? 'Stop' : 'Locate'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -903,10 +992,10 @@ const styles = StyleSheet.create({
   liveText: { color: mobileTheme.success, fontSize: 10, fontWeight: '800' },
   offlineText: { color: mobileTheme.warning },
   mapModeControl: {
-    width: 42,
-    height: 129,
+    width: 46,
     padding: 3,
     flexDirection: 'column',
+    gap: 4,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
     shadowColor: '#172554',
@@ -915,16 +1004,50 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  mapModeControlExpanded: { paddingBottom: 4 },
   mapModeButton: {
-    width: 36,
-    height: 41,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 11,
   },
+  mapModeMenuButton: { backgroundColor: 'rgba(148,163,184,0.14)' },
   mapModeButtonActive: {
     backgroundColor: mobileTheme.purple,
   },
+  followBanner: {
+    position: 'absolute',
+    top: 142,
+    left: 20,
+    right: 78,
+    minHeight: 42,
+    paddingLeft: 12,
+    paddingRight: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(147,197,253,0.45)',
+    borderRadius: 21,
+    backgroundColor: 'rgba(7,19,38,0.92)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  followBannerText: { flex: 1, color: '#cbd5e1', fontSize: 12, fontWeight: '700' },
+  followBannerName: { color: '#ffffff', fontWeight: '900' },
+  followBannerStop: {
+    minHeight: 32,
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: mobileTheme.purple,
+  },
+  followBannerStopText: { color: '#ffffff', fontSize: 11, fontWeight: '900' },
   assignmentCard: {
     position: 'absolute',
     right: 20,
@@ -1068,5 +1191,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: mobileTheme.purple,
   },
+  locateButtonFollowing: { backgroundColor: '#475569' },
   locateButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
 });
