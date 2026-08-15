@@ -19,6 +19,7 @@ export type OfficerMapCanvasProps = {
   currentPersonnelId: string;
   emergencyPulse: Animated.Value;
   enable3D: boolean;
+  followedOfficerId: string | null;
   isDark: boolean;
   mapMode: GeoSentriMapMode;
   personnel: OfficerMapPerson[];

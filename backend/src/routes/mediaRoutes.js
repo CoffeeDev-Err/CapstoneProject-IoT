@@ -14,7 +14,12 @@ const createMediaRoutes = () => {
 			expires: req.query.expires,
 			signature: req.query.signature,
 		})
-		res.set('Cache-Control', 'private, no-store')
+		// Signed media URLs are intentionally usable by the separately hosted web
+		// frontend. Keep the rest of the API same-origin via securityHeaders.
+		res.set({
+			'Cache-Control': 'private, no-store',
+			'Cross-Origin-Resource-Policy': 'cross-origin',
+		})
 		if (media.storage === 'local') {
 			return res.sendFile(media.absolutePath, {
 				dotfiles: 'deny',

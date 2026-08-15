@@ -204,7 +204,10 @@ const toMediaAccessPath = (reference) => {
 		? `s3:${parsedS3.key}`
 		: `local:${parsedLocal.prefix}/${parsedLocal.filename}`
 	const token = Buffer.from(mediaReference, 'utf8').toString('base64url')
-	const expires = Math.floor(Date.now() / 1000) + getMediaUrlTtlSeconds()
+	const now = Math.floor(Date.now() / 1000)
+	// Keep the signed URL stable within a minute so frequent GPS/socket updates
+	// do not force browsers and native clients to reload the same profile photo.
+	const expires = Math.floor(now / 60) * 60 + getMediaUrlTtlSeconds() + 60
 	const signature = signToken(token, expires)
 	return `/api/media/${token}?expires=${expires}&signature=${signature}`
 }

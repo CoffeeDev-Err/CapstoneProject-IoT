@@ -7,9 +7,10 @@
     "dev": "nodemon scripts/start-development.js",
     "lint": "eslint src",
     "test:validation": "node scripts/account-validation-check.js",
+    "test:deployments": "node scripts/deployment-lifecycle-check.js",
     "test:security": "node scripts/operational-security-check.js",
     "test:s3": "node scripts/s3-smoke-check.js",
-    "check": "npm run lint && npm run test:validation && npm run test:security"
+    "check": "npm run lint && npm run test:validation && npm run test:deployments && npm run test:security"
   },
   "keywords": [],
   "author": "",

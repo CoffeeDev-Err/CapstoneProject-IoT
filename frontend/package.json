@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test:map": "node scripts/map-behavior-check.mjs",
     "test:validation": "node scripts/account-validation-check.mjs",
-    "check": "npm run lint && npm run test:validation && npm run test:map && npm run build",
+    "test:feedback": "node scripts/workflow-feedback-check.mjs",
+    "check": "npm run lint && npm run test:validation && npm run test:feedback && npm run test:map && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {

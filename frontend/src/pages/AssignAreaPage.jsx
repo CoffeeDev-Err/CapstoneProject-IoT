@@ -3,6 +3,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getManageableDeployments, replaceDeployments } from '../services/operations'
+import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
 
 const DEPLOYMENT_MODES = {
   START_NOW: 'start_now',
@@ -663,10 +664,18 @@ function AssignAreaPage() {
   }
 
   const handleCancelEdit = () => {
+    const editingAssignment = assignments.find((assignment) => assignment.id === editingAssignmentId)
+    const editingGroupAssignment = assignments.find(
+      (assignment) => resolveGroupId(assignment) === editingGroupId
+    )
+    const deploymentLabel = editingGroupId
+      ? `the group in ${editingGroupAssignment?.patrolArea || 'the selected patrol area'}`
+      : editingAssignment?.personnelName || editingAssignmentId
+
     setEditingAssignmentId(null)
     setEditingGroupId(null)
     resetAssignmentForm()
-    setAssignMessage('Edit cancelled.')
+    setAssignMessage(getDeploymentEditCancelledMessage(deploymentLabel))
   }
 
   return (
