@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Image,
+  Alert,
   ScrollView,
   StyleSheet,
   Switch,
@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { OfflineManager } from '@maplibre/maplibre-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
@@ -16,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import { resolveApiAssetUrl } from '../services/operationsApi';
+import { cleanupOrphanedPickerEvidence } from '../services/offlineReportQueue';
 
 const formatAccountDate = (value?: string, includeTime = false) => {
   if (!value) return 'Not available';
@@ -47,11 +50,36 @@ export default function OfficerProfileScreen() {
     ? `${new Date(assignment.shiftStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${assignment.shiftEnd ? ` - ${new Date(assignment.shiftEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}`
     : 'Not scheduled';
 
+  const clearDownloadedCache = () => {
+    Alert.alert(
+      'Clear downloaded cache?',
+      'Cached maps and viewed images will be downloaded again. Pending offline reports and evidence will not be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear cache',
+          onPress: async () => {
+            try {
+              await Promise.all([
+                OfflineManager.clearAmbientCache(),
+                Image.clearDiskCache(),
+                cleanupOrphanedPickerEvidence(),
+              ]);
+              Alert.alert('Cache cleared', 'Pending offline reports and evidence were preserved.');
+            } catch {
+              Alert.alert('Unable to clear cache', 'Try again after closing the map and report viewer.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.identity}>
-          <Image source={{ uri: officer.photoUrl }} style={styles.avatar} />
+          <Image source={{ uri: officer.photoUrl }} cachePolicy="memory" style={styles.avatar} />
           <View style={styles.nameLine}>
             <Text style={[styles.name, isDark && styles.textDark]}>{officer.name}</Text>
             {user?.emailVerified && (
@@ -123,6 +151,15 @@ export default function OfficerProfileScreen() {
         </DetailSection>
 
         <View style={styles.actions}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={[styles.secondaryButton, isDark && styles.secondaryButtonDark]}
+            onPress={clearDownloadedCache}
+          >
+            <Icon name="cleaning-services" size={20} color={mobileTheme.blue} />
+            <Text style={styles.secondaryButtonText}>Clear Downloaded Cache</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             accessibilityRole="button"
             style={[styles.secondaryButton, isDark && styles.secondaryButtonDark]}

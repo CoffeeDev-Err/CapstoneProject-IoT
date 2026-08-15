@@ -128,6 +128,7 @@ const serializeTask = (task, personnelById = new Map()) => ({
 
 const serializeReport = (report, personnelById = new Map()) => ({
 	id: report.reportNumber,
+	...(report.clientSubmissionId && { client_submission_id: report.clientSubmissionId }),
 	personnel_id: report.submittedBy,
 	officer: personnelById.get(report.submittedBy)?.fullName || report.officerName,
 	date_time: report.submittedAt?.toISOString(),
@@ -1205,6 +1206,23 @@ const createOperationalService = ({ io }) => {
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
+	const getReportByClientSubmissionId = async (personnelId, rawSubmissionId) => {
+		const clientSubmissionId = String(rawSubmissionId || '').trim()
+		if (!clientSubmissionId) return null
+		if (!/^mobile-[a-z0-9-]{10,100}$/i.test(clientSubmissionId)) {
+			const error = new Error('The report submission identifier is invalid.')
+			error.status = 400
+			throw error
+		}
+		const report = await Report.findOne({
+			submittedBy: personnelId,
+			clientSubmissionId,
+		})
+		if (!report) return null
+		const personnelById = await loadPersonnelMap([report.submittedBy])
+		return serializeReport(report, personnelById)
+	}
+
 	const submitReport = async (payload = {}) => {
 		const officer = payload.personnel_id
 			? await getPersonnelMember(payload.personnel_id)
@@ -1215,6 +1233,12 @@ const createOperationalService = ({ io }) => {
 			throw error
 		}
 		const now = new Date()
+		const clientSubmissionId = String(payload.client_submission_id || '').trim()
+		if (clientSubmissionId && !/^mobile-[a-z0-9-]{10,100}$/i.test(clientSubmissionId)) {
+			const error = new Error('The report submission identifier is invalid.')
+			error.status = 400
+			throw error
+		}
 		const reportType = validateReportType(payload.report_type)
 		const isIncident = reportType === 'incident'
 		const selectedBarangay = findCabaganBarangay(payload.barangay)
@@ -1359,6 +1383,7 @@ const createOperationalService = ({ io }) => {
 		}
 		const report = await Report.create({
 			reportNumber: `RPT-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+			...(clientSubmissionId && { clientSubmissionId }),
 			submittedBy: officer.id,
 			officerName: officer.name,
 			submittedAt: now,
@@ -1384,20 +1409,25 @@ const createOperationalService = ({ io }) => {
 				evidencePhoto,
 			}),
 		})
-		await captureReportRouteSnapshot(report)
-		const personnelById = await loadPersonnelMap([report.submittedBy])
-		const serialized = serializeReport(report, personnelById)
+		try {
+			await captureReportRouteSnapshot(report)
+			const personnelById = await loadPersonnelMap([report.submittedBy])
+			const serialized = serializeReport(report, personnelById)
 
-		await createNotification({
-			type: 'info',
-			title: 'New Police Report',
-			message: `${report.officerName} submitted ${report.reportNumber}.`,
-			referenceType: 'report',
-			referenceId: report.reportNumber,
-		})
-		emitToSupervisorAndPersonnel('report:submitted', serialized, report.submittedBy)
-		io.emit('dashboard:updated')
-		return serialized
+			await createNotification({
+				type: 'info',
+				title: 'New Police Report',
+				message: `${report.officerName} submitted ${report.reportNumber}.`,
+				referenceType: 'report',
+				referenceId: report.reportNumber,
+			})
+			emitToSupervisorAndPersonnel('report:submitted', serialized, report.submittedBy)
+			io.emit('dashboard:updated')
+			return serialized
+		} catch (error) {
+			await Report.deleteOne({ _id: report._id }).catch(() => {})
+			throw error
+		}
 	}
 
 	const resolveReport = async (reportId, payload = {}) => {
@@ -1724,6 +1754,7 @@ const createOperationalService = ({ io }) => {
 		getDeployment,
 		getUpcomingDeployment,
 		getReport,
+		getReportByClientSubmissionId,
 		getReportRoute,
 		getTask,
 		listDeployments,

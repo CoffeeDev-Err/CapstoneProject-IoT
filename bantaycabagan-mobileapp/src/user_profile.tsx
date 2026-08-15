@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, TextInput, View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Pressable } from 'react-native';
+import { Modal, TextInput, View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 export default function UserProfile({ navigation }: any) {
@@ -29,6 +30,7 @@ export default function UserProfile({ navigation }: any) {
         <View style={styles.card}>
           <Image
             source={{ uri: 'https://i.pravatar.cc/150' }}
+            cachePolicy="memory"
             style={styles.avatar}
           />
           <Text style={styles.name}>Juan Dela Cruz</Text>

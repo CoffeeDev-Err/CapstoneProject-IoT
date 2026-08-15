@@ -19,6 +19,7 @@ export type OperationalTask = {
 
 export type PoliceReport = {
   id: string;
+  client_submission_id?: string;
   personnel_id: string;
   officer: string;
   date_time: string;
@@ -107,6 +108,7 @@ export type LivePersonnel = {
 };
 
 export type SubmitReportInput = {
+  client_submission_id?: string;
   report_type: string;
   title: string;
   description: string;

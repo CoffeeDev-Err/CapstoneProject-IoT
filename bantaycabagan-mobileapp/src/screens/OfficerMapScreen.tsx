@@ -10,7 +10,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Image,
   Platform,
   StyleSheet,
   Text,
@@ -18,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import OfficerMapCanvas, {
@@ -838,6 +838,7 @@ export default function OfficerMapScreen() {
               )}
               <Image
                 source={{ uri: selectedOfficer.photoUrl }}
+                cachePolicy="memory"
                 style={[
                   styles.profilePhoto,
                   selectedOfficerHasActiveBackup && styles.profilePhotoEmergency,

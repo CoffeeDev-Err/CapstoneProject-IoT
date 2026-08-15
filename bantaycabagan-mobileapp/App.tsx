@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { OfflineManager } from '@maplibre/maplibre-react-native';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationLightTheme,
@@ -34,6 +35,10 @@ applyDefaultFont(Text);
 applyDefaultFont(TextInput);
 
 export default function App() {
+  useEffect(() => {
+    OfflineManager.setMaximumAmbientCacheSize(32 * 1024 * 1024).catch(() => undefined);
+  }, []);
+
   return (
     <GestureHandlerRootView style={styles.appRoot}>
       <SafeAreaProvider>

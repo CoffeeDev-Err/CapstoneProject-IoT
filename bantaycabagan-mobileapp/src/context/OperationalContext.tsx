@@ -10,6 +10,7 @@ import React, {
 import { Alert } from 'react-native';
 import { useAuth } from './AuthContext';
 import {
+  ApiRequestError,
   acceptOperationalTask,
   acknowledgeDeploymentAssignment,
   cancelOperationalTask,
@@ -23,6 +24,17 @@ import {
   resolveIncidentReport,
   submitPoliceReport,
 } from '../services/operationsApi';
+import {
+  cleanupConfirmedReports,
+  cleanupOrphanedPickerEvidence,
+  completePendingReport,
+  discardRejectedPendingReport,
+  getPendingReports,
+  markPendingReportFailed,
+  markPendingReportUploading,
+  stagePendingReport,
+  type PendingReport,
+} from '../services/offlineReportQueue';
 import type {
   DeploymentAssignment,
   LivePersonnel,
@@ -50,7 +62,7 @@ type OperationalContextValue = {
   acceptTask: (taskId: string) => Promise<void>;
   cancelBackupRequest: (taskId: string) => Promise<void>;
   createBackupRequest: () => Promise<void>;
-  submitReport: (input: SubmitReportInput) => Promise<void>;
+  submitReport: (input: SubmitReportInput) => Promise<'submitted' | 'queued'>;
   resolveReport: (reportId: string, resolutionNotes: string) => Promise<void>;
   acknowledgeDeployment: (assignmentId: string) => Promise<void>;
   refreshReports: (category: 'all' | 'incident' | 'routine') => Promise<void>;
@@ -104,6 +116,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const [taskHistoryCursor, setTaskHistoryCursor] = useState<string | null>(null);
   const reportRequestId = useRef(0);
   const taskHistoryRequestId = useRef(0);
+  const reportSyncRunning = useRef(false);
 
   const currentOfficer = useMemo<LivePersonnel>(() => {
     const liveProfile = personnel.find((member) => member.id === currentPersonnelId);
@@ -375,10 +388,72 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setTasks((items) => upsertById(items, response.task));
   }, [actor, deployments, token]);
 
-  const submitReport = useCallback(async (input: SubmitReportInput) => {
-    const response = await submitPoliceReport(input, actor, deployments[0], token);
-    setReports((items) => upsertById(items, response.report));
+  const uploadPendingReport = useCallback(async (pending: PendingReport) => {
+    await markPendingReportUploading(pending.id);
+    try {
+      const response = await submitPoliceReport(pending.input, actor, deployments[0], token);
+      if (pending.input.evidence_photo && !response.report.evidence_photo?.url) {
+        throw new Error('The backend did not confirm the uploaded evidence.');
+      }
+      await completePendingReport(pending);
+      setReports((items) => upsertById(items, response.report));
+      return response.report;
+    } catch (error) {
+      await markPendingReportFailed(pending.id, error);
+      throw error;
+    }
   }, [actor, deployments, token]);
+
+  const submitReport = useCallback(async (input: SubmitReportInput) => {
+    const preparedInput = {
+      ...input,
+      assigned_area: input.assigned_area || deployments[0]?.patrolArea || actor.station,
+    };
+    const pending = await stagePendingReport(preparedInput, currentPersonnelId);
+    if (!pending) {
+      const response = await submitPoliceReport(preparedInput, actor, deployments[0], token);
+      setReports((items) => upsertById(items, response.report));
+      return 'submitted' as const;
+    }
+
+    try {
+      await uploadPendingReport(pending);
+      return 'submitted' as const;
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status >= 400 && error.status < 500) {
+        await discardRejectedPendingReport(pending);
+        throw error;
+      }
+      return 'queued' as const;
+    }
+  }, [actor, currentPersonnelId, deployments, token, uploadPendingReport]);
+
+  const synchronizePendingReports = useCallback(async () => {
+    if (!currentPersonnelId || !token || reportSyncRunning.current) return;
+    reportSyncRunning.current = true;
+    try {
+      await cleanupConfirmedReports();
+      const pendingReports = await getPendingReports(currentPersonnelId);
+      for (const pending of pendingReports) {
+        try {
+          await uploadPendingReport(pending);
+        } catch {
+          // Keep every unconfirmed report and its evidence for a later retry.
+        }
+      }
+    } finally {
+      reportSyncRunning.current = false;
+    }
+  }, [currentPersonnelId, token, uploadPendingReport]);
+
+  useEffect(() => {
+    cleanupOrphanedPickerEvidence().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    synchronizePendingReports().catch(() => undefined);
+  }, [isConnected, synchronizePendingReports]);
 
   const resolveReport = useCallback(async (reportId: string, resolutionNotes: string) => {
     const response = await resolveIncidentReport(reportId, resolutionNotes, actor, token);
