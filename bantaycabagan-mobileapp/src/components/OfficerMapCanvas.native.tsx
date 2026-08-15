@@ -10,13 +10,13 @@ import React, {
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import {
   Camera,
   GeoJSONSource,
@@ -140,6 +140,7 @@ function PersonnelMarker({
           ]}>
             <Image
               source={{ uri: member.photoUrl }}
+              cachePolicy="memory"
               style={[styles.markerPhoto, { borderColor }]}
             />
           </View>

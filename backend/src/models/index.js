@@ -214,6 +214,7 @@ const reportRoutePointSchema = new mongoose.Schema({
 
 const reportSchema = new mongoose.Schema({
 	reportNumber: { type: String, required: true },
+	clientSubmissionId: { type: String, trim: true, maxlength: 100 },
 	submittedBy: { type: String, required: true },
 	officerName: { type: String, required: true },
 	assignedArea: { type: String, default: 'Unassigned area', maxlength: OPERATIONAL_LIMITS.deploymentArea },
@@ -244,6 +245,13 @@ const reportSchema = new mongoose.Schema({
 	timestamps: true,
 })
 reportSchema.index({ reportNumber: 1 }, { unique: true })
+reportSchema.index(
+	{ submittedBy: 1, clientSubmissionId: 1 },
+	{
+		unique: true,
+		partialFilterExpression: { clientSubmissionId: { $type: 'string' } },
+	},
+)
 reportSchema.index({ submittedAt: -1, _id: -1 })
 reportSchema.index({ submittedBy: 1, submittedAt: -1, _id: -1 })
 reportSchema.index({ barangayCode: 1, incidentAt: -1 })

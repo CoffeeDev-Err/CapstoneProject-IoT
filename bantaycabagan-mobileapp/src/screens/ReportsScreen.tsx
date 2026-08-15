@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import { Image as CachedImage } from 'expo-image';
 import {
   ActivityIndicator,
   Alert,
@@ -48,6 +49,7 @@ import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import { resolveApiAssetUrl } from '../services/operationsApi';
+import { discardTemporaryEvidence } from '../services/offlineReportQueue';
 import type {
   PoliceReport,
   ReportEvidenceInput,
@@ -219,6 +221,7 @@ export default function ReportsScreen() {
     const asset = result.assets[0];
     const mimeType = asset.mimeType || 'image/jpeg';
     const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+    const previousEvidenceUri = evidencePhoto?.uri;
     setEvidencePhoto({
       uri: asset.uri,
       name: asset.fileName || `report-evidence-${Date.now()}.${extension}`,
@@ -226,6 +229,9 @@ export default function ReportsScreen() {
       camera_facing: cameraFacing,
       captured_at: new Date().toISOString(),
     });
+    if (previousEvidenceUri && previousEvidenceUri !== asset.uri) {
+      discardTemporaryEvidence(previousEvidenceUri).catch(() => undefined);
+    }
   };
 
   const chooseEvidenceCamera = () => {
@@ -327,15 +333,22 @@ export default function ReportsScreen() {
 
     setIsSaving(true);
     try {
-      await submitReport({
+      const submissionResult = await submitReport({
         ...form,
         ...(evidencePhoto && { evidence_photo: evidencePhoto }),
       });
+      await discardTemporaryEvidence(evidencePhoto?.uri);
+      setEvidencePhoto(null);
       setForm(emptyForm);
       close(() => {
-        Alert.alert('Report submitted', form.report_type === 'incident'
-          ? 'The incident is open and can now be resolved from Report History.'
-          : 'The activity report was saved to your history.');
+        Alert.alert(
+          submissionResult === 'queued' ? 'Report saved offline' : 'Report submitted',
+          submissionResult === 'queued'
+            ? 'The report and its evidence are secured on this device and will synchronize automatically.'
+            : form.report_type === 'incident'
+              ? 'The incident is open and can now be resolved from Report History.'
+              : 'The activity report was saved to your history.',
+        );
       });
     } catch (error) {
       Alert.alert('Submission failed', (error as Error).message);
@@ -532,6 +545,7 @@ export default function ReportsScreen() {
         sheetStyle={[styles.modalScreen, isDark && themeStyles.screen]}
         onClose={() => {
           setBarangayPickerVisible(false);
+          discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
           setEvidencePhoto(null);
           setFormVisible(false);
         }}
@@ -676,7 +690,10 @@ export default function ReportsScreen() {
                   </View>
                   <TouchableOpacity
                     style={[styles.evidenceIconButton, isDark && themeStyles.border]}
-                    onPress={() => setEvidencePhoto(null)}
+                    onPress={() => {
+                      discardTemporaryEvidence(evidencePhoto.uri).catch(() => undefined);
+                      setEvidencePhoto(null);
+                    }}
                     accessibilityLabel="Remove photo evidence"
                   >
                     <Icon name="delete-outline" size={20} color={mobileTheme.danger} />
@@ -822,10 +839,11 @@ export default function ReportsScreen() {
             {selectedReport.evidence_photo?.url && (
               <View style={[styles.detailEvidence, isDark && themeStyles.border]}>
                 <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE</Text>
-                <Image
+                <CachedImage
                   source={{ uri: resolveApiAssetUrl(selectedReport.evidence_photo.url) }}
+                  cachePolicy="memory"
                   style={styles.detailEvidenceImage}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
                 <Text style={[styles.detailEvidenceMeta, isDark && themeStyles.muted]}>
                   Captured with {selectedReport.evidence_photo.camera_facing === 'front' ? 'front' : 'back'} camera

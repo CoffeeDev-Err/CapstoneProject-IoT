@@ -39,11 +39,18 @@ const request = async <T>(
   const body = await response.json();
 
   if (!response.ok) {
-    throw new Error(body.message || 'Unable to complete the request.');
+    throw new ApiRequestError(body.message || 'Unable to complete the request.', response.status);
   }
 
   return body;
 };
+
+export class ApiRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
 
 export type CursorPagination = {
   limit: number;

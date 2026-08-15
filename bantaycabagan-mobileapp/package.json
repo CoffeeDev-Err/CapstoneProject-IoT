@@ -10,9 +10,10 @@
     "typecheck": "node scripts/typecheck.cjs",
     "test:auth": "node scripts/auth-interaction-check.cjs",
     "test:map": "node scripts/map-behavior-check.cjs",
+    "test:storage": "node scripts/storage-lifecycle-check.cjs",
     "test:security": "node scripts/asset-security-check.cjs",
     "test:ui": "node scripts/ui-regression-check.cjs",
-    "check": "npm run test:security && npm run typecheck && npm run test:auth && npm run test:map && npm run test:ui"
+    "check": "npm run test:security && npm run typecheck && npm run test:auth && npm run test:map && npm run test:storage && npm run test:ui"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.10",
@@ -27,11 +28,13 @@
     "expo-device": "~57.0.1",
     "expo-file-system": "~57.0.3",
     "expo-font": "~57.0.1",
+    "expo-image": "~57.0.3",
     "expo-image-picker": "~57.0.10",
     "expo-linear-gradient": "~57.0.1",
     "expo-notifications": "~57.0.11",
     "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.6",
+    "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.2",
     "react": "19.2.3",
