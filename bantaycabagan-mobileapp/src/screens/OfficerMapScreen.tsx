@@ -725,7 +725,7 @@ export default function OfficerMapScreen() {
                 >
                   <Icon
                     name="map"
-                    size={20}
+                    size={17}
                     color={mapMode === 'street' ? '#ffffff' : colors.textMuted}
                   />
                   <Text style={[
@@ -747,7 +747,7 @@ export default function OfficerMapScreen() {
                 >
                   <Icon
                     name="satellite-alt"
-                    size={20}
+                    size={17}
                     color={mapMode === 'satellite' ? '#ffffff' : colors.textMuted}
                   />
                   <Text style={[
@@ -769,7 +769,7 @@ export default function OfficerMapScreen() {
                 >
                   <Icon
                     name="3d-rotation"
-                    size={20}
+                    size={17}
                     color={threeDEnabled ? '#ffffff' : colors.textMuted}
                   />
                   <Text style={[
@@ -1032,10 +1032,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  mapModeControlExpanded: {
-    width: 112,
-    paddingBottom: 4,
-  },
+  mapModeControlExpanded: { paddingBottom: 4 },
   mapModeButton: {
     width: 40,
     height: 40,
@@ -1044,19 +1041,20 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   mapModeMenuButton: {
-    alignSelf: 'flex-end',
     backgroundColor: 'rgba(148,163,184,0.14)',
   },
   mapModeOptionButton: {
-    width: 106,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: 7,
-    paddingHorizontal: 10,
+    width: 40,
+    height: 44,
+    flexDirection: 'column',
+    gap: 1,
+    paddingHorizontal: 0,
   },
   mapModeButtonLabel: {
-    fontSize: 11,
+    fontSize: 8,
     fontWeight: '800',
+    lineHeight: 9,
+    letterSpacing: -0.25,
   },
   mapModeButtonActive: {
     backgroundColor: mobileTheme.purple,
