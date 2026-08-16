@@ -1,7 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
-import { OfflineManager } from '@maplibre/maplibre-react-native';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationLightTheme,
@@ -19,6 +18,7 @@ import { NotificationProvider } from './src/context/NotificationContext';
 import { ThemeProvider, useMobileTheme } from './src/context/ThemeContext';
 import MainTabs from './src/navigation/MainTabs';
 import { mobileFontFamily } from './src/constants/mobileTheme';
+import { configureMapCache } from './src/services/mapCache';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,7 +36,7 @@ applyDefaultFont(TextInput);
 
 export default function App() {
   useEffect(() => {
-    OfflineManager.setMaximumAmbientCacheSize(32 * 1024 * 1024).catch(() => undefined);
+    configureMapCache().catch(() => undefined);
   }, []);
 
   return (

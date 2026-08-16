@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { OfflineManager } from '@maplibre/maplibre-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
@@ -19,6 +18,7 @@ import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import { resolveApiAssetUrl } from '../services/operationsApi';
 import { cleanupOrphanedPickerEvidence } from '../services/offlineReportQueue';
+import { clearMapCache } from '../services/mapCache';
 
 const formatAccountDate = (value?: string, includeTime = false) => {
   if (!value) return 'Not available';
@@ -61,7 +61,7 @@ export default function OfficerProfileScreen() {
           onPress: async () => {
             try {
               await Promise.all([
-                OfflineManager.clearAmbientCache(),
+                clearMapCache(),
                 Image.clearDiskCache(),
                 cleanupOrphanedPickerEvidence(),
               ]);
