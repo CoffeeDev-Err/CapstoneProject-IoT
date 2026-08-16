@@ -14,6 +14,10 @@ const officerMapScreenSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'screens', 'OfficerMapScreen.tsx'),
 	'utf8',
 )
+const mainTabsSource = fs.readFileSync(
+	path.join(projectRoot, 'src', 'navigation', 'MainTabs.tsx'),
+	'utf8',
+)
 const output = ts.transpileModule(source, {
 	compilerOptions: {
 		module: ts.ModuleKind.CommonJS,
@@ -65,6 +69,7 @@ assert.match(nativeMapSource, /member\.id !== followedOfficerId/, 'The followed 
 assert.match(nativeMapSource, /mapStyleRevision/, 'Native style changes must remount MapLibre reliably')
 assert.match(officerMapScreenSource, /Following <Text/, 'Following mode must replace the officer sheet with a compact banner')
 assert.match(officerMapScreenSource, /mapControlsExpanded/, 'Mobile map controls must be collapsible')
+assert.match(officerMapScreenSource, /Animated\.timing\(mapControlsProgress/, 'Map controls must animate open and closed')
 assert.match(officerMapScreenSource, />\s*Satellite\s*</, 'The satellite map option must have a visible label')
 assert.match(officerMapScreenSource, />\s*Terrain\s*</, 'The terrain option must have a visible label')
 assert.doesNotMatch(
@@ -72,6 +77,10 @@ assert.doesNotMatch(
 	/mapModeControlExpanded:\s*\{[^}]*width:/,
 	'Expanded mobile map controls must retain their compact fixed width',
 )
+assert.match(nativeMapSource, /compassPosition=\{\{\s*top:\s*150,\s*left:\s*12\s*\}\}/, 'The compass must not sit behind the expanded map control')
+assert.match(nativeMapSource, /nativeEvent\.userInteraction/, 'Header visibility must react only to manual native map gestures')
+assert.match(mainTabsSource, /outputRange:\s*\[insets\.top,\s*insets\.top \+ PAGE_HEADER_CONTENT_HEIGHT\]/, 'The search area must move up while preserving the status-bar safe area')
+assert.match(mainTabsSource, /OfficerMapScreen onMapInteractionChange=/, 'Map gestures must control the shared page header')
 assert.doesNotMatch(nativeMapSource, /geosentri-patrol-area/, 'The obsolete dashed patrol-radius guide must stay hidden')
 assert.doesNotMatch(officerMapScreenSource, /L\.circle\(/, 'The web fallback must not restore the patrol-radius guide')
 assert.match(officerMapScreenSource, /backgroundColor:\s*'#0b1528'/, 'The backup control must use the navy map-control surface')

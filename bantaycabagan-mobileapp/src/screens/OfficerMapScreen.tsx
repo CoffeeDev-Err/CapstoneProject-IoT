@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import OfficerMapCanvas, {
@@ -55,6 +56,13 @@ type MapEvent = {
   officerId?: string;
 };
 
+type OfficerMapScreenProps = {
+  onMapInteractionChange?: (isInteracting: boolean) => void;
+};
+
+const MAP_OPTIONS_EXPANDED_HEIGHT = 144;
+const MAP_INTERACTION_IDLE_DELAY_MS = 520;
+
 const WebMapFrame = forwardRef<any, { html: string; onLoad: () => void }>(
   ({ html, onLoad }, ref) => React.createElement('iframe' as any, {
     ref,
@@ -72,7 +80,7 @@ const WebMapFrame = forwardRef<any, { html: string; onLoad: () => void }>(
 
 WebMapFrame.displayName = 'WebMapFrame';
 
-export default function OfficerMapScreen() {
+export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapScreenProps) {
   const { colors, isDark } = useMobileTheme();
   const {
     deployments,
@@ -88,6 +96,8 @@ export default function OfficerMapScreen() {
   const nativeMapRef = useRef<OfficerMapCanvasHandle>(null);
   const webMapRef = useRef<any>(null);
   const emergencyPulse = useRef(new Animated.Value(0)).current;
+  const mapControlsProgress = useRef(new Animated.Value(0)).current;
+  const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [backupActionPending, setBackupActionPending] = useState(false);
@@ -102,6 +112,38 @@ export default function OfficerMapScreen() {
   const hasCurrentGpsFix = currentOfficer.isLocationStale !== true
     && currentOfficer.isVisibleOnMap !== false;
   const deploymentPromptVisible = Boolean(assignment && !assignment.acknowledged);
+
+  useEffect(() => {
+    Animated.timing(mapControlsProgress, {
+      toValue: mapControlsExpanded ? 1 : 0,
+      duration: mapControlsExpanded ? 230 : 190,
+      easing: mapControlsExpanded ? Easing.out(Easing.cubic) : Easing.inOut(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [mapControlsExpanded, mapControlsProgress]);
+
+  const handleMapInteractionStart = useCallback(() => {
+    if (mapInteractionIdleTimer.current) clearTimeout(mapInteractionIdleTimer.current);
+    mapInteractionIdleTimer.current = null;
+    onMapInteractionChange?.(true);
+  }, [onMapInteractionChange]);
+
+  const handleMapInteractionEnd = useCallback(() => {
+    if (mapInteractionIdleTimer.current) clearTimeout(mapInteractionIdleTimer.current);
+    mapInteractionIdleTimer.current = setTimeout(() => {
+      mapInteractionIdleTimer.current = null;
+      onMapInteractionChange?.(false);
+    }, MAP_INTERACTION_IDLE_DELAY_MS);
+  }, [onMapInteractionChange]);
+
+  useFocusEffect(useCallback(() => {
+    onMapInteractionChange?.(false);
+    return () => {
+      if (mapInteractionIdleTimer.current) clearTimeout(mapInteractionIdleTimer.current);
+      mapInteractionIdleTimer.current = null;
+      onMapInteractionChange?.(false);
+    };
+  }, [onMapInteractionChange]));
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => {
     if (personnel.length) {
@@ -370,6 +412,9 @@ export default function OfficerMapScreen() {
               map.flyTo([Number(member.latitude),Number(member.longitude)],followZoom,{duration:.8});
             };
 
+            map.on('movestart',()=>emit({type:'map-interaction-start'}));
+            map.on('moveend',()=>emit({type:'map-interaction-end'}));
+
             window.setFollowedOfficer=(officerId)=>{
               followedOfficerId=officerId||null;
               if(followedOfficerId)window.focusOfficer(followedOfficerId);
@@ -449,7 +494,9 @@ export default function OfficerMapScreen() {
     if (payload.type === 'officer-selected' && payload.officerId) {
       setSelectedOfficerId(payload.officerId);
     }
-  }, []);
+    if (payload.type === 'map-interaction-start') handleMapInteractionStart();
+    if (payload.type === 'map-interaction-end') handleMapInteractionEnd();
+  }, [handleMapInteractionEnd, handleMapInteractionStart]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
@@ -632,6 +679,8 @@ export default function OfficerMapScreen() {
             isDark={isDark}
             mapMode={mapMode}
             personnel={mapPersonnel}
+            onMapInteractionEnd={handleMapInteractionEnd}
+            onMapInteractionStart={handleMapInteractionStart}
             onOfficerPress={setSelectedOfficerId}
           />
         )}
@@ -695,7 +744,6 @@ export default function OfficerMapScreen() {
           <View
             style={[
               styles.mapModeControl,
-              mapControlsExpanded && styles.mapModeControlExpanded,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
@@ -711,8 +759,23 @@ export default function OfficerMapScreen() {
                 color={colors.text}
               />
             </TouchableOpacity>
-            {mapControlsExpanded && (
-              <>
+            <Animated.View
+              pointerEvents={mapControlsExpanded ? 'auto' : 'none'}
+              style={[
+                styles.mapModeOptionsClip,
+                {
+                  height: mapControlsProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, MAP_OPTIONS_EXPANDED_HEIGHT],
+                  }),
+                  opacity: mapControlsProgress.interpolate({
+                    inputRange: [0, 0.22, 1],
+                    outputRange: [0, 0, 1],
+                  }),
+                },
+              ]}
+            >
+              <View style={styles.mapModeOptionsContent}>
                 <TouchableOpacity
                   accessibilityLabel="Use normal map"
                   accessibilityState={{ selected: mapMode === 'street' }}
@@ -779,8 +842,8 @@ export default function OfficerMapScreen() {
                     Terrain
                   </Text>
                 </TouchableOpacity>
-              </>
-            )}
+              </View>
+            </Animated.View>
           </View>
         </View>
       </SafeAreaView>
@@ -1023,7 +1086,6 @@ const styles = StyleSheet.create({
     width: 46,
     padding: 3,
     flexDirection: 'column',
-    gap: 4,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
     shadowColor: '#172554',
@@ -1032,7 +1094,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  mapModeControlExpanded: { paddingBottom: 4 },
+  mapModeOptionsClip: {
+    width: 40,
+    overflow: 'hidden',
+  },
+  mapModeOptionsContent: {
+    paddingTop: 4,
+    gap: 4,
+  },
   mapModeButton: {
     width: 40,
     height: 40,

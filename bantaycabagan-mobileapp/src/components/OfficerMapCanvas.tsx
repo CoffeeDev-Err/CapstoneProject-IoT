@@ -23,6 +23,8 @@ export type OfficerMapCanvasProps = {
   isDark: boolean;
   mapMode: GeoSentriMapMode;
   personnel: OfficerMapPerson[];
+  onMapInteractionEnd?: () => void;
+  onMapInteractionStart?: () => void;
   onOfficerPress: (officerId: string) => void;
 };
 

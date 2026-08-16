@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   StatusBar,
   StyleSheet,
   Text,
@@ -27,6 +29,7 @@ import { PolicePageHeader } from '../components/PolicePageHeader';
 
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
+const PAGE_HEADER_CONTENT_HEIGHT = 54;
 
 const tabIcons: Record<string, keyof typeof Icon.glyphMap> = {
   Map: 'map',
@@ -137,7 +140,35 @@ export default function MainTabs() {
   const { isDark } = useMobileTheme();
   const [tasksVisible, setTasksVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [mapInteracting, setMapInteracting] = useState(false);
+  const headerVisibility = useRef(new Animated.Value(1)).current;
   const openTaskCount = tasks.filter((task) => task.status === 'open').length;
+
+  useEffect(() => {
+    Animated.timing(headerVisibility, {
+      toValue: mapInteracting ? 0 : 1,
+      duration: mapInteracting ? 180 : 250,
+      easing: mapInteracting ? Easing.out(Easing.quad) : Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [headerVisibility, mapInteracting]);
+
+  const handleMapInteractionChange = useCallback((isInteracting: boolean) => {
+    setMapInteracting(isInteracting);
+  }, []);
+
+  const renderMapScreen = useCallback(() => (
+    <OfficerMapScreen onMapInteractionChange={handleMapInteractionChange} />
+  ), [handleMapInteractionChange]);
+
+  const headerHeight = headerVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [insets.top, insets.top + PAGE_HEADER_CONTENT_HEIGHT],
+  });
+  const headerTranslateY = headerVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-PAGE_HEADER_CONTENT_HEIGHT, 0],
+  });
 
   return (
     <View style={[styles.appRoot, isDark && styles.appRootDark]}>
@@ -145,12 +176,25 @@ export default function MainTabs() {
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={isDark ? '#0b1528' : '#ffffff'}
       />
-      <SafeAreaView
-        edges={['top']}
-        style={[styles.fixedHeaderArea, isDark && styles.fixedHeaderAreaDark]}
+      <Animated.View
+        style={[
+          styles.headerClip,
+          isDark && styles.fixedHeaderAreaDark,
+          { height: headerHeight },
+        ]}
       >
-        <PolicePageHeader onOpenNotifications={() => setNotificationsVisible(true)} />
-      </SafeAreaView>
+        <SafeAreaView
+          edges={['top']}
+          style={[styles.fixedHeaderArea, isDark && styles.fixedHeaderAreaDark]}
+        >
+          <Animated.View style={{
+            opacity: headerVisibility,
+            transform: [{ translateY: headerTranslateY }],
+          }}>
+            <PolicePageHeader onOpenNotifications={() => setNotificationsVisible(true)} />
+          </Animated.View>
+        </SafeAreaView>
+      </Animated.View>
       <View style={styles.tabSceneArea}>
       <Tab.Navigator
         detachInactiveScreens={false}
@@ -171,7 +215,9 @@ export default function MainTabs() {
           />
         )}
       >
-        <Tab.Screen name="Map" component={OfficerMapScreen} options={{ lazy: false }} />
+        <Tab.Screen name="Map" options={{ lazy: false }}>
+          {renderMapScreen}
+        </Tab.Screen>
         <Tab.Screen name="Tasks" component={TasksScreen} options={{ animation: 'none', lazy: true }} />
         <Tab.Screen name="Reports" component={ReportsScreen} options={{ lazy: false }} />
         <Tab.Screen name="Profile" component={OfficerProfileScreen} options={{ lazy: false }} />
@@ -202,6 +248,11 @@ export default function MainTabs() {
 const styles = StyleSheet.create({
   appRoot: { flex: 1, backgroundColor: '#ffffff' },
   appRootDark: { backgroundColor: '#050b18' },
+  headerClip: {
+    zIndex: 20,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+  },
   fixedHeaderArea: { zIndex: 20, backgroundColor: '#ffffff' },
   fixedHeaderAreaDark: { backgroundColor: '#0b1528' },
   tabSceneArea: { flex: 1 },
