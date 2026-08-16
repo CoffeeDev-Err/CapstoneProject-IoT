@@ -6,13 +6,17 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import {
   type AuthSession,
   type AuthUser,
   getCurrentUser,
   logoutSession,
 } from '../services/authApi';
+import {
+  deleteStoredAuthToken,
+  getStoredAuthToken,
+  setStoredAuthToken,
+} from '../services/authTokenStorage';
 
 const TOKEN_KEY = 'bantaycabagan_auth_token';
 
@@ -33,13 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const clearSession = useCallback(async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await deleteStoredAuthToken(TOKEN_KEY);
     setToken(null);
     setUser(null);
   }, []);
 
   const establishSession = useCallback(async (session: AuthSession) => {
-    await SecureStore.setItemAsync(TOKEN_KEY, session.token);
+    await setStoredAuthToken(TOKEN_KEY, session.token);
     setToken(session.token);
     setUser(session.user);
   }, []);
@@ -54,14 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const restoreSession = async () => {
-      const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+      const storedToken = await getStoredAuthToken(TOKEN_KEY);
       if (!storedToken) return;
       try {
         const response = await getCurrentUser(storedToken);
         setToken(storedToken);
         setUser(response.user);
       } catch {
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await deleteStoredAuthToken(TOKEN_KEY);
       }
     };
 
