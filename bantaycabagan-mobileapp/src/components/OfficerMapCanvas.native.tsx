@@ -160,11 +160,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   isDark,
   mapMode,
   personnel,
+  onMapInteractionEnd,
+  onMapInteractionStart,
   onOfficerPress,
 }, ref) => {
   const mapRef = useRef<MapRef>(null);
   const cameraRef = useRef<CameraRef>(null);
   const initialFitDone = useRef(false);
+  const userInteractionInProgress = useRef(false);
   const [mapStyle, setMapStyle] = useState<string | StyleSpecification | null>(null);
   const [mapStyleRevision, setMapStyleRevision] = useState(0);
   const [styleError, setStyleError] = useState<string | null>(null);
@@ -322,13 +325,23 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         touchPitch
         compass
         compassHiddenFacingNorth
-        compassPosition={{ top: 150, right: 12 }}
+        compassPosition={{ top: 150, left: 12 }}
         attribution={false}
         logo={false}
         onWillStartLoadingMap={() => setStyleLoading(true)}
         onDidFinishLoadingStyle={() => setStyleLoading(false)}
         onDidFinishLoadingMap={handleMapLoaded}
-        onRegionDidChange={(event) => setMapZoom(event.nativeEvent.zoom)}
+        onRegionWillChange={(event) => {
+          if (!event.nativeEvent.userInteraction || userInteractionInProgress.current) return;
+          userInteractionInProgress.current = true;
+          onMapInteractionStart?.();
+        }}
+        onRegionDidChange={(event) => {
+          setMapZoom(event.nativeEvent.zoom);
+          if (!userInteractionInProgress.current) return;
+          userInteractionInProgress.current = false;
+          onMapInteractionEnd?.();
+        }}
       >
         <Camera
           ref={cameraRef}

@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
 const queue = read('src/services/offlineReportQueue.ts');
+const webQueue = read('src/services/offlineReportQueue.web.ts');
 const reports = read('src/screens/ReportsScreen.tsx');
 const context = read('src/context/OperationalContext.tsx');
 const app = read('App.tsx');
@@ -35,6 +36,8 @@ assert.match(profile, /OfflineManager\.clearAmbientCache\(\)/,
   'User cache cleanup must clear ambient map data without resetting offline packs');
 assert.match(profile, /Pending offline reports and evidence will not be deleted/,
   'Cache cleanup must explicitly preserve unsynced reports');
+assert.doesNotMatch(webQueue, /expo-sqlite/,
+  'Web UI previews must not bundle the native SQLite queue');
 assert.match(backendModel, /submittedBy: 1, clientSubmissionId: 1/,
   'Offline retries require a server-side idempotency constraint');
 assert.match(backendController, /getReportByClientSubmissionId/,
