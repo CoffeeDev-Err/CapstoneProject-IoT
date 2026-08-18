@@ -9,6 +9,7 @@ const createMediaRoutes = () => {
 	const router = express.Router()
 
 	router.get('/:token', asyncHandler(async (req, res) => {
+		const download = req.query.download === '1'
 		const media = verifyMediaAccess({
 			token: req.params.token,
 			expires: req.query.expires,
@@ -21,11 +22,12 @@ const createMediaRoutes = () => {
 			'Cross-Origin-Resource-Policy': 'cross-origin',
 		})
 		if (media.storage === 'local') {
+			if (download) res.attachment(media.key.split('/').at(-1))
 			return res.sendFile(media.absolutePath, {
 				dotfiles: 'deny',
 			})
 		}
-		const url = await createPresignedDownloadUrl(media.key)
+		const url = await createPresignedDownloadUrl(media.key, { download })
 		return res.redirect(302, url)
 	}))
 

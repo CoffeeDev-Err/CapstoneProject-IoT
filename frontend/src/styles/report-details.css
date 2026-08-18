@@ -583,6 +583,11 @@
   background: var(--bg-secondary);
 }
 
+.report-evidence__preview-link {
+  display: block;
+  background: var(--bg-secondary);
+}
+
 .report-evidence figcaption {
   display: flex;
   align-items: center;
@@ -593,6 +598,29 @@
   color: var(--text-tertiary);
   font-size: 0.7rem;
   font-weight: 650;
+}
+
+.report-evidence figcaption > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.report-evidence__viewer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-primary);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.report-evidence__viewer-link:hover {
+  color: var(--color-primary-dark);
+}
+
+.report-evidence__viewer-link svg {
+  width: 15px;
+  height: 15px;
 }
 
 .report-review-panel {

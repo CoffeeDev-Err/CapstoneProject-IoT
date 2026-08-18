@@ -1,7 +1,10 @@
 import { apiRequest } from './apiClient'
 export { AUTH_TOKEN_KEY, AUTH_USER_KEY } from './sessionKeys'
 
-const request = (path, options = {}) => apiRequest(path, { auth: false, ...options })
+// Every auth call authenticates via the httpOnly session cookie the browser
+// sends automatically (apiRequest uses credentials: 'include'); no bearer token
+// is passed in from JavaScript.
+const request = (path, options = {}) => apiRequest(path, options)
 
 export const beginLogin = (username, password) => request('/api/auth/login', {
   method: 'POST',
@@ -49,19 +52,15 @@ export const resetPassword = (challengeId, code, newPassword) => (
   })
 )
 
-export const getCurrentUser = (token) => request('/api/auth/me', {
-  headers: { Authorization: `Bearer ${token}` },
-})
+export const getCurrentUser = () => request('/api/auth/me')
 
-export const logoutSession = (token) => request('/api/auth/logout', {
+export const logoutSession = () => request('/api/auth/logout', {
   method: 'POST',
-  headers: { Authorization: `Bearer ${token}` },
 })
 
-export const requestPasswordChange = (token, currentPassword) => (
+export const requestPasswordChange = (currentPassword) => (
   request('/api/auth/password/change/request', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       current_password: currentPassword,
       device_name: navigator.userAgent,
@@ -69,10 +68,9 @@ export const requestPasswordChange = (token, currentPassword) => (
   })
 )
 
-export const confirmPasswordChange = (token, challengeId, code, newPassword) => (
+export const confirmPasswordChange = (challengeId, code, newPassword) => (
   request('/api/auth/password', {
     method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       challenge_id: challengeId,
       code,

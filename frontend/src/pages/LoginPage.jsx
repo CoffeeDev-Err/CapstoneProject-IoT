@@ -155,10 +155,20 @@ function LoginPage() {
     clearFeedback()
     setPending(true)
     try {
-      const nextChallenge = await resendVerificationCode(challenge.challengeId)
-      setChallenge(nextChallenge)
-      setCode('')
-      setMessage(`A new code was sent to ${nextChallenge.maskedEmail}.`)
+      if (mode === 'reset') {
+        // Resend through the uniform reset endpoint (never the challenge-scoped
+        // resend) so a resend cannot reveal whether the account exists or leak
+        // its masked email — that would reopen the enumeration the reset flow closes.
+        const nextChallenge = await requestPasswordReset(identifier.trim())
+        setChallenge(nextChallenge)
+        setCode('')
+        setMessage(nextChallenge.message || 'If the account exists, a new code was sent.')
+      } else {
+        const nextChallenge = await resendVerificationCode(challenge.challengeId)
+        setChallenge(nextChallenge)
+        setCode('')
+        setMessage(`A new code was sent to ${nextChallenge.maskedEmail}.`)
+      }
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -262,9 +272,6 @@ function LoginPage() {
             {mode === 'otp' && (
               <form onSubmit={handleVerifyLogin} className="login-form" noValidate>
               <VerificationCodeInput value={code} onChange={setCode} autoFocus invalid={Boolean(error)} />
-              {challenge?.debugCode && (
-                <p className="auth-debug-code">Development code: {challenge.debugCode}</p>
-              )}
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Verify and Continue" />
               <button type="button" className="login-text-action login-text-action--center" onClick={handleResend} disabled={pending}>
@@ -317,9 +324,6 @@ function LoginPage() {
                 maxLength={128}
                 required
               />
-              {challenge?.debugCode && (
-                <p className="auth-debug-code">Development code: {challenge.debugCode}</p>
-              )}
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Reset Password" />
               <button type="button" className="login-text-action login-text-action--center" onClick={handleResend} disabled={pending}>

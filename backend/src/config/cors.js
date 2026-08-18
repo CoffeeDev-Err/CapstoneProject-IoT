@@ -18,6 +18,10 @@ const corsOptions = {
 		error.status = 403
 		return callback(error)
 	},
+	// The web dashboard authenticates with an httpOnly session cookie, so the
+	// browser must be allowed to send credentials — which also forces CORS to
+	// reflect the specific request origin instead of "*".
+	credentials: true,
 	methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 	allowedHeaders: ['Authorization', 'Content-Type', 'X-API-Key'],
 	maxAge: 600,

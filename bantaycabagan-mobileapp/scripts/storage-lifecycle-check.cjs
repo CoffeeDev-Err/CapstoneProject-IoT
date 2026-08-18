@@ -7,6 +7,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const queue = read('src/services/offlineReportQueue.ts');
 const webQueue = read('src/services/offlineReportQueue.web.ts');
+const cipher = read('src/services/offlineQueueCipher.ts');
 const reports = read('src/screens/ReportsScreen.tsx');
 const context = read('src/context/OperationalContext.tsx');
 const app = read('App.tsx');
@@ -44,6 +45,28 @@ assert.match(profile, /Pending offline reports and evidence will not be deleted/
   'Cache cleanup must explicitly preserve unsynced reports');
 assert.doesNotMatch(webQueue, /expo-sqlite/,
   'Web UI previews must not bundle the native SQLite queue');
+assert.doesNotMatch(webQueue, /offlineQueueCipher|expo-crypto/,
+  'Web UI previews must not bundle the native offline-queue cipher');
+assert.match(queue, /await sealReportPayload\(JSON\.stringify\(stagedInput\)\)/,
+  'Staged report payloads must be encrypted before they reach SQLite');
+assert.doesNotMatch(queue, /payload_json:\s*JSON\.stringify|JSON\.parse\(row\.payload_json\)/,
+  'Report payloads must never be written or read as bare plaintext JSON');
+assert.match(queue, /JSON\.parse\(await openReportPayload\(row\.payload_json\)\)/,
+  'Queued payloads must be decrypted through the cipher module on read');
+assert.match(cipher, /AESKeySize\.AES256/,
+  'The offline queue must be sealed with a 256-bit AES key');
+assert.match(cipher, /SecureStore\.setItemAsync\(\s*KEY_STORE_NAME/,
+  'The offline-queue key must live in the platform keystore, never in SQLite');
+assert.match(cipher, /AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY/,
+  'The queue key must stay device-bound yet readable for background sync');
+assert.match(cipher, /from '@noble\/ciphers\/utils\.js'/,
+  'Metro enforces the package exports map, which only publishes ./utils.js');
+assert.match(cipher, /if \(!isSealedPayload\(stored\)\) return stored/,
+  'Reports queued by an older build must remain readable after the upgrade');
+assert.match(queue, /continue;/,
+  'An unreadable queued row must be skipped instead of stalling the queue');
+assert.match(queue, /continue;/,
+  'An unreadable queued row must be skipped instead of stalling the queue');
 assert.match(backendModel, /submittedBy: 1, clientSubmissionId: 1/,
   'Offline retries require a server-side idempotency constraint');
 assert.match(backendController, /getReportByClientSubmissionId/,

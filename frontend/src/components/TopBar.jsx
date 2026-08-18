@@ -31,7 +31,7 @@ const SUPERVISOR_FALLBACK = {
   name: 'Sgt. Leo Gannad',
   rank: 'Police Sergeant',
   role: 'Supervisor',
-  photoUrl: 'https://randomuser.me/api/portraits/men/56.jpg',
+  photoUrl: 'https://ui-avatars.com/api/?name=Leo+Gannad&background=1d4ed8&color=fff&size=128',
 }
 
 const NOTIFICATION_HISTORY_OPTIONS = [
@@ -127,7 +127,7 @@ function TopBar({
   const dropdownRef = useRef(null)
   const notificationRef = useRef(null)
   const navigate = useNavigate()
-  const { clearSession, logout, token, user } = useAuth()
+  const { clearSession, logout, user } = useAuth()
   const supervisor = {
     name: user?.profile?.fullName || user?.name || SUPERVISOR_FALLBACK.name,
     rank: user?.profile?.rank || SUPERVISOR_FALLBACK.rank,
@@ -430,7 +430,6 @@ function TopBar({
       />
       <PasswordChangeModal
         open={passwordModalOpen}
-        token={token}
         onClose={() => setPasswordModalOpen(false)}
         onChanged={handlePasswordChanged}
       />
