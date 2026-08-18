@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, Download, Route, X, XCircle } from 'lucide-react'
+import { CheckCircle2, Download, Maximize2, Route, X, XCircle } from 'lucide-react'
 import ReportLocationMap from './ReportLocationMap'
 import { getReportRoute } from '../services/operations'
-import { API_URL } from '../services/runtime'
-
-const resolveEvidenceUrl = (assetUrl) => {
-  if (!assetUrl) return ''
-  if (/^https?:\/\//i.test(assetUrl)) return assetUrl
-  return `${API_URL}${assetUrl.startsWith('/') ? '' : '/'}${assetUrl}`
-}
+import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
 
 const emptyRouteState = {
   reportId: null,
@@ -339,19 +333,38 @@ function ReportDetailDrawer({
             <section className="report-detail-section">
               <h4>Photo evidence</h4>
               <figure className="report-evidence">
-                <img
-                  src={resolveEvidenceUrl(report.evidence_photo.url)}
-                  alt={`Evidence attached to ${report.id}`}
-                />
+                <a
+                  className="report-evidence__preview-link"
+                  href={getEvidenceViewerPath(report.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open evidence viewer for ${report.id}`}
+                >
+                  <img
+                    src={resolveMediaUrl(report.evidence_photo.url)}
+                    alt={`Evidence attached to ${report.id}`}
+                  />
+                </a>
                 <figcaption>
-                  <span>
-                    {report.evidence_photo.camera_facing === 'front'
-                      ? 'Front camera'
-                      : 'Back camera'}
-                  </span>
-                  {report.evidence_photo.captured_at && (
-                    <span>{formatDateTime(report.evidence_photo.captured_at)}</span>
-                  )}
+                  <div>
+                    <span>
+                      {report.evidence_photo.camera_facing === 'front'
+                        ? 'Front camera'
+                        : 'Back camera'}
+                    </span>
+                    {report.evidence_photo.captured_at && (
+                      <span>{formatDateTime(report.evidence_photo.captured_at)}</span>
+                    )}
+                  </div>
+                  <a
+                    className="report-evidence__viewer-link"
+                    href={getEvidenceViewerPath(report.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Maximize2 aria-hidden="true" />
+                    Open evidence viewer
+                  </a>
                 </figcaption>
               </figure>
             </section>

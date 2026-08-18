@@ -116,11 +116,21 @@ export default function LoginScreen() {
   });
 
   const resend = () => run(async () => {
-    if (!challenge) return;
-    const response = await resendVerificationCode(challenge.challengeId);
-    setChallenge(response);
-    setCode('');
-    setMessage(`A new code was sent to ${response.maskedEmail}.`);
+    if (mode === 'reset') {
+      // Resend through the uniform reset endpoint (never the challenge-scoped
+      // resend) so a resend cannot reveal whether the account exists or leak its
+      // masked email — that would reopen the enumeration the reset flow closes.
+      const response = await requestPasswordReset(identifier.trim());
+      setChallenge(response);
+      setCode('');
+      setMessage(response.message || 'If the account exists, a new code was sent.');
+    } else {
+      if (!challenge) return;
+      const response = await resendVerificationCode(challenge.challengeId);
+      setChallenge(response);
+      setCode('');
+      setMessage(`A new code was sent to ${response.maskedEmail}.`);
+    }
   });
 
   const backToLogin = () => {
@@ -204,7 +214,7 @@ export default function LoginScreen() {
                 >
                   <Text style={styles.textAction}>Forgot password?</Text>
                 </TouchableOpacity>
-                <Feedback error={error} message={message} debugCode={undefined} />
+                <Feedback error={error} message={message} />
                 <SubmitButton label="Sign In" pending={pending} onPress={submitLogin} />
               </>
             )}
@@ -217,7 +227,7 @@ export default function LoginScreen() {
                   dark
                   invalid={Boolean(error)}
                 />
-                <Feedback error={error} message={message} debugCode={challenge?.debugCode} />
+                <Feedback error={error} message={message} />
                 <SubmitButton label="Verify and Continue" pending={pending} onPress={submitVerification} />
                 <TextButton label="Resend code" onPress={resend} disabled={pending} />
                 <TextButton label="Use another account" onPress={backToLogin} />
@@ -234,7 +244,7 @@ export default function LoginScreen() {
                   autoComplete="email"
                   maxLength={254}
                 />
-                <Feedback error={error} message={message} debugCode={undefined} />
+                <Feedback error={error} message={message} />
                 <SubmitButton label="Send Reset Code" pending={pending} onPress={submitForgot} />
                 <TextButton label="Back to sign in" onPress={backToLogin} />
               </>
@@ -260,7 +270,7 @@ export default function LoginScreen() {
                   autoComplete="new-password"
                   maxLength={128}
                 />
-                <Feedback error={error} message={message} debugCode={challenge?.debugCode} />
+                <Feedback error={error} message={message} />
                 <SubmitButton label="Reset Password" pending={pending} onPress={submitReset} />
                 <TextButton label="Resend code" onPress={resend} disabled={pending} />
                 <TextButton label="Cancel" onPress={backToLogin} />
@@ -353,15 +363,12 @@ function TextButton({
 function Feedback({
   error,
   message,
-  debugCode,
 }: {
   error: string;
   message: string;
-  debugCode?: string;
 }) {
   return (
     <>
-      {debugCode ? <Text style={styles.debug}>Development code: {debugCode}</Text> : null}
       {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
       {message ? <Text style={styles.success} accessibilityRole="alert">{message}</Text> : null}
     </>
@@ -485,15 +492,5 @@ const styles = StyleSheet.create({
     color: mobileTheme.success,
     fontSize: 12,
     lineHeight: 18,
-  },
-  debug: {
-    marginBottom: 12,
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: mobileTheme.warningSoft,
-    color: mobileTheme.warning,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
   },
 });

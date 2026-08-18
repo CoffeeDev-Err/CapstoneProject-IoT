@@ -63,12 +63,37 @@ type OfficerMapScreenProps = {
 const MAP_OPTIONS_EXPANDED_HEIGHT = 144;
 const MAP_INTERACTION_IDLE_DELAY_MS = 520;
 
+// Leaflet is pinned to an exact version and subresource-integrity hash so a
+// tampered CDN response cannot execute inside the frame that receives live
+// personnel positions. Hashes are the published leaflet@1.9.4 values.
+const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_CSS_INTEGRITY = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+const LEAFLET_JS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+const LEAFLET_JS_INTEGRITY = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+
+// default-src 'none' plus connect-src 'none' means the frame can render tiles
+// and officer photos but cannot open a socket or XHR to exfiltrate them.
+const MAP_FRAME_CSP = [
+  "default-src 'none'",
+  "script-src https://unpkg.com 'unsafe-inline'",
+  "style-src https://unpkg.com 'unsafe-inline'",
+  'img-src * data: blob:',
+  "connect-src 'none'",
+  "font-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'",
+].join('; ');
+
 const WebMapFrame = forwardRef<any, { html: string; onLoad: () => void }>(
   ({ html, onLoad }, ref) => React.createElement('iframe' as any, {
     ref,
     srcDoc: html,
     title: 'Live personnel map',
     onLoad,
+    // allow-scripts without allow-same-origin gives the frame an opaque origin,
+    // so a compromised map script cannot reach the host page's session storage.
+    sandbox: 'allow-scripts',
+    referrerPolicy: 'no-referrer',
     style: {
       width: '100%',
       height: '100%',
@@ -250,6 +275,11 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
     const longitude = assignment?.longitude || 121.7681;
     const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
+    // Addressed explicitly so personnel positions are delivered only to this
+    // app's origin rather than to whatever window happens to embed the frame.
+    const hostOrigin = JSON.stringify(
+      typeof window !== 'undefined' ? window.location.origin : '',
+    );
     const controlBackground = isDark ? '#0b1528' : '#ffffff';
     const controlBorder = isDark ? '#2a3a56' : '#d9dee8';
     const controlText = isDark ? '#f8fafc' : '#172554';
@@ -262,8 +292,9 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
       <html>
         <head>
           <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <meta http-equiv="Content-Security-Policy" content="${MAP_FRAME_CSP}">
+          <link rel="stylesheet" href="${LEAFLET_CSS_URL}" integrity="${LEAFLET_CSS_INTEGRITY}" crossorigin="anonymous" referrerpolicy="no-referrer">
+          <script src="${LEAFLET_JS_URL}" integrity="${LEAFLET_JS_INTEGRITY}" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
           <style>
             html,body,#map{height:100%;margin:0}
             body{overflow:hidden;background:#e5e4df}
@@ -343,11 +374,7 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
               .replace(/'/g,'&#039;');
 
             const emit=(payload)=>{
-              if(window.ReactNativeWebView){
-                window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-              }else{
-                window.parent.postMessage({source:'bantay-map',...payload},'*');
-              }
+              window.parent.postMessage({source:'bantay-map',...payload},${hostOrigin} || '*');
             };
 
             const officerIcon=(member)=>{
@@ -443,6 +470,7 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
             };
 
             window.addEventListener('message',(event)=>{
+              if(event.source!==window.parent)return;
               if(event.data&&event.data.source==='bantay-map-command'){
                 window.handleMapCommand(event.data.command);
               }
@@ -458,6 +486,9 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
 
   const sendMapCommand = useCallback((command: MapCommand) => {
     if (Platform.OS !== 'web') return;
+    // The sandboxed frame has an opaque origin that cannot be named as a target,
+    // so delivery is scoped by posting to that frame's own window handle. The
+    // frame in turn ignores anything that did not come from this window.
     webMapRef.current?.contentWindow?.postMessage({
       source: 'bantay-map-command',
       command,
@@ -502,6 +533,8 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
     if (Platform.OS !== 'web') return undefined;
 
     const onMessage = (event: MessageEvent) => {
+      // Only the map frame we created may drive selection and gesture state.
+      if (event.source !== webMapRef.current?.contentWindow) return;
       const payload = event.data as MapEvent;
       if (payload?.source === 'bantay-map') handleMapEvent(payload);
     };

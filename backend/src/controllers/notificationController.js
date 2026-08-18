@@ -1,3 +1,8 @@
+// Supervisor endpoints are pinned to the shared supervisor stream. A
+// client-supplied recipient id would otherwise let a supervisor read, mark, or
+// delete any individual officer's notifications.
+const SUPERVISOR_RECIPIENT = 'supervisor'
+
 const createNotificationController = (notificationService) => ({
 	getMyNotifications: async (req, res) => {
 		const notifications = await notificationService.getNotifications(
@@ -44,14 +49,14 @@ const createNotificationController = (notificationService) => ({
 	},
 
 	getNotifications: async (req, res) => {
-		const recipientId = String(req.query.recipient_id || 'supervisor')
-		const notifications = await notificationService.getNotifications(recipientId)
+		const notifications = await notificationService.getNotifications(SUPERVISOR_RECIPIENT)
 		res.json({ notifications })
 	},
 
 	markRead: async (req, res) => {
 		const notification = await notificationService.markNotificationRead(
 			req.params.notificationId,
+			SUPERVISOR_RECIPIENT,
 		)
 		if (!notification) {
 			return res.status(404).json({
@@ -62,14 +67,12 @@ const createNotificationController = (notificationService) => ({
 		return res.json({ success: true, notification })
 	},
 	markAllRead: async (req, res) => {
-		const recipientId = String(req.body?.recipient_id || 'supervisor')
-		const updated = await notificationService.markAllNotificationsRead(recipientId)
+		const updated = await notificationService.markAllNotificationsRead(SUPERVISOR_RECIPIENT)
 		res.json({ success: true, updated })
 	},
 
 	clearNotifications: async (req, res) => {
-		const recipientId = String(req.query.recipient_id || 'supervisor')
-		const deleted = await notificationService.deleteNotifications(recipientId)
+		const deleted = await notificationService.deleteNotifications(SUPERVISOR_RECIPIENT)
 		res.json({ success: true, deleted })
 	},
 })

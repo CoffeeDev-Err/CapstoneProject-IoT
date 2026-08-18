@@ -198,9 +198,6 @@ export default function ChangePasswordModal({
                 secureTextEntry
                 maxLength={128}
               />
-              {challenge?.debugCode && (
-                <Text style={styles.debugCode}>Development code: {challenge.debugCode}</Text>
-              )}
             </>
           )}
 
@@ -343,16 +340,6 @@ const styles = StyleSheet.create({
     color: mobileTheme.success,
     fontSize: 12,
     lineHeight: 18,
-  },
-  debugCode: {
-    marginBottom: 12,
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: mobileTheme.warningSoft,
-    color: mobileTheme.warning,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   submit: {
     minHeight: 50,

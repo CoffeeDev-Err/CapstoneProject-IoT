@@ -10,6 +10,14 @@ export const getReports = () => (
   getCollection('/api/reports?limit=100', 'Unable to load reports.')
 )
 
+export const getReport = async (reportId) => {
+  const payload = await apiRequest(
+    `/api/reports/${encodeURIComponent(reportId)}`,
+    { errorMessage: 'Unable to load the report evidence.' },
+  )
+  return payload.report
+}
+
 export const getDeployments = () => (
   getCollection('/api/deployments?limit=100', 'Unable to load deployments.')
 )

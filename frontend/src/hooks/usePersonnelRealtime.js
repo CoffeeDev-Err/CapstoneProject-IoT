@@ -71,7 +71,7 @@ const MAX_NOTIFICATIONS = 25
  * Prevents an empty map flash on initial page load.
  */
 export const usePersonnelRealtime = () => {
-  const { token } = useAuth()
+  const { isAuthenticated } = useAuth()
   // Full live officer list — replaced every time the server emits an update
   const [personnel, setPersonnel] = useState([])
 
@@ -153,7 +153,7 @@ export const usePersonnelRealtime = () => {
   }
 
   useEffect(() => {
-    if (!token) return undefined
+    if (!isAuthenticated) return undefined
     getNotifications()
       .then((history) => {
         setNotifications((current) => {
@@ -172,15 +172,14 @@ export const usePersonnelRealtime = () => {
         })
       })
       .catch(() => {})
-  }, [token])
+  }, [isAuthenticated])
 
   useEffect(() => {
-    if (!token) {
+    if (!isAuthenticated) {
       socket.disconnect()
       return undefined
     }
 
-    socket.auth = { token }
     if (!socket.connected) socket.connect()
     // ── Event handlers ──────────────────────────────────────────────────────
 
@@ -499,7 +498,7 @@ export const usePersonnelRealtime = () => {
       socket.off('personnel:inactivity', onPersonnelInactivity)
       socket.disconnect()
     }
-  }, [addNotification, token])
+  }, [addNotification, isAuthenticated])
 
   // Derive the count from the array so consumers don't have to compute it
   const activePersonnel = useMemo(
@@ -531,7 +530,7 @@ export const usePersonnelRealtime = () => {
     personnelCount,
     outOfBoundaryPersonnel,
     stalePersonnel,
-    isConnected: Boolean(token && isConnected),
+    isConnected: Boolean(isAuthenticated && isConnected),
     statusMessage,
     notifications,
     unreadNotificationCount,

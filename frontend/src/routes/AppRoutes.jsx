@@ -23,6 +23,7 @@ import ProtectedRoute from '../components/ProtectedRoute'
 const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
 const AssignAreaPage = lazy(() => import('../pages/AssignAreaPage'))
 const DashboardPage = lazy(() => import('../pages/DashboardPage'))
+const EvidenceViewerPage = lazy(() => import('../pages/EvidenceViewerPage'))
 const LoginPage = lazy(() => import('../pages/LoginPage'))
 const MonitoringPage = lazy(() => import('../pages/MonitoringPage'))
 const PersonnelPage = lazy(() => import('../pages/PersonnelPage'))
@@ -44,6 +45,10 @@ function AppRoutes() {
         The matched page component is rendered into AppLayout's <Outlet />.
       */}
       <Route element={<ProtectedRoute />}>
+        <Route
+          path="/reports/:reportId/evidence"
+          element={withPageLoader(<EvidenceViewerPage />)}
+        />
         <Route element={<AppLayout />}>
           <Route path="/" element={withPageLoader(<MonitoringPage />)} />
           <Route path="/monitoring" element={withPageLoader(<DashboardPage />)} />

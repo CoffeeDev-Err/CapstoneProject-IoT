@@ -65,6 +65,14 @@ const validateProductionEnvironment = (environment = process.env) => {
 		errors.push('OTP_SECRET and GPS_INGEST_API_KEY must be different secrets.')
 	}
 
+	const mediaSigningSecret = validateSecret(environment, 'MEDIA_URL_SIGNING_SECRET', errors)
+	if (
+		mediaSigningSecret
+		&& (mediaSigningSecret === otpSecret || mediaSigningSecret === ingestKey)
+	) {
+		errors.push('MEDIA_URL_SIGNING_SECRET must be different from OTP_SECRET and GPS_INGEST_API_KEY.')
+	}
+
 	if (readValue(environment, 'EMAIL_DELIVERY_MODE').toLowerCase() !== 'gmail') {
 		errors.push('EMAIL_DELIVERY_MODE must be gmail in production.')
 	}
