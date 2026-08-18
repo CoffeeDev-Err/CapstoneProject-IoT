@@ -22,12 +22,15 @@ import { SOCKET_URL } from './runtime'
  */
 /**
  * Shared Socket.IO client instance used across the entire app.
- *   autoConnect: true  — connects as soon as this module is first imported
+ *   autoConnect: false — the auth hook connects once the session is known
+ *   withCredentials    — sends the httpOnly session cookie on the handshake so
+ *                        the server can authenticate the socket like the API
  *   transports         — starts with polling and upgrades when WebSocket is supported
  */
 export const socket = io(SOCKET_URL, {
   transports: ['polling', 'websocket'],
   autoConnect: false,
+  withCredentials: true,
 })
 
 /**

@@ -333,8 +333,7 @@
 }
 
 .auth-error,
-.auth-success,
-.auth-debug-code {
+.auth-success {
   margin: 0;
   padding: 0.75rem 0.9rem;
   border-radius: 8px;
@@ -352,14 +351,6 @@
   border: 1px solid #1e3a5f;
   background: #172554;
   color: #bfdbfe;
-}
-
-.auth-debug-code {
-  border: 1px solid #1d4ed8;
-  background: #172554;
-  color: #bfdbfe;
-  text-align: center;
-  font-weight: 700;
 }
 
 .auth-loading-screen {

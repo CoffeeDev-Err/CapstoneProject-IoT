@@ -16,33 +16,34 @@ const readStoredUser = () => {
 }
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem(AUTH_TOKEN_KEY))
   const [user, setUser] = useState(readStoredUser)
-  const [loading, setLoading] = useState(Boolean(token))
+  // The session token now lives in an httpOnly cookie the browser attaches
+  // automatically, so we can never read it from JavaScript. Bootstrap therefore
+  // always asks the server who the current user is.
+  const [loading, setLoading] = useState(true)
 
   const clearSession = useCallback(() => {
+    // AUTH_TOKEN_KEY is only removed to purge any legacy token left behind by a
+    // pre-cookie build; new sessions never write it.
     localStorage.removeItem(AUTH_TOKEN_KEY)
     localStorage.removeItem(AUTH_USER_KEY)
-    setToken(null)
     setUser(null)
   }, [])
 
   const establishSession = useCallback((session) => {
-    localStorage.setItem(AUTH_TOKEN_KEY, session.token)
+    // The backend delivers the session as an httpOnly cookie; only the
+    // non-sensitive user profile is cached locally for a fast first paint.
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(session.user))
-    setToken(session.token)
     setUser(session.user)
   }, [])
 
   const logout = useCallback(async () => {
-    const activeToken = localStorage.getItem(AUTH_TOKEN_KEY)
     clearSession()
-    if (activeToken) await logoutSession(activeToken).catch(() => {})
+    await logoutSession().catch(() => {})
   }, [clearSession])
 
   useEffect(() => {
-    if (!token) return undefined
-    const refreshCurrentUser = () => getCurrentUser(token)
+    const refreshCurrentUser = () => getCurrentUser()
       .then(({ user: currentUser }) => {
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser))
         setUser(currentUser)
@@ -51,16 +52,16 @@ export function AuthProvider({ children }) {
     refreshCurrentUser().finally(() => setLoading(false))
     window.addEventListener('bantaycabagan:account-updated', refreshCurrentUser)
     return () => window.removeEventListener('bantaycabagan:account-updated', refreshCurrentUser)
-  }, [clearSession, token])
+  }, [clearSession])
 
   const value = useMemo(() => ({
     clearSession,
     establishSession,
     loading,
     logout,
-    token,
     user,
-  }), [clearSession, establishSession, loading, logout, token, user])
+    isAuthenticated: Boolean(user),
+  }), [clearSession, establishSession, loading, logout, user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

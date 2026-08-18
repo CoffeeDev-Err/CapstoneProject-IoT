@@ -24,7 +24,6 @@ export type VerificationChallenge = {
   challengeId: string;
   maskedEmail: string;
   expiresAt: string;
-  debugCode?: string;
   message?: string;
 };
 

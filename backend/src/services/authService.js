@@ -111,12 +111,11 @@ const createVerificationChallenge = async (
 	})
 
 	try {
-		const delivery = await sendVerificationCode({ email, code, purpose })
+		await sendVerificationCode({ email, code, purpose })
 		return {
 			challengeId: String(challenge._id),
 			maskedEmail: maskEmail(email),
 			expiresAt: challenge.expiresAt.toISOString(),
-			debugCode: delivery.debugCode,
 		}
 	} catch (error) {
 		await EmailVerification.deleteOne({ _id: challenge._id })
@@ -315,6 +314,17 @@ const requestPasswordReset = async (
 			'INVALID_RESET_INPUT',
 		)
 	}
+	// Keep the response identical whether or not the account exists — and whether or not
+	// a code could actually be sent — so the endpoint cannot be used to enumerate accounts
+	// (via body, status code, rate-limit state, or delivery failure) or leak a masked email.
+	// Per-IP abuse throttling is handled uniformly by the route rate limiter.
+	const uniformMessage = 'If the account exists, a verification code was sent.'
+	const uniformResponse = () => ({
+		accepted: true,
+		message: uniformMessage,
+		challengeId: randomBytes(12).toString('hex'),
+		expiresAt: new Date(Date.now() + OTP_DURATION_MS).toISOString(),
+	})
 	const user = await User.findOne({
 		status: 'active',
 		$or: [
@@ -322,20 +332,25 @@ const requestPasswordReset = async (
 			{ email: normalizedIdentifier },
 		],
 	})
-	if (!user) {
+	if (!user) return uniformResponse()
+
+	try {
+		const challenge = await createVerificationChallenge(user, 'reset_password', {
+			deviceName,
+			requestIp,
+		})
 		return {
 			accepted: true,
-			message: 'If the account exists, a verification code was sent.',
+			message: uniformMessage,
+			challengeId: challenge.challengeId,
+			expiresAt: challenge.expiresAt,
 		}
-	}
-	const challenge = await createVerificationChallenge(user, 'reset_password', {
-		deviceName,
-		requestIp,
-	})
-	return {
-		accepted: true,
-		message: 'If the account exists, a verification code was sent.',
-		...challenge,
+	} catch (error) {
+		// A rate-limited account, one with no email configured, or a delivery failure must
+		// look exactly like a non-existent account to the caller. Log server-side for ops;
+		// the per-user cap inside createVerificationChallenge still prevents email flooding.
+		console.error(`Password reset code not delivered for user ${user._id}: ${error.code || error.message}`)
+		return uniformResponse()
 	}
 }
 

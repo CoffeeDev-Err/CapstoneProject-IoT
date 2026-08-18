@@ -14,8 +14,10 @@ const createAccountController = (accountService) => ({
 			storedPhoto = req.file
 				? await storeUploadedMedia(req.file, 'profile-photos')
 				: undefined
+			// A photo is only ever the file we just stored; ignore any client-supplied path.
+			const { photoUrl: _clientPhotoUrl, ...accountInput } = req.body
 			const account = await accountService.createAccount({
-				...req.body,
+				...accountInput,
 				...(storedPhoto ? { photoUrl: storedPhoto } : {}),
 			}, {
 				ipAddress: req.ip,
@@ -36,10 +38,12 @@ const createAccountController = (accountService) => ({
 			storedPhoto = req.file
 				? await storeUploadedMedia(req.file, 'profile-photos')
 				: undefined
+			// A photo is only ever the file we just stored; ignore any client-supplied path.
+			const { photoUrl: _clientPhotoUrl, ...accountInput } = req.body
 			const account = await accountService.updateAccount(
 				req.params.accountId,
 				{
-					...req.body,
+					...accountInput,
 					...(storedPhoto ? { photoUrl: storedPhoto } : {}),
 				},
 				{ ipAddress: req.ip },

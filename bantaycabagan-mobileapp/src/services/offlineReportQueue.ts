@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 
+import { openReportPayload, sealReportPayload } from './offlineQueueCipher';
 import type { SubmitReportInput } from '../types/operations';
 
 const DATABASE_NAME = 'geosentri-offline.db';
@@ -133,7 +134,7 @@ export const stagePendingReport = async (
       ) VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
       id,
       personnelId,
-      JSON.stringify(stagedInput),
+      await sealReportPayload(JSON.stringify(stagedInput)),
       durableEvidenceUri,
       createdAt,
       createdAt,
@@ -163,14 +164,27 @@ export const getPendingReports = async (personnelId: string): Promise<PendingRep
      ORDER BY created_at ASC`,
     personnelId,
   );
-  return rows.map((row) => ({
-    id: row.id,
-    personnelId: row.personnel_id,
-    input: JSON.parse(row.payload_json) as SubmitReportInput,
-    evidenceUri: row.evidence_uri,
-    createdAt: row.created_at,
-    attemptCount: row.attempt_count,
-  }));
+
+  const reports: PendingReport[] = [];
+  for (const row of rows) {
+    let input: SubmitReportInput;
+    try {
+      input = JSON.parse(await openReportPayload(row.payload_json)) as SubmitReportInput;
+    } catch {
+      // An unreadable row must not stall the rest of the queue. Leave it and its
+      // evidence file on disk rather than destroying unsubmitted report data.
+      continue;
+    }
+    reports.push({
+      id: row.id,
+      personnelId: row.personnel_id,
+      input,
+      evidenceUri: row.evidence_uri,
+      createdAt: row.created_at,
+      attemptCount: row.attempt_count,
+    });
+  }
+  return reports;
 };
 
 export const markPendingReportUploading = async (id: string) => {

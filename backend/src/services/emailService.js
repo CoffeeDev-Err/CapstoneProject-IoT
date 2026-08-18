@@ -64,8 +64,10 @@ const sendVerificationCode = async ({ email, code, purpose }) => {
 	const brandName = getBrandName()
 
 	if (mode === 'console') {
+		// Dev-only: surface the code in the SERVER log for the developer.
+		// Never return it in the HTTP response (that would defeat the OTP factor).
 		console.log(`[EMAIL-CONSOLE] ${purpose} code for ${email}: ${code}`)
-		return { mode, debugCode: code }
+		return { mode }
 	}
 	if (mode !== 'gmail') {
 		const error = new Error('Email delivery is not configured.')
