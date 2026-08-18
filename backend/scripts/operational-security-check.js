@@ -95,10 +95,92 @@ assert.deepEqual(validateProductionEnvironment({
 	TRUST_PROXY: '1',
 	OTP_SECRET: 'a'.repeat(32),
 	GPS_INGEST_API_KEY: 'b'.repeat(32),
+	MEDIA_URL_SIGNING_SECRET: 'd'.repeat(32),
 	EMAIL_DELIVERY_MODE: 'gmail',
 	GMAIL_USER: 'alerts@example.gov.ph',
 	GMAIL_APP_PASSWORD: 'application-password',
 }), { isProduction: true })
+
+// --- Rate limiting must stay bounded and must not exempt unidentified callers ---
+// A request with no resolvable address (misconfigured trusted-proxy depth) must
+// still be counted rather than sailing past the limiter unlimited.
+{
+	const createRateLimit = require('../src/middleware/rateLimit')
+	const limiter = createRateLimit({ windowMs: 60_000, max: 2, keyPrefix: 'anonymous-test' })
+	const run = (req) => {
+		let statusCode = 200
+		let nextCalled = false
+		const res = {
+			set() {},
+			status(code) { statusCode = code; return res },
+			json() { return res },
+		}
+		limiter(req, res, () => { nextCalled = true })
+		return { statusCode, nextCalled }
+	}
+
+	assert.equal(run({}).nextCalled, true)
+	assert.equal(run({}).nextCalled, true)
+	const blocked = run({})
+	assert.equal(blocked.nextCalled, false, 'Unidentified callers must still be rate limited')
+	assert.equal(blocked.statusCode, 429)
+
+	// A distinct address must not inherit the exhausted anonymous bucket.
+	assert.equal(run({ ip: '203.0.113.55' }).nextCalled, true)
+}
+
+// --- The mock-officer account must never fall back to a committed password ---
+{
+	const fs = require('fs')
+	const path = require('path')
+	const seedSource = fs.readFileSync(
+		path.join(__dirname, '..', 'src', 'services', 'seedService.js'),
+		'utf8',
+	)
+	assert.doesNotMatch(
+		seedSource,
+		/MOCK_OFFICER_TEMP_PASSWORD\s*\|\|\s*'[^']+'/,
+		'A committed default would be a publicly known credential for a loginable account',
+	)
+	assert.match(
+		seedSource,
+		/MOCK_OFFICER_TEMP_PASSWORD is required when ENABLE_MOCK_OFFICER=true/,
+		'Enabling the mock officer without a supplied password must fail loudly',
+	)
+}
+
+// --- No client-shaped value may reach a Mongo query uncoerced ---
+// Path params are always strings, but `req.query` and `req.body` can be objects
+// or arrays (`?x[$ne]=1`, a crafted JSON body), which is how NoSQL operator
+// injection happens. Every call site today coerces with String()/Number() first;
+// this guard fails the build if a future edit hands one straight to a query.
+{
+	const fs = require('fs')
+	const path = require('path')
+	const sourceRoot = path.join(__dirname, '..', 'src')
+	const mongoCallWithRawInput = new RegExp(
+		'\\.(find|findOne|findById|findOneAndUpdate|findOneAndDelete|updateOne|updateMany'
+		+ '|deleteOne|deleteMany|countDocuments|aggregate|distinct)\\('
+		+ '[^;]{0,200}?req\\.(query|body)\\b',
+		's',
+	)
+
+	const walk = (directory) => fs.readdirSync(directory, { withFileTypes: true })
+		.flatMap((entry) => {
+			const entryPath = path.join(directory, entry.name)
+			if (entry.isDirectory()) return walk(entryPath)
+			return entry.name.endsWith('.js') ? [entryPath] : []
+		})
+
+	const offenders = walk(sourceRoot).filter((filePath) => (
+		mongoCallWithRawInput.test(fs.readFileSync(filePath, 'utf8'))
+	))
+	assert.deepEqual(
+		offenders.map((filePath) => path.relative(sourceRoot, filePath)),
+		[],
+		'Coerce req.query/req.body values before using them in a Mongo query',
+	)
+}
 
 const previousNodeEnvironment = process.env.NODE_ENV
 process.env.NODE_ENV = 'production'
@@ -119,4 +201,136 @@ assert.match(headers['Content-Security-Policy'], /default-src 'self'/)
 assert.equal(headers['Strict-Transport-Security'], 'max-age=31536000; includeSubDomains')
 assert.equal(headers['Cache-Control'], 'no-store')
 
-console.log('Backend operational security checks passed.')
+// --- Password reset must not enable account enumeration (regression guard) ---
+// The reset endpoint must return an IDENTICAL response for a non-existent account and
+// for a real account whose code cannot be delivered (rate limited / no email / send
+// failure): same keys, same message, a synthetic 24-hex challengeId, and NO maskedEmail.
+// This locks in the enumeration hardening so a future edit cannot silently reopen the
+// oracle (via body shape, status, rate-limit state, or a leaked masked email).
+;(async () => {
+	const authService = require('../src/services/authService')
+	const models = require('../src/models')
+	const originalFindOne = models.User.findOne
+	const originalCount = models.EmailVerification.countDocuments
+	const originalConsoleError = console.error
+
+	try {
+		// (i) Account does not exist -> uniform response, no challenge work done.
+		models.User.findOne = async () => null
+		const missing = await authService.requestPasswordReset(
+			{ identifier: 'ghost@cabagan.gov.ph' },
+			{ requestIp: '203.0.113.10' },
+		)
+
+		// (ii) Account exists but is over the per-user OTP cap -> must look identical.
+		models.User.findOne = async () => ({ _id: 'user-1', email: 'officer@cabagan.gov.ph' })
+		models.EmailVerification.countDocuments = async () => 999
+		console.error = () => {} // swallow the expected server-side "code not delivered" log
+		const throttled = await authService.requestPasswordReset(
+			{ identifier: 'officer@cabagan.gov.ph' },
+			{ requestIp: '203.0.113.10' },
+		)
+		console.error = originalConsoleError
+
+		const expectedKeys = ['accepted', 'challengeId', 'expiresAt', 'message']
+		assert.deepEqual(Object.keys(missing).sort(), expectedKeys)
+		assert.deepEqual(Object.keys(throttled).sort(), expectedKeys)
+		assert.equal(missing.accepted, true)
+		assert.equal(throttled.accepted, true)
+		assert.equal(missing.message, throttled.message)
+		assert.equal('maskedEmail' in missing, false)
+		assert.equal('maskedEmail' in throttled, false)
+		assert.match(missing.challengeId, /^[0-9a-f]{24}$/)
+		assert.match(throttled.challengeId, /^[0-9a-f]{24}$/)
+	} finally {
+		models.User.findOne = originalFindOne
+		models.EmailVerification.countDocuments = originalCount
+		console.error = originalConsoleError
+	}
+
+	// --- Supervisor notification endpoints must ignore a client recipient id ---
+	// Otherwise a supervisor could read, mark, or delete any individual officer's
+	// notifications by passing that officer's personnel id.
+	{
+		const createNotificationController = require('../src/controllers/notificationController')
+		const requested = []
+		const controller = createNotificationController({
+			getNotifications: async (recipientId) => { requested.push(recipientId); return [] },
+			markNotificationRead: async (_id, recipientId) => {
+				requested.push(recipientId)
+				return { _id: 'notification-1' }
+			},
+			markAllNotificationsRead: async (recipientId) => { requested.push(recipientId); return 0 },
+			deleteNotifications: async (recipientId) => { requested.push(recipientId); return 0 },
+		})
+		const res = { json() { return res }, status() { return res } }
+		const hostile = 'pcpl-001'
+
+		await controller.getNotifications({ query: { recipient_id: hostile } }, res)
+		await controller.markAllRead({ body: { recipient_id: hostile } }, res)
+		await controller.clearNotifications({ query: { recipient_id: hostile } }, res)
+		await controller.markRead(
+			{ params: { notificationId: 'notification-1' }, query: { recipient_id: hostile }, body: {} },
+			res,
+		)
+
+		assert.equal(requested.length, 4)
+		assert.deepEqual(
+			[...new Set(requested)],
+			['supervisor'],
+			'Supervisor notification endpoints must always scope to the supervisor stream',
+		)
+	}
+
+	// --- Reading a report route must not mutate the report ---
+	// The durable snapshot is persisted at submission and finalized by the
+	// lifecycle tick; a GET that writes would let prefetching clients mutate data
+	// and would make captured_at mean "last viewed".
+	{
+		const createOperationalService = require('../src/services/operationalService')
+		const models = require('../src/models')
+		const originalReportFindOne = models.Report.findOne
+		const originalHistoryFind = models.LocationHistory.find
+
+		try {
+			const incidentAt = new Date('2026-08-19T02:00:00.000Z')
+			const capturedAt = new Date('2026-08-19T02:20:00.000Z')
+			models.Report.findOne = () => ({
+				lean: async () => ({
+					reportNumber: 'RPT-0001',
+					submittedBy: 'pcpl-001',
+					incidentAt,
+					routeSnapshotCapturedAt: capturedAt,
+					routeSnapshot: [{
+						location: { type: 'Point', coordinates: [121.7681, 17.4239] },
+						recordedAt: incidentAt,
+						source: 'gps',
+					}],
+					// A reintroduced write would call this and fail the check.
+					save: async () => { throw new Error('GET /reports/:id/route must not write') },
+				}),
+			})
+			models.LocationHistory.find = () => ({
+				sort: () => ({ lean: async () => [] }),
+			})
+
+			const service = createOperationalService({ io: null })
+			const route = await service.getReportRoute('RPT-0001')
+			assert.equal(route.report_id, 'RPT-0001')
+			assert.equal(route.points.length, 1)
+			assert.equal(
+				route.captured_at,
+				capturedAt.toISOString(),
+				'captured_at must report the persisted capture, not the time of the read',
+			)
+		} finally {
+			models.Report.findOne = originalReportFindOne
+			models.LocationHistory.find = originalHistoryFind
+		}
+	}
+
+	console.log('Backend operational security checks passed.')
+})().catch((error) => {
+	console.error(error)
+	process.exit(1)
+})

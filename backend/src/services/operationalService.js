@@ -53,6 +53,10 @@ const asDate = (value, fallback = new Date()) => {
 
 const REPORT_ROUTE_BEFORE_MS = 30 * 60 * 1000
 const REPORT_ROUTE_AFTER_MS = 15 * 60 * 1000
+// location_history is TTL-pruned after 24h, so a snapshot older than that has no
+// source points left to gather and is not worth scanning for.
+const REPORT_ROUTE_FINALIZE_MAX_AGE_MS = 25 * 60 * 60 * 1000
+const REPORT_ROUTE_FINALIZE_BATCH = 25
 const REPORT_GPS_MAX_DISTANCE_METERS = 100
 const MANAGEABLE_DEPLOYMENT_STATUSES = ['scheduled', 'active']
 const DEPLOYMENT_STATUSES = [...MANAGEABLE_DEPLOYMENT_STATUSES, 'completed', 'cancelled']
@@ -340,7 +344,10 @@ const createOperationalService = ({ io }) => {
 		}
 	}
 
-	const captureReportRouteSnapshot = async (report) => {
+	// Pure read: merges whatever is already stored with GPS history that still
+	// falls inside the report's route window. Never writes, so it is safe to run
+	// from a GET. Callers that need durability persist through the wrapper below.
+	const computeReportRouteSnapshot = async (report) => {
 		const { from, to } = getReportRouteWindow(report)
 		const history = await LocationHistory.find({
 			personnelId: report.submittedBy,
@@ -367,11 +374,55 @@ const createOperationalService = ({ io }) => {
 			})
 		}
 
-		report.routeSnapshot = [...merged.values()]
-			.sort((left, right) => left.recordedAt - right.recordedAt)
+		return {
+			from,
+			to,
+			points: [...merged.values()].sort((left, right) => left.recordedAt - right.recordedAt),
+		}
+	}
+
+	const captureReportRouteSnapshot = async (report) => {
+		const { from, to, points } = await computeReportRouteSnapshot(report)
+		report.routeSnapshot = points
 		report.routeSnapshotCapturedAt = new Date()
 		await report.save()
 		return { from, to, points: report.routeSnapshot }
+	}
+
+	/**
+	 * Persists route snapshots for reports whose window has closed. Once the
+	 * window ends no further GPS can belong to it, so one final capture makes the
+	 * snapshot permanent. This runs on the operational lifecycle tick so the
+	 * durable record no longer depends on a supervisor happening to open the
+	 * report before location_history is TTL-pruned.
+	 */
+	const finalizeReportRouteSnapshots = async ({ now = new Date() } = {}) => {
+		const windowClosedAt = { $add: ['$incidentAt', REPORT_ROUTE_AFTER_MS] }
+		const reports = await Report.find({
+			incidentAt: { $gte: new Date(now.getTime() - REPORT_ROUTE_FINALIZE_MAX_AGE_MS) },
+			$expr: {
+				$and: [
+					{ $lte: [windowClosedAt, now] },
+					{
+						$or: [
+							{ $eq: [{ $ifNull: ['$routeSnapshotCapturedAt', null] }, null] },
+							{ $lt: ['$routeSnapshotCapturedAt', windowClosedAt] },
+						],
+					},
+				],
+			},
+		}).limit(REPORT_ROUTE_FINALIZE_BATCH)
+
+		let finalized = 0
+		for (const report of reports) {
+			try {
+				await captureReportRouteSnapshot(report)
+				finalized += 1
+			} catch {
+				// Retry on the next tick instead of aborting the whole batch.
+			}
+		}
+		return finalized
 	}
 
 	const loadTasks = async () => {
@@ -810,9 +861,12 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const getReportRoute = async (reportId) => {
-		const report = await Report.findOne({ reportNumber: reportId })
+		// Read-only by design: `.lean()` plus the pure compute helper guarantee a
+		// GET cannot mutate the report. Durability comes from the capture at
+		// submission and from finalizeReportRouteSnapshots once the window closes.
+		const report = await Report.findOne({ reportNumber: reportId }).lean()
 		if (!report) return null
-		const { from, to, points } = await captureReportRouteSnapshot(report)
+		const { from, to, points } = await computeReportRouteSnapshot(report)
 		return {
 			report_id: report.reportNumber,
 			captured_at: report.routeSnapshotCapturedAt?.toISOString(),
@@ -1770,6 +1824,7 @@ const createOperationalService = ({ io }) => {
 		submitReport,
 		updateDeploymentStatus,
 		updateReportValidation,
+		finalizeReportRouteSnapshots,
 	}
 }
 

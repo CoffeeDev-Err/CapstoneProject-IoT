@@ -14,7 +14,7 @@ const strongPassword = (value) => (
 
 const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.'
 
-function PasswordChangeModal({ open, token, onClose, onChanged }) {
+function PasswordChangeModal({ open, onClose, onChanged }) {
   const [step, setStep] = useState('password')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -49,7 +49,7 @@ function PasswordChangeModal({ open, token, onClose, onChanged }) {
     }
     setPending(true)
     try {
-      const nextChallenge = await requestPasswordChange(token, currentPassword)
+      const nextChallenge = await requestPasswordChange(currentPassword)
       setChallenge(nextChallenge)
       setStep('verify')
     } catch (requestError) {
@@ -90,7 +90,7 @@ function PasswordChangeModal({ open, token, onClose, onChanged }) {
     setPending(true)
     setError('')
     try {
-      await confirmPasswordChange(token, challenge.challengeId, code, newPassword)
+      await confirmPasswordChange(challenge.challengeId, code, newPassword)
       resetAndClose()
       onChanged()
     } catch (requestError) {
@@ -167,9 +167,6 @@ function PasswordChangeModal({ open, token, onClose, onChanged }) {
                 maxLength={128}
               />
               <p className="password-requirements">{PASSWORD_REQUIREMENTS}</p>
-              {challenge?.debugCode && (
-                <p className="auth-debug-code">Development code: {challenge.debugCode}</p>
-              )}
             </>
           )}
           {error && <p className="auth-error" role="alert">{error}</p>}

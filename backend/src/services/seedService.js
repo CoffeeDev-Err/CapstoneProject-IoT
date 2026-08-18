@@ -68,7 +68,7 @@ const seedPersonnel = [
 		defaultLocationName: 'Cabagan Public Market',
 		photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
 	},
-	{
+	...(mockOfficerEnabled ? [{
 		personnelId: mockOfficerPersonnelId,
 		badgeNumber: 'P-1002',
 		fullName: mockOfficerFullName,
@@ -76,12 +76,12 @@ const seedPersonnel = [
 		dutyStatus: 'Monitoring',
 		defaultLocationName: 'Cabagan Municipal Hall',
 		photoUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-	},
+	}] : []),
 ]
 
-const seedLocations = [
+const seedLocations = mockOfficerEnabled ? [
 	[mockOfficerPersonnelId, 'Cabagan Municipal Hall', 121.7683, 17.4213],
-]
+] : []
 
 const LEGACY_SEEDED_PERSONNEL_IDS = ['pltc-003']
 
@@ -140,6 +140,43 @@ const removeLegacySeedData = async () => {
 	])
 }
 
+const removeDisabledMockOfficerData = async () => {
+	if (mockOfficerEnabled) return
+
+	const mockUsers = await User.find({ isMockAccount: true })
+		.select('_id personnelId')
+		.lean()
+	const userIds = mockUsers.map((user) => user._id)
+	const personnelIds = [...new Set(
+		mockUsers.map((user) => String(user.personnelId || '').trim()).filter(Boolean),
+	)]
+
+	if (userIds.length === 0) return
+
+	if (personnelIds.length > 0) {
+		await Task.updateMany(
+			{},
+			{
+				$pull: {
+					responders: { personnelId: { $in: personnelIds } },
+				},
+			},
+		)
+		await Promise.all([
+			Personnel.deleteMany({ personnelId: { $in: personnelIds } }),
+			CurrentLocation.deleteMany({ personnelId: { $in: personnelIds } }),
+			LocationHistory.deleteMany({ personnelId: { $in: personnelIds } }),
+			GpsDeviceAssignment.deleteMany({ personnelId: { $in: personnelIds } }),
+			Deployment.deleteMany({ personnelId: { $in: personnelIds } }),
+			Report.deleteMany({ submittedBy: { $in: personnelIds } }),
+			Task.deleteMany({ requestedBy: { $in: personnelIds } }),
+		])
+	}
+
+	await User.deleteMany({ _id: { $in: userIds }, isMockAccount: true })
+	console.log(`Removed ${userIds.length} disabled mock officer account(s).`)
+}
+
 const configureDemoGpsAssignment = async (personnelId) => {
 	const flespiDeviceId = String(process.env.DEMO_GPS_FLESPI_DEVICE_ID || '').trim()
 	const deviceIdent = String(process.env.DEMO_GPS_DEVICE_IDENT || '').trim()
@@ -193,6 +230,7 @@ const configureDemoGpsAssignment = async (personnelId) => {
 const seedDatabase = async (models) => {
 	await initializeCollections(models)
 	await removeLegacySeedData()
+	await removeDisabledMockOfficerData()
 
 	const supervisorLoginId = String(process.env.SUPERVISOR_LOGIN_ID || '').trim().toLowerCase()
 	const supervisorEmail = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase()
@@ -257,9 +295,7 @@ const seedDatabase = async (models) => {
 		const mockLoginId = String(
 			process.env.MOCK_OFFICER_LOGIN_ID || 'officer.mock',
 		).trim().toLowerCase()
-		const mockPassword = String(
-			process.env.MOCK_OFFICER_TEMP_PASSWORD || 'MockOfficer!2026',
-		)
+		const mockPassword = String(process.env.MOCK_OFFICER_TEMP_PASSWORD || '')
 		const mockEmail = String(
 			process.env.MOCK_OFFICER_EMAIL
 			|| buildEmailAlias(
@@ -267,6 +303,14 @@ const seedDatabase = async (models) => {
 				'mock-officer',
 			),
 		).trim().toLowerCase()
+
+		// A committed default password would be a publicly known credential for a
+		// real, loginable officer account, so the operator must supply one.
+		if (!mockPassword) {
+			throw new Error(
+				'MOCK_OFFICER_TEMP_PASSWORD is required when ENABLE_MOCK_OFFICER=true.',
+			)
+		}
 
 		if (!mockEmail) {
 			throw new Error(

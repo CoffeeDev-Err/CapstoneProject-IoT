@@ -94,8 +94,11 @@ const createOperationalController = (operationalService) => ({
 			storedEvidence = req.file
 				? await storeUploadedMedia(req.file, 'report-evidence')
 				: undefined
+			// Never trust a client-supplied evidence path; evidence is only ever the
+			// file we just stored. Strip any evidence_photo the client sent in the body.
+			const { evidence_photo: _clientEvidence, ...reportInput } = req.body
 			const report = await operationalService.submitReport({
-				...req.body,
+				...reportInput,
 				personnel_id: req.auth.user.personnelId,
 				...(req.file && storedEvidence && {
 					evidence_photo: {

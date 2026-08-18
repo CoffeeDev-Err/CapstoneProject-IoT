@@ -257,14 +257,16 @@ const verifyMediaAccess = ({ token, expires, signature }) => {
 	}
 }
 
-const createPresignedDownloadUrl = async (key) => {
+const createPresignedDownloadUrl = async (key, { download = false } = {}) => {
 	const { client, config } = getS3Client()
 	return getSignedUrl(
 		client,
 		new GetObjectCommand({
 			Bucket: config.bucket,
 			Key: key,
-			ResponseContentDisposition: 'inline',
+			ResponseContentDisposition: download
+				? `attachment; filename="${path.basename(key)}"`
+				: 'inline',
 		}),
 		{ expiresIn: 60 },
 	)

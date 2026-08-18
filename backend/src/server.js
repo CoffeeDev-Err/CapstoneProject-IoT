@@ -12,6 +12,7 @@ const mongoose = require('mongoose')
 const { Server } = require('socket.io')
 const app = require('./app')
 const { corsOptions } = require('./config/cors')
+const { readSessionCookie } = require('./config/authCookie')
 const connectDB = require('./config/db')
 const createAccountController = require('./controllers/accountController')
 const createAnalyticsController = require('./controllers/analyticsController')
@@ -144,7 +145,11 @@ if (process.env.NODE_ENV === 'production') {
 app.use(errorHandler)
 
 io.use(async (socket, next) => {
-	const token = String(socket.handshake.auth?.token || '')
+	const bearerToken = String(socket.handshake.auth?.token || '')
+	// Officers (mobile) pass the Bearer token in the handshake auth payload;
+	// the web dashboard sends none, so fall back to the httpOnly session cookie
+	// carried on the handshake request headers.
+	const token = bearerToken || readSessionCookie(socket.handshake.headers?.cookie)
 	try {
 		socket.data.auth = await authService.authenticate(token)
 		return next()
@@ -297,6 +302,7 @@ const runOperationalLifecycleCheck = async () => {
 		await operationalService.reconcileDeploymentShifts()
 		await evaluatePersonnelInactivity({ io })
 		await evaluatePersonnelGeofences({ io })
+		await operationalService.finalizeReportRouteSnapshots()
 	} catch (error) {
 		console.error('Operational lifecycle check failed:', error.message)
 	} finally {

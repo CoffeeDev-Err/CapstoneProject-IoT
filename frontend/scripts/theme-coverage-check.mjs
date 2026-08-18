@@ -11,6 +11,7 @@ for (const selector of [
   '.auth-modal',
   '.profile-modal',
   '.report-detail-drawer',
+  '.evidence-viewer',
 ]) {
   assert.ok(
     darkThemeSource.includes(`[data-theme="dark"] ${selector}`),
