@@ -20,7 +20,7 @@
   align-items: center;
   gap: var(--space-xs);
   color: var(--text-tertiary);
-  font-size: 0.813rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -29,7 +29,7 @@
   color: inherit;
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.03em;
 }
 
@@ -40,7 +40,7 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   padding: 0.5rem 2.2rem 0.5rem 0.75rem;
-  font-size: 0.844rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: 1.4;
   cursor: pointer;
@@ -92,7 +92,7 @@
 
 .analytics-chart-note {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
   font-weight: 500;
   letter-spacing: 0.01em;
@@ -121,7 +121,7 @@
 .barangay-analytics__header p {
   margin: 0.25rem 0 0;
   color: var(--text-tertiary);
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
 }
 
 .analytics-segmented-control {
@@ -143,7 +143,7 @@
   padding: 0.4rem 0.65rem;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   font-weight: 750;
   white-space: nowrap;
   cursor: pointer;
@@ -199,7 +199,7 @@
 
 .barangay-analytics__summary span {
   color: var(--text-tertiary);
-  font-size: 0.68rem;
+  font-size: var(--font-size-xs);
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -208,7 +208,7 @@
   margin-top: 0.25rem;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: var(--font-size-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -216,7 +216,7 @@
 .barangay-analytics__summary small {
   margin-top: 0.15rem;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
 }
 
 .barangay-analytics__workspace {
@@ -247,7 +247,7 @@
 .barangay-analytics__section-header h4 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
   font-weight: 800;
 }
 
@@ -255,7 +255,7 @@
   display: block;
   margin-top: 0.18rem;
   color: var(--text-muted);
-  font-size: 0.68rem;
+  font-size: var(--font-size-xs);
 }
 
 .barangay-bar-list {
@@ -271,7 +271,7 @@
   border: 1px dashed var(--border-color-light);
   border-radius: 6px;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   text-align: center;
 }
 
@@ -307,7 +307,7 @@
 
 .barangay-bar-row__label {
   overflow: hidden;
-  font-size: 0.76rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -337,7 +337,7 @@
 
 .barangay-bar-row > strong {
   color: var(--text-primary);
-  font-size: 0.76rem;
+  font-size: var(--font-size-sm);
   text-align: right;
 }
 
@@ -383,7 +383,7 @@
   place-items: center;
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
-  font-size: 0.65rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
 }
 
@@ -400,18 +400,18 @@
 }
 
 .barangay-priority-row__name strong {
-  font-size: 0.76rem;
+  font-size: var(--font-size-sm);
 }
 
 .barangay-priority-row__name small {
   margin-top: 0.15rem;
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: var(--font-size-xs);
 }
 
 .barangay-priority-row__score {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   text-align: right;
 }
 
@@ -422,7 +422,7 @@
   min-height: 22px;
   border-radius: 999px;
   padding: 0.18rem 0.48rem;
-  font-size: 0.61rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   line-height: 1;
   text-transform: uppercase;
@@ -465,7 +465,7 @@
 .barangay-drilldown__header > div:first-child > span {
   display: block;
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -473,7 +473,7 @@
 .barangay-drilldown__header h4 {
   margin: 0.2rem 0 0;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: var(--font-size-base);
   font-weight: 800;
 }
 
@@ -486,12 +486,12 @@
 .barangay-drilldown__priority > strong {
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 1.35rem;
+  font-size: var(--font-size-xl);
 }
 
 .barangay-drilldown__priority > strong small {
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: var(--font-size-xs);
 }
 
 .barangay-drilldown__content {
@@ -505,7 +505,7 @@
 .priority-explanation h5 {
   margin: 0 0 0.75rem;
   color: var(--text-primary);
-  font-size: 0.76rem;
+  font-size: var(--font-size-sm);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -529,14 +529,14 @@
 
 .priority-breakdown__row > div span {
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
 }
 
 .priority-breakdown__row > div small {
   margin-top: 0.08rem;
   color: var(--text-muted);
-  font-size: 0.6rem;
+  font-size: var(--font-size-xs);
 }
 
 .priority-breakdown__track {
@@ -557,7 +557,7 @@
 .priority-breakdown__row > strong {
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--font-size-xs);
   text-align: right;
 }
 
@@ -565,7 +565,7 @@
   margin: 0;
   padding-left: 1.05rem;
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   line-height: 1.55;
 }
 
@@ -583,7 +583,7 @@
 .priority-recommendation span {
   display: block;
   color: var(--text-tertiary);
-  font-size: 0.62rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -591,7 +591,7 @@
 .priority-recommendation p {
   margin: 0.25rem 0 0;
   color: var(--text-primary);
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
@@ -606,13 +606,13 @@
 
 .barangay-drilldown__footer span {
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
 }
 
 .barangay-drilldown__footer small {
   color: var(--text-muted);
-  font-size: 0.62rem;
+  font-size: var(--font-size-xs);
   text-align: right;
 }
 
@@ -684,7 +684,7 @@
   }
 
   .analytics-stats-grid .stat-card__value {
-    font-size: 1.9rem;
+    font-size: var(--font-size-3xl);
   }
 }
 

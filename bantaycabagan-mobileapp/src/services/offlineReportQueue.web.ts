@@ -11,13 +11,26 @@ export type PendingReport = {
   attemptCount: number;
 };
 
+export type PendingReportReadFailure = {
+  id: string;
+  createdAt: string;
+  message: string;
+};
+
+export type PendingReportQueueSnapshot = {
+  reports: PendingReport[];
+  failures: PendingReportReadFailure[];
+};
+
 export const discardTemporaryEvidence = async (_uri?: string | null) => undefined;
 export const cleanupOrphanedPickerEvidence = async () => undefined;
 export const stagePendingReport = async (
   _input: SubmitReportInput,
   _personnelId: string,
 ): Promise<PendingReport | null> => null;
-export const getPendingReports = async (_personnelId: string): Promise<PendingReport[]> => [];
+export const getPendingReports = async (
+  _personnelId: string,
+): Promise<PendingReportQueueSnapshot> => ({ reports: [], failures: [] });
 export const markPendingReportUploading = async (_id: string) => undefined;
 export const markPendingReportFailed = async (_id: string, _error: unknown) => undefined;
 export const completePendingReport = async (_report: PendingReport) => undefined;

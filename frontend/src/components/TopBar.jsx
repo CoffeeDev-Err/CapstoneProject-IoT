@@ -23,16 +23,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { resolveApiAssetUrl } from '../services/apiAssets'
+import { matchesPrefixSearch } from '../utils/searchMatching'
 import ConfirmModal from './ConfirmModal'
 import PasswordChangeModal from './PasswordChangeModal'
-
-/** Hardcoded supervisor — replace with an auth context in production */
-const SUPERVISOR_FALLBACK = {
-  name: 'Sgt. Leo Gannad',
-  rank: 'Police Sergeant',
-  role: 'Supervisor',
-  photoUrl: 'https://ui-avatars.com/api/?name=Leo+Gannad&background=1d4ed8&color=fff&size=128',
-}
 
 const NOTIFICATION_HISTORY_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -108,6 +101,27 @@ const formatNotificationTimestamp = (isoValue) => {
   }).format(new Date(isoValue))
 }
 
+const getInitials = (name) => String(name || 'User')
+  .trim()
+  .split(/\s+/)
+  .slice(0, 2)
+  .map((part) => part.charAt(0).toUpperCase())
+  .join('') || 'U'
+
+function ProfileAvatar({ className, name, src }) {
+  const [failedSrc, setFailedSrc] = useState('')
+
+  if (!src || failedSrc === src) {
+    return (
+      <span className={`${className} profile-avatar-fallback`} role="img" aria-label={`${name} profile photo`}>
+        {getInitials(name)}
+      </span>
+    )
+  }
+
+  return <img src={src} alt={name} className={className} onError={() => setFailedSrc(src)} />
+}
+
 function TopBar({
   isConnected,
   isDark,
@@ -128,11 +142,12 @@ function TopBar({
   const notificationRef = useRef(null)
   const navigate = useNavigate()
   const { clearSession, logout, user } = useAuth()
+  const roleLabel = user?.role === 'supervisor' ? 'Supervisor' : 'Officer'
   const supervisor = {
-    name: user?.profile?.fullName || user?.name || SUPERVISOR_FALLBACK.name,
-    rank: user?.profile?.rank || SUPERVISOR_FALLBACK.rank,
-    role: user?.role === 'supervisor' ? 'Supervisor' : 'Officer',
-    photoUrl: resolveApiAssetUrl(user?.photoUrl || user?.profile?.photoUrl) || SUPERVISOR_FALLBACK.photoUrl,
+    name: user?.profile?.fullName || user?.fullName || user?.username || 'Signed-in user',
+    rank: user?.profile?.rank || user?.rank || roleLabel,
+    role: roleLabel,
+    photoUrl: resolveApiAssetUrl(user?.profile?.photoUrl || user?.photoUrl),
   }
 
   const handleLogout = async () => {
@@ -150,16 +165,9 @@ function TopBar({
   }
 
   const filteredNotifications = useMemo(() => {
-    const searchQuery = notificationSearch.trim().toLowerCase()
-    const searchTokens = searchQuery.split(/\s+/).filter(Boolean)
-
     return notifications.filter((notification) => {
       if (!isNotificationInHistoryRange(notification, notificationHistoryRange)) {
         return false
-      }
-
-      if (searchTokens.length === 0) {
-        return true
       }
 
       const typeAliases = []
@@ -171,17 +179,13 @@ function TopBar({
       }
 
       const searchableTimestamp = formatNotificationTimestamp(notification.timestamp).toLowerCase()
-      const searchableText = [
+      return matchesPrefixSearch(notificationSearch, [
         notification.title,
         notification.message,
         notification.type,
         typeAliases.join(' '),
         searchableTimestamp,
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      return searchTokens.every((token) => searchableText.includes(token))
+      ])
     })
   }, [notificationHistoryRange, notificationSearch, notifications])
 
@@ -360,14 +364,7 @@ function TopBar({
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
           >
-            <img
-              src={supervisor.photoUrl}
-              alt={supervisor.name}
-              className="supervisor-avatar"
-              onError={(e) => {
-                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(supervisor.name)}&background=1d4ed8&color=fff&size=64`
-              }}
-            />
+            <ProfileAvatar className="supervisor-avatar" name={supervisor.name} src={supervisor.photoUrl} />
             <div className="supervisor-info d-flex flex-column align-items-start">
               <span className="supervisor-name">{supervisor.name}</span>
               <span className="supervisor-role mt-1">{supervisor.role}</span>
@@ -380,14 +377,7 @@ function TopBar({
             <div className="supervisor-dropdown">
               {/* Header row with larger photo + name + rank */}
               <div className="dropdown-profile-header d-flex align-items-center">
-                <img
-                  src={supervisor.photoUrl}
-                  alt={supervisor.name}
-                  className="dropdown-avatar"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(supervisor.name)}&background=1d4ed8&color=fff&size=64`
-                  }}
-                />
+                <ProfileAvatar className="dropdown-avatar" name={supervisor.name} src={supervisor.photoUrl} />
                 <div>
                   <strong className="dropdown-name">{supervisor.name}</strong>
                   <span className="dropdown-rank mt-1">{supervisor.rank}</span>

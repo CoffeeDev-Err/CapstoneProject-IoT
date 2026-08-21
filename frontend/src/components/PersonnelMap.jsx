@@ -26,7 +26,9 @@ import {
 import { addMobileLikeNavigationControls } from '../utils/mapNavigation'
 import {
   MARKER_ANIMATION_DURATION_MS,
+  confirmedFixFromMember,
   interpolateLatLng,
+  markerMotionForFixes,
 } from '../utils/mapMotion'
 
 const LIVE_MAP_DEFAULT_CENTER = [CABAGAN_CENTER[1], CABAGAN_CENTER[0]]
@@ -121,7 +123,7 @@ const addOperationalLayers = (map, deploymentData) => {
       id: 'geosentri-outside-mask-fill',
       type: 'fill',
       source: 'geosentri-outside-mask',
-      paint: { 'fill-color': '#dc2626', 'fill-opacity': 0.12 },
+      paint: { 'fill-color': '#f51212', 'fill-opacity': 0.12 },
     }, firstSymbolLayerId)
   }
 
@@ -134,7 +136,7 @@ const addOperationalLayers = (map, deploymentData) => {
       type: 'line',
       source: 'geosentri-cabagan-boundary',
       paint: {
-        'line-color': '#dc2626',
+        'line-color': '#f71616',
         'line-width': 2,
         'line-dasharray': [4, 3.5],
       },
@@ -180,7 +182,7 @@ function PersonnelMap({
   const mapRef = useRef(null)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
   const markerStatesRef = useRef(new Map())
-  const clusterMarkersRef = useRef([])
+  const clusterMarkerStatesRef = useRef(new Map())
   const clusterIndexRef = useRef(null)
   const personnelRef = useRef(personnel)
   const followedPersonnelIdRef = useRef(followedPersonnelId)
@@ -217,8 +219,11 @@ function PersonnelMap({
   }, [deployments])
 
   const clearClusterMarkers = useCallback(() => {
-    clusterMarkersRef.current.forEach((marker) => marker.remove())
-    clusterMarkersRef.current = []
+    clusterMarkerStatesRef.current.forEach((state) => {
+      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      state.marker.remove()
+    })
+    clusterMarkerStatesRef.current.clear()
   }, [])
 
   const renderClusters = useCallback(() => {
@@ -226,7 +231,6 @@ function PersonnelMap({
     const index = clusterIndexRef.current
     if (!map || !index || !map.loaded()) return
 
-    clearClusterMarkers()
     markerStatesRef.current.forEach((state) => {
       state.element.style.display = 'none'
     })
@@ -237,6 +241,7 @@ function PersonnelMap({
       Math.max(0, Math.min(20, Math.floor(map.getZoom()))),
     )
 
+    const activeClusterKeys = new Set()
     clusters.forEach((feature) => {
       if (!feature.properties.cluster) {
         const markerState = markerStatesRef.current.get(feature.properties.memberId)
@@ -244,47 +249,116 @@ function PersonnelMap({
         return
       }
 
-      const element = document.createElement('button')
-      element.type = 'button'
+      const memberIds = index
+        .getLeaves(feature.properties.cluster_id, Infinity)
+        .map((leaf) => String(leaf.properties.memberId))
+        .sort()
+      const clusterKey = memberIds.join('|')
+      activeClusterKeys.add(clusterKey)
       const tone = feature.properties.critical > 0
         ? 'personnel-cluster--critical'
         : (feature.properties.operation > 0 ? 'personnel-cluster--operation' : 'personnel-cluster--duty')
-      element.className = 'personnel-cluster-shell maplibre-personnel-cluster'
-      const badge = document.createElement('span')
-      badge.className = `personnel-cluster ${tone}`
-      badge.textContent = String(feature.properties.point_count)
-      element.append(badge)
-      element.setAttribute('aria-label', `Zoom to ${feature.properties.point_count} grouped officers`)
-      element.addEventListener('click', () => {
-        const zoom = Math.min(index.getClusterExpansionZoom(feature.properties.cluster_id), 18)
-        map.easeTo({ center: feature.geometry.coordinates, zoom, duration: 650 })
-      })
-      const marker = new maplibregl.Marker({ element })
-        .setLngLat(feature.geometry.coordinates)
-        .addTo(map)
-      clusterMarkersRef.current.push(marker)
+      const target = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]]
+      const animationDurationMs = Number(feature.properties.motionDuration) > 0
+        ? Number(feature.properties.motionDuration)
+        : MARKER_ANIMATION_DURATION_MS
+      let state = clusterMarkerStatesRef.current.get(clusterKey)
+
+      if (!state) {
+        const element = document.createElement('button')
+        element.type = 'button'
+        element.className = 'personnel-cluster-shell maplibre-personnel-cluster'
+        const badge = document.createElement('span')
+        element.append(badge)
+        const marker = new maplibregl.Marker({ element })
+          .setLngLat(feature.geometry.coordinates)
+          .addTo(map)
+        state = {
+          marker,
+          element,
+          badge,
+          currentPosition: target,
+          targetPosition: target,
+          expansionZoom: 18,
+          animationFrame: null,
+        }
+        element.addEventListener('click', () => {
+          const latest = clusterMarkerStatesRef.current.get(clusterKey)
+          if (!latest) return
+          map.easeTo({
+            center: [latest.currentPosition[1], latest.currentPosition[0]],
+            zoom: latest.expansionZoom,
+            duration: 650,
+          })
+        })
+        clusterMarkerStatesRef.current.set(clusterKey, state)
+      }
+
+      state.badge.className = `personnel-cluster ${tone}`
+      state.badge.textContent = String(feature.properties.point_count)
+      state.element.setAttribute('aria-label', `Zoom to ${feature.properties.point_count} grouped officers`)
+      state.expansionZoom = Math.min(
+        index.getClusterExpansionZoom(feature.properties.cluster_id),
+        18,
+      )
+      const from = [...state.currentPosition]
+      const targetUnchanged = state.targetPosition[0] === target[0]
+        && state.targetPosition[1] === target[1]
+      state.targetPosition = target
+      if (targetUnchanged && state.animationFrame) return
+      if (from[0] === target[0] && from[1] === target[1]) return
+      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      const startTime = performance.now()
+      let lastRenderedAt = 0
+      const tick = (now) => {
+        const progress = Math.min((now - startTime) / animationDurationMs, 1)
+        if (progress < 1 && now - lastRenderedAt < 1000 / 30) {
+          state.animationFrame = requestAnimationFrame(tick)
+          return
+        }
+        lastRenderedAt = now
+        const nextPosition = interpolateLatLng(from, target, progress)
+        state.currentPosition = nextPosition
+        state.marker.setLngLat([nextPosition[1], nextPosition[0]])
+        if (progress < 1) state.animationFrame = requestAnimationFrame(tick)
+        else state.animationFrame = null
+      }
+      state.animationFrame = requestAnimationFrame(tick)
+    })
+
+    clusterMarkerStatesRef.current.forEach((state, clusterKey) => {
+      if (activeClusterKeys.has(clusterKey)) return
+      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      state.marker.remove()
+      clusterMarkerStatesRef.current.delete(clusterKey)
     })
 
     markerStatesRef.current.forEach((state) => {
       if (state.element.classList.contains('is-followed')) state.element.style.display = ''
     })
-  }, [clearClusterMarkers])
+  }, [])
 
   const rebuildClusterIndex = useCallback(() => {
     const points = personnelRef.current
       .filter((member) => isValidPosition(member) && member.id !== followedPersonnelIdRef.current)
-      .map((member) => ({
-      type: 'Feature',
-      properties: {
-        memberId: member.id,
-        critical: member.isInsideCabagan === false || member.emergencyActive ? 1 : 0,
-        operation: member.operationActive ? 1 : 0,
-      },
-      geometry: {
-        type: 'Point',
-        coordinates: [Number(member.longitude), Number(member.latitude)],
-      },
-      }))
+      .map((member) => {
+        const markerState = markerStatesRef.current.get(member.id)
+        const effectivePosition = markerState?.targetPosition
+          || [Number(member.latitude), Number(member.longitude)]
+        return ({
+          type: 'Feature',
+          properties: {
+            memberId: member.id,
+            critical: member.isInsideCabagan === false || member.emergencyActive ? 1 : 0,
+            operation: member.operationActive ? 1 : 0,
+            motionDuration: markerState?.motionDuration || 0,
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [effectivePosition[1], effectivePosition[0]],
+          },
+        })
+      })
 
     clusterIndexRef.current = new Supercluster({
       radius: PERSONNEL_CLUSTER_RADIUS,
@@ -292,10 +366,15 @@ function PersonnelMap({
       map: (properties) => ({
         critical: properties.critical,
         operation: properties.operation,
+        motionDuration: properties.motionDuration,
       }),
       reduce: (accumulated, properties) => {
         accumulated.critical += properties.critical
         accumulated.operation += properties.operation
+        accumulated.motionDuration = Math.max(
+          accumulated.motionDuration,
+          properties.motionDuration,
+        )
       },
     }).load(points)
     renderClusters()
@@ -387,6 +466,9 @@ function PersonnelMap({
           pin: markerElement.pin,
           member,
           currentPosition: [Number(member.latitude), Number(member.longitude)],
+          targetPosition: [Number(member.latitude), Number(member.longitude)],
+          confirmedFix: confirmedFixFromMember(member),
+          motionDuration: 0,
           animationFrame: null,
         }
         markerStatesRef.current.set(member.id, state)
@@ -403,14 +485,26 @@ function PersonnelMap({
         state.photo.src = nextPhoto
       }
 
+      const confirmedFix = confirmedFixFromMember(member)
+      const rawTarget = [confirmedFix.latitude, confirmedFix.longitude]
+      const sameConfirmedFix = state.confirmedFix
+        && state.confirmedFix.latitude === confirmedFix.latitude
+        && state.confirmedFix.longitude === confirmedFix.longitude
+        && state.confirmedFix.recordedAt === confirmedFix.recordedAt
+      if (sameConfirmedFix) return
+
+      const motion = markerMotionForFixes(state.confirmedFix, confirmedFix)
       const from = [...state.currentPosition]
-      const target = [Number(member.latitude), Number(member.longitude)]
+      const target = motion.suppressJitter ? [...state.targetPosition] : rawTarget
+      state.confirmedFix = confirmedFix
+      state.targetPosition = target
+      state.motionDuration = motion.durationMs
       if (from[0] === target[0] && from[1] === target[1]) return
       if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
       if (member.id === followedPersonnelId) {
         map.easeTo({
           center: [target[1], target[0]],
-          duration: MARKER_ANIMATION_DURATION_MS,
+          duration: motion.durationMs,
           essential: true,
         })
       }
@@ -418,7 +512,7 @@ function PersonnelMap({
       let lastRenderedAt = 0
 
       const tick = (now) => {
-        const progress = Math.min((now - startTime) / MARKER_ANIMATION_DURATION_MS, 1)
+        const progress = Math.min((now - startTime) / motion.durationMs, 1)
         if (progress < 1 && now - lastRenderedAt < 1000 / 30) {
           state.animationFrame = requestAnimationFrame(tick)
           return

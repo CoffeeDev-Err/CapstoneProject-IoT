@@ -10,6 +10,10 @@ const {
 } = require('../models')
 const { hashPassword, isStrongPassword } = require('../utils/password')
 const {
+	assertAccountCanBeDeactivated,
+	isProtectedAccount,
+} = require('../utils/accountProtection')
+const {
 	FIELD_LIMITS,
 	normalizeBadgeNumber,
 	normalizeEmail,
@@ -48,15 +52,16 @@ const assertValidField = (field, message) => {
 const serializeAccount = (user, profile, device) => ({
 	id: String(user._id),
 	personnelId: user.personnelId,
-	fullName: profile?.fullName || '',
+	fullName: profile?.fullName || user.fullName || '',
 	badgeNumber: profile?.badgeNumber || '',
-	rank: profile?.rank || '',
+	rank: profile?.rank || user.rank || '',
 	mobileNumber: profile?.mobileNumber || '',
 	photoUrl: toMediaAccessPath(profile?.photoUrl || user.photoUrl || ''),
 	loginId: user.username,
 	officialEmail: user.email || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role === 'officer' ? 'Officer' : 'Supervisor',
+	isProtected: isProtectedAccount(user),
 	isMockAccount: Boolean(user.isMockAccount),
 	accountStatus: user.status === 'active' ? 'Active' : 'Inactive',
 	forcePasswordReset: user.forcePasswordReset,
@@ -104,6 +109,9 @@ const validateAccountPayload = (
 		assertValidField('badgeNumber', validateBadgeNumber(payload.badgeNumber))
 		assertValidField('rank', validateRank(payload.rank))
 		assertValidField('mobileNumber', validateMobileNumber(payload.mobileNumber))
+	} else {
+		assertValidField('fullName', validateFullName(payload.fullName))
+		assertValidField('rank', validateRank(payload.rank))
 	}
 	assertValidField('loginId', validateLoginId(payload.loginId, {
 		accountType: requirePersonnel ? 'officer' : 'supervisor',
@@ -294,13 +302,18 @@ const createAccountService = ({ io, personnelService }) => {
 		})
 
 		if (isSupervisor) {
+			if (String(payload.accountStatus || '').toLowerCase() === 'inactive') {
+				assertAccountCanBeDeactivated(user)
+			}
+			user.fullName = normalizeHumanName(payload.fullName)
+			user.rank = String(payload.rank).trim()
 			user.username = normalizeLoginId(payload.loginId)
 			const nextEmail = normalizeEmail(payload.officialEmail)
 			if (user.email !== nextEmail) {
 				user.email = nextEmail
 				user.emailVerifiedAt = null
 			}
-			user.status = normalizeStatus(payload.accountStatus)
+			user.status = 'active'
 			if (payload.photoUrl) user.photoUrl = payload.photoUrl
 			if (payload.temporaryPassword) {
 				user.passwordHash = await hashPassword(payload.temporaryPassword)
@@ -418,8 +431,14 @@ const createAccountService = ({ io, personnelService }) => {
 		await broadcastAccountData({
 			personnelId: user.personnelId,
 			name: profile.fullName,
+			badgeNumber: profile.badgeNumber,
 			rank: profile.rank,
+			mobileNumber: profile.mobileNumber,
 			photoUrl: toMediaAccessPath(profile.photoUrl),
+			loginId: user.username,
+			officialEmail: user.email || '',
+			emailVerified: Boolean(user.emailVerifiedAt),
+			accountStatus: user.status,
 		})
 		return serializeAccount(user, profile, assignment)
 	}
@@ -427,6 +446,7 @@ const createAccountService = ({ io, personnelService }) => {
 	const deactivateAccount = async (accountId, { ipAddress } = {}) => {
 		const user = await User.findById(accountId)
 		if (!user) throw createHttpError('Account not found.', 404)
+		assertAccountCanBeDeactivated(user)
 
 		const now = new Date()
 		user.status = 'inactive'
@@ -449,7 +469,10 @@ const createAccountService = ({ io, personnelService }) => {
 			ipAddress,
 		})
 
-		await broadcastAccountData()
+		await broadcastAccountData({
+			personnelId: user.personnelId,
+			accountStatus: user.status,
+		})
 		return {
 			message: 'Account deactivated and GPS assignment released.',
 		}

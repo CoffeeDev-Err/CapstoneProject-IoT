@@ -44,12 +44,12 @@
 
 .evidence-viewer__brand strong {
   color: #0f172a;
-  font-size: 1rem;
+  font-size: var(--font-size-base);
 }
 
 .evidence-viewer__brand span {
   color: #64748b;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
 }
 
 .evidence-viewer__topbar-actions {
@@ -89,7 +89,7 @@
   justify-content: center;
   gap: 0.45rem;
   padding: 0.65rem 0.9rem;
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   font-weight: 750;
   text-decoration: none;
 }
@@ -123,7 +123,7 @@
 
 .evidence-viewer__eyebrow {
   color: #2563eb;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -131,13 +131,13 @@
 
 .evidence-viewer__heading h1 {
   margin: 0.25rem 0 0;
-  font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+  font-size: var(--font-size-2xl);
 }
 
 .evidence-viewer__heading p {
   margin: 0.3rem 0 0;
   color: #64748b;
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
 }
 
 .evidence-viewer__download {
@@ -183,7 +183,7 @@
 
 .evidence-viewer__metadata dt {
   color: #64748b;
-  font-size: 0.68rem;
+  font-size: var(--font-size-xs);
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -192,7 +192,7 @@
   overflow-wrap: anywhere;
   margin: 0.3rem 0 0;
   color: #1e293b;
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
 }
 
@@ -202,7 +202,7 @@
   border-top: 1px solid #e5ebf2;
   background: #f8fafc;
   color: #64748b;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
 }
 
 .evidence-viewer__security-note svg {
@@ -233,7 +233,7 @@
 
 .evidence-viewer__state h1 {
   margin: 0.8rem 0 0;
-  font-size: 1.3rem;
+  font-size: var(--font-size-xl);
 }
 
 .evidence-viewer__state p {

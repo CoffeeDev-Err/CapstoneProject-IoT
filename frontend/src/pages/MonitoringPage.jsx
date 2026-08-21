@@ -15,7 +15,7 @@
  *   User clicks marker/name → setSelectedPersonnel → modal opens
  */
 import { useMemo, useState } from 'react'
-import { PanelLeft } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import ProfileModal from '../components/ProfileModal'
 import PersonnelMap from '../components/PersonnelMap'
 import SidePanel from '../components/SidePanel'
@@ -108,7 +108,11 @@ function MonitoringPage() {
             aria-label={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
             title={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
           >
-            <PanelLeft className="side-panel-collapse-icon" aria-hidden="true" />
+            {isSidePanelCollapsed ? (
+              <PanelLeftOpen className="side-panel-collapse-icon" aria-hidden="true" />
+            ) : (
+              <PanelLeftClose className="side-panel-collapse-icon" aria-hidden="true" />
+            )}
           </button>
 
           <SidePanel

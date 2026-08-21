@@ -294,23 +294,38 @@ const loadPersonnelMap = async (personnelIds = []) => {
 	return new Map(profiles.map((profile) => [profile.personnelId, profile]))
 }
 
+const emitDeploymentCollection = ({
+	io,
+	eventName,
+	deployments,
+	affectedPersonnelIds = [],
+}) => {
+	io.to('role:supervisor').emit(eventName, deployments)
+	const personnelIds = [...new Set([
+		...deployments.map((deployment) => deployment.personnelId),
+		...affectedPersonnelIds,
+	].map((personnelId) => String(personnelId || '').trim()).filter(Boolean))]
+	for (const personnelId of personnelIds) {
+		io.to(`personnel:${personnelId}`).emit(
+			eventName,
+			deployments.filter((deployment) => deployment.personnelId === personnelId),
+		)
+	}
+}
+
+const emitTaskRemoval = ({ io, taskId, personnelIds = [] }) => {
+	const recipients = [...new Set(
+		personnelIds.map((personnelId) => String(personnelId || '').trim()).filter(Boolean),
+	)]
+	for (const personnelId of recipients) {
+		io.to(`personnel:${personnelId}`).emit('task:removed', { id: taskId })
+	}
+}
+
 const createOperationalService = ({ io }) => {
 	const emitToSupervisorAndPersonnel = (eventName, payload, personnelId) => {
 		io.to('role:supervisor').emit(eventName, payload)
 		if (personnelId) io.to(`personnel:${personnelId}`).emit(eventName, payload)
-	}
-
-	const emitDeploymentCollection = (eventName, deployments) => {
-		io.to('role:supervisor').emit(eventName, deployments)
-		const personnelIds = [...new Set(
-			deployments.map((deployment) => deployment.personnelId).filter(Boolean),
-		)]
-		for (const personnelId of personnelIds) {
-			io.to(`personnel:${personnelId}`).emit(
-				eventName,
-				deployments.filter((deployment) => deployment.personnelId === personnelId),
-			)
-		}
 	}
 
 	const getOnDutyPersonnelIds = (now = new Date()) => Deployment.distinct('personnelId', {
@@ -479,13 +494,21 @@ const createOperationalService = ({ io }) => {
 	}
 
 	const reconcileDeploymentShifts = async ({ broadcast = true, now = new Date() } = {}) => {
-		const activatingDeployments = broadcast
-			? await Deployment.find({
+		const [activatingDeployments, completingDeployments] = await Promise.all([
+			Deployment.find({
 				status: 'scheduled',
 				shiftStart: { $ne: null, $lte: now },
 				shiftEnd: { $gt: now },
-			}).lean()
-			: []
+			}).lean(),
+			Deployment.find({
+				status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES },
+				shiftEnd: { $ne: null, $lte: now },
+			}).lean(),
+		])
+		const affectedPersonnelIds = [
+			...activatingDeployments.map((deployment) => deployment.personnelId),
+			...completingDeployments.map((deployment) => deployment.personnelId),
+		]
 		const completed = await Deployment.updateMany(
 			{ status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES }, shiftEnd: { $ne: null, $lte: now } },
 			{ $set: { status: 'completed' } },
@@ -524,7 +547,12 @@ const createOperationalService = ({ io }) => {
 				loadDeployments(),
 				getPersonnelWithLocations(),
 			])
-			emitDeploymentCollection('deployments:updated', deployments)
+			emitDeploymentCollection({
+				io,
+				eventName: 'deployments:updated',
+				deployments,
+				affectedPersonnelIds,
+			})
 			emitPersonnelCollection(io, 'personnel:update', personnel)
 			io.emit('dashboard:updated')
 		}
@@ -575,7 +603,7 @@ const createOperationalService = ({ io }) => {
 			}
 		}
 
-		return { changed, onDutyPersonnelIds }
+		return { affectedPersonnelIds, changed, onDutyPersonnelIds }
 	}
 
 	const acknowledgeDeployment = async (assignmentId, personnelId) => {
@@ -707,6 +735,7 @@ const createOperationalService = ({ io }) => {
 				body: { success: false, message: 'A cancelled task cannot be completed.' },
 			}
 		}
+		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
 		task.status = 'completed'
 		task.completedAt = new Date()
 		await task.save()
@@ -728,6 +757,11 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', taskId: task.taskId },
 			dedupeKey: `task:${task.taskId}:completed`,
 		})))
+		emitTaskRemoval({
+			io,
+			taskId: task.taskId,
+			personnelIds: previouslyEligiblePersonnelIds,
+		})
 		await emitTaskToAuthorizedOfficers('task:updated', serialized, task)
 		return { status: 200, body: { success: true, task: serialized } }
 	}
@@ -760,6 +794,7 @@ const createOperationalService = ({ io }) => {
 				body: { success: false, message: 'A completed backup request cannot be cancelled.' },
 			}
 		}
+		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
 
 		if (task.status !== 'cancelled') {
 			task.status = 'cancelled'
@@ -781,6 +816,11 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', taskId: task.taskId },
 			dedupeKey: `task:${task.taskId}:cancelled`,
 		})))
+		emitTaskRemoval({
+			io,
+			taskId: task.taskId,
+			personnelIds: previouslyEligiblePersonnelIds,
+		})
 		await emitTaskToAuthorizedOfficers('task:updated', serialized, task)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, task: serialized } }
@@ -981,7 +1021,7 @@ const createOperationalService = ({ io }) => {
 			{ returnDocument: 'after' },
 		)
 		if (!deployment) return createNotFoundResult('Deployment')
-		await reconcileDeploymentShifts({ broadcast: false })
+		const reconciliation = await reconcileDeploymentShifts({ broadcast: false })
 		const [activeDeployments, personnel] = await Promise.all([
 			loadDeployments(),
 			getPersonnelWithLocations(),
@@ -1002,7 +1042,15 @@ const createOperationalService = ({ io }) => {
 			data: { destination: status === 'active' ? 'Map' : 'Tasks', assignmentId },
 			dedupeKey: `deployment:${assignmentId}:status:${status}`,
 		})
-		emitDeploymentCollection('deployments:updated', activeDeployments)
+		emitDeploymentCollection({
+			io,
+			eventName: 'deployments:updated',
+			deployments: activeDeployments,
+			affectedPersonnelIds: [
+				deployment.personnelId,
+				...reconciliation.affectedPersonnelIds,
+			],
+		})
 		emitPersonnelCollection(io, 'personnel:update', personnel)
 		return {
 			status: 200,
@@ -1731,7 +1779,7 @@ const createOperationalService = ({ io }) => {
 			{ $set: { status: 'cancelled' } },
 		)
 
-		await reconcileDeploymentShifts({ broadcast: false })
+		const reconciliation = await reconcileDeploymentShifts({ broadcast: false })
 		const [activeDeployments, manageablePayload, personnel] = await Promise.all([
 			loadDeployments(),
 			listDeployments({ view: 'manageable', limit: 100 }),
@@ -1784,7 +1832,16 @@ const createOperationalService = ({ io }) => {
 			data: { destination: 'Tasks', assignmentId: deployment.assignmentId },
 			dedupeKey: `deployment:${deployment.assignmentId}:cancelled`,
 		})))
-		emitDeploymentCollection('deployments:updated', activeDeployments)
+		emitDeploymentCollection({
+			io,
+			eventName: 'deployments:updated',
+			deployments: activeDeployments,
+			affectedPersonnelIds: [
+				...previousDeployments.map((deployment) => deployment.personnelId),
+				...normalizedAssignments.map((assignment) => assignment.personnelId),
+				...reconciliation.affectedPersonnelIds,
+			],
+		})
 		emitPersonnelCollection(io, 'personnel:update', personnel)
 		io.emit('dashboard:updated')
 		return manageablePayload.data
@@ -1830,4 +1887,6 @@ const createOperationalService = ({ io }) => {
 
 module.exports = createOperationalService
 module.exports.canOfficerReadTask = canOfficerReadTask
+module.exports.emitDeploymentCollection = emitDeploymentCollection
+module.exports.emitTaskRemoval = emitTaskRemoval
 module.exports.taskParticipantIds = taskParticipantIds

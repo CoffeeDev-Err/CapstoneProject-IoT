@@ -18,6 +18,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
+import GuestOnlyRoute from '../components/GuestOnlyRoute'
 import ProtectedRoute from '../components/ProtectedRoute'
 
 const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
@@ -53,14 +54,17 @@ function AppRoutes() {
           <Route path="/" element={withPageLoader(<MonitoringPage />)} />
           <Route path="/monitoring" element={withPageLoader(<DashboardPage />)} />
           <Route path="/analytics" element={withPageLoader(<AnalyticsPage />)} />
-          <Route path="/assign-area" element={withPageLoader(<AssignAreaPage />)} />
+          <Route path="/assign-area" element={withPageLoader(<AssignAreaPage key="deployment-form" />)} />
+          <Route path="/deployments" element={withPageLoader(<AssignAreaPage key="deployment-list" view="list" />)} />
           <Route path="/personnel" element={withPageLoader(<PersonnelPage />)} />
           <Route path="/reports" element={withPageLoader(<ReportsPage />)} />
           <Route path="/settings" element={withPageLoader(<SettingsPage />)} />
         </Route>
       </Route>
 
-      <Route path="/login" element={withPageLoader(<LoginPage />)} />
+      <Route element={<GuestOnlyRoute />}>
+        <Route path="/login" element={withPageLoader(<LoginPage />)} />
+      </Route>
 
       {/* Redirect any unrecognised path back to the dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />

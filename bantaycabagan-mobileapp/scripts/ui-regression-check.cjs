@@ -15,6 +15,10 @@ const swipeSheetSource = readFileSync(
   resolve(projectRoot, 'src/components/SwipeDismissSheet.tsx'),
   'utf8',
 );
+const reportsSource = readFileSync(
+  resolve(projectRoot, 'src/screens/ReportsScreen.tsx'),
+  'utf8',
+);
 
 assert.match(operationsApiSource, /import \{ File \} from 'expo-file-system'/);
 assert.match(operationsApiSource, /new File\(input\.evidence_photo\.uri\)/);
@@ -37,5 +41,15 @@ assert.match(
   /styles\.assignmentCard,\s*\{ backgroundColor: colors\.surface, borderColor: colors\.border \}/s,
 );
 assert.match(swipeSheetSource, /\{ backgroundColor: colors\.surface \}/);
+assert.match(
+  reportsSource,
+  /<FlatList\s+key=\{`reports-\$\{filter\}`\}/s,
+  'Changing report filters must remount the virtualized list so stale cell measurements are discarded',
+);
+assert.doesNotMatch(
+  reportsSource,
+  /LinearTransition|layout=\{[^}]*CARD_LAYOUT/,
+  'Animated card layout measurements cause large stale gaps after report filter changes',
+);
 
 console.log('Mobile upload and dark-theme UI regression checks passed.');

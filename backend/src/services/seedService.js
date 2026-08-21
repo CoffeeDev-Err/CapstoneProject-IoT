@@ -235,6 +235,8 @@ const seedDatabase = async (models) => {
 	const supervisorLoginId = String(process.env.SUPERVISOR_LOGIN_ID || '').trim().toLowerCase()
 	const supervisorEmail = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase()
 	const supervisorPassword = String(process.env.SUPERVISOR_TEMP_PASSWORD || '')
+	const supervisorFullName = String(process.env.SUPERVISOR_FULL_NAME || '').trim()
+	const supervisorRank = String(process.env.SUPERVISOR_RANK || '').trim()
 	if (supervisorLoginId && supervisorEmail && supervisorPassword) {
 		const existingSupervisor = await findProvisionedUser({
 			username: supervisorLoginId,
@@ -244,14 +246,19 @@ const seedDatabase = async (models) => {
 			await User.create({
 				username: supervisorLoginId,
 				email: supervisorEmail,
+				fullName: supervisorFullName,
+				rank: supervisorRank,
 				passwordHash: await hashPassword(supervisorPassword),
 				role: 'supervisor',
 				status: 'active',
 				forcePasswordReset: true,
 			})
 			console.log(`Created initial supervisor account: ${supervisorLoginId}`)
-		} else if (!existingSupervisor.email) {
-			existingSupervisor.email = supervisorEmail
+		} else {
+			if (!existingSupervisor.email) existingSupervisor.email = supervisorEmail
+			if (supervisorFullName) existingSupervisor.fullName = supervisorFullName
+			if (supervisorRank) existingSupervisor.rank = supervisorRank
+			if (existingSupervisor.status !== 'active') existingSupervisor.status = 'active'
 			await existingSupervisor.save()
 		}
 	}

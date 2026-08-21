@@ -2,7 +2,7 @@
 
 .settings-label {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   color: var(--text-primary);
   text-transform: none;
@@ -10,7 +10,7 @@
 
 .settings-hint {
   margin: 0.3rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -19,7 +19,7 @@
   padding: 0.6rem 0.85rem;
   border: 1px solid var(--border-color);
   border-radius: 9px;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: var(--text-primary);
   background: var(--bg-secondary);
   outline: none;
@@ -64,7 +64,7 @@
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.844rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   border-radius: 9px;
   padding: 0.5rem 0.85rem;
@@ -165,8 +165,8 @@
   resize: vertical;
 }
 
-.account-field span {
-  font-size: 0.75rem;
+.account-field > span {
+  font-size: var(--font-size-xs);
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -179,6 +179,104 @@
 
 .account-field--full {
   grid-column: 1 / -1;
+}
+
+.account-rank-picker {
+  display: grid;
+  min-width: 0;
+  position: relative;
+}
+
+.account-rank-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-rank-trigger__icon {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.account-rank-dropdown {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  max-height: var(--account-rank-max-height, min(260px, 38vh));
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.account-rank-dropdown--below {
+  top: calc(100% + 0.35rem);
+}
+
+.account-rank-dropdown--above {
+  bottom: calc(100% + 0.35rem);
+}
+
+.account-rank-search {
+  flex: 0 0 auto;
+  padding: 0.55rem;
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.account-rank-search .settings-input {
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
+}
+
+.account-rank-options {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.3rem;
+}
+
+.account-rank-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 36px;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+
+.account-rank-option:hover,
+.account-rank-option:focus-visible {
+  background: var(--color-success-soft);
+}
+
+.account-rank-option.is-selected {
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.account-rank-empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
 }
 
 .account-photo-actions {
@@ -230,7 +328,7 @@
 .account-table-avatar {
   width: 36px;
   height: 36px;
-  font-size: 0.78rem;
+  font-size: var(--font-size-base);
 }
 
 .account-password-row {
@@ -241,7 +339,7 @@
 
 .field-error {
   color: var(--color-danger-dark);
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   font-weight: 600;
 }
 
@@ -253,7 +351,7 @@
   min-height: 44px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  font-size: 0.813rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   padding: 0.65rem 1rem;
   cursor: pointer;
@@ -304,7 +402,7 @@
   border: 1px solid #93c5fd;
   background: #eff6ff;
   color: #1d4ed8;
-  font-size: 0.844rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   letter-spacing: 0.01em;
   text-transform: uppercase;
@@ -337,7 +435,7 @@
 
 .account-table-meta {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
 }
 
 .account-table-section {
@@ -398,7 +496,7 @@
   border-radius: 8px;
   background: var(--bg-primary);
   color: var(--text-secondary);
-  font-size: 0.813rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   font-family: var(--font-body);
   letter-spacing: 0.01em;
@@ -443,4 +541,22 @@
   background: var(--color-danger-dark);
   color: #ffffff;
   box-shadow: none;
+}
+
+.account-protected-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  min-width: 96px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: not-allowed;
 }

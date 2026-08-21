@@ -25,8 +25,22 @@ type AuthContextValue = {
   token: string | null;
   user: AuthUser | null;
   establishSession: (session: AuthSession) => Promise<void>;
+  applyIdentityUpdate: (identity: AuthIdentityUpdate) => void;
   clearSession: () => Promise<void>;
   logout: () => Promise<void>;
+};
+
+export type AuthIdentityUpdate = {
+  personnelId?: string;
+  name?: string;
+  badgeNumber?: string;
+  rank?: string;
+  mobileNumber?: string;
+  photoUrl?: string;
+  loginId?: string;
+  officialEmail?: string;
+  emailVerified?: boolean;
+  accountStatus?: string;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -46,6 +60,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setStoredAuthToken(TOKEN_KEY, session.token);
     setToken(session.token);
     setUser(session.user);
+  }, []);
+
+  const applyIdentityUpdate = useCallback((identity: AuthIdentityUpdate) => {
+    setUser((current) => {
+      if (!current || !identity.personnelId || current.personnelId !== identity.personnelId) {
+        return current;
+      }
+      return {
+        ...current,
+        username: identity.loginId ?? current.username,
+        email: identity.officialEmail ?? current.email,
+        emailVerified: identity.emailVerified ?? current.emailVerified,
+        profile: current.profile ? {
+          ...current.profile,
+          fullName: identity.name ?? current.profile.fullName,
+          badgeNumber: identity.badgeNumber ?? current.profile.badgeNumber,
+          rank: identity.rank ?? current.profile.rank,
+          mobileNumber: identity.mobileNumber ?? current.profile.mobileNumber,
+          photoUrl: identity.photoUrl ?? current.profile.photoUrl,
+        } : current.profile,
+      };
+    });
   }, []);
 
   const logout = useCallback(async () => {
@@ -73,13 +109,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({
+    applyIdentityUpdate,
     loading,
     token,
     user,
     establishSession,
     clearSession,
     logout,
-  }), [clearSession, establishSession, loading, logout, token, user]);
+  }), [applyIdentityUpdate, clearSession, establishSession, loading, logout, token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

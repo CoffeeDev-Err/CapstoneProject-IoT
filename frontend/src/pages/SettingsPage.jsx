@@ -5,8 +5,9 @@
  * Includes a supervisor-only account provisioning form so mobile users
  * do not need an in-app signup flow.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
+import { useFeedback } from '../context/useFeedback'
 import {
   createAccount,
   deactivateAccount,
@@ -31,6 +32,7 @@ import {
   validateRank,
 } from '../utils/accountValidation'
 import { getAccountEditCancelledMessage } from '../utils/workflowFeedback'
+import { matchesPrefixSearch } from '../utils/searchMatching'
 
 const rankOptions = POLICE_RANKS
 
@@ -90,6 +92,7 @@ const formatDateTime = (isoValue) => {
 }
 
 function SettingsPage() {
+  const { showFeedback } = useFeedback()
   const [accountForm, setAccountForm] = useState(initialFormState)
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
@@ -107,6 +110,10 @@ function SettingsPage() {
   const [devicesSetupPending, setDevicesSetupPending] = useState(false)
   const [accountsLoading, setAccountsLoading] = useState(true)
   const [accountRequestPending, setAccountRequestPending] = useState(false)
+
+  useEffect(() => {
+    if (formMessage) showFeedback(formMessage, { type: formMessageKind })
+  }, [formMessage, formMessageKind, showFeedback])
 
   const loadAccounts = async () => {
     setAccountsLoading(true)
@@ -147,16 +154,8 @@ function SettingsPage() {
   }, [])
 
   const filteredAccounts = useMemo(() => {
-    const query = accountSearch.trim().toLowerCase()
-
-    if (!query) {
-      return createdAccounts
-    }
-
-    const tokens = query.split(/\s+/).filter(Boolean)
-
-    return createdAccounts.filter((account) => {
-      const searchableText = [
+    return createdAccounts.filter((account) => (
+      matchesPrefixSearch(accountSearch, [
         account.fullName,
         account.rank,
         account.badgeNumber,
@@ -166,12 +165,8 @@ function SettingsPage() {
         account.officialEmail,
         account.accountStatus,
         account.mobileNumber,
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      return tokens.every((token) => searchableText.includes(token))
-    })
+      ])
+    ))
   }, [accountSearch, createdAccounts])
 
   const assignedImeiToAccount = useMemo(
@@ -186,6 +181,20 @@ function SettingsPage() {
   const isEditingSupervisor = editingAccount?.role === 'Supervisor'
   const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
   const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount
+  const isAccountFormComplete = useMemo(() => {
+    const requiredValues = isEditingSupervisor
+      ? [accountForm.fullName, accountForm.rank, accountForm.loginId, accountForm.officialEmail]
+      : [
+          accountForm.fullName,
+          accountForm.badgeNumber,
+          accountForm.rank,
+          accountForm.loginId,
+          accountForm.officialEmail,
+          ...(!editingAccountId ? [accountForm.temporaryPassword] : []),
+          ...(requiresGpsDevice ? [accountForm.imei, accountForm.flespiDeviceId] : []),
+        ]
+    return requiredValues.every((value) => String(value || '').trim())
+  }, [accountForm, editingAccountId, isEditingSupervisor, requiresGpsDevice])
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
@@ -221,6 +230,16 @@ function SettingsPage() {
       if (!prev.imei) return prev
       const nextErrors = { ...prev }
       delete nextErrors.imei
+      return nextErrors
+    })
+  }
+
+  const handleRankChange = (rank) => {
+    setAccountForm((prev) => ({ ...prev, rank }))
+    setFormErrors((prev) => {
+      if (!prev.rank) return prev
+      const nextErrors = { ...prev }
+      delete nextErrors.rank
       return nextErrors
     })
   }
@@ -267,14 +286,15 @@ function SettingsPage() {
   const validateAccountForm = () => {
     const errors = {}
 
+    const fullNameError = validateFullName(accountForm.fullName)
+    const rankError = validateRank(accountForm.rank)
+    if (fullNameError) errors.fullName = fullNameError
+    if (rankError) errors.rank = rankError
+
     if (!isEditingSupervisor) {
-      const fullNameError = validateFullName(accountForm.fullName)
       const badgeNumberError = validateBadgeNumber(accountForm.badgeNumber)
-      const rankError = validateRank(accountForm.rank)
       const mobileNumberError = validateMobileNumber(accountForm.mobileNumber)
-      if (fullNameError) errors.fullName = fullNameError
       if (badgeNumberError) errors.badgeNumber = badgeNumberError
-      if (rankError) errors.rank = rankError
       if (mobileNumberError) errors.mobileNumber = mobileNumberError
 
       if (requiresGpsDevice && !accountForm.imei.trim()) {
@@ -389,7 +409,7 @@ function SettingsPage() {
       imei: account.imei ?? '',
       flespiDeviceId: account.flespiDeviceId ?? '',
       flespiDeviceName: account.flespiDeviceName ?? '',
-      rank: account.rank ?? rankOptions[0],
+      rank: account.rank || rankOptions[0],
       loginId: account.loginId ?? '',
       officialEmail: account.officialEmail ?? '',
       temporaryPassword: '',
@@ -406,7 +426,11 @@ function SettingsPage() {
   const handleDeleteAccount = (accountId) => {
     const account = createdAccounts.find((item) => item.id === accountId)
 
-    if (!account) {
+    if (!account || account.isProtected || account.role === 'Supervisor') {
+      if (account) {
+        setFormMessage('COP/admin accounts are protected and cannot be deactivated.')
+        setFormMessageKind('error')
+      }
       return
     }
 
@@ -460,17 +484,17 @@ function SettingsPage() {
     setFormErrors(errors)
 
     if (Object.keys(errors).length > 0) {
-      setFormMessage('Please correct the highlighted account fields.')
-      setFormMessageKind('error')
       return
     }
 
     const normalizedPayload = isEditingSupervisor
       ? {
+          fullName: normalizeHumanName(accountForm.fullName),
+          rank: accountForm.rank,
           loginId: normalizeLoginId(accountForm.loginId),
           officialEmail: normalizeEmail(accountForm.officialEmail),
           temporaryPassword: accountForm.temporaryPassword,
-          accountStatus: editingAccount?.accountStatus || 'Active',
+          accountStatus: 'Active',
         }
       : {
           fullName: normalizeHumanName(accountForm.fullName),
@@ -524,7 +548,10 @@ function SettingsPage() {
           temporaryPassword: 'temporaryPassword',
         }
         const formField = fieldMap[error.field]
-        if (formField) setFormErrors((prev) => ({ ...prev, [formField]: error.message }))
+        if (formField) {
+          setFormErrors((prev) => ({ ...prev, [formField]: error.message }))
+          return
+        }
       }
       setFormMessage(error.message)
       setFormMessageKind('error')
@@ -564,21 +591,12 @@ function SettingsPage() {
               </button>
             </div>
 
-            {formMessage && (
-              <p
-                className={`account-feedback account-feedback--inline mb-3 ${formMessageKind === 'error' ? 'account-feedback--error' : ''}`}
-                role="status"
-              >
-                {formMessage}
-              </p>
-            )}
-
             {activeAccountView === 'create' && (
               <div className="account-create-section">
                 <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount} noValidate>
 	                  {isEditingSupervisor && (
 	                    <p className="settings-hint account-role-note">
-	                      Supervisor accounts are for web monitoring and administration. A badge, field rank, mobile number, and GPS device are not required.
+	                      This protected COP/admin account is for web monitoring and administration. It cannot be deactivated. A badge, mobile number, and GPS device are not required.
 	                    </p>
 	                  )}
 	                  <div className="account-form-grid">
@@ -597,8 +615,6 @@ function SettingsPage() {
 	                  </div>
 	                  {formErrors.profilePhoto && <small className="field-error">{formErrors.profilePhoto}</small>}
 	                </div>
-	                {!isEditingSupervisor && (
-	                  <>
 	                <label className="account-field">
                   <span>Full Name *</span>
                   <input
@@ -614,6 +630,7 @@ function SettingsPage() {
                   {formErrors.fullName && <small className="field-error">{formErrors.fullName}</small>}
                 </label>
 
+	                {!isEditingSupervisor && (
                 <label className="account-field">
                   <span>Badge Number *</span>
                   <input
@@ -628,26 +645,17 @@ function SettingsPage() {
                   />
                   {formErrors.badgeNumber && <small className="field-error">{formErrors.badgeNumber}</small>}
                 </label>
-
-                <label className="account-field">
-	                  <span>Rank *</span>
-                  <select
-                    className={`settings-input w-100 ${formErrors.rank ? 'settings-input--error' : ''}`}
-                    value={accountForm.rank}
-                    onChange={handleFieldChange('rank')}
-                    onBlur={handleFieldBlur('rank')}
-                    aria-invalid={Boolean(formErrors.rank)}
-                  >
-                    {rankOptions.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.rank && <small className="field-error">{formErrors.rank}</small>}
-	                </label>
-	                  </>
 	                )}
+
+                <div className="account-field">
+	                  <span id="account-rank-label">Rank *</span>
+                  <RankPicker
+                    value={accountForm.rank}
+                    onChange={handleRankChange}
+                    invalid={Boolean(formErrors.rank)}
+                  />
+                  {formErrors.rank && <small className="field-error">{formErrors.rank}</small>}
+	                </div>
 
                 {!isEditingSupervisor && (
                 <div className="account-field account-field--wide">
@@ -791,7 +799,7 @@ function SettingsPage() {
                     <button
                       type="submit"
                       className="account-submit-btn"
-	                      disabled={accountRequestPending || (requiresGpsDevice && (devicesLoading || flespiDevices.length === 0))}
+	                      disabled={!isAccountFormComplete || accountRequestPending || (requiresGpsDevice && (devicesLoading || flespiDevices.length === 0))}
 	                      title={requiresGpsDevice && flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
                     >
                       {accountRequestPending
@@ -879,7 +887,7 @@ function SettingsPage() {
 	                                <span>{account.fullName || 'Supervisor account'}</span>
 	                              </div>
 	                            </td>
-	                            <td>{account.role === 'Supervisor' ? 'Supervisor' : account.rank}</td>
+	                            <td>{account.rank || account.role}</td>
 	                            <td className="personnel-badge">{account.role === 'Supervisor' ? '-' : account.badgeNumber}</td>
 	                            <td>
 	                              {account.role === 'Supervisor' ? (
@@ -919,14 +927,20 @@ function SettingsPage() {
                                 >
                                   Edit
                                 </button>
-                                <button
-                                  type="button"
-                                  className="account-table-btn account-table-btn--delete"
-                                  onClick={() => handleDeleteAccount(account.id)}
-                                  disabled={accountRequestPending || account.accountStatus === 'Inactive'}
-                                >
-                                  Delete
-                                </button>
+                                {account.isProtected || account.role === 'Supervisor' ? (
+                                  <span className="account-protected-label" title="COP/admin accounts cannot be deactivated.">
+                                    Protected
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="account-table-btn account-table-btn--delete"
+                                    onClick={() => handleDeleteAccount(account.id)}
+                                    disabled={accountRequestPending || account.accountStatus === 'Inactive'}
+                                  >
+                                    Deactivate
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -954,6 +968,123 @@ function SettingsPage() {
         onConfirm={handleConfirmDeleteAccount}
         onCancel={handleCancelDeleteAccount}
       />
+    </div>
+  )
+}
+
+function RankPicker({ value, onChange, invalid }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [dropdownLayout, setDropdownLayout] = useState({ placement: 'below', maxHeight: 260 })
+  const pickerRef = useRef(null)
+  const filteredRanks = useMemo(() => (
+    rankOptions.filter((rank) => matchesPrefixSearch(search, [rank]))
+  ), [search])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const handlePointerDownOutside = (event) => {
+      if (!pickerRef.current?.contains(event.target)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDownOutside)
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside)
+  }, [open])
+
+  const closePicker = () => {
+    setOpen(false)
+    setSearch('')
+  }
+
+  const togglePicker = () => {
+    if (open) {
+      closePicker()
+      return
+    }
+
+    const pickerBounds = pickerRef.current?.getBoundingClientRect()
+    const topBarBottom = document.querySelector('.top-bar')?.getBoundingClientRect().bottom || 0
+    const viewportHeight = window.innerHeight
+    const desiredHeight = Math.min(260, viewportHeight * 0.38)
+    const spaceBelow = Math.max(0, viewportHeight - (pickerBounds?.bottom || 0) - 12)
+    const spaceAbove = Math.max(0, (pickerBounds?.top || 0) - topBarBottom - 12)
+    const placement = spaceBelow >= Math.min(180, desiredHeight) || spaceBelow >= spaceAbove
+      ? 'below'
+      : 'above'
+    const availableSpace = placement === 'below' ? spaceBelow : spaceAbove
+
+    setDropdownLayout({
+      placement,
+      maxHeight: Math.min(desiredHeight, availableSpace),
+    })
+    setSearch('')
+    setOpen(true)
+  }
+
+  return (
+    <div
+      ref={pickerRef}
+      className="account-rank-picker"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') closePicker()
+      }}
+    >
+      <button
+        type="button"
+        className={`settings-input account-rank-trigger${invalid ? ' settings-input--error' : ''}`}
+        onClick={togglePicker}
+        aria-labelledby="account-rank-label account-rank-value"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls="account-rank-options"
+        aria-invalid={invalid}
+      >
+        <span id="account-rank-value">{value}</span>
+        <span className="account-rank-trigger__icon" aria-hidden="true">⌄</span>
+      </button>
+
+      {open && (
+        <div
+          className={`account-rank-dropdown account-rank-dropdown--${dropdownLayout.placement}`}
+          style={{ '--account-rank-max-height': `${dropdownLayout.maxHeight}px` }}
+        >
+          <div className="account-rank-search">
+            <input
+              type="search"
+              className="settings-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search rank"
+              aria-label="Search police rank"
+              autoFocus
+            />
+          </div>
+          <div id="account-rank-options" className="account-rank-options" role="listbox">
+            {filteredRanks.length === 0 ? (
+              <p className="account-rank-empty">No matching rank.</p>
+            ) : filteredRanks.map((rank) => (
+              <button
+                key={rank}
+                type="button"
+                role="option"
+                aria-selected={value === rank}
+                className={`account-rank-option${value === rank ? ' is-selected' : ''}`}
+                onClick={() => {
+                  onChange(rank)
+                  closePicker()
+                }}
+              >
+                <span>{rank}</span>
+                {value === rank && <span aria-hidden="true">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -239,8 +239,10 @@ export const usePersonnelRealtime = () => {
 
     /**
      * personnel:update
-     * Received every 4 seconds from the server setInterval.
-     * Replaces the entire personnel array so all map markers move smoothly.
+     * Received whenever Flespi publishes a new tracker fix (the deployed
+     * tracker uploads every 10 seconds), with REST polling as fallback.
+     * Replaces the personnel snapshot so map markers can interpolate between
+     * the last confirmed position and the new fix.
      */
     const onUpdate = (payload) => {
       if (Array.isArray(payload)) {

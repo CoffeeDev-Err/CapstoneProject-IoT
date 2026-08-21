@@ -141,6 +141,23 @@
 [data-theme="dark"] .dropdown-item--logout:hover svg { color: #ffffff; }
 
 /* Cards & panels */
+[data-theme="dark"] .side-panel-shell {
+  background: #0b1528;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+[data-theme="dark"] .side-panel-collapse-btn {
+  background: #17233a;
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #a9b9cf;
+}
+
+[data-theme="dark"] .side-panel-collapse-btn:hover {
+  background: #20314f;
+  border-color: rgba(147, 197, 253, 0.55);
+  color: #dbeafe;
+}
+
 [data-theme="dark"] .metric-card,
 [data-theme="dark"] .status-card,
 [data-theme="dark"] .list-card,
@@ -988,6 +1005,24 @@
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.22);
 }
+[data-theme="dark"] .account-rank-dropdown {
+  border-color: #334155;
+  background: #0f172a;
+}
+[data-theme="dark"] .account-rank-search {
+  border-bottom-color: #334155;
+}
+[data-theme="dark"] .account-rank-option {
+  color: #e2e8f0;
+}
+[data-theme="dark"] .account-rank-option:hover,
+[data-theme="dark"] .account-rank-option:focus-visible {
+  background: #1e293b;
+}
+[data-theme="dark"] .account-rank-option.is-selected {
+  background: #2563eb;
+  color: #ffffff;
+}
 [data-theme="dark"] .account-field span { color: #94a3b8; }
 [data-theme="dark"] .field-error { color: #3b82f6; }
 [data-theme="dark"] .account-table-meta { color: #94a3b8; }
@@ -1126,7 +1161,7 @@
 
   .account-table-btn {
     min-width: 76px;
-    font-size: 0.74rem;
+    font-size: var(--font-size-xs);
     padding: 0.32rem 0.58rem;
   }
 }
@@ -1342,7 +1377,7 @@
   }
 
   .top-bar h1 {
-    font-size: 1rem;
+    font-size: var(--font-size-base);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

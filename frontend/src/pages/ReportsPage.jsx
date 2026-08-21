@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Eye, Search } from 'lucide-react'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
+import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { updateReportValidation } from '../services/operations'
+import { matchesPrefixSearch } from '../utils/searchMatching'
 
 const REPORTS_PER_PAGE = 10
 
@@ -68,7 +70,7 @@ const getReportCsvRows = (report) => [
 
 function ReportsPage() {
   const { reports: realtimeReports, refreshReports } = usePersonnelContext()
-  const [reportMessage, setReportMessage] = useState('')
+  const { showFeedback } = useFeedback()
   const [selectedReportId, setSelectedReportId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [reportTypeFilter, setReportTypeFilter] = useState('all')
@@ -90,10 +92,8 @@ function ReportsPage() {
     [reports],
   )
   const filteredReports = useMemo(() => {
-    const normalizedSearchTerm = searchTerm.trim().toLowerCase()
-
     return reports.filter((report) => {
-      const matchesSearch = !normalizedSearchTerm || [
+      const matchesSearch = matchesPrefixSearch(searchTerm, [
         report.id,
         report.personnel_id,
         report.officer,
@@ -101,7 +101,7 @@ function ReportsPage() {
         report.barangay,
         report.title,
         report.location,
-      ].some((value) => String(value || '').toLowerCase().includes(normalizedSearchTerm))
+      ])
       const matchesType = reportTypeFilter === 'all' || report.report_type === reportTypeFilter
       const matchesStatus = caseStatusFilter === 'all'
         || (caseStatusFilter === 'open' && report.is_incident && report.case_status !== 'resolved')
@@ -148,17 +148,19 @@ function ReportsPage() {
       setReviewState({
         isSaving: false,
         error: '',
-        message: `Report marked ${validationStatus}. Analytics has been updated.`,
+        message: '',
       })
+      showFeedback(`Report marked ${validationStatus}. Analytics has been updated.`, { type: 'success' })
     } catch (error) {
-      setReviewState({ isSaving: false, error: error.message, message: '' })
+      setReviewState({ isSaving: false, error: '', message: '' })
+      showFeedback(error.message, { type: 'error', title: 'Report update failed' })
     }
-  }, [refreshReports, reviewState.isSaving, selectedReport])
+  }, [refreshReports, reviewState.isSaving, selectedReport, showFeedback])
 
   const handleDownloadReport = useCallback((report) => {
     downloadCsv(getReportCsvRows(report), `${report.id.toLowerCase()}.csv`)
-    setReportMessage(`${report.id} downloaded successfully.`)
-  }, [])
+    showFeedback(`${report.id} downloaded successfully.`, { type: 'success' })
+  }, [showFeedback])
 
   const updateSearchTerm = (value) => {
     setSearchTerm(value)
@@ -231,12 +233,6 @@ function ReportsPage() {
             </select>
           </label>
         </div>
-
-        {reportMessage && (
-          <div className="report-feedback-slot" aria-live="polite">
-            <small className="report-feedback">{reportMessage}</small>
-          </div>
-        )}
 
         <div className="report-list" role="table" aria-label="Submitted police reports">
           <div className="report-list__header" role="row">

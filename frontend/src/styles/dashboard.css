@@ -14,7 +14,7 @@
 
 .stat-card__label {
   margin: 0 0 var(--space-xs);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: var(--text-tertiary);
   font-weight: 700;
   text-transform: uppercase;
@@ -27,7 +27,7 @@
   align-items: center;
   gap: 0.35rem;
   color: #1d4ed8;
-  font-size: 0.68rem;
+  font-size: var(--font-size-xs);
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -42,7 +42,7 @@
 
 .stat-card__value {
   display: block;
-  font-size: 2.2rem;
+  font-size: var(--font-size-3xl);
   font-weight: 800;
   color: var(--text-primary);
   margin-bottom: var(--space-xs);
@@ -53,14 +53,14 @@
 
 .stat-card__subtext {
   margin: 0 0 var(--space-xs);
-  font-size: 0.813rem;
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
   line-height: 1.4;
   font-weight: 500;
 }
 
 .stat-card__change {
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   padding: var(--space-2xs) var(--space-xs);
   border-radius: 999px;
@@ -78,7 +78,7 @@
 
 .widget-title {
   margin: 0 0 1rem;
-  font-size: 1rem;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: 0.015em;
@@ -112,14 +112,14 @@
 
 .activity-text {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: #334155;
   line-height: 1.5;
 }
 
 .activity-time {
   display: block;
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
   color: #94a3b8;
   margin-bottom: 0.15rem;
 }
@@ -138,7 +138,7 @@
 
 .coverage-label {
   width: 145px;
-  font-size: 0.813rem;
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
   flex-shrink: 0;
   font-weight: 600;
@@ -164,7 +164,7 @@
 }
 
 .coverage-pct {
-  font-size: 0.813rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   color: var(--text-primary);
   width: 40px;
