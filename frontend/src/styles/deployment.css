@@ -11,7 +11,7 @@
   border-radius: 8px;
   background: var(--bg-primary);
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   font-weight: 700;
   min-height: 40px;
@@ -71,7 +71,7 @@
   padding: 0.5rem 0.85rem;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.844rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -99,7 +99,7 @@
   border-radius: 999px;
   background: var(--bg-primary);
   color: inherit;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   line-height: 1;
   text-decoration: none;
 }
@@ -143,14 +143,14 @@
 .assignment-group-label {
   display: block;
   color: var(--text-primary);
-  font-size: 0.84rem;
+  font-size: var(--font-size-sm);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
 .assignment-group-meta {
   color: var(--text-secondary);
-  font-size: 0.73rem;
+  font-size: var(--font-size-xs);
   font-weight: 600;
 }
 
@@ -174,7 +174,7 @@
   min-height: 40px;
   min-width: 8.6rem;
   padding: 0.55rem 0.8rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-base);
@@ -226,7 +226,7 @@
   min-height: 40px;
   min-width: 96px;
   padding: 0.55rem 0.8rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
@@ -271,7 +271,7 @@
   min-height: 40px;
   min-width: 96px;
   padding: 0.55rem 0.8rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-base);
@@ -296,7 +296,7 @@
   min-height: 40px;
   min-width: 96px;
   padding: 0.55rem 0.8rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-base);

@@ -261,14 +261,6 @@ function ReportDetailDrawer({
                     : 'Validate report'}
               </button>
             </div>
-            {(validationState?.message || validationState?.error) && (
-              <p
-                className={`report-review-feedback ${validationState.error ? 'is-error' : ''}`}
-                role="status"
-              >
-                {validationState.error || validationState.message}
-              </p>
-            )}
           </section>
           )}
 

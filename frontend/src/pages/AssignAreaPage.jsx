@@ -1,8 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ConfirmModal from '../components/ConfirmModal'
 import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
+import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getManageableDeployments, replaceDeployments } from '../services/operations'
+import { matchesPrefixSearch } from '../utils/searchMatching'
 import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
 
 const DEPLOYMENT_MODES = {
@@ -118,6 +121,26 @@ const toIsoDateTime = (value) => {
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString()
 }
 
+const addHoursToLocalValue = (value, hours) => {
+  const parsedDate = new Date(value)
+  if (Number.isNaN(parsedDate.getTime())) return ''
+  parsedDate.setHours(parsedDate.getHours() + hours)
+  return toDateTimeLocalValue(parsedDate.toISOString())
+}
+
+const addMinutesToLocalValue = (value, minutes) => {
+  const parsedDate = new Date(value)
+  if (Number.isNaN(parsedDate.getTime())) return ''
+  parsedDate.setMinutes(parsedDate.getMinutes() + minutes)
+  return toDateTimeLocalValue(parsedDate.toISOString())
+}
+
+const toEditableShiftStart = (value) => {
+  const currentValue = getCurrentDateTimeLocalValue()
+  const requestedValue = toDateTimeLocalValue(value)
+  return requestedValue && requestedValue >= currentValue ? requestedValue : currentValue
+}
+
 const resolveGroupId = (assignment) => assignment.groupId || `${assignment.patrolArea}__${assignment.assignedAt || 'none'}`
 
 const createDeploymentId = (prefix) => {
@@ -136,8 +159,28 @@ const formatDeploymentStatus = (status) => (
   status ? `${status.charAt(0).toUpperCase()}${status.slice(1)}` : 'Active'
 )
 
-function AssignAreaPage() {
+const openDateTimePicker = (event) => {
+  const input = event.currentTarget
+  if (typeof input.showPicker !== 'function') return
+
+  try {
+    input.showPicker()
+  } catch {
+    input.focus()
+  }
+}
+
+function AssignAreaPage({ view = 'form' }) {
   const { personnel = [] } = usePersonnelContext()
+  const { showFeedback } = useFeedback()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const listOnly = view === 'list'
+  const requestedAssignment = !listOnly ? location.state?.editAssignment : null
+  const requestedGroupAssignments = !listOnly && Array.isArray(location.state?.editGroupAssignments)
+    ? location.state.editGroupAssignments
+    : []
+  const requestedGroupFirstAssignment = requestedGroupAssignments[0]
 
   const personnelOptions = useMemo(() => {
     if (Array.isArray(personnel) && personnel.length > 0) {
@@ -151,20 +194,39 @@ function AssignAreaPage() {
     return []
   }, [personnel])
 
-  const [assignmentForm, setAssignmentForm] = useState(createEmptyAssignmentForm)
+  const [assignmentForm, setAssignmentForm] = useState(() => {
+    const source = requestedAssignment || requestedGroupFirstAssignment
+    if (!source) return createEmptyAssignmentForm()
+    return {
+      mode: getDeploymentMode(source),
+      personnelIds: requestedAssignment
+        ? [requestedAssignment.personnelId]
+        : requestedGroupAssignments.map((item) => item.personnelId),
+      patrolArea: source.patrolArea || patrolAreas[0],
+      shiftStart: toEditableShiftStart(source.shiftStart),
+      shiftEnd: toDateTimeLocalValue(source.shiftEnd),
+      notes: source.notes || '',
+    }
+  })
   const [personnelSearch, setPersonnelSearch] = useState('')
   const [patrolAreaSearch, setPatrolAreaSearch] = useState('')
   const [isPatrolAreaOpen, setIsPatrolAreaOpen] = useState(false)
   const [assignments, setAssignments] = useState([])
-  const [editingAssignmentId, setEditingAssignmentId] = useState(null)
-  const [editingGroupId, setEditingGroupId] = useState(null)
+  const [editingAssignmentId, setEditingAssignmentId] = useState(requestedAssignment?.id || null)
+  const [editingGroupId, setEditingGroupId] = useState(
+    requestedGroupFirstAssignment ? resolveGroupId(requestedGroupFirstAssignment) : null,
+  )
   const [pendingDeleteAssignment, setPendingDeleteAssignment] = useState(null)
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
   const [deploymentSearch, setDeploymentSearch] = useState('')
   const [activeDeploymentView, setActiveDeploymentView] = useState(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
   const [openGroupMenuId, setOpenGroupMenuId] = useState(null)
-  const [assignMessage, setAssignMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeploymentsLoading, setIsDeploymentsLoading] = useState(true)
+  const [minimumShiftDateTime, setMinimumShiftDateTime] = useState(getCurrentDateTimeLocalValue)
+  const minimumSelectableShiftStart = assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
+    ? addMinutesToLocalValue(minimumShiftDateTime, 1)
+    : minimumShiftDateTime
   const patrolAreaPickerRef = useRef(null)
   const patrolAreaSearchInputRef = useRef(null)
 
@@ -176,25 +238,60 @@ function AssignAreaPage() {
         if (isCurrent) setAssignments(deploymentPayload)
       })
       .catch((error) => {
-        if (isCurrent) setAssignMessage(error.message)
+        if (isCurrent) showFeedback(error.message, { type: 'error', title: 'Deployments unavailable' })
+      })
+      .finally(() => {
+        if (isCurrent) setIsDeploymentsLoading(false)
       })
 
     return () => {
       isCurrent = false
     }
+  }, [showFeedback])
+
+  useEffect(() => {
+    const updateMinimum = () => {
+      const nextMinimum = getCurrentDateTimeLocalValue()
+      setMinimumShiftDateTime(nextMinimum)
+      setAssignmentForm((currentForm) => (
+        currentForm.mode === DEPLOYMENT_MODES.START_NOW
+          && currentForm.shiftStart < nextMinimum
+          ? { ...currentForm, shiftStart: nextMinimum }
+          : currentForm
+      ))
+    }
+    const intervalId = window.setInterval(updateMinimum, 30_000)
+    return () => window.clearInterval(intervalId)
   }, [])
+
+  useEffect(() => {
+    if (listOnly || !location.state) return
+    if (requestedAssignment) {
+      showFeedback(`Re-assigning ${requestedAssignment.id}. Update the details, then save.`, { type: 'info' })
+    } else if (requestedGroupFirstAssignment) {
+      showFeedback(`Re-assigning the group in ${requestedGroupFirstAssignment.patrolArea}. Update the details, then save.`, { type: 'info' })
+    }
+    navigate('/assign-area', { replace: true, state: null })
+  }, [
+    listOnly,
+    location.state,
+    navigate,
+    requestedAssignment,
+    requestedGroupFirstAssignment,
+    showFeedback,
+  ])
 
   const commitAssignments = async (nextAssignments, successMessage) => {
     setIsSaving(true)
-    setAssignMessage('Saving deployment changes...')
+    showFeedback('Saving deployment changes...', { type: 'info', duration: 2500 })
 
     try {
       const savedAssignments = await replaceDeployments(nextAssignments)
       setAssignments(savedAssignments)
-      setAssignMessage(successMessage)
+      showFeedback(successMessage, { type: 'success' })
       return true
     } catch (error) {
-      setAssignMessage(error.message)
+      showFeedback(error.message, { type: 'error', title: 'Deployment not saved' })
       return false
     } finally {
       setIsSaving(false)
@@ -209,15 +306,36 @@ function AssignAreaPage() {
     activePersonnelIds.includes(item.id)
   )
 
+  const formShiftStart = new Date(assignmentForm.shiftStart)
+  const formShiftEnd = new Date(assignmentForm.shiftEnd)
+  const hasValidShiftStart = !Number.isNaN(formShiftStart.getTime())
+    && formShiftStart >= new Date(minimumSelectableShiftStart)
+  const hasValidShiftEnd = !Number.isNaN(formShiftEnd.getTime()) && formShiftEnd > formShiftStart
+  const isWithinMaximumDuration = hasValidShiftStart && hasValidShiftEnd
+    && formShiftEnd.getTime() - formShiftStart.getTime() <= 24 * 60 * 60 * 1000
+  const deploymentFormState = {
+    canSubmit: !isDeploymentsLoading
+      && selectedPersonnelMembers.length > 0
+      && Boolean(assignmentForm.patrolArea.trim())
+      && hasValidShiftStart
+      && hasValidShiftEnd
+      && isWithinMaximumDuration
+      && (!editingAssignmentId || selectedPersonnelMembers.length === 1),
+    maximumShiftEnd: assignmentForm.shiftStart
+      ? addHoursToLocalValue(assignmentForm.shiftStart, 24)
+      : '',
+    minimumShiftEnd: assignmentForm.shiftStart > minimumSelectableShiftStart
+      ? assignmentForm.shiftStart
+      : minimumSelectableShiftStart,
+  }
+
   const filteredPersonnelOptions = useMemo(() => {
     const searchQuery = personnelSearch.trim().toLowerCase()
     if (!searchQuery) {
       return personnelOptions
     }
 
-    return personnelOptions.filter((item) =>
-      `${item.name} ${item.rank}`.toLowerCase().includes(searchQuery)
-    )
+    return personnelOptions.filter((item) => matchesPrefixSearch(searchQuery, [item.name, item.rank]))
   }, [personnelOptions, personnelSearch])
 
   const filteredPatrolAreas = useMemo(() => {
@@ -226,7 +344,7 @@ function AssignAreaPage() {
       return patrolAreas
     }
 
-    return patrolAreas.filter((area) => area.toLowerCase().includes(searchQuery))
+    return patrolAreas.filter((area) => matchesPrefixSearch(searchQuery, [area]))
   }, [patrolAreaSearch])
 
   const deploymentViewCounts = useMemo(() => assignments.reduce((counts, assignment) => {
@@ -272,7 +390,22 @@ function AssignAreaPage() {
       return groupedAssignments
     }
 
-    return groupedAssignments.filter((group) => group.patrolArea.toLowerCase().includes(query))
+    return groupedAssignments.flatMap((group) => {
+      if (matchesPrefixSearch(query, [group.patrolArea])) return [group]
+
+      const matchingAssignments = group.assignments.filter((assignment) => (
+        matchesPrefixSearch(query, [
+        assignment.id,
+        assignment.personnelName,
+        assignment.rank,
+        assignment.status,
+        ])
+      ))
+
+      return matchingAssignments.length > 0
+        ? [{ ...group, assignments: matchingAssignments }]
+        : []
+    })
   }, [deploymentSearch, groupedAssignments])
 
   useEffect(() => {
@@ -332,7 +465,6 @@ function AssignAreaPage() {
         ? getCurrentDateTimeLocalValue()
         : '',
     }))
-    setAssignMessage('')
   }
 
   const handlePersonnelToggle = (personnelId) => {
@@ -381,7 +513,7 @@ function AssignAreaPage() {
     event.preventDefault()
 
     if (selectedPersonnelMembers.length === 0 || !assignmentForm.patrolArea.trim()) {
-      setAssignMessage('Select at least one personnel and a patrol area before saving.')
+      showFeedback('Select at least one personnel and a patrol area before saving.', { type: 'error' })
       return
     }
 
@@ -389,12 +521,22 @@ function AssignAreaPage() {
     const shiftEnd = toIsoDateTime(assignmentForm.shiftEnd)
 
     if (!shiftStart || !shiftEnd) {
-      setAssignMessage('Enter both the shift start and shift end before saving.')
+      showFeedback('Enter both the shift start and shift end before saving.', { type: 'error' })
       return
     }
 
     if (new Date(shiftEnd) <= new Date(shiftStart)) {
-      setAssignMessage('Shift end must be later than shift start.')
+      showFeedback('Shift end must be later than shift start.', { type: 'error' })
+      return
+    }
+
+    if (new Date(shiftStart) < new Date(minimumSelectableShiftStart)) {
+      showFeedback('Shift start cannot use a past date or time.', { type: 'error' })
+      return
+    }
+
+    if (new Date(shiftEnd).getTime() - new Date(shiftStart).getTime() > 24 * 60 * 60 * 1000) {
+      showFeedback('A deployment shift must not exceed 24 hours.', { type: 'error' })
       return
     }
 
@@ -403,7 +545,7 @@ function AssignAreaPage() {
       : 'active'
 
     if (deploymentStatus === 'scheduled' && new Date(shiftStart) <= new Date()) {
-      setAssignMessage('A scheduled deployment must start in the future.')
+      showFeedback('A scheduled deployment must start in the future.', { type: 'error' })
       return
     }
 
@@ -411,7 +553,7 @@ function AssignAreaPage() {
       const currentGroupAssignments = assignments.filter((assignment) => resolveGroupId(assignment) === editingGroupId)
 
       if (currentGroupAssignments.length === 0) {
-        setAssignMessage('Selected deployment group is no longer available.')
+        showFeedback('Selected deployment group is no longer available.', { type: 'error' })
         setEditingGroupId(null)
         resetAssignmentForm()
         return
@@ -459,12 +601,13 @@ function AssignAreaPage() {
       setEditingGroupId(null)
       setEditingAssignmentId(null)
       resetAssignmentForm()
+      navigate('/deployments')
       return
     }
 
     if (editingAssignmentId) {
       if (selectedPersonnelMembers.length !== 1) {
-        setAssignMessage('Editing requires exactly one personnel selection.')
+        showFeedback('Editing requires exactly one personnel selection.', { type: 'error' })
         return
       }
 
@@ -499,6 +642,7 @@ function AssignAreaPage() {
       setEditingAssignmentId(null)
       setEditingGroupId(null)
       resetAssignmentForm()
+      navigate('/deployments')
       return
     }
 
@@ -528,6 +672,7 @@ function AssignAreaPage() {
       ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
       : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
     resetAssignmentForm()
+    navigate('/deployments')
   }
 
   const handleSelectPatrolArea = (area) => {
@@ -540,24 +685,33 @@ function AssignAreaPage() {
   }
 
   const handleEditAssignment = (assignment) => {
+    if (listOnly) {
+      navigate('/assign-area', { state: { editAssignment: assignment } })
+      return
+    }
     setEditingAssignmentId(assignment.id)
     setEditingGroupId(null)
     setAssignmentForm({
       mode: getDeploymentMode(assignment),
       personnelIds: [assignment.personnelId],
       patrolArea: assignment.patrolArea || patrolAreas[0],
-      shiftStart: toDateTimeLocalValue(assignment.shiftStart) || getCurrentDateTimeLocalValue(),
+      shiftStart: toEditableShiftStart(assignment.shiftStart),
       shiftEnd: toDateTimeLocalValue(assignment.shiftEnd),
       notes: assignment.notes || '',
     })
     setPersonnelSearch('')
-    setAssignMessage(`Re-assigning ${assignment.id}. Update details then click "Save Re-assignment".`)
+    showFeedback(`Re-assigning ${assignment.id}. Update details, then save.`, { type: 'info' })
   }
 
   const handleEditGroup = (groupId) => {
     const groupAssignments = assignments.filter((assignment) => resolveGroupId(assignment) === groupId)
 
     if (groupAssignments.length === 0) {
+      return
+    }
+
+    if (listOnly) {
+      navigate('/assign-area', { state: { editGroupAssignments: groupAssignments } })
       return
     }
 
@@ -569,15 +723,13 @@ function AssignAreaPage() {
       mode: getDeploymentMode(firstAssignment),
       personnelIds: groupAssignments.map((assignment) => assignment.personnelId),
       patrolArea: firstAssignment.patrolArea || patrolAreas[0],
-      shiftStart: toDateTimeLocalValue(firstAssignment.shiftStart) || getCurrentDateTimeLocalValue(),
+      shiftStart: toEditableShiftStart(firstAssignment.shiftStart),
       shiftEnd: toDateTimeLocalValue(firstAssignment.shiftEnd),
       notes: firstAssignment.notes || '',
     })
     setPersonnelSearch('')
     setOpenGroupMenuId(null)
-    setAssignMessage(
-      `Re-assigning group ${firstAssignment.patrolArea}. Update details then click "Save Group Re-assignment".`
-    )
+    showFeedback(`Re-assigning the group in ${firstAssignment.patrolArea}. Update details, then save.`, { type: 'info' })
   }
 
   const handleDeleteAssignment = (assignmentId) => {
@@ -675,18 +827,30 @@ function AssignAreaPage() {
     setEditingAssignmentId(null)
     setEditingGroupId(null)
     resetAssignmentForm()
-    setAssignMessage(getDeploymentEditCancelledMessage(deploymentLabel))
+    showFeedback(getDeploymentEditCancelledMessage(deploymentLabel), { type: 'info' })
   }
 
   return (
     <div className="page-container fade-in p-3 p-md-4">
-      <header className="page-header mb-4">
+      <header className="page-header assignment-page-header mb-4">
         <div>
-          <h2 className="page-title">Deployment Management</h2>
-          <p className="page-subtitle">Assign personnel to patrol areas and shifts</p>
+          <h2 className="page-title">{listOnly ? 'Assigned Deployments' : 'Deployment Management'}</h2>
+          <p className="page-subtitle">
+            {listOnly
+              ? 'Search and manage active or scheduled personnel assignments'
+              : 'Assign personnel to patrol areas and shifts'}
+          </p>
         </div>
+        <button
+          type="button"
+          className="assignment-page-link"
+          onClick={() => navigate(listOnly ? '/assign-area' : '/deployments')}
+        >
+          {listOnly ? 'Create Deployment' : 'View Assigned Deployments'}
+        </button>
       </header>
 
+      {!listOnly && (
       <div className="widget-card deployment-form-card slide-up mb-3">
         <h3 className="widget-title mb-3">Assign Personnel</h3>
 
@@ -793,12 +957,16 @@ function AssignAreaPage() {
               <span>{assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER ? 'Scheduled Start *' : 'Shift Start *'}</span>
               <input
                 type="datetime-local"
-                className="settings-input w-100"
+                className="settings-input w-100 assignment-datetime-input"
                 value={assignmentForm.shiftStart}
                 onChange={handleFormChange('shiftStart')}
-                min={assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
-                  ? getCurrentDateTimeLocalValue()
-                  : undefined}
+                onClick={openDateTimePicker}
+                min={minimumSelectableShiftStart}
+                step="60"
+                aria-label={assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
+                  ? 'Scheduled deployment start date and time'
+                  : 'Deployment shift start date and time'}
+                title="Click anywhere in this field to open the date and time picker"
                 required
               />
               <small className="assignment-field__datetime-preview">
@@ -806,8 +974,8 @@ function AssignAreaPage() {
               </small>
               <small className="assignment-field__hint">
                 {assignmentForm.mode === DEPLOYMENT_MODES.START_NOW
-                  ? 'Defaults to now; adjust manually when operationally required.'
-                  : 'Select a future date and time.'}
+                  ? 'Defaults to now. Click anywhere in the field to adjust it.'
+                  : 'Choose a future date and time; past options are unavailable.'}
               </small>
             </label>
 
@@ -815,14 +983,22 @@ function AssignAreaPage() {
               <span>Shift End *</span>
               <input
                 type="datetime-local"
-                className="settings-input w-100"
+                className="settings-input w-100 assignment-datetime-input"
                 value={assignmentForm.shiftEnd}
                 onChange={handleFormChange('shiftEnd')}
-                min={assignmentForm.shiftStart}
+                onClick={openDateTimePicker}
+                min={deploymentFormState.minimumShiftEnd}
+                max={deploymentFormState.maximumShiftEnd}
+                step="60"
+                aria-label="Deployment shift end date and time"
+                title="Click anywhere in this field to open the date and time picker"
                 required
               />
               <small className="assignment-field__datetime-preview">
                 {formatDateTimePreview(assignmentForm.shiftEnd)}
+              </small>
+              <small className="assignment-field__hint">
+                Click anywhere in the field to choose an end time, up to 24 hours after shift start.
               </small>
             </label>
 
@@ -882,7 +1058,7 @@ function AssignAreaPage() {
             <button
               type="submit"
               className="report-generate-btn report-generate-btn--assign"
-              disabled={isSaving}
+              disabled={isSaving || !deploymentFormState.canSubmit}
             >
               {isSaving
                 ? 'Saving...'
@@ -899,11 +1075,12 @@ function AssignAreaPage() {
                 Cancel Re-assign
               </button>
             )}
-            {assignMessage && <small className="report-feedback">{assignMessage}</small>}
           </div>
         </form>
       </div>
+      )}
 
+      {listOnly && (
       <div className="widget-card deployment-list-card slide-up overflow-auto no-scrollbar">
         <div className="assignment-list-header mb-3">
           <h3 className="widget-title mb-0">Assigned Deployment List</h3>
@@ -912,7 +1089,7 @@ function AssignAreaPage() {
             className="settings-input assignment-list-search"
             value={deploymentSearch}
             onChange={(event) => setDeploymentSearch(event.target.value)}
-            placeholder="Search barangay, street, or highway"
+            placeholder="Search personnel name, rank, barangay, or assignment ID"
           />
         </div>
 
@@ -1063,6 +1240,7 @@ function AssignAreaPage() {
           )}
         </div>
       </div>
+      )}
 
       <ConfirmModal
         open={Boolean(pendingDeleteGroup)}

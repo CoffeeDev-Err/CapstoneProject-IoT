@@ -16,6 +16,7 @@ body,
 body {
   min-width: 320px;
   font-family: var(--font-body, 'Manrope', 'Segoe UI', Tahoma, sans-serif);
+  font-size: var(--font-size-sm, 0.875rem);
   line-height: 1.55;
   letter-spacing: 0;
   background: var(--bg-secondary, #f6f7fb);
@@ -29,6 +30,15 @@ input,
 select,
 textarea {
   font-family: inherit;
+  font-size: inherit;
+}
+
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: var(--font-size-base) !important;
+  }
 }
 
 :where(button, a, input, select, textarea):focus-visible {

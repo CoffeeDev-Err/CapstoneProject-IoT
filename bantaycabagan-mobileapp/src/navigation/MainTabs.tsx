@@ -149,7 +149,7 @@ export default function MainTabs() {
       toValue: mapInteracting ? 0 : 1,
       duration: mapInteracting ? 180 : 250,
       easing: mapInteracting ? Easing.out(Easing.quad) : Easing.out(Easing.cubic),
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start();
   }, [headerVisibility, mapInteracting]);
 
@@ -158,13 +158,14 @@ export default function MainTabs() {
   }, []);
 
   const renderMapScreen = useCallback(() => (
-    <OfficerMapScreen onMapInteractionChange={handleMapInteractionChange} />
-  ), [handleMapInteractionChange]);
+    <OfficerMapScreen
+      headerContentHeight={PAGE_HEADER_CONTENT_HEIGHT}
+      headerTopInset={insets.top}
+      headerVisibility={headerVisibility}
+      onMapInteractionChange={handleMapInteractionChange}
+    />
+  ), [handleMapInteractionChange, headerVisibility, insets.top]);
 
-  const headerHeight = headerVisibility.interpolate({
-    inputRange: [0, 1],
-    outputRange: [insets.top, insets.top + PAGE_HEADER_CONTENT_HEIGHT],
-  });
   const headerTranslateY = headerVisibility.interpolate({
     inputRange: [0, 1],
     outputRange: [-PAGE_HEADER_CONTENT_HEIGHT, 0],
@@ -178,33 +179,37 @@ export default function MainTabs() {
       />
       <Animated.View
         style={[
-          styles.headerClip,
+          styles.headerOverlay,
           isDark && styles.fixedHeaderAreaDark,
-          { height: headerHeight },
+          {
+            height: insets.top + PAGE_HEADER_CONTENT_HEIGHT,
+            opacity: headerVisibility,
+            transform: [{ translateY: headerTranslateY }],
+          },
         ]}
       >
         <SafeAreaView
           edges={['top']}
           style={[styles.fixedHeaderArea, isDark && styles.fixedHeaderAreaDark]}
         >
-          <Animated.View style={{
-            opacity: headerVisibility,
-            transform: [{ translateY: headerTranslateY }],
-          }}>
+          <View>
             <PolicePageHeader onOpenNotifications={() => setNotificationsVisible(true)} />
-          </Animated.View>
+          </View>
         </SafeAreaView>
       </Animated.View>
       <View style={styles.tabSceneArea}>
       <Tab.Navigator
         detachInactiveScreens={false}
-        screenOptions={{
+        screenOptions={({ route }) => ({
           animation: 'none',
           headerShown: false,
           sceneStyle: {
             backgroundColor: isDark ? '#050b18' : '#ffffff',
+            paddingTop: route.name === 'Map'
+              ? 0
+              : insets.top + PAGE_HEADER_CONTENT_HEIGHT,
           },
-        }}
+        })}
         tabBar={(props) => (
           <FloatingTabBar
             {...props}
@@ -248,7 +253,11 @@ export default function MainTabs() {
 const styles = StyleSheet.create({
   appRoot: { flex: 1, backgroundColor: '#ffffff' },
   appRootDark: { backgroundColor: '#050b18' },
-  headerClip: {
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
     zIndex: 20,
     overflow: 'hidden',
     backgroundColor: '#ffffff',

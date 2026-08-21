@@ -6,6 +6,15 @@
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
 
+  /* Accessible application type scale (browser default base: 16px). */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+
   --sidebar-w: 248px;
   --sidebar-w-collapsed: 60px;
   --sidebar-bg: #0f172a;
@@ -68,10 +77,10 @@
 }
 
 html {
-  font-size: 14px;
+  font-size: 100%;
 }
 
 small,
 .small {
-  font-size: 0.875rem !important;
+  font-size: var(--font-size-sm) !important;
 }

@@ -10,6 +10,10 @@ const {
 } = require('../src/utils/accountValidation')
 const { isStrongPassword } = require('../src/utils/password')
 const { isValidCoordinates } = require('../src/utils/geo')
+const {
+	assertAccountCanBeDeactivated,
+	isProtectedAccount,
+} = require('../src/utils/accountProtection')
 
 assert.equal(validateFullName('Leo B. Gannad'), '')
 assert.match(validateFullName('Leo123'), /letters/)
@@ -38,5 +42,12 @@ assert.equal(isStrongPassword(`${'A'.repeat(126)}a1!`), false)
 assert.equal(isValidCoordinates(17.4239, 121.7681), true)
 assert.equal(isValidCoordinates(91, 121.7681), false)
 assert.equal(isValidCoordinates(17.4239, 181), false)
+assert.equal(isProtectedAccount({ role: 'supervisor' }), true)
+assert.equal(isProtectedAccount({ role: 'officer' }), false)
+assert.doesNotThrow(() => assertAccountCanBeDeactivated({ role: 'officer' }))
+assert.throws(
+	() => assertAccountCanBeDeactivated({ role: 'supervisor' }),
+	(error) => error.status === 403 && error.code === 'PROTECTED_ACCOUNT',
+)
 
 console.log('Backend account validation checks passed.')

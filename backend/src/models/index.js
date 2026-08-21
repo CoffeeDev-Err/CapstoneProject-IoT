@@ -30,6 +30,8 @@ const pointSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
 	username: { type: String, required: true, trim: true, lowercase: true, maxlength: 50 },
 	email: { type: String, trim: true, lowercase: true, maxlength: 254 },
+	fullName: { type: String, trim: true, default: '', maxlength: 100 },
+	rank: { type: String, trim: true, default: '', maxlength: 80 },
 	emailVerifiedAt: Date,
 	passwordHash: { type: String, required: true, select: false },
 	role: { type: String, enum: ['supervisor', 'officer'], default: 'officer' },

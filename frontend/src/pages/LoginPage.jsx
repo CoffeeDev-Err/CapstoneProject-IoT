@@ -34,6 +34,7 @@ function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [challenge, setChallenge] = useState(null)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const navigate = useNavigate()
@@ -45,15 +46,23 @@ function LoginPage() {
     setMessage('')
   }
 
+  const clearFieldError = (field) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current
+      const nextErrors = { ...current }
+      delete nextErrors[field]
+      return nextErrors
+    })
+  }
+
   const handleLogin = async (event) => {
     event.preventDefault()
     clearFeedback()
-    if (!accountId.trim()) {
-      setError('Enter your Login ID.')
-      return
-    }
-    if (!password) {
-      setError('Enter your password.')
+    const nextFieldErrors = {}
+    if (!accountId.trim()) nextFieldErrors.accountId = 'Login ID is required.'
+    if (!password) nextFieldErrors.password = 'Password is required.'
+    setFieldErrors(nextFieldErrors)
+    if (Object.keys(nextFieldErrors).length > 0) {
       return
     }
     setPending(true)
@@ -73,9 +82,10 @@ function LoginPage() {
     event.preventDefault()
     clearFeedback()
     if (code.length !== 6) {
-      setError(COMPLETE_CODE_MESSAGE)
+      setFieldErrors({ code: COMPLETE_CODE_MESSAGE })
       return
     }
+    setFieldErrors({})
     setPending(true)
     try {
       const session = await verifyLoginCode(challenge.challengeId, code)
@@ -92,9 +102,10 @@ function LoginPage() {
     event.preventDefault()
     clearFeedback()
     if (!identifier.trim()) {
-      setError('Enter your Login ID or official email.')
+      setFieldErrors({ identifier: 'Login ID or official email is required.' })
       return
     }
+    setFieldErrors({})
     setPending(true)
     try {
       const nextChallenge = await requestPasswordReset(identifier.trim())
@@ -115,24 +126,22 @@ function LoginPage() {
   const handleResetPassword = async (event) => {
     event.preventDefault()
     clearFeedback()
+    const nextFieldErrors = {}
     if (code.length !== 6) {
-      setError(COMPLETE_CODE_MESSAGE)
-      return
+      nextFieldErrors.code = COMPLETE_CODE_MESSAGE
     }
     if (!newPassword) {
-      setError('Enter a new password.')
-      return
-    }
-    if (!isStrongPassword(newPassword)) {
-      setError(PASSWORD_REQUIREMENTS)
-      return
+      nextFieldErrors.newPassword = 'New password is required.'
+    } else if (!isStrongPassword(newPassword)) {
+      nextFieldErrors.newPassword = PASSWORD_REQUIREMENTS
     }
     if (!confirmPassword) {
-      setError('Confirm your new password.')
-      return
+      nextFieldErrors.confirmPassword = 'Password confirmation is required.'
+    } else if (newPassword && newPassword !== confirmPassword) {
+      nextFieldErrors.confirmPassword = 'The new password and confirmation do not match.'
     }
-    if (newPassword !== confirmPassword) {
-      setError('The new password and confirmation do not match.')
+    setFieldErrors(nextFieldErrors)
+    if (Object.keys(nextFieldErrors).length > 0) {
       return
     }
     setPending(true)
@@ -178,6 +187,7 @@ function LoginPage() {
 
   const goToLogin = () => {
     clearFeedback()
+    setFieldErrors({})
     setMode('login')
     setChallenge(null)
     setCode('')
@@ -238,26 +248,36 @@ function LoginPage() {
                   className="form-control form-control-lg fs-6 login-input"
                   placeholder="Enter your Login ID"
                   value={accountId}
-                  onChange={(event) => setAccountId(event.target.value)}
+                  onChange={(event) => {
+                    setAccountId(event.target.value)
+                    clearFieldError('accountId')
+                  }}
                   autoComplete="username"
                   maxLength={50}
                   required
+                  aria-invalid={Boolean(fieldErrors.accountId)}
                 />
+                {fieldErrors.accountId && <small className="login-field-error">{fieldErrors.accountId}</small>}
               </label>
               <PasswordField
                 label="Password"
                 placeholder="Enter your password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value)
+                  clearFieldError('password')
+                }}
                 autoComplete="current-password"
                 maxLength={128}
                 required
+                error={fieldErrors.password}
               />
               <button
                 type="button"
                 className="login-text-action"
                 onClick={() => {
                   clearFeedback()
+                  setFieldErrors({})
                   setIdentifier(accountId)
                   setMode('forgot')
                 }}
@@ -271,7 +291,16 @@ function LoginPage() {
 
             {mode === 'otp' && (
               <form onSubmit={handleVerifyLogin} className="login-form" noValidate>
-              <VerificationCodeInput value={code} onChange={setCode} autoFocus invalid={Boolean(error)} />
+              <VerificationCodeInput
+                value={code}
+                onChange={(value) => {
+                  setCode(value)
+                  clearFieldError('code')
+                }}
+                autoFocus
+                invalid={Boolean(error || fieldErrors.code)}
+              />
+              {fieldErrors.code && <small className="login-field-error">{fieldErrors.code}</small>}
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Verify and Continue" />
               <button type="button" className="login-text-action login-text-action--center" onClick={handleResend} disabled={pending}>
@@ -291,10 +320,15 @@ function LoginPage() {
                   type="text"
                   className="form-control form-control-lg fs-6 login-input"
                   value={identifier}
-                  onChange={(event) => setIdentifier(event.target.value)}
+                  onChange={(event) => {
+                    setIdentifier(event.target.value)
+                    clearFieldError('identifier')
+                  }}
                   maxLength={254}
                   required
+                  aria-invalid={Boolean(fieldErrors.identifier)}
                 />
+                {fieldErrors.identifier && <small className="login-field-error">{fieldErrors.identifier}</small>}
               </label>
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Send Reset Code" />
@@ -306,23 +340,40 @@ function LoginPage() {
 
             {mode === 'reset' && (
               <form onSubmit={handleResetPassword} className="login-form" noValidate>
-              <VerificationCodeInput value={code} onChange={setCode} autoFocus />
+              <VerificationCodeInput
+                value={code}
+                onChange={(value) => {
+                  setCode(value)
+                  clearFieldError('code')
+                }}
+                autoFocus
+                invalid={Boolean(fieldErrors.code)}
+              />
+              {fieldErrors.code && <small className="login-field-error">{fieldErrors.code}</small>}
               <PasswordField
                 label="New Password"
                 value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
+                onChange={(event) => {
+                  setNewPassword(event.target.value)
+                  clearFieldError('newPassword')
+                }}
                 autoComplete="new-password"
                 maxLength={128}
                 required
+                error={fieldErrors.newPassword}
               />
               <p className="password-requirements">{PASSWORD_REQUIREMENTS}</p>
               <PasswordField
                 label="Confirm New Password"
                 value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
+                onChange={(event) => {
+                  setConfirmPassword(event.target.value)
+                  clearFieldError('confirmPassword')
+                }}
                 autoComplete="new-password"
                 maxLength={128}
                 required
+                error={fieldErrors.confirmPassword}
               />
               <AuthFeedback error={error} message={message} />
               <SubmitButton pending={pending} label="Reset Password" />
@@ -341,7 +392,7 @@ function LoginPage() {
   )
 }
 
-function PasswordField({ label, ...inputProps }) {
+function PasswordField({ label, error, ...inputProps }) {
   const [visible, setVisible] = useState(false)
 
   return (
@@ -352,6 +403,7 @@ function PasswordField({ label, ...inputProps }) {
           {...inputProps}
           type={visible ? 'text' : 'password'}
           className="form-control form-control-lg fs-6 login-input login-password-input"
+          aria-invalid={Boolean(error)}
         />
         <button
           type="button"
@@ -363,6 +415,7 @@ function PasswordField({ label, ...inputProps }) {
           {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
         </button>
       </span>
+      {error && <small className="login-field-error">{error}</small>}
     </label>
   )
 }

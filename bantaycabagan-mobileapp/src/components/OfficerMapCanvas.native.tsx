@@ -36,9 +36,12 @@ import {
 import {
   CLUSTER_MAX_ZOOM,
   clusterPersonnel,
+  confirmedFixFromMember,
   interpolatePosition,
+  markerMotionForFixes,
   markerTone,
   markerToneColor,
+  type ConfirmedGpsFix,
 } from '../utils/officerMapMath';
 import type {
   OfficerMapCanvasHandle,
@@ -49,41 +52,83 @@ import type {
 const CABAGAN_CENTER: [number, number] = [121.7653, 17.4269];
 const STREET_FOCUS_ZOOM = 16;
 const SATELLITE_FOCUS_ZOOM = 15;
-const MARKER_ANIMATION_DURATION = 700;
 const ANIMATION_FRAME_INTERVAL = 1000 / 30;
+
+type OfficerMotion = {
+  durationMs: number;
+  suppressJitter: boolean;
+  target: [number, number];
+};
 
 const useInterpolatedPersonnel = (personnel: OfficerMapPerson[]) => {
   const [interpolated, setInterpolated] = useState(personnel);
   const currentPositions = useRef(new globalThis.Map<string, [number, number]>());
+  const effectiveTargets = useRef(new globalThis.Map<string, [number, number]>());
+  const previousConfirmedFixes = useRef(new globalThis.Map<string, ConfirmedGpsFix>());
+  const motionByOfficer = useRef(new globalThis.Map<string, OfficerMotion>());
   const animationFrame = useRef<number | null>(null);
 
   useEffect(() => {
     if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
     const starts = new globalThis.Map<string, [number, number]>();
-    personnel.forEach((member) => {
-      const target: [number, number] = [Number(member.longitude), Number(member.latitude)];
-      starts.set(member.id, currentPositions.current.get(member.id) || target);
+    const motions = new globalThis.Map<string, OfficerMotion>();
+    const activeIds = new Set(personnel.map((member) => member.id));
+    currentPositions.current.forEach((_, id) => {
+      if (!activeIds.has(id)) currentPositions.current.delete(id);
     });
+    effectiveTargets.current.forEach((_, id) => {
+      if (!activeIds.has(id)) effectiveTargets.current.delete(id);
+    });
+    previousConfirmedFixes.current.forEach((_, id) => {
+      if (!activeIds.has(id)) previousConfirmedFixes.current.delete(id);
+    });
+
+    personnel.forEach((member) => {
+      const confirmedFix = confirmedFixFromMember(member);
+      const rawTarget: [number, number] = [confirmedFix.longitude, confirmedFix.latitude];
+      const start = currentPositions.current.get(member.id) || rawTarget;
+      const motion = markerMotionForFixes(previousConfirmedFixes.current.get(member.id), confirmedFix);
+      const target = motion.suppressJitter
+        ? (effectiveTargets.current.get(member.id) || start)
+        : rawTarget;
+      starts.set(member.id, start);
+      motions.set(member.id, {
+        durationMs: start[0] === target[0] && start[1] === target[1] ? 0 : motion.durationMs,
+        suppressJitter: motion.suppressJitter,
+        target,
+      });
+      effectiveTargets.current.set(member.id, target);
+      previousConfirmedFixes.current.set(member.id, confirmedFix);
+    });
+    motionByOfficer.current = motions;
     const startedAt = Date.now();
     let lastRenderedAt = 0;
 
     const tick = () => {
       const now = Date.now();
-      const progress = Math.min((now - startedAt) / MARKER_ANIMATION_DURATION, 1);
-      if (progress < 1 && now - lastRenderedAt < ANIMATION_FRAME_INTERVAL) {
+      const hasActiveMotion = personnel.some((member) => {
+        const durationMs = motions.get(member.id)?.durationMs || 0;
+        return now - startedAt < durationMs;
+      });
+      if (hasActiveMotion && now - lastRenderedAt < ANIMATION_FRAME_INTERVAL) {
         animationFrame.current = requestAnimationFrame(tick);
         return;
       }
       lastRenderedAt = now;
       const next = personnel.map((member) => {
         const start = starts.get(member.id)!;
-        const target: [number, number] = [Number(member.longitude), Number(member.latitude)];
+        const motion = motions.get(member.id)!;
+        const target = motion.target;
+        const progress = motion.durationMs > 0
+          ? Math.min((now - startedAt) / motion.durationMs, 1)
+          : 1;
         const position = interpolatePosition(start, target, progress);
         currentPositions.current.set(member.id, position);
         return { ...member, longitude: position[0], latitude: position[1] };
       });
       setInterpolated(next);
-      if (progress < 1) animationFrame.current = requestAnimationFrame(tick);
+      if (hasActiveMotion) animationFrame.current = requestAnimationFrame(tick);
+      else animationFrame.current = null;
     };
 
     animationFrame.current = requestAnimationFrame(tick);
@@ -92,7 +137,7 @@ const useInterpolatedPersonnel = (personnel: OfficerMapPerson[]) => {
     };
   }, [personnel]);
 
-  return interpolated;
+  return { interpolated, motionByOfficer };
 };
 
 function PersonnelMarker({
@@ -173,7 +218,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   const [styleError, setStyleError] = useState<string | null>(null);
   const [styleLoading, setStyleLoading] = useState(false);
   const [mapZoom, setMapZoom] = useState(14.5);
-  const interpolatedPersonnel = useInterpolatedPersonnel(personnel);
+  const { interpolated: interpolatedPersonnel, motionByOfficer } = useInterpolatedPersonnel(personnel);
   const followedPersonnel = useMemo(
     () => interpolatedPersonnel.find((member) => member.id === followedOfficerId) || null,
     [followedOfficerId, interpolatedPersonnel],
@@ -248,14 +293,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
 
   useEffect(() => {
     if (!followedOfficerId) return;
-    const member = personnel.find((item) => item.id === followedOfficerId);
-    if (!member) return;
+    const motion = motionByOfficer.current.get(followedOfficerId);
+    if (!motion || motion.durationMs <= 0 || motion.suppressJitter) return;
     cameraRef.current?.easeTo({
-      center: [Number(member.longitude), Number(member.latitude)],
+      center: motion.target,
       pitch: enable3D ? 52 : 0,
-      duration: MARKER_ANIMATION_DURATION,
+      duration: motion.durationMs,
     });
-  }, [enable3D, followedOfficerId, personnel]);
+  }, [enable3D, followedOfficerId, motionByOfficer, personnel]);
 
   useEffect(() => {
     if (!hasMapTilerApiKey) {

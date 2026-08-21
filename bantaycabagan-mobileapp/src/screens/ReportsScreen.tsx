@@ -1,9 +1,7 @@
 import React, {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,13 +25,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, {
-  cancelAnimation,
   FadeIn,
   FadeOut,
-  LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
 } from 'react-native-reanimated';
 import { ReportLocationPickerModal } from '../components/ReportLocationPickerModal';
 import {
@@ -59,7 +52,6 @@ import type {
 const reportTypes = ['incident', 'patrol', 'checkpoint', 'others'];
 const reportFilters = ['all', 'incident', 'routine'] as const;
 const SUBMIT_MODAL_TOP_OFFSET = 1;
-const CARD_LAYOUT_TRANSITION = LinearTransition.duration(220);
 const CARD_CONTENT_ENTER = FadeIn.duration(170);
 const CARD_CONTENT_EXIT = FadeOut.duration(130);
 
@@ -122,9 +114,6 @@ export default function ReportsScreen() {
     isReportsLoadingMore,
   } = useOperationalContext();
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
-  const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
-  const filterTranslateX = useSharedValue(0);
-  const pendingFilterDirection = useRef(0);
   const [formVisible, setFormVisible] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
@@ -135,10 +124,6 @@ export default function ReportsScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [evidencePhoto, setEvidencePhoto] = useState<ReportEvidenceInput | null>(null);
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
-  const filterAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: filterTranslateX.value }],
-  }));
-
   const toggleReport = useCallback((reportId: string) => {
     setExpandedReportIds((current) => {
       const next = new Set(current);
@@ -150,26 +135,8 @@ export default function ReportsScreen() {
 
   const selectFilter = useCallback((nextFilter: (typeof reportFilters)[number]) => {
     if (nextFilter === filter) return;
-
-    const forward = reportFilters.indexOf(nextFilter) > reportFilters.indexOf(filter);
-    pendingFilterDirection.current = forward ? 1 : -1;
-    setIsFilterTransitioning(true);
     setFilter(nextFilter);
   }, [filter]);
-
-  useLayoutEffect(() => {
-    if (pendingFilterDirection.current === 0) return;
-    cancelAnimation(filterTranslateX);
-    filterTranslateX.value = pendingFilterDirection.current * 14;
-    pendingFilterDirection.current = 0;
-    filterTranslateX.value = withTiming(0, { duration: 140 });
-
-    const transitionTimer = setTimeout(() => {
-      setIsFilterTransitioning(false);
-    }, 150);
-
-    return () => clearTimeout(transitionTimer);
-  }, [filter, filterTranslateX]);
 
   useEffect(() => {
     refreshReports('all').catch(() => undefined);
@@ -382,15 +349,13 @@ export default function ReportsScreen() {
     const expanded = expandedReportIds.has(item.id);
 
     return (
-      <Animated.View
-        layout={isFilterTransitioning ? undefined : CARD_LAYOUT_TRANSITION}
+      <View
         style={[
           styles.reportCard,
           isDark && themeStyles.surface,
           item.is_incident ? styles.reportCardIncident : styles.reportCardRoutine,
         ]}
       >
-        <Animated.View style={filterAnimatedStyle}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityState={{ expanded }}
@@ -450,15 +415,12 @@ export default function ReportsScreen() {
             </View>
           </Animated.View>
         )}
-        </Animated.View>
-      </Animated.View>
+      </View>
     );
   }, [
     colors.textMuted,
     expandedReportIds,
-    filterAnimatedStyle,
     isDark,
-    isFilterTransitioning,
     toggleReport,
   ]);
 
@@ -498,6 +460,7 @@ export default function ReportsScreen() {
 
       <View style={styles.listTransition}>
         <FlatList
+          key={`reports-${filter}`}
           data={filteredReports}
           keyExtractor={(item) => item.id}
           renderItem={renderReport}
@@ -525,7 +488,7 @@ export default function ReportsScreen() {
             </TouchableOpacity>
           ) : null}
           ListEmptyComponent={(
-            <Animated.View style={[styles.emptyState, filterAnimatedStyle]}>
+            <View style={styles.emptyState}>
               <Icon name="description" size={34} color={colors.textMuted} />
               <Text style={[styles.emptyTitle, isDark && themeStyles.text]}>
                 {isReportsLoading ? 'Loading reports...' : 'No submitted reports'}
@@ -533,7 +496,7 @@ export default function ReportsScreen() {
               <Text style={[styles.emptyText, isDark && themeStyles.muted]}>
                 {isReportsLoading ? 'Getting your latest records.' : 'Reports you submit will appear here.'}
               </Text>
-            </Animated.View>
+            </View>
           )}
         />
       </View>

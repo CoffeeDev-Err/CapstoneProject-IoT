@@ -30,6 +30,8 @@ const serializeUser = (user, profile) => ({
 	id: String(user._id),
 	username: user.username,
 	email: user.email || '',
+	fullName: profile?.fullName || user.fullName || '',
+	rank: profile?.rank || user.rank || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role,
 	personnelId: user.personnelId,

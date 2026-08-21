@@ -72,7 +72,7 @@
 .nav-sidebar__brand-name {
   color: #f1f5f9;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
   transition: opacity var(--transition-base);
 }
 
@@ -103,7 +103,7 @@
   display: block;
   padding: 0 0.75rem;
   color: #64748b;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.2;
@@ -133,7 +133,7 @@
   border-radius: 10px;
   color: #94a3b8;
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   white-space: nowrap;
   overflow: visible;
@@ -229,7 +229,7 @@
   color: #94a3b8;
   background: transparent;
   text-align: left;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
   transition: background var(--transition-base), color var(--transition-base), transform 0.15s ease;
@@ -281,7 +281,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.35rem;
+  font-size: var(--font-size-xl);
   line-height: 1;
   font-weight: 800;
   color: inherit;
@@ -315,7 +315,7 @@
   border-radius: 8px;
   color: #94a3b8;
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   padding: 0.4rem 0.55rem;
   transition: background var(--transition-base), color var(--transition-base);
@@ -358,20 +358,27 @@
 
 .nav-sidebar__toggle {
   margin: 0.5rem;
-  border: 0;
+  min-height: 42px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #94a3b8;
+  background: #17233a;
+  color: #a9b9cf;
   padding: 0.6rem;
   cursor: pointer;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: flex-end;
   transition: background var(--transition-base), color var(--transition-base);
 }
 
+.nav-sidebar--collapsed .nav-sidebar__toggle {
+  justify-content: center;
+}
+
 .nav-sidebar__toggle:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
+  background: #20314f;
+  border-color: rgba(147, 197, 253, 0.45);
+  color: #dbeafe;
 }
 
 .nav-sidebar__toggle svg {
@@ -407,7 +414,7 @@
 
 .top-bar h1 {
   margin: 0;
-  font-size: 1.32rem;
+  font-size: var(--font-size-xl);
   font-family: var(--font-display);
   letter-spacing: 0;
   color: #f1f5f9;
@@ -416,14 +423,14 @@
 .top-bar p {
   margin: 0.2rem 0 0;
   color: #94a3b8;
-  font-size: 0.92rem;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.01em;
 }
 
 .connection-pill {
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
-  font-size: 0.86rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   transition: background var(--transition-base), color var(--transition-base);
 }

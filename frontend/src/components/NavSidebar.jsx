@@ -7,11 +7,12 @@
 import { NavLink } from 'react-router-dom'
 import {
   BarChart3,
-  ChevronLeft,
-  ChevronRight,
+  ClipboardList,
   FileText,
   LayoutDashboard,
   Map as MapIcon,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenLine,
   Settings,
   Users,
@@ -46,6 +47,11 @@ const navSections = [
         to: '/assign-area',
         icon: PenLine,
         label: 'Deployment Management',
+      },
+      {
+        to: '/deployments',
+        icon: ClipboardList,
+        label: 'Assigned Deployments',
       },
     ],
   },
@@ -119,8 +125,14 @@ function NavSidebar({ collapsed, onToggle }) {
         ))}
       </nav>
 
-      <button type="button" className="nav-sidebar__toggle" onClick={onToggle} aria-label="Toggle sidebar">
-        {collapsed ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
+      <button
+        type="button"
+        className="nav-sidebar__toggle"
+        onClick={onToggle}
+        aria-label={collapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
+        title={collapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
+      >
+        {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
       </button>
     </aside>
   )

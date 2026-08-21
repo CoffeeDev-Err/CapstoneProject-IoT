@@ -24,6 +24,9 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
+  const missingRequiredFields = step === 'password'
+    ? !currentPassword
+    : code.length !== 6 || !newPassword || !confirmPassword
 
   if (!open) return null
 
@@ -171,7 +174,11 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
           )}
           {error && <p className="auth-error" role="alert">{error}</p>}
           {message && <p className="auth-success" role="status">{message}</p>}
-          <button type="submit" className="login-submit-btn auth-modal__submit" disabled={pending}>
+          <button
+            type="submit"
+            className="login-submit-btn auth-modal__submit"
+            disabled={pending || missingRequiredFields}
+          >
             {pending ? 'Please wait...' : step === 'password' ? 'Send Verification Code' : 'Update Password'}
           </button>
           {step === 'verify' && (

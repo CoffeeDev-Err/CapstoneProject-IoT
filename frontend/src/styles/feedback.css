@@ -1,0 +1,79 @@
+.global-feedback {
+  position: fixed;
+  z-index: 4000;
+  top: calc(var(--top-bar-h, 68px) + 10px);
+  left: 50%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(920px, calc(100vw - 32px));
+  min-height: 48px;
+  max-height: 96px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  box-shadow: 0 14px 40px rgba(2, 8, 23, 0.3);
+  color: #fff;
+  transform: translateX(-50%);
+  animation: global-feedback-enter 180ms ease-out;
+  overflow: auto;
+}
+
+.global-feedback--success { background: #037f3f; border-color: #15a75b; }
+.global-feedback--error { background: #b42318; border-color: #e5484d; }
+.global-feedback--warning { background: #8a4b08; border-color: #d97706; }
+.global-feedback--info { background: #0756a8; border-color: #2f7fd2; }
+
+.global-feedback__icon {
+  width: 19px;
+  height: 19px;
+}
+
+.global-feedback__content {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.global-feedback__content strong { flex: 0 0 auto; font-size: var(--font-size-sm); }
+.global-feedback__content strong::after { content: ':'; }
+.global-feedback__content span { font-size: var(--font-size-sm); line-height: 1.35; }
+
+.global-feedback button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+
+.global-feedback button:hover { background: rgba(255, 255, 255, 0.14); }
+.global-feedback button svg { width: 18px; height: 18px; }
+
+@keyframes global-feedback-enter {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 575px) {
+  .global-feedback {
+    top: calc(var(--top-bar-h, 68px) + 8px);
+    width: calc(100vw - 20px);
+  }
+
+  .global-feedback__content {
+    align-items: start;
+    flex-direction: column;
+    gap: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-feedback { animation: none; }
+}

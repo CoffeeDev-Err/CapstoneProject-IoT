@@ -2,7 +2,11 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 
-import { openReportPayload, sealReportPayload } from './offlineQueueCipher';
+import {
+  SEALED_PAYLOAD_PREFIX,
+  openReportPayload,
+  sealReportPayload,
+} from './offlineQueueCipher';
 import type { SubmitReportInput } from '../types/operations';
 
 const DATABASE_NAME = 'geosentri-offline.db';
@@ -18,6 +22,17 @@ export type PendingReport = {
   evidenceUri: string | null;
   createdAt: string;
   attemptCount: number;
+};
+
+export type PendingReportReadFailure = {
+  id: string;
+  createdAt: string;
+  message: string;
+};
+
+export type PendingReportQueueSnapshot = {
+  reports: PendingReport[];
+  failures: PendingReportReadFailure[];
 };
 
 type PendingReportRow = {
@@ -128,13 +143,22 @@ export const stagePendingReport = async (
   }
 
   try {
+    const existingEncryptedRow = await database.getFirstAsync<{ id: string }>(
+      `SELECT id FROM pending_reports
+       WHERE status IN ('pending', 'uploading') AND payload_json LIKE ?
+       LIMIT 1`,
+      `${SEALED_PAYLOAD_PREFIX}%`,
+    );
     await database.runAsync(
       `INSERT INTO pending_reports (
         id, personnel_id, payload_json, evidence_uri, status, created_at, updated_at
       ) VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
       id,
       personnelId,
-      await sealReportPayload(JSON.stringify(stagedInput)),
+      await sealReportPayload(
+        JSON.stringify(stagedInput),
+        { allowKeyCreation: !existingEncryptedRow },
+      ),
       durableEvidenceUri,
       createdAt,
       createdAt,
@@ -154,9 +178,11 @@ export const stagePendingReport = async (
   };
 };
 
-export const getPendingReports = async (personnelId: string): Promise<PendingReport[]> => {
+export const getPendingReports = async (
+  personnelId: string,
+): Promise<PendingReportQueueSnapshot> => {
   const database = await getDatabase();
-  if (!database) return [];
+  if (!database) return { reports: [], failures: [] };
   const rows = await database.getAllAsync<PendingReportRow>(
     `SELECT id, personnel_id, payload_json, evidence_uri, created_at, attempt_count
      FROM pending_reports
@@ -166,13 +192,22 @@ export const getPendingReports = async (personnelId: string): Promise<PendingRep
   );
 
   const reports: PendingReport[] = [];
+  const failures: PendingReportReadFailure[] = [];
   for (const row of rows) {
     let input: SubmitReportInput;
     try {
       input = JSON.parse(await openReportPayload(row.payload_json)) as SubmitReportInput;
-    } catch {
-      // An unreadable row must not stall the rest of the queue. Leave it and its
-      // evidence file on disk rather than destroying unsubmitted report data.
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message.slice(0, 500)
+        : 'The queued report payload could not be opened.';
+      await database.runAsync(
+        `UPDATE pending_reports SET updated_at = ?, last_error = ? WHERE id = ?`,
+        new Date().toISOString(),
+        message,
+        row.id,
+      );
+      failures.push({ id: row.id, createdAt: row.created_at, message });
       continue;
     }
     reports.push({
@@ -184,7 +219,7 @@ export const getPendingReports = async (personnelId: string): Promise<PendingRep
       attemptCount: row.attempt_count,
     });
   }
-  return reports;
+  return { reports, failures };
 };
 
 export const markPendingReportUploading = async (id: string) => {

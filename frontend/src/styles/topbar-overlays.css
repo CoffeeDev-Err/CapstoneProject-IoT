@@ -84,13 +84,13 @@
 
 .notification-dropdown__header strong {
   display: block;
-  font-size: 0.88rem;
+  font-size: var(--font-size-sm);
   color: #0f172a;
 }
 
 .notification-dropdown__header small {
   color: #64748b;
-  font-size: 0.73rem;
+  font-size: var(--font-size-xs);
 }
 
 .notification-dropdown__actions {
@@ -103,7 +103,7 @@
   background: #f8fafc;
   color: #475569;
   border-radius: 8px;
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   padding: 0.2rem 0.45rem;
   cursor: pointer;
@@ -129,14 +129,14 @@
 
 .notification-empty-state strong {
   display: block;
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   color: #0f172a;
   margin-bottom: 0.2rem;
 }
 
 .notification-empty-state p {
   color: #64748b;
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
 }
 
 .notification-search {
@@ -151,7 +151,7 @@
   border-radius: 9px;
   background: #f8fafc;
   color: #0f172a;
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
   padding: 0.45rem 0.6rem;
   outline: none;
   transition: border-color var(--transition-base), box-shadow var(--transition-base), background var(--transition-base);
@@ -177,7 +177,7 @@
   display: block;
   margin-bottom: 0.38rem;
   color: #64748b;
-  font-size: 0.66rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -195,7 +195,7 @@
   border-radius: 6px;
   background: #ffffff;
   color: #64748b;
-  font-size: 0.66rem;
+  font-size: var(--font-size-xs);
   font-weight: 750;
   cursor: pointer;
   transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
@@ -255,7 +255,7 @@
 }
 
 .notification-item__meta small {
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   color: #94a3b8;
 }
 
@@ -263,7 +263,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  font-size: 0.65rem;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.02em;
   padding: 0.12rem 0.46rem;
@@ -298,12 +298,12 @@
 .notification-item__title {
   display: block;
   margin-top: 0.4rem;
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
   color: #0f172a;
 }
 
 .notification-item__message {
-  font-size: 0.76rem;
+  font-size: var(--font-size-sm);
   color: #64748b;
   margin-top: 0.2rem;
   line-height: 1.38;
@@ -345,16 +345,28 @@
   border: 2px solid #334155;
 }
 
+.profile-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1d4ed8;
+  color: #ffffff;
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  line-height: 1;
+  user-select: none;
+}
+
 .supervisor-info {
   line-height: 1.2;
 }
 .supervisor-name {
-  font-size: 0.88rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   color: #f1f5f9;
 }
 .supervisor-role {
-  font-size: 0.76rem;
+  font-size: var(--font-size-sm);
   color: #94a3b8;
 }
 
@@ -402,13 +414,13 @@
 }
 .dropdown-name {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   color: #0f172a;
 }
 .dropdown-rank {
   display: block;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: #64748b;
   margin-top: 0.1rem;
 }
@@ -427,7 +439,7 @@
   border: 0;
   background: transparent;
   padding: 0.6rem 1rem;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: #334155;
   cursor: pointer;
   text-align: left;
@@ -457,8 +469,8 @@
 }
 
 /* Name + rank column next to the avatar */
-.list-item-info span { font-size: 0.875rem; font-weight: 600; }
-.list-item-info small { font-size: 0.78rem; line-height: 1.25; }
+.list-item-info span { font-size: var(--font-size-sm); font-weight: 600; }
+.list-item-info small { font-size: var(--font-size-sm); line-height: 1.25; }
 
 /* Circular photo at the top of the profile modal */
 .profile-photo {

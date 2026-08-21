@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useFeedback } from '../context/useFeedback'
 import { getDashboardSummary } from '../services/dashboard'
 import { socket } from '../services/socket'
 
@@ -23,6 +24,7 @@ const formatActivityTime = (timestamp) => {
 function DashboardPage() {
   const [summary, setSummary] = useState(initialSummary)
   const [loadMessage, setLoadMessage] = useState('Loading live operational summary...')
+  const { showFeedback } = useFeedback()
 
   useEffect(() => {
     let refreshTimer
@@ -35,7 +37,12 @@ function DashboardPage() {
         setLoadMessage('')
       })
       .catch((error) => {
-        if (active) setLoadMessage(error.message)
+        if (!active) return
+        setLoadMessage('')
+        showFeedback(error.message || 'Unable to load the dashboard summary.', {
+          type: 'error',
+          title: 'Dashboard unavailable',
+        })
       })
 
     const scheduleRefresh = () => {
@@ -63,7 +70,7 @@ function DashboardPage() {
       clearTimeout(refreshTimer)
       refreshEvents.forEach((eventName) => socket.off(eventName, scheduleRefresh))
     }
-  }, [])
+  }, [showFeedback])
 
   const stats = useMemo(() => [
     {

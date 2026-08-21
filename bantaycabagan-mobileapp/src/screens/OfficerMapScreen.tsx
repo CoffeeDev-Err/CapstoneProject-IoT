@@ -57,11 +57,15 @@ type MapEvent = {
 };
 
 type OfficerMapScreenProps = {
+  headerContentHeight?: number;
+  headerTopInset?: number;
+  headerVisibility?: Animated.Value;
   onMapInteractionChange?: (isInteracting: boolean) => void;
 };
 
 const MAP_OPTIONS_EXPANDED_HEIGHT = 144;
 const MAP_INTERACTION_IDLE_DELAY_MS = 520;
+const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 
 // Leaflet is pinned to an exact version and subresource-integrity hash so a
 // tampered CDN response cannot execute inside the frame that receives live
@@ -105,7 +109,12 @@ const WebMapFrame = forwardRef<any, { html: string; onLoad: () => void }>(
 
 WebMapFrame.displayName = 'WebMapFrame';
 
-export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapScreenProps) {
+export default function OfficerMapScreen({
+  headerContentHeight = 0,
+  headerTopInset = 0,
+  headerVisibility,
+  onMapInteractionChange,
+}: OfficerMapScreenProps) {
   const { colors, isDark } = useMobileTheme();
   const {
     deployments,
@@ -137,6 +146,10 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
   const hasCurrentGpsFix = currentOfficer.isLocationStale !== true
     && currentOfficer.isVisibleOnMap !== false;
   const deploymentPromptVisible = Boolean(assignment && !assignment.acknowledged);
+  const overlayTranslateY = headerVisibility?.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-headerContentHeight, 0],
+  }) || 0;
 
   useEffect(() => {
     Animated.timing(mapControlsProgress, {
@@ -277,8 +290,14 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
     const initialPersonnel = JSON.stringify(mapPersonnel);
     // Addressed explicitly so personnel positions are delivered only to this
     // app's origin rather than to whatever window happens to embed the frame.
+    // This memo also runs on native (hooks are unconditional) even though the
+    // frame is web-only, and Hermes defines `window` while leaving
+    // `window.location` undefined — so guard the location itself, not just
+    // `window`, or `.origin` throws on device. On native the value is unused.
     const hostOrigin = JSON.stringify(
-      typeof window !== 'undefined' ? window.location.origin : '',
+      typeof window !== 'undefined' && window.location
+        ? window.location.origin
+        : '',
     );
     const controlBackground = isDark ? '#0b1528' : '#ffffff';
     const controlBorder = isDark ? '#2a3a56' : '#d9dee8';
@@ -729,7 +748,17 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
         />
       )}
 
-      <SafeAreaView pointerEvents="box-none" style={styles.overlay} edges={['left', 'right']}>
+      <AnimatedSafeAreaView
+        pointerEvents="box-none"
+        style={[
+          styles.overlay,
+          {
+            paddingTop: headerTopInset + headerContentHeight,
+            transform: [{ translateY: overlayTranslateY }],
+          },
+        ]}
+        edges={['left', 'right']}
+      >
         <View
           style={[
             styles.searchContainer,
@@ -879,7 +908,7 @@ export default function OfficerMapScreen({ onMapInteractionChange }: OfficerMapS
             </Animated.View>
           </View>
         </View>
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
 
       {followedOfficer && !selectedOfficer && (
         <View style={styles.followBanner}>

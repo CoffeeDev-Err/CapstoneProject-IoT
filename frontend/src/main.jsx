@@ -17,8 +17,10 @@ import { BrowserRouter } from 'react-router-dom'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './index.css'               // Global CSS resets, base font, and body layout
+import './styles/feedback.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { FeedbackProvider } from './context/FeedbackContext.jsx'
 import { PersonnelProvider } from './context/PersonnelContext.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -29,11 +31,13 @@ createRoot(document.getElementById('root')).render(
         top of the tree so ALL pages share one Socket.IO connection and one
         copy of the personnel state — no duplicate connections or data.
       */}
-      <AuthProvider>
-        <PersonnelProvider>
-          <App />
-        </PersonnelProvider>
-      </AuthProvider>
+      <FeedbackProvider>
+        <AuthProvider>
+          <PersonnelProvider>
+            <App />
+          </PersonnelProvider>
+        </AuthProvider>
+      </FeedbackProvider>
     </BrowserRouter>
   </StrictMode>,
 )
