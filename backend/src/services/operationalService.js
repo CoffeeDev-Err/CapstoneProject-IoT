@@ -22,8 +22,8 @@ const {
 } = require('../constants/cabaganBarangays')
 const {
 	buildDateRange,
+	buildPrefixSearchConditions,
 	createPaginationMeta,
-	escapeRegex,
 	parsePagination,
 } = require('../utils/query')
 const { isInsideCabagan } = require('../utils/cabaganGeofence')
@@ -669,15 +669,12 @@ const createOperationalService = ({ io }) => {
 			appendFilterCondition(filter, taskParticipantFilter(String(query.personnel_id)))
 		}
 		if (query.search) {
-			const pattern = new RegExp(escapeRegex(query.search), 'i')
-			appendFilterCondition(filter, {
-				$or: [
-					{ taskId: pattern },
-					{ title: pattern },
-					{ locationName: pattern },
-					{ requesterName: pattern },
-				],
-			})
+			buildPrefixSearchConditions(query.search, [
+				'taskId',
+				'title',
+				'locationName',
+				'requesterName',
+			]).forEach((condition) => appendFilterCondition(filter, condition))
 		}
 
 		if (query.pagination === 'cursor') {
@@ -829,6 +826,16 @@ const createOperationalService = ({ io }) => {
 	const listReports = async (query = {}, actor) => {
 		const pagination = parsePagination(query)
 		const filter = {}
+		const reportSortFields = {
+			submitted_at: 'submittedAt',
+			report_type: 'reportType',
+			severity: 'severity',
+			validation_status: 'validationStatus',
+			case_status: 'caseStatus',
+		}
+		const sortField = reportSortFields[query.sort_by] || 'submittedAt'
+		const sortDirection = String(query.sort_order).toLowerCase() === 'asc' ? 1 : -1
+		const sort = { [sortField]: sortDirection, _id: sortDirection }
 		const officerPersonnelId = getOfficerPersonnelId(actor)
 		if (officerPersonnelId) filter.submittedBy = officerPersonnelId
 		else if (query.personnel_id) filter.submittedBy = String(query.personnel_id)
@@ -845,14 +852,15 @@ const createOperationalService = ({ io }) => {
 		const dateRange = buildDateRange(query.from, query.to)
 		if (dateRange) filter.submittedAt = dateRange
 		if (query.search) {
-			const pattern = new RegExp(escapeRegex(query.search), 'i')
-			filter.$or = [
-				{ reportNumber: pattern },
-				{ officerName: pattern },
-				{ title: pattern },
-				{ assignedArea: pattern },
-				{ locationName: pattern },
-			]
+			buildPrefixSearchConditions(query.search, [
+				'reportNumber',
+				'submittedBy',
+				'officerName',
+				'title',
+				'assignedArea',
+				'barangayCode',
+				'locationName',
+			]).forEach((condition) => appendFilterCondition(filter, condition))
 		}
 
 		if (query.pagination === 'cursor') {
@@ -874,7 +882,7 @@ const createOperationalService = ({ io }) => {
 
 		const [documents, total] = await Promise.all([
 			Report.find(filter)
-				.sort({ submittedAt: -1, _id: -1 })
+				.sort(sort)
 				.skip(pagination.skip)
 				.limit(pagination.limit)
 				.lean(),
@@ -972,11 +980,24 @@ const createOperationalService = ({ io }) => {
 		else if (query.personnel_id) filter.personnelId = String(query.personnel_id)
 		if (query.barangay) filter.barangayCode = normalizeBarangayCode(query.barangay)
 		if (query.view === 'manageable') {
-			filter.status = { $in: MANAGEABLE_DEPLOYMENT_STATUSES }
+			filter.status = MANAGEABLE_DEPLOYMENT_STATUSES.includes(query.status)
+				? query.status
+				: { $in: MANAGEABLE_DEPLOYMENT_STATUSES }
 		} else if (DEPLOYMENT_STATUSES.includes(query.status)) {
 			filter.status = query.status
 		} else {
 			filter.status = 'active'
+		}
+		if (query.search) {
+			buildPrefixSearchConditions(query.search, [
+				'assignmentId',
+				'groupId',
+				'personnelId',
+				'personnelName',
+				'rank',
+				'barangayCode',
+				'patrolArea',
+			]).forEach((condition) => appendFilterCondition(filter, condition))
 		}
 		const [documents, total] = await Promise.all([
 			Deployment.find(filter)

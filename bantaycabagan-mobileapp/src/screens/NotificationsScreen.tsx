@@ -23,11 +23,13 @@ const iconFor = (notification: OfficerNotification): keyof typeof Icon.glyphMap 
   return 'notifications';
 };
 
-const colorFor = (notification: OfficerNotification) => {
-  if (notification.priority === 'critical') return mobileTheme.danger;
-  if (notification.priority === 'high') return mobileTheme.warning;
-  if (notification.type === 'success') return mobileTheme.success;
-  return mobileTheme.blue;
+const colorFor = (notification: OfficerNotification, colors: typeof mobileTheme) => {
+  if (notification.priority === 'critical') return colors.priorityCritical;
+  if (notification.priority === 'high') return colors.priorityHigh;
+  if (notification.priority === 'low') return colors.priorityLow;
+  if (notification.type === 'success') return colors.success;
+  if (notification.type === 'geofence' || notification.type === 'warning') return colors.warning;
+  return colors.info;
 };
 
 const formatTimestamp = (value: string) => {
@@ -60,7 +62,7 @@ export default function NotificationsScreen({
   }, [onClose, openNotification]);
 
   const renderNotification = useCallback(({ item }: { item: OfficerNotification }) => {
-    const accent = colorFor(item);
+    const accent = colorFor(item, colors);
     return (
       <TouchableOpacity
         activeOpacity={0.75}

@@ -86,8 +86,20 @@ export const usePersonnelRealtime = () => {
 
   // Report records stay available app-wide so mobile status events update analytics immediately.
   const [reports, setReports] = useState([])
+  const [reportsRevision, setReportsRevision] = useState(0)
   const [deployments, setDeployments] = useState([])
   const [tasks, setTasks] = useState([])
+  const [isInitialDataLoading, setIsInitialDataLoading] = useState(false)
+  const [initialDataError, setInitialDataError] = useState('')
+  const [lastPersonnelSyncAt, setLastPersonnelSyncAt] = useState('')
+  const [initialLoadVersion, setInitialLoadVersion] = useState(0)
+  const [operationalAlert, setOperationalAlert] = useState(null)
+
+  const retryInitialData = useCallback(() => {
+    setInitialDataError('')
+    setIsInitialDataLoading(true)
+    setInitialLoadVersion((version) => version + 1)
+  }, [])
 
   const refreshReports = useCallback(async () => {
     const reportPayload = await getReports()
@@ -175,11 +187,17 @@ export const usePersonnelRealtime = () => {
   }, [isAuthenticated])
 
   useEffect(() => {
+    let isCurrent = true
+
     if (!isAuthenticated) {
+      queueMicrotask(() => setIsInitialDataLoading(false))
       socket.disconnect()
       return undefined
     }
 
+    queueMicrotask(() => {
+      if (isCurrent) setIsInitialDataLoading(true)
+    })
     if (!socket.connected) socket.connect()
     // ── Event handlers ──────────────────────────────────────────────────────
 
@@ -212,6 +230,7 @@ export const usePersonnelRealtime = () => {
       if (Array.isArray(payload)) {
         const normalized = payload.map(normalizeAndTagPersonnel)
         setPersonnel(normalized)
+        setLastPersonnelSyncAt(new Date().toISOString())
 
         const { outsidePersonnel } = evaluateGeofence(normalized)
         if (outsidePersonnel.length > 0) {
@@ -219,6 +238,7 @@ export const usePersonnelRealtime = () => {
           const verb = outsidePersonnel.length === 1 ? 'is' : 'are'
           const message = `${names} ${verb} outside the Cabagan boundary.`
           setStatusMessage(message)
+          setOperationalAlert({ type: 'geofence', message, timestamp: new Date().toISOString() })
           addNotification({
             type: 'geofence',
             title: 'Geofence Alert',
@@ -248,6 +268,8 @@ export const usePersonnelRealtime = () => {
       if (Array.isArray(payload)) {
         const normalized = payload.map(normalizeAndTagPersonnel)
         setPersonnel(normalized)
+        setLastPersonnelSyncAt(new Date().toISOString())
+        setInitialDataError('')
 
         const { newlyOutside, hasRecovered } = evaluateGeofence(normalized)
 
@@ -256,6 +278,7 @@ export const usePersonnelRealtime = () => {
           const verb = newlyOutside.length === 1 ? 'is' : 'are'
           const message = `${names} ${verb} outside the Cabagan boundary.`
           setStatusMessage(message)
+          setOperationalAlert({ type: 'geofence', message, timestamp: new Date().toISOString() })
           addNotification({
             type: 'geofence',
             title: 'Geofence Alert',
@@ -267,6 +290,7 @@ export const usePersonnelRealtime = () => {
         if (hasRecovered) {
           const message = 'All tracked personnel are back inside the Cabagan boundary.'
           setStatusMessage(message)
+          setOperationalAlert({ type: 'success', message, timestamp: new Date().toISOString() })
           addNotification({
             type: 'success',
             title: 'Geofence Normalized',
@@ -284,6 +308,7 @@ export const usePersonnelRealtime = () => {
     const onEmergencyStatus = (payload) => {
       const message = payload?.message || 'Emergency status updated.'
       setStatusMessage(message)
+      setOperationalAlert({ type: 'emergency', message, timestamp: new Date().toISOString() })
       addNotification({
         type: 'emergency',
         title: 'Emergency Status',
@@ -299,6 +324,11 @@ export const usePersonnelRealtime = () => {
     const onEmergencyAlert = (payload) => {
       const message = payload?.message || 'Emergency alert triggered.'
       setStatusMessage(message)
+      setOperationalAlert({
+        type: 'emergency',
+        message,
+        timestamp: payload?.timestamp || new Date().toISOString(),
+      })
       addNotification({
         type: 'emergency',
         title: 'Emergency Alert',
@@ -333,6 +363,7 @@ export const usePersonnelRealtime = () => {
 
     const onReportSubmitted = (payload) => {
       mergeReportUpdates([payload])
+      setReportsRevision((revision) => revision + 1)
       addNotification({
         type: 'info',
         title: 'New Police Report',
@@ -351,6 +382,7 @@ export const usePersonnelRealtime = () => {
         case_status: 'resolved',
         resolved_at: payload.resolved_at || new Date().toISOString(),
       }])
+      setReportsRevision((revision) => revision + 1)
       addNotification({
         type: 'success',
         title: 'Case Resolved',
@@ -388,6 +420,13 @@ export const usePersonnelRealtime = () => {
 
     const onTaskCreated = (payload) => {
       upsertTask(payload)
+      if (payload.type === 'backup') {
+        setOperationalAlert({
+          type: 'emergency',
+          message: `${payload.title} at ${payload.location}.`,
+          timestamp: payload.created_at || new Date().toISOString(),
+        })
+      }
       addNotification({
         type: 'emergency',
         title: payload.type === 'backup' ? 'Backup Request' : 'Urgent Task',
@@ -402,11 +441,17 @@ export const usePersonnelRealtime = () => {
 
     const onReportUpdated = (payload) => {
       mergeReportUpdates([payload])
+      setReportsRevision((revision) => revision + 1)
     }
 
     const onPersonnelInactivity = (payload) => {
       const message = payload?.message || 'An on-duty officer has no detected movement.'
       setStatusMessage(message)
+      setOperationalAlert({
+        type: 'warning',
+        message,
+        timestamp: payload?.timestamp || new Date().toISOString(),
+      })
       addNotification({
         type: 'warning',
         title: payload?.title || 'Personnel Inactivity',
@@ -463,24 +508,38 @@ export const usePersonnelRealtime = () => {
     socket.on('task:updated', onTaskUpdated)
     socket.on('personnel:inactivity', onPersonnelInactivity)
 
-    Promise.all([
+    Promise.allSettled([
       getPersonnel(),
       getReports(),
       getDeployments(),
       getTasks(),
     ])
-      .then(([personnelPayload, reportPayload, deploymentPayload, taskPayload]) => {
-        onBootstrap(personnelPayload)
-        onReportsBootstrap(reportPayload)
-        onDeploymentsBootstrap(deploymentPayload)
-        onTasksBootstrap(taskPayload)
+      .then(([personnelResult, reportResult, deploymentResult, taskResult]) => {
+        if (!isCurrent) return
+        const unavailable = []
+
+        if (personnelResult.status === 'fulfilled') onBootstrap(personnelResult.value)
+        else unavailable.push('live personnel')
+        if (reportResult.status === 'fulfilled') onReportsBootstrap(reportResult.value)
+        else unavailable.push('reports')
+        if (deploymentResult.status === 'fulfilled') onDeploymentsBootstrap(deploymentResult.value)
+        else unavailable.push('deployments')
+        if (taskResult.status === 'fulfilled') onTasksBootstrap(taskResult.value)
+        else unavailable.push('active operations')
+
+        setInitialDataError(unavailable.length > 0
+          ? `Unable to load ${unavailable.join(', ')}. Existing live data will remain visible while you retry.`
+          : '')
       })
-      .catch(() => {})
+      .finally(() => {
+        if (isCurrent) setIsInitialDataLoading(false)
+      })
 
     // ── Cleanup on unmount ───────────────────────────────────────────────────
     // Removes all listeners when the PersonnelProvider unmounts to prevent
     // stale handlers or memory leaks.
     return () => {
+      isCurrent = false
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
       socket.off('personnel:bootstrap', onBootstrap)
@@ -500,7 +559,7 @@ export const usePersonnelRealtime = () => {
       socket.off('personnel:inactivity', onPersonnelInactivity)
       socket.disconnect()
     }
-  }, [addNotification, isAuthenticated])
+  }, [addNotification, initialLoadVersion, isAuthenticated])
 
   // Derive the count from the array so consumers don't have to compute it
   const activePersonnel = useMemo(
@@ -527,18 +586,24 @@ export const usePersonnelRealtime = () => {
     personnel,
     activePersonnel,
     reports,
+    reportsRevision,
     deployments,
     tasks,
+    isInitialDataLoading,
+    initialDataError,
+    lastPersonnelSyncAt,
     personnelCount,
     outOfBoundaryPersonnel,
     stalePersonnel,
     isConnected: Boolean(isAuthenticated && isConnected),
     statusMessage,
+    operationalAlert,
     notifications,
     unreadNotificationCount,
     markNotificationAsRead,
     markAllNotificationsRead,
     clearNotifications,
     refreshReports,
+    retryInitialData,
   }
 }

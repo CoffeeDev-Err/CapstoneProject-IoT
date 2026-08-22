@@ -18,7 +18,8 @@
 function SidePanel({
   personnel,
   personnelCount,
-  statusMessage,
+  connectionMessage,
+  operationalAlert,
   outOfBoundaryPersonnelCount,
   stalePersonnelCount,
   onSelectPersonnel,
@@ -34,9 +35,11 @@ function SidePanel({
       </article>
 
       {/* ── Status Card: last socket event or connection message ── */}
-      <article className="status-card">
+      <article className="status-card" aria-live="polite">
         <h2 className="mb-0 text-uppercase fw-bold small">System Status</h2>
-        <p className="mt-2 mb-0 text-body-secondary">{statusMessage}</p>
+        <p className="mt-2 mb-0 text-body-secondary">
+          {operationalAlert?.message || connectionMessage}
+        </p>
         {outOfBoundaryPersonnelCount > 0 && (
           <span className="geofence-alert-pill">
             {outOfBoundaryPersonnelCount} personnel outside Cabagan
@@ -53,6 +56,11 @@ function SidePanel({
       <article className="list-card d-flex flex-column min-vh-0">
         <h2 className="mb-0 text-uppercase fw-bold small">Active Personnel</h2>
         <ul className="mt-3 mb-0 ps-0 list-unstyled d-grid gap-2 overflow-auto">
+          {personnel.length === 0 && (
+            <li className="personnel-empty-state">
+              No active personnel with a current GPS fix.
+            </li>
+          )}
           {personnel.map((member) => (
             <li key={member.id}>
               {/*
@@ -65,13 +73,11 @@ function SidePanel({
                 onClick={() => onSelectPersonnel(member)}
               >
                 {/* Small circular photo on the left */}
-                <img
+                <InitialsAvatar
                   src={member.photoUrl}
-                  alt={member.name}
+                  name={member.name}
+                  alt=""
                   className="officer-list-avatar"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=1d4ed8&color=fff&size=64`
-                  }}
                 />
                 <div className="list-item-info flex-grow-1 overflow-hidden d-flex flex-column gap-1">
                   <span className="fw-semibold text-truncate">{member.name}</span>
@@ -90,3 +96,4 @@ function SidePanel({
 }
 
 export default SidePanel
+import InitialsAvatar from './InitialsAvatar'

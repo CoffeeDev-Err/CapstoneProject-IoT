@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { mobileTheme } from '../constants/mobileTheme';
+import { mobileDarkSemanticColors } from '../constants/semanticColors';
 
 const STORAGE_KEY = 'bantaycabagan-mobile-theme';
 const THEME_REVEAL_DURATION = 460;
@@ -32,6 +33,7 @@ const THEME_REVEAL_EASING = Easing.bezier(0.22, 1, 0.36, 1);
 
 const darkTheme = {
   ...mobileTheme,
+  ...mobileDarkSemanticColors,
   background: '#050b18',
   surface: '#0b1528',
   surfaceMuted: '#0e1a30',
@@ -41,9 +43,6 @@ const darkTheme = {
   textMuted: '#9eabc0',
   blueSoft: '#132442',
   purpleSoft: '#132442',
-  successSoft: '#172554',
-  warningSoft: '#172554',
-  dangerSoft: '#3a151d',
   offline: '#64748b',
 };
 

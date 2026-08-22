@@ -4,9 +4,27 @@ const normalizeSearchValue = (value) => String(value || '')
   .toLowerCase()
   .trim()
 
-const tokenizeSearchValue = (value) => normalizeSearchValue(value)
-  .split(/[^a-z0-9]+/)
-  .filter(Boolean)
+const SEARCH_TOKEN_CACHE_LIMIT = 2500
+const searchTokenCache = new Map()
+
+const tokenizeSearchValue = (value) => {
+  const normalizedValue = normalizeSearchValue(value)
+
+  if (searchTokenCache.has(normalizedValue)) {
+    return searchTokenCache.get(normalizedValue)
+  }
+
+  const tokens = normalizedValue
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+
+  if (searchTokenCache.size >= SEARCH_TOKEN_CACHE_LIMIT) {
+    searchTokenCache.clear()
+  }
+
+  searchTokenCache.set(normalizedValue, tokens)
+  return tokens
+}
 
 /**
  * Matches every typed token against the beginning of any searchable word.

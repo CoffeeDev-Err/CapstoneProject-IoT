@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { mobileSemanticColors } from './semanticColors';
 
 export const mobileFontFamily = Platform.select({
   ios: 'System',
@@ -8,6 +9,7 @@ export const mobileFontFamily = Platform.select({
 });
 
 export const mobileTheme = {
+  ...mobileSemanticColors,
   navy: '#0f172a',
   navySoft: '#1e3a5f',
   blue: '#2563eb',
@@ -22,12 +24,6 @@ export const mobileTheme = {
   borderSoft: '#e5ebf2',
   text: '#0f172a',
   textMuted: '#64748b',
-  success: '#1d4ed8',
-  successSoft: '#eff6ff',
-  warning: '#1d4ed8',
-  warningSoft: '#eff6ff',
-  danger: '#dc2626',
-  dangerSoft: '#fef2f2',
   offline: '#94a3b8',
   focus: '#2563eb',
 };

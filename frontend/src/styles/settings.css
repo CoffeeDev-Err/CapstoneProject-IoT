@@ -51,13 +51,16 @@
 }
 
 .account-view-nav {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: var(--space-2xs);
-  padding: var(--space-xs);
+  gap: 0.25rem;
+  width: min(100%, 420px);
+  padding: 0.25rem;
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--bg-secondary);
+  --smooth-underline-bottom: 0.2rem;
 }
 
 .account-view-tab {
@@ -67,32 +70,23 @@
   font-size: var(--font-size-sm);
   font-weight: 700;
   border-radius: 9px;
-  padding: 0.5rem 0.85rem;
+  padding: 0.4rem 0.7rem 0.55rem;
   cursor: pointer;
   transition: all var(--transition-base);
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .account-view-tab:hover {
-  background: transparent;
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
   color: var(--color-primary-dark);
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-  text-decoration-color: currentColor;
-  text-decoration-skip-ink: none;
 }
 
 .account-view-tab--active {
-  background: transparent;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   color: var(--color-primary-dark);
   box-shadow: none;
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-  text-decoration-color: currentColor;
-  text-decoration-skip-ink: none;
 }
 
 .account-create-section {

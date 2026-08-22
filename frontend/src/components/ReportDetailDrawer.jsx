@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, Download, Maximize2, Route, X, XCircle } from 'lucide-react'
-import ReportLocationMap from './ReportLocationMap'
+import { SkeletonBlock } from './LoadingSkeleton'
 import { getReportRoute } from '../services/operations'
 import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
+
+const ReportLocationMap = lazy(() => import('./ReportLocationMap'))
 
 const emptyRouteState = {
   reportId: null,
@@ -45,33 +48,8 @@ function ReportDetailDrawer({
   validationState,
 }) {
   const closeButtonRef = useRef(null)
+  const dialogRef = useAccessibleDialog(Boolean(report), onClose, closeButtonRef)
   const [routeState, setRouteState] = useState(emptyRouteState)
-
-  useEffect(() => {
-    if (!report) {
-      return undefined
-    }
-
-    const previouslyFocusedElement = document.activeElement
-    const previousBodyOverflow = document.body.style.overflow
-
-    document.body.style.overflow = 'hidden'
-    closeButtonRef.current?.focus()
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow
-      document.removeEventListener('keydown', handleKeyDown)
-      previouslyFocusedElement?.focus?.()
-    }
-  }, [onClose, report])
 
   if (!report) {
     return null
@@ -138,11 +116,13 @@ function ReportDetailDrawer({
   return createPortal(
     <div className="report-drawer-backdrop" role="presentation" onClick={onClose}>
       <aside
+        ref={dialogRef}
         className="report-detail-drawer"
         role="dialog"
         aria-modal="true"
         aria-labelledby="report-detail-title"
         onClick={(event) => event.stopPropagation()}
+        tabIndex={-1}
       >
         <header className="report-detail-drawer__header">
           <div>
@@ -226,12 +206,11 @@ function ReportDetailDrawer({
             </dl>
           </section>
 
-          {report.is_incident && (
           <section className="report-detail-section report-review-panel">
             <div className="report-review-panel__heading">
               <div>
                 <h4>COP review</h4>
-                <p>Validated incident reports are included in operational analytics.</p>
+                <p>Validate or reject this submitted report after reviewing its details and evidence.</p>
               </div>
               <span className={`report-review-status report-review-status--${report.validation_status}`}>
                 {report.validation_status}
@@ -262,7 +241,6 @@ function ReportDetailDrawer({
               </button>
             </div>
           </section>
-          )}
 
           <section className="report-detail-section">
             <div className="report-detail-section__header">
@@ -274,14 +252,16 @@ function ReportDetailDrawer({
               )}
             </div>
 
-            <ReportLocationMap
-              incident={{
-                latitude: report.latitude,
-                longitude: report.longitude,
-              }}
-              markerLabel={report.is_incident ? 'Reported incident' : 'Reported activity'}
-              routePoints={activeRouteState.points}
-            />
+            <Suspense fallback={<div className="report-location-map__empty" role="status">Loading report map...</div>}>
+              <ReportLocationMap
+                incident={{
+                  latitude: report.latitude,
+                  longitude: report.longitude,
+                }}
+                markerLabel={report.is_incident ? 'Reported incident' : 'Reported activity'}
+                routePoints={activeRouteState.points}
+              />
+            </Suspense>
 
             <div className="report-route-history">
               <div>
@@ -302,6 +282,13 @@ function ReportDetailDrawer({
                     : 'Show route'}
               </button>
             </div>
+
+            {activeRouteState.status === 'loading' && (
+              <div className="report-route-loading-skeleton" role="status" aria-label="Loading officer route">
+                <SkeletonBlock width="100%" height="0.7rem" />
+                <SkeletonBlock width="76%" height="0.7rem" />
+              </div>
+            )}
 
             {activeRouteState.status === 'loaded' && (
               <p className="report-route-history__status">
@@ -335,6 +322,8 @@ function ReportDetailDrawer({
                   <img
                     src={resolveMediaUrl(report.evidence_photo.url)}
                     alt={`Evidence attached to ${report.id}`}
+                    loading="lazy"
+                    decoding="async"
                   />
                 </a>
                 <figcaption>

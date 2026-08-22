@@ -164,12 +164,15 @@ io.on('connection', async (socket) => {
 		if (personnelId) socket.join(`personnel:${personnelId}`)
 		const role = socket.data.auth?.user?.role
 		if (role) socket.join(`role:${role}`)
-		const personnel = await getPersonnelWithLocations()
-		socket.emit(
-			'personnel:bootstrap',
-			scopePersonnelForActor(personnel, socket.data.auth?.user),
-		)
-		await operationalService.registerSocket(socket, socket.data.auth?.user)
+		const bootstrapMode = String(socket.handshake.auth?.bootstrapMode || '')
+		if (bootstrapMode !== 'rest') {
+			const personnel = await getPersonnelWithLocations()
+			socket.emit(
+				'personnel:bootstrap',
+				scopePersonnelForActor(personnel, socket.data.auth?.user),
+			)
+			await operationalService.registerSocket(socket, socket.data.auth?.user)
+		}
 	} catch (error) {
 		console.error('Socket bootstrap failed:', error)
 	}

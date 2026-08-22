@@ -96,7 +96,11 @@ function BarangayOperationalAnalytics({ analytics, period }) {
               <span>Sorted from highest to lowest activity</span>
             </div>
 
-            <div className="analytics-segmented-control analytics-segmented-control--compact" aria-label="Barangay activity metric">
+            <div
+              className="analytics-segmented-control analytics-segmented-control--compact smooth-underline-control"
+              aria-label="Barangay activity metric"
+              style={{ '--smooth-underline-left': metric === 'reports' ? '25%' : '75%' }}
+            >
               {METRIC_OPTIONS.map((option) => (
                 <button
                   key={option.value}

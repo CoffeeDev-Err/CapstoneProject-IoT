@@ -10,6 +10,45 @@ export const getReports = () => (
   getCollection('/api/reports?limit=100', 'Unable to load reports.')
 )
 
+export const getReportsPage = async ({
+  page = 1,
+  limit = 10,
+  search = '',
+  reportType = 'all',
+  caseStatus = 'all',
+  sortBy = 'submitted_at',
+  sortOrder = 'desc',
+  signal,
+} = {}) => {
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  })
+
+  if (search.trim()) query.set('search', search.trim())
+  if (reportType !== 'all') query.set('report_type', reportType)
+  if (caseStatus !== 'all') query.set('case_status', caseStatus)
+  query.set('sort_by', sortBy)
+  query.set('sort_order', sortOrder)
+
+  const payload = await apiRequest(`/api/reports?${query}`, {
+    signal,
+    errorMessage: 'Unable to search reports.',
+  })
+
+  return {
+    data: Array.isArray(payload.data) ? payload.data : [],
+    pagination: payload.pagination || {
+      page,
+      limit,
+      total: 0,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: page > 1,
+    },
+  }
+}
+
 export const getReport = async (reportId) => {
   const payload = await apiRequest(
     `/api/reports/${encodeURIComponent(reportId)}`,

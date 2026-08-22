@@ -1,5 +1,20 @@
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+const buildPrefixSearchConditions = (value, fields, { maxTokens = 8 } = {}) => {
+	const tokens = String(value || '')
+		.trim()
+		.split(/[^a-z0-9]+/i)
+		.filter(Boolean)
+		.slice(0, maxTokens)
+
+	return tokens.map((token) => {
+		const pattern = new RegExp(`(?:^|[^a-z0-9])${escapeRegex(token)}`, 'i')
+		return {
+			$or: fields.map((field) => ({ [field]: pattern })),
+		}
+	})
+}
+
 const parsePagination = (query, { defaultLimit = 20, maxLimit = 100 } = {}) => {
 	const page = Math.max(1, Number.parseInt(query.page, 10) || 1)
 	const limit = Math.min(
@@ -37,6 +52,7 @@ const buildDateRange = (from, to) => {
 
 module.exports = {
 	buildDateRange,
+	buildPrefixSearchConditions,
 	createPaginationMeta,
 	escapeRegex,
 	parsePagination,

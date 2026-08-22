@@ -8,6 +8,11 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // MapLibre is intentionally isolated behind lazy map components. Its raw
+    // bundle is large, but it is no longer part of the initial application load.
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     host: '127.0.0.1',
     port: 5600,

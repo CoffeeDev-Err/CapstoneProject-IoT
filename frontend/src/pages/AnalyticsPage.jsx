@@ -4,13 +4,20 @@
  */
 import { useMemo, useState } from 'react'
 import BarangayOperationalAnalytics from '../components/BarangayOperationalAnalytics'
+import { AnalyticsContentSkeleton } from '../components/LoadingSkeleton'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import {
   BARANGAY_ANALYTICS_PERIODS,
   buildBarangayAnalytics,
 } from '../utils/barangayAnalytics'
 
-const toCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
+const toCsvValue = (value) => {
+  const rawValue = String(value ?? '')
+  const safeValue = typeof value === 'string' && /^[\t\r ]*[=+\-@]/.test(rawValue)
+    ? `'${rawValue}`
+    : rawValue
+  return `"${safeValue.replace(/"/g, '""')}"`
+}
 
 const formatDateTime = (isoValue) => {
   if (!isoValue) return '-'
@@ -34,7 +41,7 @@ const barangayFromArea = (area = '') => {
 
 function AnalyticsPage() {
   const [barangayPeriod, setBarangayPeriod] = useState('weekly')
-  const { deployments, personnel, reports } = usePersonnelContext()
+  const { deployments, personnel, reports, isInitialDataLoading } = usePersonnelContext()
   const deploymentCoverage = useMemo(() => {
     const personnelById = new Map(personnel.map((member) => [member.id, member]))
     const coverageByBarangay = new Map()
@@ -153,7 +160,13 @@ function AnalyticsPage() {
           <p className="page-subtitle">Patrol, incident, and barangay deployment trends</p>
         </div>
         <div className="analytics-page-actions">
-          <div className="analytics-segmented-control" aria-label="Analytics period">
+          <div
+            className="analytics-segmented-control smooth-underline-control"
+            aria-label="Analytics period"
+            style={{
+              '--smooth-underline-left': `${((BARANGAY_ANALYTICS_PERIODS.findIndex((option) => option.value === barangayPeriod) + 0.5) / BARANGAY_ANALYTICS_PERIODS.length) * 100}%`,
+            }}
+          >
             {BARANGAY_ANALYTICS_PERIODS.map((option) => (
               <button
                 key={option.value}
@@ -172,6 +185,8 @@ function AnalyticsPage() {
         </div>
       </header>
 
+      {isInitialDataLoading ? <AnalyticsContentSkeleton /> : (
+      <>
       <div className="stats-grid analytics-stats-grid row g-3 mb-3 mx-0">
         {operationalStats.map((stat) => (
           <div key={stat.label} className="col-12 col-sm-6 col-xl-3">
@@ -196,6 +211,8 @@ function AnalyticsPage() {
         analytics={barangayAnalytics}
         period={barangayPeriod}
       />
+      </>
+      )}
     </div>
   )
 }

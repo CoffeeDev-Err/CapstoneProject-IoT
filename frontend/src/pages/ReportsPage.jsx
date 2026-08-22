@@ -1,12 +1,22 @@
-import { useCallback, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, Eye, Search } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye, Search } from 'lucide-react'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
+import { ReportListSkeleton } from '../components/LoadingSkeleton'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
-import { updateReportValidation } from '../services/operations'
-import { matchesPrefixSearch } from '../utils/searchMatching'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { getReportsPage, updateReportValidation } from '../services/operations'
 
 const REPORTS_PER_PAGE = 10
+const REPORT_TYPES = ['incident', 'patrol', 'checkpoint', 'others']
+const EMPTY_PAGINATION = {
+  page: 1,
+  limit: REPORTS_PER_PAGE,
+  total: 0,
+  totalPages: 1,
+  hasNextPage: false,
+  hasPreviousPage: false,
+}
 
 const formatDateTime = (isoValue) => {
   if (!isoValue) {
@@ -22,7 +32,13 @@ const formatDateTime = (isoValue) => {
   }).format(new Date(isoValue))
 }
 
-const toCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
+const toCsvValue = (value) => {
+  const rawValue = String(value ?? '')
+  const safeValue = typeof value === 'string' && /^[\t\r ]*[=+\-@]/.test(rawValue)
+    ? `'${rawValue}`
+    : rawValue
+  return `"${safeValue.replace(/"/g, '""')}"`
+}
 
 const getInitials = (name) => name
   .split(/\s+/)
@@ -69,53 +85,96 @@ const getReportCsvRows = (report) => [
 ]
 
 function ReportsPage() {
-  const { reports: realtimeReports, refreshReports } = usePersonnelContext()
+  const { refreshReports, reportsRevision } = usePersonnelContext()
   const { showFeedback } = useFeedback()
   const [selectedReportId, setSelectedReportId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 250)
   const [reportTypeFilter, setReportTypeFilter] = useState('all')
   const [caseStatusFilter, setCaseStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('submitted_at')
+  const [sortOrder, setSortOrder] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
+  const [reportResults, setReportResults] = useState({
+    data: [],
+    pagination: EMPTY_PAGINATION,
+    requestKey: '',
+    error: '',
+  })
+  const [refreshVersion, setRefreshVersion] = useState(0)
   const [reviewState, setReviewState] = useState({
     isSaving: false,
     error: '',
     message: '',
   })
-  const reports = useMemo(
-    () => [...realtimeReports].sort(
-      (firstReport, secondReport) => new Date(secondReport.date_time) - new Date(firstReport.date_time)
-    ),
-    [realtimeReports],
-  )
-  const reportTypes = useMemo(
-    () => [...new Set(reports.map((report) => report.report_type))].sort(),
-    [reports],
-  )
-  const filteredReports = useMemo(() => {
-    return reports.filter((report) => {
-      const matchesSearch = matchesPrefixSearch(searchTerm, [
-        report.id,
-        report.personnel_id,
-        report.officer,
-        report.assigned_area,
-        report.barangay,
-        report.title,
-        report.location,
-      ])
-      const matchesType = reportTypeFilter === 'all' || report.report_type === reportTypeFilter
-      const matchesStatus = caseStatusFilter === 'all'
-        || (caseStatusFilter === 'open' && report.is_incident && report.case_status !== 'resolved')
-        || (caseStatusFilter === 'resolved' && report.is_incident && report.case_status === 'resolved')
+  const requestKey = [
+    currentPage,
+    debouncedSearchTerm,
+    reportTypeFilter,
+    caseStatusFilter,
+    sortBy,
+    sortOrder,
+    refreshVersion,
+    reportsRevision,
+  ].join('|')
+  const isReportsLoading = reportResults.requestKey !== requestKey
 
-      return matchesSearch && matchesType && matchesStatus
+  useEffect(() => {
+    const requestController = new AbortController()
+    let isCurrent = true
+
+    getReportsPage({
+      page: currentPage,
+      limit: REPORTS_PER_PAGE,
+      search: debouncedSearchTerm,
+      reportType: reportTypeFilter,
+      caseStatus: caseStatusFilter,
+      sortBy,
+      sortOrder,
+      signal: requestController.signal,
     })
-  }, [caseStatusFilter, reportTypeFilter, reports, searchTerm])
-  const totalPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE))
-  const activePage = Math.min(currentPage, totalPages)
+      .then((result) => {
+        if (!isCurrent) return
+        if (currentPage > result.pagination.totalPages) {
+          setCurrentPage(result.pagination.totalPages)
+          return
+        }
+        setReportResults({ ...result, requestKey, error: '' })
+      })
+      .catch((error) => {
+        if (!isCurrent || error?.name === 'AbortError') return
+        setReportResults({
+          data: [],
+          pagination: { ...EMPTY_PAGINATION, page: currentPage },
+          requestKey,
+          error: error.message || 'Reports could not be loaded.',
+        })
+      })
+
+    return () => {
+      isCurrent = false
+      requestController.abort()
+    }
+  }, [
+    caseStatusFilter,
+    currentPage,
+    debouncedSearchTerm,
+    refreshVersion,
+    reportTypeFilter,
+    reportsRevision,
+    requestKey,
+    sortBy,
+    sortOrder,
+  ])
+
+  const reports = reportResults.data
+  const pagination = reportResults.pagination
+  const reportsError = reportResults.error
+  const totalPages = pagination.totalPages
+  const activePage = pagination.page
   const pageStartIndex = (activePage - 1) * REPORTS_PER_PAGE
-  const paginatedReports = filteredReports.slice(pageStartIndex, pageStartIndex + REPORTS_PER_PAGE)
-  const firstVisibleReport = filteredReports.length === 0 ? 0 : pageStartIndex + 1
-  const lastVisibleReport = Math.min(pageStartIndex + REPORTS_PER_PAGE, filteredReports.length)
+  const firstVisibleReport = pagination.total === 0 ? 0 : pageStartIndex + 1
+  const lastVisibleReport = Math.min(pageStartIndex + reports.length, pagination.total)
   const visiblePageNumbers = Array.from(
     { length: Math.min(5, totalPages) },
     (_, index) => {
@@ -145,6 +204,7 @@ function ReportsPage() {
     try {
       await updateReportValidation(selectedReport.id, validationStatus)
       await refreshReports()
+      setRefreshVersion((version) => version + 1)
       setReviewState({
         isSaving: false,
         error: '',
@@ -177,6 +237,31 @@ function ReportsPage() {
     setCurrentPage(1)
   }
 
+  const updateSort = (field) => {
+    setSortOrder((currentOrder) => (sortBy === field && currentOrder === 'desc' ? 'asc' : 'desc'))
+    setSortBy(field)
+    setCurrentPage(1)
+  }
+
+  const renderSortHeading = (label, field) => {
+    const isActive = sortBy === field
+    const SortIcon = isActive ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+    return (
+      <button
+        type="button"
+        className={`report-sort-heading${isActive ? ' is-active' : ''}`}
+        onClick={() => updateSort(field)}
+        aria-label={`Sort by ${label} ${isActive && sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+        title={isActive
+          ? `${label}: ${sortOrder === 'asc' ? 'ascending' : 'descending'} — click to reverse`
+          : `Sort reports by ${label}`}
+      >
+        {label}
+        <SortIcon aria-hidden="true" />
+      </button>
+    )
+  }
+
   return (
     <div className="page-container fade-in p-3 p-md-4">
       <header className="page-header mb-3 reports-header">
@@ -190,7 +275,7 @@ function ReportsPage() {
         <div className="report-list-panel__header">
           <div>
             <h3 className="widget-title mb-0">Submitted reports</h3>
-            <p>{filteredReports.length} of {reports.length} reports shown</p>
+            <p>{reports.length} of {pagination.total} matching reports shown</p>
           </div>
         </div>
 
@@ -213,7 +298,7 @@ function ReportsPage() {
               onChange={(event) => updateReportTypeFilter(event.target.value)}
             >
               <option value="all">All types</option>
-              {reportTypes.map((reportType) => (
+              {REPORT_TYPES.map((reportType) => (
                 <option key={reportType} value={reportType}>
                   {reportType}
                 </option>
@@ -237,12 +322,17 @@ function ReportsPage() {
         <div className="report-list" role="table" aria-label="Submitted police reports">
           <div className="report-list__header" role="row">
             <span role="columnheader">Officer</span>
-            <span role="columnheader">Submitted</span>
+            <span role="columnheader">{renderSortHeading('Type', 'report_type')}</span>
+            <span role="columnheader">{renderSortHeading('Severity', 'severity')}</span>
+            <span role="columnheader">{renderSortHeading('Status', 'validation_status')}</span>
+            <span role="columnheader">{renderSortHeading('Submitted', 'submitted_at')}</span>
             <span role="columnheader">Assigned area</span>
             <span role="columnheader" className="report-list__actions-heading">Actions</span>
           </div>
 
-          {paginatedReports.map((report) => (
+          {isReportsLoading ? (
+            <ReportListSkeleton />
+          ) : reports.map((report) => (
             <article className="report-list__row" role="row" key={report.id}>
               <div className="report-list__officer" role="cell">
                 <span className="report-list__avatar" aria-hidden="true">{getInitials(report.officer)}</span>
@@ -250,6 +340,25 @@ function ReportsPage() {
                   <strong>{report.officer}</strong>
                   <small>{report.personnel_id}</small>
                 </div>
+              </div>
+              <div className="report-list__type" role="cell">
+                <span className="report-list__mobile-label">Type</span>
+                <span className="report-type-pill">{report.report_type || 'other'}</span>
+              </div>
+              <div className="report-list__severity" role="cell">
+                <span className="report-list__mobile-label">Severity</span>
+                <span className={`report-severity report-severity--${Number(report.severity) || 1}`}>
+                  {report.severity || 1}/5
+                </span>
+              </div>
+              <div className="report-list__status" role="cell">
+                <span className="report-list__mobile-label">Status</span>
+                <span className={`report-decision-status report-decision-status--${report.validation_status || 'pending'}`}>
+                  {report.validation_status || 'pending'}
+                </span>
+                {report.report_type === 'incident' && (
+                  <small>{report.case_status || 'open'} case</small>
+                )}
               </div>
               <div className="report-list__submitted" role="cell">
                 <span className="report-list__mobile-label">Submitted</span>
@@ -280,17 +389,17 @@ function ReportsPage() {
             </article>
           ))}
 
-          {paginatedReports.length === 0 && (
+          {!isReportsLoading && reports.length === 0 && (
             <div className="report-list-empty" role="row">
-              <strong>No matching reports</strong>
-              <span>Try a different search term or filter.</span>
+              <strong>{reportsError ? 'Reports unavailable' : 'No matching reports'}</strong>
+              <span>{reportsError || 'Try a different search term or filter.'}</span>
             </div>
           )}
         </div>
 
         <nav className="report-pagination" aria-label="Report list pagination">
           <span className="report-pagination__summary">
-            Showing {firstVisibleReport}-{lastVisibleReport} of {filteredReports.length}
+            Showing {firstVisibleReport}-{lastVisibleReport} of {pagination.total}
           </span>
 
           <div className="report-pagination__controls">

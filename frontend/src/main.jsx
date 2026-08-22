@@ -15,7 +15,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import 'bootstrap/dist/css/bootstrap.min.css'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import './index.css'               // Global CSS resets, base font, and body layout
 import './styles/feedback.css'
 import App from './App.jsx'

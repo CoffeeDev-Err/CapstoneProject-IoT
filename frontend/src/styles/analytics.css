@@ -134,6 +134,8 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-secondary);
+  --smooth-underline-bottom: 0.2rem;
+  --smooth-underline-width: calc(33.333% - 0.5rem);
 }
 
 .analytics-segmented-control button {
@@ -151,27 +153,18 @@
 }
 
 .analytics-segmented-control button:hover {
-  background: transparent;
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
   color: var(--color-primary-dark);
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-  text-decoration-color: currentColor;
-  text-decoration-skip-ink: none;
 }
 
 .analytics-segmented-control button.is-active {
-  background: transparent;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   color: var(--color-primary-dark);
   box-shadow: none;
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-  text-decoration-color: currentColor;
-  text-decoration-skip-ink: none;
 }
 
 .analytics-segmented-control--compact {
+  --smooth-underline-width: calc(50% - 0.5rem);
   grid-auto-columns: minmax(112px, 1fr);
 }
 
@@ -430,23 +423,23 @@
 }
 
 .priority-level--critical {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--priority-critical-bg);
+  color: var(--priority-critical-fg);
 }
 
 .priority-level--high {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--priority-high-bg);
+  color: var(--priority-high-fg);
 }
 
 .priority-level--moderate {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--priority-moderate-bg);
+  color: var(--priority-moderate-fg);
 }
 
 .priority-level--low {
-  background: #dbeafe;
-  color: #1e3a5f;
+  background: var(--priority-low-bg);
+  color: var(--priority-low-fg);
 }
 
 .barangay-drilldown {

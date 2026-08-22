@@ -19,6 +19,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import GuestOnlyRoute from '../components/GuestOnlyRoute'
+import { PageLoadingSkeleton } from '../components/LoadingSkeleton'
 import ProtectedRoute from '../components/ProtectedRoute'
 
 const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
@@ -32,7 +33,7 @@ const ReportsPage = lazy(() => import('../pages/ReportsPage'))
 const SettingsPage = lazy(() => import('../pages/SettingsPage'))
 
 const withPageLoader = (page) => (
-  <Suspense fallback={<div className="route-page-loading" role="status">Loading page…</div>}>
+  <Suspense fallback={<PageLoadingSkeleton />}>
     {page}
   </Suspense>
 )

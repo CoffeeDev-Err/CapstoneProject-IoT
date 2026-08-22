@@ -159,6 +159,7 @@ function PersonnelMarker({
   const borderColor = markerToneColor(tone);
   const pulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
   const pulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
+  const statusCue = tone === 'backup' ? 'SOS' : (tone === 'boundary' ? '!' : (tone === 'operation' ? 'OP' : '✓'));
 
   return (
     <Marker
@@ -169,7 +170,7 @@ function PersonnelMarker({
     >
       <View style={styles.markerRoot}>
         <View style={styles.markerPhotoWrap}>
-          {tone === 'critical' && (
+          {tone === 'backup' && (
             <Animated.View
               pointerEvents="none"
               style={[
@@ -189,6 +190,11 @@ function PersonnelMarker({
               style={[styles.markerPhoto, { borderColor }]}
             />
           </View>
+          {statusCue ? (
+            <View style={[styles.markerStatusCue, { backgroundColor: borderColor }]}>
+              <Text style={styles.markerStatusCueText}>{statusCue}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={[styles.markerArrow, { borderTopColor: borderColor }]} />
       </View>
@@ -443,7 +449,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
             })}
           >
             <View style={styles.clusterMarkerRoot}>
-              {cluster.tone === 'critical' && (
+              {cluster.tone === 'backup' && (
                 <Animated.View
                   pointerEvents="none"
                   style={[
@@ -454,6 +460,11 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
               )}
               <View style={[styles.clusterMarker, { backgroundColor: markerToneColor(cluster.tone) }]}>
                 <Text style={styles.clusterMarkerText}>{cluster.members.length}</Text>
+              </View>
+              <View style={[styles.clusterStatusCue, { backgroundColor: markerToneColor(cluster.tone) }]}>
+                <Text style={styles.clusterStatusCueText}>
+                  {cluster.tone === 'backup' ? 'SOS' : (cluster.tone === 'boundary' ? '!' : (cluster.tone === 'operation' ? 'OP' : '✓'))}
+                </Text>
               </View>
             </View>
           </Marker>
@@ -513,6 +524,21 @@ const styles = StyleSheet.create({
   markerCurrentRingVisible: { borderColor: '#FFFFFF' },
   markerFollowedRing: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.2)' },
   markerPhoto: { width: 42, height: 42, borderWidth: 3, borderRadius: 21, backgroundColor: '#ffffff' },
+  markerStatusCue: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 19,
+    height: 19,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 10,
+    zIndex: 3,
+  },
+  markerStatusCueText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900' },
   markerPulse: {
     position: 'absolute',
     width: 44,
@@ -554,6 +580,20 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   clusterMarkerText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  clusterStatusCue: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 10,
+  },
+  clusterStatusCueText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900' },
   styleLoader: {
     position: 'absolute',
     top: 202,

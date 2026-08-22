@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ConfirmModal from '../components/ConfirmModal'
+import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton'
 import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
@@ -171,7 +172,7 @@ const openDateTimePicker = (event) => {
 }
 
 function AssignAreaPage({ view = 'form' }) {
-  const { personnel = [] } = usePersonnelContext()
+  const { personnel = [], isInitialDataLoading } = usePersonnelContext()
   const { showFeedback } = useFeedback()
   const location = useLocation()
   const navigate = useNavigate()
@@ -210,6 +211,8 @@ function AssignAreaPage({ view = 'form' }) {
   })
   const [personnelSearch, setPersonnelSearch] = useState('')
   const [patrolAreaSearch, setPatrolAreaSearch] = useState('')
+  const deferredPersonnelSearch = useDeferredValue(personnelSearch)
+  const deferredPatrolAreaSearch = useDeferredValue(patrolAreaSearch)
   const [isPatrolAreaOpen, setIsPatrolAreaOpen] = useState(false)
   const [assignments, setAssignments] = useState([])
   const [editingAssignmentId, setEditingAssignmentId] = useState(requestedAssignment?.id || null)
@@ -219,6 +222,7 @@ function AssignAreaPage({ view = 'form' }) {
   const [pendingDeleteAssignment, setPendingDeleteAssignment] = useState(null)
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
   const [deploymentSearch, setDeploymentSearch] = useState('')
+  const deferredDeploymentSearch = useDeferredValue(deploymentSearch)
   const [activeDeploymentView, setActiveDeploymentView] = useState(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
   const [openGroupMenuId, setOpenGroupMenuId] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -330,22 +334,22 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   const filteredPersonnelOptions = useMemo(() => {
-    const searchQuery = personnelSearch.trim().toLowerCase()
+    const searchQuery = deferredPersonnelSearch.trim().toLowerCase()
     if (!searchQuery) {
       return personnelOptions
     }
 
     return personnelOptions.filter((item) => matchesPrefixSearch(searchQuery, [item.name, item.rank]))
-  }, [personnelOptions, personnelSearch])
+  }, [deferredPersonnelSearch, personnelOptions])
 
   const filteredPatrolAreas = useMemo(() => {
-    const searchQuery = patrolAreaSearch.trim().toLowerCase()
+    const searchQuery = deferredPatrolAreaSearch.trim().toLowerCase()
     if (!searchQuery) {
       return patrolAreas
     }
 
     return patrolAreas.filter((area) => matchesPrefixSearch(searchQuery, [area]))
-  }, [patrolAreaSearch])
+  }, [deferredPatrolAreaSearch])
 
   const deploymentViewCounts = useMemo(() => assignments.reduce((counts, assignment) => {
     if (assignment.status === 'scheduled') {
@@ -384,7 +388,7 @@ function AssignAreaPage({ view = 'form' }) {
   }, [visibleAssignments])
 
   const filteredGroupedAssignments = useMemo(() => {
-    const query = deploymentSearch.trim().toLowerCase()
+    const query = deferredDeploymentSearch.trim().toLowerCase()
 
     if (!query) {
       return groupedAssignments
@@ -406,7 +410,7 @@ function AssignAreaPage({ view = 'form' }) {
         ? [{ ...group, assignments: matchingAssignments }]
         : []
     })
-  }, [deploymentSearch, groupedAssignments])
+  }, [deferredDeploymentSearch, groupedAssignments])
 
   useEffect(() => {
     if (!isPatrolAreaOpen) {
@@ -857,7 +861,10 @@ function AssignAreaPage({ view = 'form' }) {
         <form className="assignment-form" onSubmit={handleAssignPersonnel}>
           <fieldset className="assignment-mode-selector mb-3" disabled={isSaving}>
             <legend>Deployment Timing</legend>
-            <div className="assignment-mode-options">
+            <div
+              className="assignment-mode-options smooth-underline-control"
+              style={{ '--smooth-underline-left': assignmentForm.mode === DEPLOYMENT_MODES.START_NOW ? '25%' : '75%' }}
+            >
               <label className={`assignment-mode-option${assignmentForm.mode === DEPLOYMENT_MODES.START_NOW ? ' is-active' : ''}`}>
                 <input
                   type="radio"
@@ -1010,10 +1017,15 @@ function AssignAreaPage({ view = 'form' }) {
                 value={personnelSearch}
                 onChange={(event) => setPersonnelSearch(event.target.value)}
                 placeholder="Search personnel name or rank"
+                disabled={isInitialDataLoading}
               />
 
               <div className="assignment-checklist no-scrollbar">
-                {filteredPersonnelOptions.length === 0 ? (
+                {isInitialDataLoading ? (
+                  Array.from({ length: 4 }, (_, index) => (
+                    <SkeletonBlock key={index} width={`${78 + (index % 3) * 7}%`} height="2.25rem" />
+                  ))
+                ) : filteredPersonnelOptions.length === 0 ? (
                   <p className="assignment-checklist__empty mb-0">No personnel matches your search.</p>
                 ) : (
                   filteredPersonnelOptions.map((option) => (
@@ -1035,7 +1047,7 @@ function AssignAreaPage({ view = 'form' }) {
                   type="button"
                   className="assignment-inline-btn"
                   onClick={handleToggleAllFilteredPersonnel}
-                  disabled={filteredPersonnelOptions.length === 0}
+                  disabled={isInitialDataLoading || filteredPersonnelOptions.length === 0}
                 >
                   {areAllFilteredSelected ? 'Clear Filtered' : 'Select All Filtered'}
                 </button>
@@ -1093,7 +1105,12 @@ function AssignAreaPage({ view = 'form' }) {
           />
         </div>
 
-        <div className="deployment-view-nav mb-3" role="tablist" aria-label="Deployment list views">
+        <div
+          className="deployment-view-nav smooth-underline-control mb-3"
+          role="tablist"
+          aria-label="Deployment list views"
+          style={{ '--smooth-underline-left': activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? '25%' : '75%' }}
+        >
           <button
             type="button"
             role="tab"
@@ -1125,7 +1142,25 @@ function AssignAreaPage({ view = 'form' }) {
         </div>
 
         <div id="deployment-list-panel" role="tabpanel" className="deployment-list-panel">
-          {assignments.length === 0 ? (
+          {isDeploymentsLoading ? (
+            <table className="personnel-table assignment-list-table table align-middle mb-0" aria-busy="true">
+              <thead>
+                <tr className="assignment-group-table">
+                  <th>Assignment ID</th>
+                  <th>Personnel</th>
+                  <th>Patrol Area</th>
+                  <th>Shift Start</th>
+                  <th>Shift End</th>
+                  <th>Status</th>
+                  <th>Assigned At</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <TableSkeletonRows columns={8} rows={5} label="Loading deployments" />
+              </tbody>
+            </table>
+          ) : assignments.length === 0 ? (
             <p className="text-body-secondary mb-0 small">No deployment assignments yet.</p>
           ) : visibleAssignments.length === 0 ? (
             <p className="text-body-secondary mb-0 small">
