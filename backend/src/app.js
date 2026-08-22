@@ -1,4 +1,5 @@
 const cors = require('cors')
+const compression = require('compression')
 const express = require('express')
 const { corsOptions } = require('./config/cors')
 const { parseTrustProxy } = require('./config/environment')
@@ -11,6 +12,7 @@ app.disable('x-powered-by')
 app.set('trust proxy', trustProxy)
 app.use(securityHeaders)
 app.use(cors(corsOptions))
+app.use(compression())
 app.use(express.json({ limit: '256kb' }))
 app.use(express.urlencoded({ extended: false, limit: '64kb' }))
 module.exports = app

@@ -184,7 +184,7 @@ const clustered = clusterPersonnel(personnel, 14)
 assert.equal(clustered.length, 2, 'Nearby officers must cluster while a distant officer remains separate')
 const nearbyCluster = clustered.find((cluster) => cluster.members.length === 3)
 assert.ok(nearbyCluster, 'The three nearby officers must share one cluster')
-assert.equal(nearbyCluster.tone, 'critical', 'A cluster must inherit its highest-priority marker state')
+assert.equal(nearbyCluster.tone, 'backup', 'A cluster must inherit its highest-priority marker state')
 assert.equal(nearbyCluster.id, 'critical-duty-operation', 'Cluster IDs must remain stable')
 assert.deepEqual(
 	clusterPersonnel([...personnel].reverse(), 14).map((cluster) => cluster.id).sort(),

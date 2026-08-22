@@ -156,12 +156,30 @@
   background: #0b1220;
 }
 
+.evidence-viewer__image-skeleton,
+.evidence-viewer__figure img {
+  grid-area: 1 / 1;
+}
+
+.evidence-viewer__image-skeleton {
+  min-height: min(58vh, 26rem);
+}
+
 .evidence-viewer__figure img {
   display: block;
   max-width: 100%;
   max-height: 72vh;
   object-fit: contain;
   border-radius: 8px;
+  transition: opacity var(--transition-base);
+}
+
+.evidence-viewer__figure img.is-loading {
+  opacity: 0;
+}
+
+.evidence-viewer__figure img.is-loaded {
+  opacity: 1;
 }
 
 .evidence-viewer__metadata {

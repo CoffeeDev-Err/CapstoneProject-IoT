@@ -7,8 +7,11 @@ import {
   X,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useRef } from 'react'
 
 import { formatTime } from '../utils/dateTime'
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
+import InitialsAvatar from './InitialsAvatar'
 
 const formatGpsDateTime = (value) => {
   if (!value) return 'Unavailable'
@@ -26,6 +29,9 @@ const formatGpsDateTime = (value) => {
 }
 
 function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
+  const closeButtonRef = useRef(null)
+  const dialogRef = useAccessibleDialog(Boolean(selectedPersonnel), onClose, closeButtonRef)
+
   if (!selectedPersonnel) return null
 
   const hasCurrentLocation = !selectedPersonnel.isLocationStale
@@ -38,13 +44,18 @@ function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
     : 'Unavailable'
 
   return createPortal(
-    <div className="profile-modal-layer" role="presentation">
+    <div className="profile-modal-layer" role="presentation" onClick={onClose}>
       <section
+        ref={dialogRef}
         className="profile-map-card"
         role="dialog"
+        aria-modal="true"
         aria-label={`${selectedPersonnel.name} live details`}
+        onClick={(event) => event.stopPropagation()}
+        tabIndex={-1}
       >
         <button
+          ref={closeButtonRef}
           type="button"
           className="profile-map-card__close"
           onClick={onClose}
@@ -55,13 +66,11 @@ function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
         </button>
 
         <header className="profile-map-card__header">
-          <img
+          <InitialsAvatar
             src={selectedPersonnel.photoUrl}
+            name={selectedPersonnel.name}
             alt=""
             className="profile-map-card__photo"
-            onError={(event) => {
-              event.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPersonnel.name)}&background=1d4ed8&color=fff&size=128`
-            }}
           />
           <div className="profile-map-card__identity">
             <h3>{selectedPersonnel.name}</h3>

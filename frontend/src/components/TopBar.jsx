@@ -11,7 +11,7 @@
  *   isDark       {boolean}  — true when dark mode is active
  *   onToggleDark {Function} — called to flip the dark mode flag
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -26,6 +26,7 @@ import { resolveApiAssetUrl } from '../services/apiAssets'
 import { matchesPrefixSearch } from '../utils/searchMatching'
 import ConfirmModal from './ConfirmModal'
 import PasswordChangeModal from './PasswordChangeModal'
+import pnpLogo from '../assets/pnp-logo.png'
 
 const NOTIFICATION_HISTORY_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -137,6 +138,7 @@ function TopBar({
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [notificationSearch, setNotificationSearch] = useState('')
+  const deferredNotificationSearch = useDeferredValue(notificationSearch)
   const [notificationHistoryRange, setNotificationHistoryRange] = useState('all')
   const dropdownRef = useRef(null)
   const notificationRef = useRef(null)
@@ -179,7 +181,7 @@ function TopBar({
       }
 
       const searchableTimestamp = formatNotificationTimestamp(notification.timestamp).toLowerCase()
-      return matchesPrefixSearch(notificationSearch, [
+      return matchesPrefixSearch(deferredNotificationSearch, [
         notification.title,
         notification.message,
         notification.type,
@@ -187,7 +189,7 @@ function TopBar({
         searchableTimestamp,
       ])
     })
-  }, [notificationHistoryRange, notificationSearch, notifications])
+  }, [deferredNotificationSearch, notificationHistoryRange, notifications])
 
   // Close open top-bar popovers whenever user clicks outside of them
   useEffect(() => {
@@ -235,8 +237,11 @@ function TopBar({
     <header className="top-bar">
       {/* ── Left: system branding ── */}
       <div className="topbar-left">
-        <h1>Philippine National Police</h1>
-        <p>Cabagan Police Station Operations Portal</p>
+        <img className="topbar-left__pnp-logo" src={pnpLogo} alt="" aria-hidden="true" />
+        <div className="topbar-left__copy">
+          <h1>Philippine National Police</h1>
+          <p>Cabagan Police Station Operations Portal</p>
+        </div>
       </div>
 
       {/* ── Right: status pill + theme + notifications + supervisor profile ── */}

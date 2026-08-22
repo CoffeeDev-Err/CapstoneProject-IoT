@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import '../services/configureMapLibre'
 import MapAttribution from './MapAttribution'
+import { SkeletonBlock } from './LoadingSkeleton'
 import MapStyleControls from './MapStyleControls'
 import { useDocumentTheme } from '../hooks/useDocumentTheme'
 import {
@@ -283,7 +285,11 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
           onThreeDChange={setThreeDEnabled}
         />
         <MapAttribution />
-        {!mapReady && <div className="map-style-loading map-style-loading--compact" role="status">Loading…</div>}
+        {!mapReady && (
+          <div className="map-style-loading map-style-loading--compact" role="status" aria-label="Loading report map">
+            <SkeletonBlock width="4.5rem" height="0.6rem" />
+          </div>
+        )}
       </div>
 
       <div className="report-location-map__legend" aria-label="Map legend">

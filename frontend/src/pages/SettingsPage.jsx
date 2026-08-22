@@ -5,8 +5,10 @@
  * Includes a supervisor-only account provisioning form so mobile users
  * do not need an in-app signup flow.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
+import InitialsAvatar from '../components/InitialsAvatar'
+import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton'
 import { useFeedback } from '../context/useFeedback'
 import {
   createAccount,
@@ -40,8 +42,17 @@ const createTempPassword = (length = 12) => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?'
   let value = ''
 
-  for (let index = 0; index < length; index += 1) {
-    value += chars[Math.floor(Math.random() * chars.length)]
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error('Secure password generation is unavailable in this browser.')
+  }
+
+  const upperBound = 256 - (256 % chars.length)
+  while (value.length < length) {
+    const bytes = new Uint8Array(Math.max(16, length - value.length))
+    globalThis.crypto.getRandomValues(bytes)
+    bytes.forEach((byte) => {
+      if (value.length < length && byte < upperBound) value += chars[byte % chars.length]
+    })
   }
 
   return value
@@ -98,6 +109,7 @@ function SettingsPage() {
   const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
   const [createdAccounts, setCreatedAccounts] = useState([])
   const [accountSearch, setAccountSearch] = useState('')
+  const deferredAccountSearch = useDeferredValue(accountSearch)
   const [editingAccountId, setEditingAccountId] = useState(null)
   const [activeAccountView, setActiveAccountView] = useState('create')
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState(null)
@@ -155,7 +167,7 @@ function SettingsPage() {
 
   const filteredAccounts = useMemo(() => {
     return createdAccounts.filter((account) => (
-      matchesPrefixSearch(accountSearch, [
+      matchesPrefixSearch(deferredAccountSearch, [
         account.fullName,
         account.rank,
         account.badgeNumber,
@@ -167,7 +179,7 @@ function SettingsPage() {
         account.mobileNumber,
       ])
     ))
-  }, [accountSearch, createdAccounts])
+  }, [createdAccounts, deferredAccountSearch])
 
   const assignedImeiToAccount = useMemo(
     () => new Map(createdAccounts.filter((account) => account.imei).map((account) => [account.imei, account])),
@@ -570,7 +582,12 @@ function SettingsPage() {
       <div className="settings-grid row g-3 mx-0">
         <div className="col-12">
           <div className="widget-card slide-up account-management-card">
-            <div className="account-view-nav mb-3" role="tablist" aria-label="Account management views">
+            <div
+              className="account-view-nav smooth-underline-control mb-3"
+              role="tablist"
+              aria-label="Account management views"
+              style={{ '--smooth-underline-left': activeAccountView === 'create' ? '25%' : '75%' }}
+            >
               <button
                 type="button"
                 role="tab"
@@ -660,6 +677,12 @@ function SettingsPage() {
                 {!isEditingSupervisor && (
                 <div className="account-field account-field--wide">
                   <span>Registered GPS Device {requiresGpsDevice ? '*' : '(Optional)'}</span>
+                  {devicesLoading ? (
+                    <div className="inline-loading-skeleton" role="status" aria-label="Loading registered GPS devices">
+                      <SkeletonBlock width="100%" height="2.65rem" />
+                      <SkeletonBlock width="6.5rem" height="2.65rem" />
+                    </div>
+                  ) : (
                   <div className="account-password-row">
                     <select
                       className={`settings-input w-100 ${formErrors.imei ? 'settings-input--error' : ''}`}
@@ -700,6 +723,7 @@ function SettingsPage() {
                       Refresh
                     </button>
                   </div>
+                  )}
                   {devicesError && <small className="field-error">{devicesError}</small>}
                   {!devicesLoading && !devicesError && flespiDevices.length === 0 && (
                     <small className="settings-hint">
@@ -854,11 +878,7 @@ function SettingsPage() {
                     </thead>
                     <tbody>
                       {accountsLoading ? (
-                        <tr className="personnel-row">
-                          <td colSpan={9} className="text-body-secondary small">
-                            Loading accounts from MongoDB...
-                          </td>
-                        </tr>
+                        <TableSkeletonRows columns={9} rows={5} label="Loading accounts" />
                       ) : filteredAccounts.length === 0 ? (
                         <tr className="personnel-row">
                           <td colSpan={9} className="text-body-secondary small">
@@ -870,20 +890,12 @@ function SettingsPage() {
                           <tr key={account.id} className="personnel-row">
 	                            <td>
 	                              <div className="account-name-cell">
-	                                {account.photoUrl ? (
-	                                  <img
-	                                    className="account-table-avatar"
-	                                    src={resolveApiAssetUrl(account.photoUrl)}
-	                                    alt=""
-	                                    onError={(event) => {
-	                                      event.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(account.fullName || account.loginId || 'Personnel')}&background=1d4ed8&color=fff&size=64`
-	                                    }}
-	                                  />
-	                                ) : (
-	                                  <span className="account-table-avatar account-table-avatar--fallback" aria-hidden="true">
-	                                    {(account.fullName || account.loginId || 'P').charAt(0).toUpperCase()}
-	                                  </span>
-	                                )}
+	                                <InitialsAvatar
+	                                  className="account-table-avatar account-table-avatar--fallback"
+	                                  src={account.photoUrl ? resolveApiAssetUrl(account.photoUrl) : ''}
+	                                  name={account.fullName || account.loginId || 'Personnel'}
+	                                  alt=""
+	                                />
 	                                <span>{account.fullName || 'Supervisor account'}</span>
 	                              </div>
 	                            </td>
@@ -911,7 +923,7 @@ function SettingsPage() {
                             <td>
                               <span
                                 className="status-badge"
-                                style={{ '--status-color': account.accountStatus === 'Active' ? '#2563eb' : '#64748b' }}
+                                style={{ '--status-color': account.accountStatus === 'Active' ? 'var(--color-success)' : '#64748b' }}
                               >
                                 {account.accountStatus}
                               </span>

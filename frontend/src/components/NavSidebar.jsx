@@ -17,7 +17,7 @@ import {
   Settings,
   Users,
 } from 'lucide-react'
-import pnpLogo from '../assets/pnp-logo.png'
+import geosentriIcon from '../assets/geosentri-icon.png'
 
 const navSections = [
   {
@@ -92,8 +92,8 @@ function NavSidebar({ collapsed, onToggle }) {
   return (
     <aside className={`nav-sidebar ${collapsed ? 'nav-sidebar--collapsed' : ''}`}>
       <div className="nav-sidebar__brand">
-        <span className="nav-sidebar__badge mb-2">
-          <img src={pnpLogo} alt="Philippine National Police seal" />
+        <span className="nav-sidebar__badge">
+          <img src={geosentriIcon} alt="" aria-hidden="true" />
         </span>
         {!collapsed && <span className="nav-sidebar__brand-name fs-4">GeoSentri</span>}
       </div>
@@ -111,6 +111,8 @@ function NavSidebar({ collapsed, onToggle }) {
                     to={item.to}
                     end={item.to === '/'}
                     onClick={() => handleNavItemClick(item)}
+                    aria-label={item.label}
+                    title={collapsed ? item.label : undefined}
                     className={({ isActive }) =>
                       `nav-sidebar__link ${isActive ? 'nav-sidebar__link--active' : ''}`
                     }

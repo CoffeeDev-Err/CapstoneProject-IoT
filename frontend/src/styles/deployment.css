@@ -52,13 +52,16 @@
 }
 
 .deployment-view-nav {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: var(--space-2xs);
-  padding: var(--space-xs);
+  gap: 0.25rem;
+  width: min(100%, 420px);
+  padding: 0.25rem;
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--bg-secondary);
+  --smooth-underline-bottom: 0.2rem;
 }
 
 .deployment-view-tab {
@@ -68,7 +71,7 @@
   gap: 0.45rem;
   border: 0;
   border-radius: 9px;
-  padding: 0.5rem 0.85rem;
+  padding: 0.4rem 0.7rem 0.55rem;
   background: transparent;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
@@ -77,16 +80,20 @@
   text-transform: uppercase;
   cursor: pointer;
   transition: all var(--transition-base);
+  white-space: nowrap;
 }
 
 .deployment-view-tab:hover,
 .deployment-view-tab--active {
   color: var(--color-primary-dark);
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-  text-decoration-color: currentColor;
-  text-decoration-skip-ink: none;
+}
+
+.deployment-view-tab:hover {
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.deployment-view-tab--active {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 .deployment-view-count {

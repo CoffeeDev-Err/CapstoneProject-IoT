@@ -271,28 +271,28 @@
 }
 
 .notification-type-pill--geofence {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-strong);
+}
+
+.notification-type-pill--emergency {
   background: var(--color-danger-soft);
   color: var(--color-danger-strong);
 }
 
-.notification-type-pill--emergency {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
 .notification-type-pill--warning {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--color-warning-soft);
+  color: var(--color-warning-strong);
 }
 
 .notification-type-pill--success {
-  background: #dbeafe;
-  color: #1e3a5f;
+  background: var(--color-success-soft);
+  color: var(--color-success-strong);
 }
 
 .notification-type-pill--system {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--color-info-soft);
+  color: var(--color-info-strong);
 }
 
 .notification-item__title {
@@ -324,16 +324,23 @@
   cursor: pointer;
   transition: background var(--transition-base), border-color var(--transition-base);
 }
-.supervisor-btn:hover {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: #ffffff;
+.supervisor-btn:hover,
+.supervisor-btn[aria-expanded='true'] {
+  border-color: #3b82f6;
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
 }
 
 .supervisor-btn:hover .supervisor-name,
+.supervisor-btn:hover .supervisor-chevron,
+.supervisor-btn[aria-expanded='true'] .supervisor-name,
+.supervisor-btn[aria-expanded='true'] .supervisor-chevron {
+  color: #93c5fd;
+}
+
 .supervisor-btn:hover .supervisor-role,
-.supervisor-btn:hover .supervisor-chevron {
-  color: #ffffff;
+.supervisor-btn[aria-expanded='true'] .supervisor-role {
+  color: #9eabc0;
 }
 
 .supervisor-avatar {

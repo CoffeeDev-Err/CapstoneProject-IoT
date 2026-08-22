@@ -8,8 +8,8 @@ const {
 const { distanceInMeters, point, readCoordinates } = require('../utils/geo')
 const {
 	buildDateRange,
+	buildPrefixSearchConditions,
 	createPaginationMeta,
-	escapeRegex,
 	parsePagination,
 } = require('../utils/query')
 const {
@@ -177,13 +177,12 @@ const listPersonnel = async (query = {}, actor) => {
 	}
 	if (query.duty_status) filter.dutyStatus = String(query.duty_status)
 	if (query.search) {
-		const pattern = new RegExp(escapeRegex(query.search), 'i')
-		filter.$or = [
-			{ personnelId: pattern },
-			{ badgeNumber: pattern },
-			{ fullName: pattern },
-			{ rank: pattern },
-		]
+		filter.$and = buildPrefixSearchConditions(query.search, [
+			'personnelId',
+			'badgeNumber',
+			'fullName',
+			'rank',
+		])
 	}
 
 	const [profiles, total] = await Promise.all([

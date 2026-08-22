@@ -1,4 +1,6 @@
 import { createPortal } from 'react-dom'
+import { useRef } from 'react'
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
 
 function ConfirmModal({
   open,
@@ -10,6 +12,9 @@ function ConfirmModal({
   onCancel,
   variant = 'danger',
 }) {
+  const cancelButtonRef = useRef(null)
+  const dialogRef = useAccessibleDialog(open, onCancel, cancelButtonRef)
+
   if (!open) {
     return null
   }
@@ -21,6 +26,7 @@ function ConfirmModal({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         className="confirm-modal"
         role="dialog"
         aria-modal="true"
@@ -31,7 +37,7 @@ function ConfirmModal({
         <p className="confirm-modal__message">{message}</p>
 
         <div className="confirm-modal__actions">
-          <button type="button" className="confirm-btn confirm-btn--cancel" onClick={onCancel}>
+          <button ref={cancelButtonRef} type="button" className="confirm-btn confirm-btn--cancel" onClick={onCancel}>
             {cancelLabel}
           </button>
           <button

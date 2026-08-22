@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { confirmPasswordChange, requestPasswordChange, resendVerificationCode } from '../services/auth'
 import VerificationCodeInput from './VerificationCodeInput'
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
 
 const strongPassword = (value) => (
   value.length >= 10
@@ -28,8 +29,6 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
     ? !currentPassword
     : code.length !== 6 || !newPassword || !confirmPassword
 
-  if (!open) return null
-
   const resetAndClose = () => {
     setStep('password')
     setCurrentPassword('')
@@ -41,6 +40,10 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
     setMessage('')
     onClose()
   }
+
+  const dialogRef = useAccessibleDialog(open, resetAndClose)
+
+  if (!open) return null
 
   const requestCode = async (event) => {
     event.preventDefault()
@@ -121,7 +124,7 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
 
   return (
     <div className="auth-modal-backdrop" role="presentation">
-      <div className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
+      <div ref={dialogRef} className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="change-password-title" tabIndex={-1}>
         <div className="auth-modal__header">
           <div>
             <span className="auth-modal__step">Step {step === 'password' ? '1' : '2'} of 2</span>

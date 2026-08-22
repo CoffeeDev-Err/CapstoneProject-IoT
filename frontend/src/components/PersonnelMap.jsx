@@ -5,9 +5,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
 import '../services/configureMapLibre'
 import MapAttribution from './MapAttribution'
+import MapLegend from './MapLegend'
+import { SkeletonBlock } from './LoadingSkeleton'
 import MapStyleControls from './MapStyleControls'
 import { useDocumentTheme } from '../hooks/useDocumentTheme'
 import {
@@ -76,14 +79,27 @@ const getMarkerStatusClass = (status = '') => {
 }
 
 const getMarkerClass = (member) => {
-  if (member.isInsideCabagan === false || member.emergencyActive) return 'police-marker--out-of-boundary'
+  if (member.emergencyActive) return 'police-marker--backup'
+  if (member.isInsideCabagan === false) return 'police-marker--boundary'
   if (member.operationActive) return 'police-marker--operation'
   return getMarkerStatusClass(member.status)
 }
 
-const getFallbackPhoto = (member) => (
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=1d4ed8&color=fff&size=96`
-)
+const getMarkerCue = (member) => {
+  if (member.emergencyActive) return 'SOS'
+  if (member.isInsideCabagan === false) return '!'
+  if (member.operationActive) return 'OP'
+  return '✓'
+}
+
+const getInitials = (name = '') => name
+  .trim()
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0])
+  .join('')
+  .toUpperCase() || 'P'
 
 const createPersonnelMarkerElement = (member, onSelect) => {
   const button = document.createElement('button')
@@ -99,17 +115,28 @@ const createPersonnelMarkerElement = (member, onSelect) => {
   photo.className = 'police-marker__photo'
   photo.alt = member.name
   photo.dataset.intendedSource = member.photoUrl || ''
-  photo.dataset.fallbackSource = getFallbackPhoto(member)
-  photo.src = photo.dataset.intendedSource || photo.dataset.fallbackSource
+  const initials = document.createElement('span')
+  initials.className = 'police-marker__initials'
+  initials.textContent = getInitials(member.name)
+  initials.hidden = Boolean(photo.dataset.intendedSource)
+  photo.hidden = !photo.dataset.intendedSource
+  if (photo.dataset.intendedSource) photo.src = photo.dataset.intendedSource
   photo.addEventListener('error', () => {
-    if (photo.src !== photo.dataset.fallbackSource) photo.src = photo.dataset.fallbackSource
+    photo.hidden = true
+    initials.hidden = false
   })
 
+  const statusCue = document.createElement('span')
+  statusCue.className = 'police-marker__status-cue'
+  statusCue.textContent = getMarkerCue(member)
+
   photoFrame.append(photo)
+  photoFrame.append(initials)
   pin.append(photoFrame)
+  pin.append(statusCue)
   button.append(pin)
   button.addEventListener('click', () => onSelect())
-  return { button, photo, pin }
+  return { button, photo, initials, pin, statusCue }
 }
 
 const addOperationalLayers = (map, deploymentData) => {
@@ -177,6 +204,10 @@ function PersonnelMap({
   followedPersonnelId,
   onStopFollowing,
   layoutVersion = 0,
+  isConnected = false,
+  initialDataError = '',
+  lastPersonnelSyncAt = '',
+  onRetry,
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -255,9 +286,11 @@ function PersonnelMap({
         .sort()
       const clusterKey = memberIds.join('|')
       activeClusterKeys.add(clusterKey)
-      const tone = feature.properties.critical > 0
-        ? 'personnel-cluster--critical'
-        : (feature.properties.operation > 0 ? 'personnel-cluster--operation' : 'personnel-cluster--duty')
+      const tone = feature.properties.backup > 0
+        ? 'personnel-cluster--backup'
+        : (feature.properties.boundary > 0
+          ? 'personnel-cluster--boundary'
+          : (feature.properties.operation > 0 ? 'personnel-cluster--operation' : 'personnel-cluster--duty'))
       const target = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]]
       const animationDurationMs = Number(feature.properties.motionDuration) > 0
         ? Number(feature.properties.motionDuration)
@@ -349,7 +382,8 @@ function PersonnelMap({
           type: 'Feature',
           properties: {
             memberId: member.id,
-            critical: member.isInsideCabagan === false || member.emergencyActive ? 1 : 0,
+            backup: member.emergencyActive ? 1 : 0,
+            boundary: member.isInsideCabagan === false ? 1 : 0,
             operation: member.operationActive ? 1 : 0,
             motionDuration: markerState?.motionDuration || 0,
           },
@@ -364,12 +398,14 @@ function PersonnelMap({
       radius: PERSONNEL_CLUSTER_RADIUS,
       maxZoom: PERSONNEL_CLUSTER_MAX_ZOOM,
       map: (properties) => ({
-        critical: properties.critical,
+        backup: properties.backup,
+        boundary: properties.boundary,
         operation: properties.operation,
         motionDuration: properties.motionDuration,
       }),
       reduce: (accumulated, properties) => {
-        accumulated.critical += properties.critical
+        accumulated.backup += properties.backup
+        accumulated.boundary += properties.boundary
         accumulated.operation += properties.operation
         accumulated.motionDuration = Math.max(
           accumulated.motionDuration,
@@ -463,7 +499,9 @@ function PersonnelMap({
           marker,
           element: markerElement.button,
           photo: markerElement.photo,
+          initials: markerElement.initials,
           pin: markerElement.pin,
+          statusCue: markerElement.statusCue,
           member,
           currentPosition: [Number(member.latitude), Number(member.longitude)],
           targetPosition: [Number(member.latitude), Number(member.longitude)],
@@ -478,11 +516,15 @@ function PersonnelMap({
       state.element.classList.toggle('is-followed', member.id === followedPersonnelId)
       state.element.setAttribute('aria-label', `View ${member.name} on live map`)
       state.pin.className = `police-marker ${getMarkerClass(member)}`
-      const nextPhoto = member.photoUrl || getFallbackPhoto(member)
+      state.statusCue.textContent = getMarkerCue(member)
+      state.statusCue.hidden = !state.statusCue.textContent
+      const nextPhoto = member.photoUrl || ''
       if (state.photo.dataset.intendedSource !== nextPhoto) {
         state.photo.dataset.intendedSource = nextPhoto
-        state.photo.dataset.fallbackSource = getFallbackPhoto(member)
-        state.photo.src = nextPhoto
+        state.initials.textContent = getInitials(member.name)
+        state.photo.hidden = !nextPhoto
+        state.initials.hidden = Boolean(nextPhoto)
+        if (nextPhoto) state.photo.src = nextPhoto
       }
 
       const confirmedFix = confirmedFixFromMember(member)
@@ -607,6 +649,25 @@ function PersonnelMap({
         onMapModeChange={setMapMode}
         onThreeDChange={setThreeDEnabled}
       />
+      <MapLegend />
+      <div className={`map-connection-badge${isConnected ? ' is-live' : ' is-offline'}`} role="status">
+        <span aria-hidden="true" />
+        {isConnected ? 'Live data' : 'Connection lost'}
+        {lastPersonnelSyncAt && <small>Last sync {new Date(lastPersonnelSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>}
+      </div>
+      {initialDataError && (
+        <div className="map-data-state map-data-state--error" role="alert">
+          <strong>Some live data did not load</strong>
+          <span>{initialDataError}</span>
+          <button type="button" onClick={onRetry}>Retry</button>
+        </div>
+      )}
+      {!initialDataError && mapReady && personnel.length === 0 && (
+        <div className="map-data-state" role="status">
+          <strong>No active personnel to display</strong>
+          <span>The map is working. Personnel will appear after a current GPS fix is received.</span>
+        </div>
+      )}
       {followedPersonnel && (
         <div className="map-follow-status" role="status">
           <span>Following <strong>{followedPersonnel.name}</strong></span>
@@ -614,7 +675,11 @@ function PersonnelMap({
         </div>
       )}
       <MapAttribution />
-      {!mapReady && <div className="map-style-loading" role="status">Loading map style…</div>}
+      {!mapReady && (
+        <div className="map-style-loading" role="status" aria-label="Loading map style">
+          <SkeletonBlock width="5.5rem" height="0.65rem" />
+        </div>
+      )}
     </section>
   )
 }

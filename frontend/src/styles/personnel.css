@@ -1,3 +1,50 @@
+.personnel-roster-card { padding: 0; overflow: hidden; }
+
+.personnel-toolbar {
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(150px, 190px) minmax(130px, 170px) auto;
+  align-items: end;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.personnel-toolbar label { display: grid; gap: 0.35rem; }
+.personnel-toolbar label > span:not(.visually-hidden) {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.personnel-toolbar input,
+.personnel-toolbar select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.personnel-toolbar select { padding: 0.55rem 0.7rem; }
+.personnel-search { position: relative; }
+.personnel-search svg {
+  position: absolute;
+  z-index: 1;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+}
+.personnel-search input { padding: 0.55rem 0.75rem 0.55rem 2.25rem; }
+.personnel-toolbar > small { align-self: center; color: var(--text-tertiary); white-space: nowrap; }
+
+.personnel-table-wrap { overflow: auto; }
+
 .personnel-table {
   width: 100%;
   border-collapse: collapse;
@@ -32,6 +79,12 @@
   background: #f8fafc;
 }
 
+.personnel-row.is-locatable { cursor: pointer; }
+.personnel-row.is-locatable:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
 .personnel-row td {
   padding: 0.75rem 0.9rem;
   border-bottom: 1px solid #f1f5f9;
@@ -54,4 +107,31 @@
   background: color-mix(in srgb, var(--status-color) 12%, transparent);
   color: var(--status-color);
   border: 1px solid color-mix(in srgb, var(--status-color) 24%, transparent);
+}
+
+.personnel-locate-hint {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--color-primary-dark);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.personnel-empty {
+  height: 180px;
+  color: var(--text-tertiary) !important;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .personnel-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .personnel-search { grid-column: 1 / -1; }
+  .personnel-toolbar > small { grid-column: 1 / -1; }
+  .personnel-table { min-width: 760px; }
+}
+
+@media (max-width: 560px) {
+  .personnel-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .personnel-search,
+  .personnel-toolbar > small { grid-column: 1; }
 }

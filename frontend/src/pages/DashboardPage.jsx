@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useFeedback } from '../context/useFeedback'
+import { DashboardContentSkeleton } from '../components/LoadingSkeleton'
 import { getDashboardSummary } from '../services/dashboard'
 import { socket } from '../services/socket'
 
@@ -11,6 +12,7 @@ const initialSummary = {
   openIncidents: 0,
   recentActivity: [],
   coverage: [],
+  generatedAt: '',
 }
 
 const formatActivityTime = (timestamp) => {
@@ -77,38 +79,56 @@ function DashboardPage() {
       label: 'Personnel On Field',
       value: summary.activePersonnel,
       subtext: `${summary.totalPersonnel} active personnel accounts`,
+      signal: 'Live',
+      tone: 'live',
     },
     {
       label: 'Open Response Tasks',
       value: summary.openTasks,
       subtext: 'Backup and urgent requests',
+      signal: summary.openTasks > 0 ? 'Action needed' : 'Clear',
+      tone: summary.openTasks > 0 ? 'urgent' : 'clear',
     },
     {
       label: 'Reports Today',
       value: summary.reportsToday,
       subtext: 'Submitted from the mobile app',
+      signal: 'Today',
+      tone: 'info',
     },
     {
       label: 'Open Incidents',
       value: summary.openIncidents,
       subtext: 'Incident reports awaiting resolution',
+      signal: summary.openIncidents > 0 ? 'Review' : 'Clear',
+      tone: summary.openIncidents > 0 ? 'warning' : 'clear',
     },
   ], [summary])
 
   return (
     <div className="page-container fade-in p-3 p-md-4">
-      <header className="page-header mb-4">
-        <h2 className="page-title">Dashboard</h2>
-        <p className="page-subtitle">Overview of today&apos;s field operations</p>
+      <header className="page-header dashboard-page-header mb-4">
+        <div>
+          <h2 className="page-title">Dashboard</h2>
+          <p className="page-subtitle">Overview of today&apos;s field operations</p>
+        </div>
+        {summary.generatedAt && (
+          <time className="dashboard-updated-at" dateTime={summary.generatedAt}>
+            Updated {new Intl.DateTimeFormat('en-PH', { hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(new Date(summary.generatedAt))}
+          </time>
+        )}
       </header>
 
-      {loadMessage && <p className="settings-hint mb-3" role="status">{loadMessage}</p>}
-
+      {loadMessage ? <DashboardContentSkeleton /> : (
+      <>
       <div className="stats-grid row g-3 mb-3 mx-0">
         {stats.map((stat) => (
           <div key={stat.label} className="col-12 col-sm-6 col-xl-3">
             <div className="stat-card slide-up h-100">
-              <p className="stat-card__label">{stat.label}</p>
+              <div className="stat-card__heading">
+                <p className="stat-card__label">{stat.label}</p>
+                <span className={`stat-card__signal stat-card__signal--${stat.tone}`}>{stat.signal}</span>
+              </div>
               <strong className="stat-card__value">{stat.value}</strong>
               <p className="stat-card__subtext">{stat.subtext}</p>
             </div>
@@ -157,6 +177,8 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }

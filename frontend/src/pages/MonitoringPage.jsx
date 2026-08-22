@@ -14,24 +14,34 @@
  *   PersonnelContext → hook → this page → props down to child components
  *   User clicks marker/name → setSelectedPersonnel → modal opens
  */
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { MonitoringContentSkeleton } from '../components/LoadingSkeleton'
 import ProfileModal from '../components/ProfileModal'
-import PersonnelMap from '../components/PersonnelMap'
 import SidePanel from '../components/SidePanel'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 
+const PersonnelMap = lazy(() => import('../components/PersonnelMap'))
+
 function MonitoringPage() {
+  const location = useLocation()
   // Pull live officer data and status from the shared context
   const {
     personnel,
     activePersonnel,
     personnelCount,
     statusMessage,
+    operationalAlert,
     outOfBoundaryPersonnel,
     stalePersonnel,
     deployments,
     tasks,
+    isInitialDataLoading,
+    initialDataError,
+    isConnected,
+    lastPersonnelSyncAt,
+    retryInitialData,
   } = usePersonnelContext()
 
   const mapPersonnel = useMemo(() => {
@@ -55,7 +65,9 @@ function MonitoringPage() {
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
-  const [followedPersonnelId, setFollowedPersonnelId] = useState(null)
+  const [followedPersonnelId, setFollowedPersonnelId] = useState(
+    () => location.state?.locatePersonnelId || null,
+  )
   const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false)
   const [mapLayoutVersion, setMapLayoutVersion] = useState(0)
   const selectedPersonnel = useMemo(
@@ -65,9 +77,6 @@ function MonitoringPage() {
   const activeFollowedPersonnelId = mapPersonnel.some(
     (member) => member.id === followedPersonnelId,
   ) ? followedPersonnelId : null
-  const effectiveStatusMessage = stalePersonnel.length > 0
-    ? `${stalePersonnel.map((member) => member.name).join(', ')} ${stalePersonnel.length === 1 ? 'has' : 'have'} no current GPS fix. Last known positions are hidden.`
-    : statusMessage
 
   const handleSelectPersonnel = (member) => {
     setSelectedPersonnelId(member?.id || null)
@@ -97,6 +106,14 @@ function MonitoringPage() {
     setSelectedPersonnelId(null)
   }
 
+  if (isInitialDataLoading) {
+    return (
+      <div className="monitoring-shell">
+        <MonitoringContentSkeleton />
+      </div>
+    )
+  }
+
   return (
     <div className="monitoring-shell">
       <main className={`dashboard-grid${isSidePanelCollapsed ? ' dashboard-grid--panel-collapsed' : ''}`}>
@@ -118,20 +135,27 @@ function MonitoringPage() {
           <SidePanel
             personnel={activePersonnel}
             personnelCount={personnelCount}
-            statusMessage={effectiveStatusMessage}
+            connectionMessage={statusMessage}
+            operationalAlert={operationalAlert}
             outOfBoundaryPersonnelCount={outOfBoundaryPersonnel.length}
             stalePersonnelCount={stalePersonnel.length}
             onSelectPersonnel={handleSelectPersonnel}
           />
         </aside>
-        <PersonnelMap
-          personnel={mapPersonnel}
-          deployments={deployments}
-          onSelectPersonnel={handleSelectPersonnel}
-          followedPersonnelId={activeFollowedPersonnelId}
-          onStopFollowing={() => setFollowedPersonnelId(null)}
-          layoutVersion={mapLayoutVersion}
-        />
+        <Suspense fallback={<div className="map-panel map-chunk-loading h-100" role="status">Loading live map...</div>}>
+          <PersonnelMap
+            personnel={mapPersonnel}
+            deployments={deployments}
+            onSelectPersonnel={handleSelectPersonnel}
+            followedPersonnelId={activeFollowedPersonnelId}
+            onStopFollowing={() => setFollowedPersonnelId(null)}
+            layoutVersion={mapLayoutVersion}
+            isConnected={isConnected}
+            initialDataError={initialDataError}
+            lastPersonnelSyncAt={lastPersonnelSyncAt}
+            onRetry={retryInitialData}
+          />
+        </Suspense>
       </main>
 
       <ProfileModal

@@ -138,6 +138,7 @@ export default function OfficerMapScreen({
   const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
   const [followedOfficerId, setFollowedOfficerId] = useState<string | null>(null);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
+  const [legendExpanded, setLegendExpanded] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
@@ -235,9 +236,7 @@ export default function OfficerMapScreen({
   ), [emergencyPersonnelIds, operationPersonnelIds, visiblePersonnel]);
 
   const currentOfficerHasActiveBackup = emergencyPersonnelIds.has(currentPersonnelId);
-  const hasCriticalPersonnel = mapPersonnel.some((member) => (
-    member.emergencyActive || member.outsideBoundary
-  ));
+  const hasCriticalPersonnel = mapPersonnel.some((member) => member.emergencyActive);
 
   const selectedOfficer = selectedOfficerId
     ? visiblePersonnel.find((member) => member.id === selectedOfficerId) || null
@@ -325,10 +324,16 @@ export default function OfficerMapScreen({
             .officer-pin{position:relative;width:52px;height:62px;display:flex;flex-direction:column;align-items:center}
             .officer-photo{width:42px;height:42px;border:3px solid #2563eb;border-radius:50%;object-fit:cover;background:#fff;box-shadow:0 4px 10px rgba(15,23,42,.28)}
             .officer-photo.current{border-color:#2563eb}
-            .officer-photo.emergency{border-color:#ff2f3d;animation:emergency-ring 1.15s ease-in-out infinite}
+            .officer-photo.operation{border-color:#7c3aed}
+            .officer-photo.boundary{border-color:#d97706}
+            .officer-photo.backup{border-color:#ff2f3d;animation:emergency-ring 1.15s ease-in-out infinite}
             .officer-arrow{width:0;height:0;margin-top:-2px;border-left:10px solid transparent;border-right:10px solid transparent;border-top:15px solid #2563eb}
             .officer-arrow.current{border-top-color:#2563eb}
-            .officer-arrow.emergency{border-top-color:#ff2f3d}
+            .officer-arrow.operation{border-top-color:#7c3aed}
+            .officer-arrow.boundary{border-top-color:#d97706}
+            .officer-arrow.backup{border-top-color:#ff2f3d}
+            .officer-cue{position:absolute;top:-6px;right:-2px;min-width:18px;height:18px;padding:0 3px;display:grid;place-items:center;border:2px solid #fff;border-radius:12px;background:#2563eb;color:#fff;font:900 7px/1 Arial,sans-serif;box-sizing:border-box}
+            .officer-cue.operation{background:#7c3aed}.officer-cue.boundary{background:#d97706;font-size:11px}.officer-cue.backup{background:#dc2626}
             @keyframes emergency-ring{
               0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.72),0 4px 10px rgba(15,23,42,.28)}
               50%{box-shadow:0 0 0 7px rgba(220,38,38,0),0 4px 10px rgba(15,23,42,.28)}
@@ -398,10 +403,13 @@ export default function OfficerMapScreen({
 
             const officerIcon=(member)=>{
               const current=member.id===currentOfficerId?' current':'';
-              const emergency=member.emergencyActive?' emergency':'';
+              const tone=member.emergencyActive?'backup':(member.outsideBoundary?'boundary':(member.operationActive?'operation':'duty'));
+              const statusClass=tone==='duty'?'':' '+tone;
+              const cue=tone==='backup'?'SOS':(tone==='boundary'?'!':(tone==='operation'?'OP':'✓'));
               const html='<div class="officer-pin">'
-                +'<img class="officer-photo'+current+emergency+'" src="'+escapeHtml(member.photoUrl)+'" alt="">'
-                +'<div class="officer-arrow'+current+emergency+'"></div>'
+                +'<img class="officer-photo'+current+statusClass+'" src="'+escapeHtml(member.photoUrl)+'" alt="">'
+                +(cue?'<span class="officer-cue'+statusClass+'">'+cue+'</span>':'')
+                +'<div class="officer-arrow'+current+statusClass+'"></div>'
                 +'</div>';
               return L.divIcon({className:'',html,iconSize:[62,76],iconAnchor:[31,76]});
             };
@@ -908,6 +916,45 @@ export default function OfficerMapScreen({
             </Animated.View>
           </View>
         </View>
+
+        <View style={[
+          styles.mapLegend,
+          legendExpanded && styles.mapLegendExpanded,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}>
+          <TouchableOpacity
+            accessibilityLabel={legendExpanded ? 'Hide map legend' : 'Show map legend'}
+            accessibilityState={{ expanded: legendExpanded }}
+            style={styles.mapLegendToggle}
+            onPress={() => setLegendExpanded((expanded) => !expanded)}
+          >
+            <Icon name="format-list-bulleted" size={19} color={colors.text} />
+            {legendExpanded && <Text style={[styles.mapLegendTitle, { color: colors.text }]}>Map legend</Text>}
+            {legendExpanded && <Icon name="expand-less" size={18} color={colors.textMuted} />}
+          </TouchableOpacity>
+          {legendExpanded && (
+            <View style={[styles.mapLegendItems, { borderTopColor: colors.border }]}>
+              {[
+                { tone: mobileTheme.mapBackup, cue: 'SOS', label: 'Backup request', shape: 'circle' },
+                { tone: mobileTheme.mapBoundary, cue: '!', label: 'Outside Cabagan', shape: 'diamond' },
+                { tone: mobileTheme.mapOperation, cue: 'OP', label: 'On operation', shape: 'square' },
+                { tone: mobileTheme.mapDuty, cue: '✓', label: 'On duty', shape: 'circle' },
+              ].map((item) => (
+                <View key={item.label} style={styles.mapLegendItem}>
+                  <View style={[
+                    styles.mapLegendMarker,
+                    item.shape === 'diamond' && styles.mapLegendMarkerDiamond,
+                    item.shape === 'square' && styles.mapLegendMarkerSquare,
+                    { backgroundColor: item.tone },
+                  ]}>
+                    <Text style={[styles.mapLegendCue, item.shape === 'diamond' && styles.mapLegendCueDiamond]}>{item.cue}</Text>
+                  </View>
+                  <Text style={[styles.mapLegendLabel, { color: colors.text }]}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </AnimatedSafeAreaView>
 
       {followedOfficer && !selectedOfficer && (
@@ -1114,7 +1161,7 @@ const styles = StyleSheet.create({
     outlineColor: 'transparent',
   },
   connectionDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#2563eb' },
-  connectionDotOffline: { backgroundColor: mobileTheme.warning },
+  connectionDotOffline: { backgroundColor: mobileTheme.danger },
   topUtilityRow: {
     minHeight: 44,
     marginTop: 8,
@@ -1143,7 +1190,7 @@ const styles = StyleSheet.create({
   deploymentLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
   deploymentArea: { marginTop: 2, color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
   liveText: { color: mobileTheme.success, fontSize: 10, fontWeight: '800' },
-  offlineText: { color: mobileTheme.warning },
+  offlineText: { color: mobileTheme.danger },
   mapModeControl: {
     width: 46,
     padding: 3,
@@ -1190,6 +1237,44 @@ const styles = StyleSheet.create({
   mapModeButtonActive: {
     backgroundColor: mobileTheme.purple,
   },
+  mapLegend: {
+    width: 46,
+    marginTop: 8,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 14,
+    shadowColor: '#172554',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  mapLegendExpanded: { width: 186 },
+  mapLegendToggle: {
+    height: 42,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mapLegendTitle: { flex: 1, fontSize: 12, fontWeight: '900' },
+  mapLegendItems: { padding: 8, paddingTop: 5, borderTopWidth: 1 },
+  mapLegendItem: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  mapLegendMarker: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 11,
+  },
+  mapLegendMarkerDiamond: { borderRadius: 4, transform: [{ rotate: '45deg' }] },
+  mapLegendMarkerSquare: { borderRadius: 5 },
+  mapLegendCue: { color: '#FFFFFF', fontSize: 7, fontWeight: '900' },
+  mapLegendCueDiamond: { transform: [{ rotate: '-45deg' }], fontSize: 10 },
+  mapLegendLabel: { fontSize: 11, fontWeight: '700' },
   followBanner: {
     position: 'absolute',
     top: 142,

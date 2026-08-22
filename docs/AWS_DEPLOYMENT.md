@@ -1,3 +1,4 @@
+
 # AWS deployment (single EC2, same-origin)
 
 This guide deploys the production dashboard **and** the Express API together as
@@ -54,15 +55,15 @@ it over localhost.
 Gather these before you start. Nothing here is invented by the app — you create
 or obtain each one:
 
-| Item | Where it comes from |
-| --- | --- |
-| AWS account with EC2 + S3 access | aws.amazon.com (Free Tier / credits cover a small instance) |
-| Domain name | Purchased from z.com (or any registrar) |
-| MongoDB connection string | MongoDB Atlas cluster (free M0 tier works) |
-| Private S3 bucket + restricted IAM key | See `docs/S3_MEDIA_STORAGE.md` |
-| Gmail address + 16-char App Password | Google account with 2FA → App Passwords |
-| Flespi token | Flespi dashboard (restricted token) |
-| Three 32+ char random secrets | You generate them (see [Generate the secrets](#generate-the-secrets)) |
+| Item                                   | Where it comes from                                                 |
+| -------------------------------------- | ------------------------------------------------------------------- |
+| AWS account with EC2 + S3 access       | aws.amazon.com (Free Tier / credits cover a small instance)         |
+| Domain name                            | Purchased from z.com (or any registrar)                             |
+| MongoDB connection string              | MongoDB Atlas cluster (free M0 tier works)                          |
+| Private S3 bucket + restricted IAM key | See`docs/S3_MEDIA_STORAGE.md`                                     |
+| Gmail address + 16-char App Password   | Google account with 2FA → App Passwords                            |
+| Flespi token                           | Flespi dashboard (restricted token)                                 |
+| Three 32+ char random secrets          | You generate them (see[Generate the secrets](#generate-the-secrets)) |
 
 **Node version:** the repo requires Node **>=22.13 <25**. Install Node 22.x on
 the server.
@@ -112,11 +113,11 @@ Follow `docs/S3_MEDIA_STORAGE.md` exactly. In short:
 
 Inbound rules — keep this tight:
 
-| Port | Source | Purpose |
-| --- | --- | --- |
-| 22 (SSH) | **Your IP only** | Admin access |
-| 80 (HTTP) | Anywhere | Certbot challenge + redirect to HTTPS |
-| 443 (HTTPS) | Anywhere | The app |
+| Port        | Source                 | Purpose                               |
+| ----------- | ---------------------- | ------------------------------------- |
+| 22 (SSH)    | **Your IP only** | Admin access                          |
+| 80 (HTTP)   | Anywhere               | Certbot challenge + redirect to HTTPS |
+| 443 (HTTPS) | Anywhere               | The app                               |
 
 **Do not** open port 4000. The Node process stays private behind Nginx.
 
@@ -133,6 +134,7 @@ Inbound rules — keep this tight:
    ```sh
    nslookup yourdomain.com
    ```
+
    It should resolve to your Elastic IP before you run Certbot.
 
 Your final origin (e.g. `https://yourdomain.com`) becomes `ALLOWED_ORIGINS`.
@@ -334,6 +336,7 @@ Useful commands: `pm2 logs geosentri`, `pm2 restart geosentri`,
 > Prefer plain systemd? See the [systemd alternative](#appendix-systemd-alternative).
 
 <a name="why-one-instance"></a>
+
 ### Why one instance
 
 `server.js` drives GPS broadcasts, Flespi sync, the operational lifecycle loop,
@@ -523,16 +526,16 @@ Run a **single** service instance only (same reason as
 
 ## Appendix: troubleshooting
 
-| Symptom | Likely cause / fix |
-| --- | --- |
-| Startup exits with `Unsafe production configuration:` | Read the listed items — a required var is missing, an origin isn't HTTPS, `TRUST_PROXY` isn't 1–10, or two secrets match / are <32 chars. |
-| `502 Bad Gateway` from Nginx | Node isn't running (`pm2 status` / `journalctl`) or isn't on port 4000. |
-| Status pill stays **Offline** but data loads | WebSocket upgrade blocked — confirm the `Upgrade`/`Connection` headers in the Nginx `location` block and reload Nginx. |
-| Login fails / cookie not set | Not served over HTTPS, or `ALLOWED_ORIGINS` doesn't exactly match the browser origin. |
-| OTP email never arrives | `EMAIL_DELIVERY_MODE` isn't `gmail`, or `GMAIL_APP_PASSWORD` is wrong (use a 16-char App Password, not the account password). |
-| Certbot fails to issue | DNS A record not yet pointing to the Elastic IP, or port 80 blocked in the security group. |
-| Evidence images 403 / won't open | AWS vars wrong, IAM key lacks bucket access, or `MEDIA_URL_SIGNING_SECRET` changed after links were issued (they're short-lived; reload). |
-| `npm run build` fails on the server | `NODE_ENV=production` was exported in the shell, so vite (a devDependency) wasn't installed. Unset it and re-run `npm ci`. |
+| Symptom                                                | Likely cause / fix                                                                                                                           |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup exits with`Unsafe production configuration:` | Read the listed items — a required var is missing, an origin isn't HTTPS,`TRUST_PROXY` isn't 1–10, or two secrets match / are <32 chars. |
+| `502 Bad Gateway` from Nginx                         | Node isn't running (`pm2 status` / `journalctl`) or isn't on port 4000.                                                                  |
+| Status pill stays**Offline** but data loads      | WebSocket upgrade blocked — confirm the`Upgrade`/`Connection` headers in the Nginx `location` block and reload Nginx.                 |
+| Login fails / cookie not set                           | Not served over HTTPS, or`ALLOWED_ORIGINS` doesn't exactly match the browser origin.                                                       |
+| OTP email never arrives                                | `EMAIL_DELIVERY_MODE` isn't `gmail`, or `GMAIL_APP_PASSWORD` is wrong (use a 16-char App Password, not the account password).          |
+| Certbot fails to issue                                 | DNS A record not yet pointing to the Elastic IP, or port 80 blocked in the security group.                                                   |
+| Evidence images 403 / won't open                       | AWS vars wrong, IAM key lacks bucket access, or`MEDIA_URL_SIGNING_SECRET` changed after links were issued (they're short-lived; reload).   |
+| `npm run build` fails on the server                  | `NODE_ENV=production` was exported in the shell, so vite (a devDependency) wasn't installed. Unset it and re-run `npm ci`.               |
 
 ---
 

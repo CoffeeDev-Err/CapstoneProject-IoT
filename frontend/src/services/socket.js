@@ -31,6 +31,9 @@ export const socket = io(SOCKET_URL, {
   transports: ['polling', 'websocket'],
   autoConnect: false,
   withCredentials: true,
+  // The web dashboard loads its initial state through the paginated REST APIs.
+  // This prevents the socket handshake from fetching and sending the same data again.
+  auth: { bootstrapMode: 'rest' },
 })
 
 /**

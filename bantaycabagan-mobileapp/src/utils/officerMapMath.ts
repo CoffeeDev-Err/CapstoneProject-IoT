@@ -113,7 +113,7 @@ export const markerMotionForFixes = (
   };
 };
 
-export type MarkerTone = 'duty' | 'operation' | 'critical';
+export type MarkerTone = 'duty' | 'operation' | 'boundary' | 'backup';
 
 export type PersonnelCluster = {
   id: string;
@@ -124,15 +124,17 @@ export type PersonnelCluster = {
 };
 
 export const markerTone = (member: OfficerMapPerson): MarkerTone => {
-  if (member.emergencyActive || member.outsideBoundary) return 'critical';
+  if (member.emergencyActive) return 'backup';
+  if (member.outsideBoundary) return 'boundary';
   if (member.operationActive) return 'operation';
   return 'duty';
 };
 
 export const markerToneColor = (tone: MarkerTone) => ({
   duty: '#2563EB',
-  operation: '#38BDF8',
-  critical: '#DC2626',
+  operation: '#7C3AED',
+  boundary: '#D97706',
+  backup: '#DC2626',
 }[tone]);
 
 export const easeOutCubic = (progress: number) => {
@@ -230,14 +232,15 @@ export const clusterPersonnel = (
     }
 
     const members = memberIndexes.map((index) => projected[index].member);
-    const critical = members.some((member) => markerTone(member) === 'critical');
+    const backup = members.some((member) => markerTone(member) === 'backup');
+    const boundary = members.some((member) => markerTone(member) === 'boundary');
     const operation = members.some((member) => markerTone(member) === 'operation');
     clusters.push({
       id: members.map((member) => member.id).sort().join('-'),
       latitude: members.reduce((sum, member) => sum + Number(member.latitude), 0) / members.length,
       longitude: members.reduce((sum, member) => sum + Number(member.longitude), 0) / members.length,
       members,
-      tone: critical ? 'critical' : (operation ? 'operation' : 'duty'),
+      tone: backup ? 'backup' : (boundary ? 'boundary' : (operation ? 'operation' : 'duty')),
     });
   });
 

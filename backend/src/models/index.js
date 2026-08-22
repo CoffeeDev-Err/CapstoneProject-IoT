@@ -71,6 +71,7 @@ personnelSchema.index({ personnelId: 1 }, { unique: true })
 personnelSchema.index({ badgeNumber: 1 }, { unique: true })
 personnelSchema.index({ dutyStatus: 1 })
 personnelSchema.index({ status: 1 })
+personnelSchema.index({ status: 1, fullName: 1, _id: 1 })
 
 const gpsDeviceAssignmentSchema = new mongoose.Schema({
 	assignmentId: { type: String, required: true },
@@ -189,6 +190,7 @@ deploymentSchema.index({ barangayCode: 1, status: 1 })
 deploymentSchema.index({ shiftStart: -1 })
 deploymentSchema.index({ status: 1, shiftStart: 1, shiftEnd: 1 })
 deploymentSchema.index({ personnelId: 1, shiftStart: 1, shiftEnd: 1 })
+deploymentSchema.index({ status: 1, assignedAt: -1, _id: -1 })
 
 const resolutionSchema = new mongoose.Schema({
 	resolvedAt: Date,
@@ -258,6 +260,10 @@ reportSchema.index({ submittedAt: -1, _id: -1 })
 reportSchema.index({ submittedBy: 1, submittedAt: -1, _id: -1 })
 reportSchema.index({ barangayCode: 1, incidentAt: -1 })
 reportSchema.index({ reportType: 1, caseStatus: 1, incidentAt: -1 })
+reportSchema.index({ reportType: 1, submittedAt: -1, _id: -1 })
+reportSchema.index({ caseStatus: 1, submittedAt: -1, _id: -1 })
+reportSchema.index({ validationStatus: 1, submittedAt: -1, _id: -1 })
+reportSchema.index({ severity: -1, submittedAt: -1, _id: -1 })
 reportSchema.index({ location: '2dsphere' })
 
 const responderSchema = new mongoose.Schema({

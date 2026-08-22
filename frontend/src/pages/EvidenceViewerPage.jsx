@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Download, ImageOff, Moon, RefreshCw, ShieldCheck, Sun } from 'lucide-react'
+import { EvidenceLoadingSkeleton, SkeletonBlock } from '../components/LoadingSkeleton'
 import { useNavigate, useParams } from 'react-router-dom'
 import geosentriIcon from '../assets/geosentri-icon.png'
 import { getReport } from '../services/operations'
@@ -22,6 +23,7 @@ function EvidenceViewerPage() {
   const [loadVersion, setLoadVersion] = useState(0)
   const [state, setState] = useState({ reportId: '', status: 'loading', report: null, error: '' })
   const [failedImageUrl, setFailedImageUrl] = useState('')
+  const [loadedImageUrl, setLoadedImageUrl] = useState('')
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
@@ -76,10 +78,12 @@ function EvidenceViewerPage() {
   const evidenceUrl = resolveMediaUrl(evidence?.url)
   const downloadUrl = getMediaDownloadUrl(evidence?.url)
   const imageFailed = Boolean(evidenceUrl && failedImageUrl === evidenceUrl)
+  const imageLoaded = Boolean(evidenceUrl && loadedImageUrl === evidenceUrl)
 
   const retryLoad = () => {
     setState({ reportId, status: 'loading', report: null, error: '' })
     setFailedImageUrl('')
+    setLoadedImageUrl('')
     setLoadVersion((value) => value + 1)
   }
 
@@ -112,11 +116,7 @@ function EvidenceViewerPage() {
 
       <div className="evidence-viewer__content">
         {activeState.status === 'loading' && (
-          <section className="evidence-viewer__state" role="status">
-            <span className="evidence-viewer__spinner" aria-hidden="true" />
-            <h1>Loading evidence</h1>
-            <p>Verifying your session and preparing the protected image.</p>
-          </section>
+          <EvidenceLoadingSkeleton />
         )}
 
         {activeState.status === 'error' && (
@@ -149,9 +149,15 @@ function EvidenceViewerPage() {
 
             {evidenceUrl && !imageFailed ? (
               <figure className="evidence-viewer__figure">
+                {!imageLoaded && (
+                  <SkeletonBlock className="evidence-viewer__image-skeleton" width="100%" height="26rem" />
+                )}
                 <img
+                  className={imageLoaded ? 'is-loaded' : 'is-loading'}
                   src={evidenceUrl}
                   alt={`Evidence attached to report ${report.id}`}
+                  decoding="async"
+                  onLoad={() => setLoadedImageUrl(evidenceUrl)}
                   onError={() => setFailedImageUrl(evidenceUrl)}
                 />
               </figure>
