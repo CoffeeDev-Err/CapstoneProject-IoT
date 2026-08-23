@@ -189,7 +189,7 @@ export default function LoginScreen() {
                   label="Login ID"
                   value={loginId}
                   onChangeText={setLoginId}
-                  placeholder="Enter your Login ID"
+                  placeholder="e.g., 01-2002"
                   autoCapitalize="none"
                   autoComplete="username"
                   maxLength={50}
@@ -240,6 +240,7 @@ export default function LoginScreen() {
                   label="Login ID or Official Email"
                   value={identifier}
                   onChangeText={setIdentifier}
+                  placeholder="e.g., 01-2002 or example@gmail.com"
                   autoCapitalize="none"
                   autoComplete="email"
                   maxLength={254}

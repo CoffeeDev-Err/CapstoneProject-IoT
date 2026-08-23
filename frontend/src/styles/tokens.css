@@ -7,6 +7,7 @@
     'Liberation Mono', 'Courier New', monospace;
 
   /* Accessible application type scale (browser default base: 16px). */
+  --font-size-2xs: 0.625rem;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;

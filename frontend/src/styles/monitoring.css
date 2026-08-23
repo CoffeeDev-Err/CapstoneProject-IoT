@@ -557,7 +557,7 @@
 
 .map-legend__marker--backup {
   background: var(--map-status-backup);
-  font-size: 0.5rem;
+  font-size: var(--font-size-2xs);
   letter-spacing: -0.04em;
 }
 .map-legend__marker--boundary {

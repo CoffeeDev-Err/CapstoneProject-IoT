@@ -129,6 +129,85 @@ assert.deepEqual(validateProductionEnvironment({
 	assert.equal(run({ ip: '203.0.113.55' }).nextCalled, true)
 }
 
+// Account-specific limits must not make different officers on one station IP
+// consume each other's small password allowance. Successful requests are not
+// retained as failures, and OTP challenges use an independent namespace.
+{
+	const createRateLimit = require('../src/middleware/rateLimit')
+	const createResponse = () => {
+		const listeners = new Map()
+		return {
+			statusCode: 200,
+			set() {},
+			status(code) { this.statusCode = code; return this },
+			json() { return this },
+			once(event, listener) { listeners.set(event, listener) },
+			finish() { listeners.get('finish')?.() },
+		}
+	}
+	const run = (limiter, req, finalStatus = 401) => {
+		const res = createResponse()
+		let nextCalled = false
+		limiter(req, res, () => { nextCalled = true })
+		if (nextCalled) res.statusCode = finalStatus
+		res.finish()
+		return { statusCode: res.statusCode, nextCalled }
+	}
+	const passwordLimiter = createRateLimit({
+		windowMs: 60_000,
+		max: 2,
+		keyPrefix: 'password-account-test',
+		keyGenerator: (req) => String(req.body?.username || '').trim().toLowerCase(),
+		skipSuccessfulRequests: true,
+	})
+	const stationIp = '203.0.113.10'
+
+	assert.equal(run(passwordLimiter, { ip: stationIp, body: { username: '01-2002' } }).nextCalled, true)
+	assert.equal(run(passwordLimiter, { ip: stationIp, body: { username: '01-2002' } }).nextCalled, true)
+	assert.equal(run(passwordLimiter, { ip: stationIp, body: { username: '01-2002' } }).statusCode, 429)
+	assert.equal(
+		run(passwordLimiter, { ip: stationIp, body: { username: '02-2002' } }).nextCalled,
+		true,
+		'A different officer on the same IP must retain an independent allowance',
+	)
+
+	assert.equal(run(passwordLimiter, {
+		ip: stationIp,
+		body: { username: '03-2002' },
+	}, 200).nextCalled, true)
+	assert.equal(run(passwordLimiter, {
+		ip: stationIp,
+		body: { username: '03-2002' },
+	}, 200).nextCalled, true)
+	assert.equal(run(passwordLimiter, {
+		ip: stationIp,
+		body: { username: '03-2002' },
+	}, 200).nextCalled, true, 'Successful sign-ins must not exhaust the failure allowance')
+
+	const otpLimiter = createRateLimit({
+		windowMs: 60_000,
+		max: 1,
+		keyPrefix: 'otp-challenge-test',
+		keyGenerator: (req) => req.body?.challenge_id,
+	})
+	assert.equal(run(otpLimiter, { ip: stationIp, body: { challenge_id: 'challenge-a' } }).nextCalled, true)
+	assert.equal(run(otpLimiter, { ip: stationIp, body: { challenge_id: 'challenge-a' } }).statusCode, 429)
+	assert.equal(run(otpLimiter, { ip: stationIp, body: { challenge_id: 'challenge-b' } }).nextCalled, true)
+}
+
+{
+	const fs = require('fs')
+	const path = require('path')
+	const routeSource = fs.readFileSync(
+		path.join(__dirname, '..', 'src', 'routes', 'authRoutes.js'),
+		'utf8',
+	)
+	assert.match(routeSource, /auth-password-account/)
+	assert.match(routeSource, /auth-otp-challenge/)
+	assert.match(routeSource, /router\.post\(\s*'\/login',[\s\S]*limitPasswordByAccount/)
+	assert.match(routeSource, /router\.post\(\s*'\/login\/verify',[\s\S]*limitOtpByChallenge/)
+}
+
 // --- The mock-officer account must never fall back to a committed password ---
 {
 	const fs = require('fs')

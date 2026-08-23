@@ -1,3 +1,5 @@
+const { createHash } = require('crypto')
+
 const buckets = new Map()
 let lastPrunedAt = 0
 
@@ -30,14 +32,28 @@ const resolveClientKey = (req) => {
 	return address ? String(address) : 'unidentified'
 }
 
+// Hash caller-controlled keys so usernames, challenge IDs, and unexpectedly
+// large values are neither retained in memory nor allowed to inflate Map keys.
+const normalizeBucketKey = (value) => createHash('sha256')
+	.update(String(value || 'unidentified'))
+	.digest('base64url')
+
 const createRateLimit = ({
 	windowMs = 15 * 60 * 1000,
 	max = 20,
 	keyPrefix = 'request',
+	keyGenerator = resolveClientKey,
+	skipSuccessfulRequests = false,
 } = {}) => (req, res, next) => {
 	const now = Date.now()
 	maybePruneExpiredBuckets(now)
-	const key = `${keyPrefix}:${resolveClientKey(req)}`
+	let rawKey
+	try {
+		rawKey = keyGenerator(req)
+	} catch {
+		rawKey = 'unidentified'
+	}
+	const key = `${keyPrefix}:${normalizeBucketKey(rawKey)}`
 	let bucket = buckets.get(key)
 
 	if (!bucket || bucket.resetAt <= now) {
@@ -65,7 +81,14 @@ const createRateLimit = ({
 	res.set('RateLimit-Remaining', String(Math.max(0, max - bucket.count)))
 	res.set('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)))
 
-	if (bucket.count <= max) return next()
+	if (bucket.count <= max) {
+		if (skipSuccessfulRequests && typeof res.once === 'function') {
+			res.once('finish', () => {
+				if (res.statusCode < 400 && bucket.count > 0) bucket.count -= 1
+			})
+		}
+		return next()
+	}
 	res.set('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))))
 	return res.status(429).json({
 		success: false,

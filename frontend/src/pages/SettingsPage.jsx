@@ -743,18 +743,18 @@ function SettingsPage() {
                     value={accountForm.loginId}
                     onChange={handleFieldChange('loginId')}
                     onBlur={handleFieldBlur('loginId')}
-                    placeholder={isEditingSupervisor ? 'e.g., supervisor' : 'Enter 4-20 digits'}
-                    inputMode={isEditingSupervisor ? 'text' : 'numeric'}
-                    maxLength={ACCOUNT_FIELD_LIMITS.loginId}
+                    placeholder={isEditingSupervisor ? 'e.g., supervisor' : 'e.g., 01-2002'}
+                    inputMode="text"
+                    maxLength={isEditingSupervisor ? ACCOUNT_FIELD_LIMITS.loginId : 7}
                     autoComplete="username"
                     spellCheck="false"
                     aria-invalid={Boolean(formErrors.loginId)}
                   />
                   {!formErrors.loginId && !isEditingSupervisor && (
                     <small className="settings-hint">
-                      {editingAccount?.loginId && !/^\d{4,20}$/.test(editingAccount.loginId)
-                        ? 'Existing legacy Login ID remains valid. Use 4-20 digits if you replace it.'
-                        : 'Use 4-20 digits only.'}
+                      {editingAccount?.loginId && !/^\d{2}-\d{4}$/.test(editingAccount.loginId)
+                        ? 'Existing legacy Login ID remains valid. Use the NN-NNNN format if you replace it.'
+                        : 'Use the NN-NNNN format, such as 01-2002.'}
                     </small>
                   )}
                   {formErrors.loginId && <small className="field-error">{formErrors.loginId}</small>}

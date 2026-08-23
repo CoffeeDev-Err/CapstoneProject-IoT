@@ -246,7 +246,7 @@ function LoginPage() {
                 <input
                   type="text"
                   className="form-control form-control-lg fs-6 login-input"
-                  placeholder="Enter your Login ID"
+                  placeholder="e.g., 01-2002"
                   value={accountId}
                   onChange={(event) => {
                     setAccountId(event.target.value)
@@ -319,6 +319,7 @@ function LoginPage() {
                 <input
                   type="text"
                   className="form-control form-control-lg fs-6 login-input"
+                  placeholder="e.g., 01-2002 or example@gmail.com"
                   value={identifier}
                   onChange={(event) => {
                     setIdentifier(event.target.value)

@@ -16,8 +16,13 @@ assert.match(validateFullName('Leo123'), /letters/)
 assert.match(validateFullName('<script>alert(1)</script>'), /letters/)
 assert.equal(validateBadgeNumber('P-1001'), '')
 assert.match(validateBadgeNumber('P 1001'), /letters, numbers/)
-assert.equal(validateLoginId('123456', { accountType: 'officer' }), '')
-assert.match(validateLoginId('leo.gannad', { accountType: 'officer' }), /digits only/)
+assert.equal(validateLoginId('01-2002', { accountType: 'officer' }), '')
+assert.match(validateLoginId('012002', { accountType: 'officer' }), /NN-NNNN/)
+assert.match(validateLoginId('leo.gannad', { accountType: 'officer' }), /NN-NNNN/)
+assert.equal(validateLoginId('123456', {
+  accountType: 'officer',
+  existingLoginId: '123456',
+}), '')
 assert.equal(validateLoginId('leo.gannad', {
   accountType: 'officer',
   existingLoginId: 'leo.gannad',

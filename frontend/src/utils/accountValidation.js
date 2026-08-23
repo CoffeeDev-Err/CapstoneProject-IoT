@@ -29,7 +29,7 @@ export const ACCOUNT_FIELD_LIMITS = Object.freeze({
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
 const FULL_NAME_PATTERN = /^[\p{L}\s.'’-]+$/u
 const BADGE_NUMBER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i
-const OFFICER_LOGIN_ID_PATTERN = /^\d{4,20}$/
+const OFFICER_LOGIN_ID_PATTERN = /^\d{2}-\d{4}$/
 const SUPERVISOR_LOGIN_ID_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{2,48}[a-z0-9])$/i
 const PH_MOBILE_PATTERN = /^(?:09\d{9}|\+639\d{9})$/
 
@@ -97,7 +97,7 @@ export const validateLoginId = (value, { accountType = 'officer', existingLoginI
   if (unchangedLegacyLogin) return ''
   return OFFICER_LOGIN_ID_PATTERN.test(loginId)
     ? ''
-    : 'Officer Login ID must contain 4-20 digits only.'
+    : 'Officer Login ID must use the NN-NNNN format, such as 01-2002.'
 }
 
 export const validateOfficialEmail = (value) => {
