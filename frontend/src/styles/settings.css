@@ -15,6 +15,13 @@
   font-weight: 500;
 }
 
+/* Field-level guidance should remain visually secondary to labels and values. */
+.account-field > .settings-hint,
+.account-photo-field .settings-hint {
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
 .settings-input {
   padding: 0.6rem 0.85rem;
   border: 1px solid var(--border-color);

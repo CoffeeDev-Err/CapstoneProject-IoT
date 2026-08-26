@@ -7,6 +7,43 @@
   color: #e2e8f0;
 }
 
+/* Navy scrollbars keep native scrolling visible without introducing a bright
+   gray strip against the dark application shell. */
+:root[data-theme="dark"],
+:root[data-theme="dark"] * {
+  scrollbar-color: #285681 #0b1528;
+  scrollbar-width: thin;
+}
+
+:root[data-theme="dark"]::-webkit-scrollbar,
+:root[data-theme="dark"] *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:root[data-theme="dark"]::-webkit-scrollbar-track,
+:root[data-theme="dark"] *::-webkit-scrollbar-track {
+  background: #0b1528;
+}
+
+:root[data-theme="dark"]::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  border: 2px solid #0b1528;
+  border-radius: 999px;
+  background: #285681;
+}
+
+:root[data-theme="dark"]::-webkit-scrollbar-thumb:hover,
+:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background: #356fa6;
+}
+
+:root[data-theme="dark"]::-webkit-scrollbar-button,
+:root[data-theme="dark"] *::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+}
+
 /* Top bar */
 [data-theme="dark"] .top-bar {
   background: rgba(15, 23, 42, 0.9);
@@ -144,7 +181,7 @@
 /* Cards & panels */
 [data-theme="dark"] .side-panel-shell {
   background: #0b1528;
-  border-color: rgba(148, 163, 184, 0.18);
+  border-color: rgba(148, 163, 184, 0.11);
 }
 
 [data-theme="dark"] .side-panel-collapse-btn {
@@ -166,8 +203,8 @@
 [data-theme="dark"] .widget-card,
 [data-theme="dark"] .map-panel {
   background: #1e293b;
-  border-color: #334155;
-  box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.5);
+  border-color: rgba(148, 163, 184, 0.13);
+  box-shadow: 0 12px 30px -22px rgba(0, 0, 0, 0.62);
 }
 
 [data-theme="dark"] .stat-card:hover,

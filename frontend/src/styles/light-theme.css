@@ -1,0 +1,553 @@
+/*
+ * LIGHT MODE SURFACE SYSTEM
+ *
+ * This layer intentionally changes surfaces, dividers, and elevation only.
+ * Brand blue, active navigation, semantic status colors, content, and layout
+ * remain unchanged. Dark mode continues to be defined in dark-theme.css.
+ */
+
+:root:not([data-theme="dark"]) {
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e8eef5;
+  --sidebar-active-bg: #edf4ff;
+  --sidebar-active-color: #1d4ed8;
+
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6fbfc;
+  --bg-tertiary: #f0f4f8;
+  --border-color: #dfe7f0;
+  --border-color-light: #edf2f7;
+  --text-primary: #10233f;
+  --text-secondary: #52657d;
+  --text-tertiary: #71839a;
+  --text-muted: #8291a5;
+
+  --shadow-xs: 0 1px 2px rgba(31, 55, 86, 0.04);
+  --shadow-sm: 0 8px 24px rgba(31, 55, 86, 0.06);
+  --shadow-md: 0 14px 34px rgba(31, 55, 86, 0.09);
+  --shadow-lg: 0 20px 46px rgba(31, 55, 86, 0.12);
+}
+
+:root:not([data-theme="dark"]) body {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .layout-root {
+  background: var(--bg-secondary);
+}
+
+/* Shared application shell */
+:root:not([data-theme="dark"]) .nav-sidebar {
+  background: var(--sidebar-bg);
+  border-right-color: var(--sidebar-border);
+  box-shadow: 5px 0 24px rgba(31, 55, 86, 0.035);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__brand {
+  border-bottom-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__brand-name {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__section-title {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__link,
+:root:not([data-theme="dark"]) .nav-sidebar__group-toggle,
+:root:not([data-theme="dark"]) .nav-sidebar__sublink {
+  color: var(--text-secondary);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__link:hover,
+:root:not([data-theme="dark"]) .nav-sidebar__group-toggle:hover,
+:root:not([data-theme="dark"]) .nav-sidebar__sublink:hover {
+  background: #f6f9ff;
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__link--active,
+:root:not([data-theme="dark"]) .nav-sidebar__group-toggle--active,
+:root:not([data-theme="dark"]) .nav-sidebar__sublink--active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-color);
+}
+
+/* Keep active navigation clean and pill-like in light mode. */
+:root:not([data-theme="dark"]) .nav-sidebar__link::before,
+:root:not([data-theme="dark"]) .nav-sidebar__group-toggle::before {
+  display: none;
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__toggle {
+  border-color: var(--border-color-light);
+  background: #f8fafc;
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .nav-sidebar__toggle:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .top-bar {
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom-color: var(--border-color-light);
+  box-shadow: 0 4px 18px rgba(31, 55, 86, 0.045);
+}
+
+:root:not([data-theme="dark"]) .top-bar h1 {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .top-bar p {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .icon-btn {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .icon-btn:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .notification-dot {
+  border-color: #ffffff;
+}
+
+:root:not([data-theme="dark"]) .supervisor-btn {
+  border-color: #d8e2ed;
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .supervisor-btn:hover,
+:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .supervisor-btn:hover .supervisor-name,
+:root:not([data-theme="dark"]) .supervisor-btn:hover .supervisor-chevron,
+:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] .supervisor-name,
+:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] .supervisor-chevron {
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .supervisor-btn:hover .supervisor-role,
+:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] .supervisor-role {
+  color: var(--text-secondary);
+}
+
+:root:not([data-theme="dark"]) .supervisor-avatar {
+  border-color: #d8e2ed;
+}
+
+:root:not([data-theme="dark"]) .supervisor-name {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .supervisor-role,
+:root:not([data-theme="dark"]) .supervisor-chevron {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .notification-dropdown,
+:root:not([data-theme="dark"]) .supervisor-dropdown {
+  border-color: var(--border-color-light);
+  box-shadow: var(--shadow-lg);
+}
+
+:root:not([data-theme="dark"]) .notification-dropdown__header,
+:root:not([data-theme="dark"]) .notification-search,
+:root:not([data-theme="dark"]) .notification-history-filter {
+  border-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .notification-dropdown__header strong,
+:root:not([data-theme="dark"]) .notification-empty-state strong,
+:root:not([data-theme="dark"]) .notification-item__title {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .notification-dropdown__header small,
+:root:not([data-theme="dark"]) .notification-empty-state p,
+:root:not([data-theme="dark"]) .notification-item__message,
+:root:not([data-theme="dark"]) .notification-history-filter > span {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .notification-search input {
+  border-color: #d8e2ed;
+  background: #f8fafc;
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .notification-item {
+  border-bottom-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .dropdown-divider {
+  background: var(--border-color-light);
+}
+
+/* Consistent card elevation across dashboard, analytics, reports, personnel,
+   deployment, monitoring, and settings pages. */
+:root:not([data-theme="dark"]) .metric-card,
+:root:not([data-theme="dark"]) .status-card,
+:root:not([data-theme="dark"]) .list-card,
+:root:not([data-theme="dark"]) .stat-card,
+:root:not([data-theme="dark"]) .widget-card,
+:root:not([data-theme="dark"]) .map-panel,
+:root:not([data-theme="dark"]) .barangay-analytics,
+:root:not([data-theme="dark"]) .personnel-roster-card,
+:root:not([data-theme="dark"]) .report-list-panel,
+:root:not([data-theme="dark"]) .account-management-card {
+  border-color: var(--border-color-light);
+  box-shadow: var(--shadow-sm);
+}
+
+:root:not([data-theme="dark"]) .stat-card:hover,
+:root:not([data-theme="dark"]) .widget-card:hover {
+  border-color: #d5e4f7;
+  box-shadow: var(--shadow-md);
+}
+
+:root:not([data-theme="dark"]) .side-panel-shell .metric-card,
+:root:not([data-theme="dark"]) .side-panel-shell .status-card,
+:root:not([data-theme="dark"]) .side-panel-shell .list-card {
+  border-color: rgba(223, 231, 240, 0.55);
+  box-shadow: 0 10px 26px rgba(31, 55, 86, 0.055);
+}
+
+:root:not([data-theme="dark"]) .side-panel-shell,
+:root:not([data-theme="dark"]) .page-loading-skeleton__card,
+:root:not([data-theme="dark"]) .page-loading-skeleton__panel,
+:root:not([data-theme="dark"]) .monitoring-loading-skeleton__side,
+:root:not([data-theme="dark"]) .monitoring-loading-skeleton__map {
+  border-color: var(--border-color-light);
+  box-shadow: var(--shadow-xs);
+}
+
+:root:not([data-theme="dark"]) .side-panel-shell {
+  background: #ffffff;
+}
+
+/* Inputs and selection controls */
+:root:not([data-theme="dark"]) .settings-input,
+:root:not([data-theme="dark"]) .personnel-toolbar input,
+:root:not([data-theme="dark"]) .personnel-toolbar select,
+:root:not([data-theme="dark"]) .report-search input,
+:root:not([data-theme="dark"]) .report-filter select,
+:root:not([data-theme="dark"]) .analytics-chart-filter__select,
+:root:not([data-theme="dark"]) .form-control,
+:root:not([data-theme="dark"]) .form-select {
+  border-color: #d8e2ed;
+  background: #ffffff;
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(31, 55, 86, 0.025);
+}
+
+:root:not([data-theme="dark"]) .settings-input:hover:not(:disabled),
+:root:not([data-theme="dark"]) .personnel-toolbar input:hover:not(:disabled),
+:root:not([data-theme="dark"]) .personnel-toolbar select:hover:not(:disabled),
+:root:not([data-theme="dark"]) .report-search input:hover,
+:root:not([data-theme="dark"]) .report-filter select:hover,
+:root:not([data-theme="dark"]) .form-control:hover,
+:root:not([data-theme="dark"]) .form-select:hover {
+  border-color: #b9d2ef;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.06);
+}
+
+:root:not([data-theme="dark"]) .settings-input:focus,
+:root:not([data-theme="dark"]) .personnel-toolbar input:focus,
+:root:not([data-theme="dark"]) .personnel-toolbar select:focus,
+:root:not([data-theme="dark"]) .report-search input:focus,
+:root:not([data-theme="dark"]) .report-filter select:focus,
+:root:not([data-theme="dark"]) .analytics-chart-filter__select:focus-visible,
+:root:not([data-theme="dark"]) .form-control:focus,
+:root:not([data-theme="dark"]) .form-select:focus {
+  border-color: var(--color-primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+:root:not([data-theme="dark"]) ::placeholder {
+  color: #98a6b8;
+}
+
+/* Tables and list separators use quiet neutral dividers rather than outlines. */
+:root:not([data-theme="dark"]) .personnel-table.table {
+  --bs-table-bg: #ffffff;
+  --bs-table-color: var(--text-secondary);
+  --bs-table-border-color: var(--border-color-light);
+  --bs-table-hover-bg: #f8fbff;
+}
+
+:root:not([data-theme="dark"]) .personnel-table th,
+:root:not([data-theme="dark"]) .report-list__header {
+  border-bottom-color: var(--border-color-light);
+  background: #f8fafc;
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .personnel-row:hover,
+:root:not([data-theme="dark"]) .report-list__row:hover {
+  background: #f8fbff;
+}
+
+:root:not([data-theme="dark"]) .personnel-row td,
+:root:not([data-theme="dark"]) .report-list__row,
+:root:not([data-theme="dark"]) .report-list,
+:root:not([data-theme="dark"]) .personnel-toolbar {
+  border-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .report-list {
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* Analytics chart and deployment form surfaces */
+:root:not([data-theme="dark"]) .analytics-chart-canvas-wrap {
+  border-color: var(--border-color-light);
+  background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Officer profile overlays should feel like the rest of the light workspace;
+   the map beneath them remains intentionally map-styled. */
+:root:not([data-theme="dark"]) .profile-map-card {
+  color: var(--text-primary);
+  background: #ffffff;
+  border-color: var(--border-color-light);
+  box-shadow: var(--shadow-lg);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__close {
+  border-color: #d8e2ed;
+  color: var(--text-tertiary);
+  background: #f8fafc;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__close:hover {
+  border-color: #bfdbfe;
+  color: var(--color-primary-dark);
+  background: #eff6ff;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__identity h3 {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__identity p {
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__status,
+:root:not([data-theme="dark"]) .profile-map-card__location,
+:root:not([data-theme="dark"]) .profile-map-card__metric {
+  color: var(--text-secondary);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__location {
+  border-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__location span,
+:root:not([data-theme="dark"]) .profile-map-card__location small,
+:root:not([data-theme="dark"]) .profile-map-card__metric span {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__location strong,
+:root:not([data-theme="dark"]) .profile-map-card__metric strong {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__photo {
+  background: #f0f4f8;
+}
+
+:root:not([data-theme="dark"]) .analytics-chart-canvas-wrap:hover {
+  border-color: #d5e4f7;
+  box-shadow: var(--shadow-sm);
+}
+
+:root:not([data-theme="dark"]) .deployment-form-card,
+:root:not([data-theme="dark"]) .deployment-list-card {
+  --deployment-navy: var(--text-primary);
+  --deployment-navy-soft: #1e3a5f;
+  --deployment-blue: var(--color-primary);
+  --deployment-blue-dark: var(--color-primary-dark);
+  --deployment-blue-soft: #eaf2ff;
+  --deployment-blue-surface: #f3f7ff;
+  --deployment-surface-muted: #f8fafc;
+  --deployment-border: var(--border-color-light);
+  --deployment-text-muted: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .assignment-mode-options,
+:root:not([data-theme="dark"]) .assignment-mode-status,
+:root:not([data-theme="dark"]) .assignment-checklist,
+:root:not([data-theme="dark"]) .assignment-area-dropdown,
+:root:not([data-theme="dark"]) .assignment-group-menu-dropdown {
+  border-color: var(--border-color-light);
+  box-shadow: var(--shadow-xs);
+}
+
+:root:not([data-theme="dark"]) .assignment-group-menu-dropdown {
+  background: #ffffff;
+}
+
+:root:not([data-theme="dark"]) .assignment-check-item:has(input:checked) {
+  background: var(--deployment-blue-soft);
+  color: var(--deployment-navy-soft);
+}
+
+:root:not([data-theme="dark"]) .assignment-check-item:has(input:checked) span {
+  color: var(--deployment-navy-soft);
+}
+
+/* Detail drawers and evidence viewer */
+:root:not([data-theme="dark"]) .report-drawer-backdrop {
+  background: rgba(25, 46, 75, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+:root:not([data-theme="dark"]) .profile-modal-layer {
+  background: rgba(25, 46, 75, 0.2);
+}
+
+:root:not([data-theme="dark"]) .report-detail-drawer,
+:root:not([data-theme="dark"]) .evidence-viewer__panel,
+:root:not([data-theme="dark"]) .evidence-viewer__state {
+  border-color: var(--border-color-light);
+  box-shadow: var(--shadow-lg);
+}
+
+:root:not([data-theme="dark"]) .report-detail-drawer__header,
+:root:not([data-theme="dark"]) .report-detail-drawer__summary,
+:root:not([data-theme="dark"]) .report-detail-drawer__footer,
+:root:not([data-theme="dark"]) .evidence-viewer__heading,
+:root:not([data-theme="dark"]) .evidence-viewer__metadata {
+  border-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .report-detail-drawer__summary,
+:root:not([data-theme="dark"]) .evidence-viewer__metadata {
+  background: #f8fafc;
+}
+
+:root:not([data-theme="dark"]) .evidence-viewer {
+  background: var(--bg-secondary);
+}
+
+:root:not([data-theme="dark"]) .evidence-viewer__topbar {
+  border-bottom-color: var(--border-color-light);
+  box-shadow: 0 4px 18px rgba(31, 55, 86, 0.045);
+}
+
+/* Login and recovery surfaces use the same light-mode language. */
+:root:not([data-theme="dark"]) .login-page {
+  background: #f6f8fc;
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .login-accent--top {
+  background: #eaf2ff;
+}
+
+:root:not([data-theme="dark"]) .login-accent--bottom {
+  background: #dbeafe;
+}
+
+:root:not([data-theme="dark"]) .login-brand strong,
+:root:not([data-theme="dark"]) .login-copy-title {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .login-brand div > span,
+:root:not([data-theme="dark"]) .login-copy-subtitle {
+  color: var(--text-secondary);
+}
+
+:root:not([data-theme="dark"]) .login-card,
+:root:not([data-theme="dark"]) .auth-modal {
+  border-color: var(--border-color-light);
+  background: #ffffff;
+  box-shadow: var(--shadow-lg);
+}
+
+:root:not([data-theme="dark"]) .login-card {
+  border-radius: 16px;
+}
+
+:root:not([data-theme="dark"]) .auth-modal {
+  border-radius: 16px;
+}
+
+:root:not([data-theme="dark"]) .login-label,
+:root:not([data-theme="dark"]) .auth-field label {
+  color: var(--text-secondary);
+}
+
+:root:not([data-theme="dark"]) .login-input,
+:root:not([data-theme="dark"]) .auth-field input,
+:root:not([data-theme="dark"]) .verification-code-digit {
+  border-color: #d8e2ed;
+  background: #ffffff;
+  color: var(--text-primary);
+  border-radius: 10px;
+}
+
+:root:not([data-theme="dark"]) .login-input:focus,
+:root:not([data-theme="dark"]) .auth-field input:focus,
+:root:not([data-theme="dark"]) .verification-code-digit:focus {
+  border-color: var(--color-primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .auth-modal__header,
+:root:not([data-theme="dark"]) .auth-modal__header h2 {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .auth-modal__header p,
+:root:not([data-theme="dark"]) .password-requirements {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .auth-error,
+:root:not([data-theme="dark"]) .login-error {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-strong);
+}
+
+:root:not([data-theme="dark"]) .auth-success {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success-strong);
+}
+
+:root:not([data-theme="dark"]) .login-field-error {
+  color: var(--color-danger-strong);
+}
+
+:root:not([data-theme="dark"]) .login-text-action {
+  color: var(--color-primary-dark);
+}
+
+:root:not([data-theme="dark"]) .login-submit-btn {
+  border-radius: 10px !important;
+}

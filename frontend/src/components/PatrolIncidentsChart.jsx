@@ -33,6 +33,13 @@ const CHART_FONT_FAMILY = 'Space Grotesk, Manrope, Segoe UI, sans-serif'
 
 function PatrolIncidentsChart({ chartVariant = 'grouped', dataByTimeframe = ANALYTICS_DATA_BY_TIMEFRAME }) {
   const [timeframe, setTimeframe] = useState('week')
+  // Chart.js draws text onto a canvas, so it cannot consume CSS variables
+  // directly. Read the active theme here to keep the chart legible in both
+  // the soft light surfaces and the existing dark mode.
+  const isDarkTheme = typeof document !== 'undefined'
+    && document.documentElement.getAttribute('data-theme') === 'dark'
+  const chartTextColor = isDarkTheme ? '#cbd5e1' : '#52657d'
+  const chartMutedColor = isDarkTheme ? '#94a3b8' : '#71839a'
 
   const selectedData = dataByTimeframe[timeframe] ?? dataByTimeframe.week
   const incidentsType = chartVariant === 'mixed' ? 'line' : 'bar'
@@ -110,7 +117,7 @@ function PatrolIncidentsChart({ chartVariant = 'grouped', dataByTimeframe = ANAL
           position: 'bottom',
           align: 'start',
           labels: {
-            color: '#cbd5e1',
+            color: chartTextColor,
             boxWidth: 12,
             boxHeight: 12,
             usePointStyle: true,
@@ -131,19 +138,19 @@ function PatrolIncidentsChart({ chartVariant = 'grouped', dataByTimeframe = ANAL
                 index: i,
                 pointStyle: 'circle',
                 strokeStyle: dataset.borderColor,
-                fontColor: '#cbd5e1',
+                fontColor: chartTextColor,
               }))
             },
           },
         },
         tooltip: {
           enabled: true,
-          backgroundColor: 'rgba(15, 23, 42, 0.95)',
-          borderColor: 'rgba(100, 116, 139, 0.3)',
+          backgroundColor: isDarkTheme ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+          borderColor: isDarkTheme ? 'rgba(100, 116, 139, 0.3)' : 'rgba(148, 163, 184, 0.32)',
           borderWidth: 1,
           padding: 12,
-          titleColor: '#f1f5f9',
-          bodyColor: '#cbd5e1',
+          titleColor: isDarkTheme ? '#f1f5f9' : '#10233f',
+          bodyColor: chartTextColor,
           titleFont: {
             family: CHART_FONT_FAMILY,
             size: 13,
@@ -165,7 +172,7 @@ function PatrolIncidentsChart({ chartVariant = 'grouped', dataByTimeframe = ANAL
       scales: {
         x: {
           ticks: {
-            color: '#94a3b8',
+            color: chartMutedColor,
             font: {
               family: CHART_FONT_FAMILY,
               size: 12,
@@ -185,7 +192,7 @@ function PatrolIncidentsChart({ chartVariant = 'grouped', dataByTimeframe = ANAL
           beginAtZero: true,
           ticks: {
             precision: 0,
-            color: '#94a3b8',
+            color: chartMutedColor,
             font: {
               family: CHART_FONT_FAMILY,
               size: 12,
@@ -206,7 +213,7 @@ function PatrolIncidentsChart({ chartVariant = 'grouped', dataByTimeframe = ANAL
         },
       },
     }),
-    [],
+    [chartMutedColor, chartTextColor, isDarkTheme],
   )
 
   return (

@@ -15,6 +15,9 @@
   --font-size-xl: 1.25rem;
   --font-size-2xl: 1.5rem;
   --font-size-3xl: 2rem;
+  --font-size-brand: 1.8rem;
+  --font-size-brand-geo: 1.04em;
+  --font-size-brand-sentri: 0.98em;
 
   --sidebar-w: 248px;
   --sidebar-w-collapsed: 60px;
@@ -103,6 +106,8 @@
 }
 
 :root[data-theme="dark"] {
+  --sidebar-active-bg: rgba(37, 99, 235, 0.16);
+  --sidebar-active-color: #bfdbfe;
   --color-primary: #3b82f6;
   --color-primary-light: #93c5fd;
   --color-primary-dark: #60a5fa;
@@ -147,8 +152,8 @@
   --bg-primary: #1e293b;
   --bg-secondary: #0f172a;
   --bg-tertiary: #111d33;
-  --border-color: #334155;
-  --border-color-light: #2b3a51;
+  --border-color: rgba(148, 163, 184, 0.2);
+  --border-color-light: rgba(148, 163, 184, 0.13);
   --focus-ring: rgba(96, 165, 250, 0.72);
 }
 

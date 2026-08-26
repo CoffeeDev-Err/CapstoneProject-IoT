@@ -95,7 +95,13 @@ function NavSidebar({ collapsed, onToggle }) {
         <span className="nav-sidebar__badge">
           <img src={geosentriIcon} alt="" aria-hidden="true" />
         </span>
-        {!collapsed && <span className="nav-sidebar__brand-name fs-4">GeoSentri</span>}
+        {!collapsed && (
+          <span className="nav-sidebar__brand-name">
+            <span className="visually-hidden">GeoSentri</span>
+            <span className="nav-sidebar__brand-geo" aria-hidden="true">Geo</span>
+            <span className="nav-sidebar__brand-sentri" aria-hidden="true">Sentri</span>
+          </span>
+        )}
       </div>
 
       <nav className="nav-sidebar__nav mt-4">
