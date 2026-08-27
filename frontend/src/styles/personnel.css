@@ -1,4 +1,4 @@
-.personnel-roster-card { padding: 0; overflow: hidden; }
+.personnel-roster-card { overflow: hidden; }
 
 .personnel-toolbar {
   padding: 1rem;
@@ -43,7 +43,21 @@
 .personnel-search input { padding: 0.55rem 0.75rem 0.55rem 2.25rem; }
 .personnel-toolbar > small { align-self: center; color: var(--text-tertiary); white-space: nowrap; }
 
+.personnel-mock-label {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
 .personnel-table-wrap { overflow: auto; }
+
+.personnel-table-wrap .personnel-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--border-color);
+}
 
 .personnel-table {
   width: 100%;

@@ -314,33 +314,26 @@
 .supervisor-profile { position: relative; }
 
 .supervisor-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
   background: transparent;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  padding: 0.38rem 0.72rem 0.38rem 0.34rem;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
   cursor: pointer;
-  transition: background var(--transition-base), border-color var(--transition-base);
+  transition: transform var(--transition-base), opacity var(--transition-base);
 }
 .supervisor-btn:hover,
 .supervisor-btn[aria-expanded='true'] {
-  border-color: #3b82f6;
-  background: rgba(37, 99, 235, 0.18);
-  color: #93c5fd;
+  background: transparent;
+  transform: scale(1.05);
 }
 
-.supervisor-btn:hover .supervisor-name,
-.supervisor-btn:hover .supervisor-chevron,
-.supervisor-btn[aria-expanded='true'] .supervisor-name,
-.supervisor-btn[aria-expanded='true'] .supervisor-chevron {
-  color: #93c5fd;
-}
-
-.supervisor-btn:hover .supervisor-role,
-.supervisor-btn[aria-expanded='true'] .supervisor-role {
-  color: #9eabc0;
+.supervisor-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
 .supervisor-avatar {
@@ -349,7 +342,7 @@
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 2px solid #334155;
+  border: 0;
 }
 
 .profile-avatar-fallback {
@@ -362,26 +355,6 @@
   font-weight: 800;
   line-height: 1;
   user-select: none;
-}
-
-.supervisor-info {
-  line-height: 1.2;
-}
-.supervisor-name {
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  color: #f1f5f9;
-}
-.supervisor-role {
-  font-size: var(--font-size-sm);
-  color: #94a3b8;
-}
-
-.supervisor-chevron {
-  width: 14px;
-  height: 14px;
-  color: #94a3b8;
-  flex-shrink: 0;
 }
 
 /* Dropdown card */
@@ -408,16 +381,7 @@
 .dropdown-profile-header {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
   padding: 0.85rem 1rem;
-}
-.dropdown-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  border: 2px solid #dbe2ea;
 }
 .dropdown-name {
   display: block;
@@ -425,11 +389,20 @@
   font-weight: 700;
   color: #0f172a;
 }
+.dropdown-profile-copy {
+  min-width: 0;
+}
 .dropdown-rank {
   display: block;
   font-size: var(--font-size-xs);
   color: #64748b;
   margin-top: 0.1rem;
+}
+.dropdown-role {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: var(--font-size-xs);
+  color: #64748b;
 }
 
 .dropdown-divider {

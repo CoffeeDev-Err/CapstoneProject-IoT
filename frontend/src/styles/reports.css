@@ -103,6 +103,21 @@
   border-radius: 8px;
 }
 
+.record-scroll-container {
+  height: clamp(320px, 60vh, 680px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.report-list.record-scroll-container > .report-list__header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
 .report-list__header,
 .report-list__row {
   display: grid;

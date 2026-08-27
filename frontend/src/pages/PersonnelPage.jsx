@@ -15,6 +15,7 @@ import { Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { TableSkeletonRows } from '../components/LoadingSkeleton'
 import { usePersonnelContext } from '../context/usePersonnelContext'
+import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
 
 /** Maps normalized duty status strings to badge colours. */
 const dutyStatusColor = {
@@ -38,6 +39,7 @@ function PersonnelPage() {
   const deferredSearchTerm = useDeferredValue(searchTerm)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name')
+  const displayedPersonnel = useMemo(() => appendDevelopmentMockPersonnel(personnel), [personnel])
 
   const roster = useMemo(() => {
     const emergencyIds = new Set()
@@ -51,7 +53,7 @@ function PersonnelPage() {
       })
 
     const query = deferredSearchTerm.trim().toLowerCase()
-    return personnel
+    return displayedPersonnel
       .map((officer) => {
         const dutyStatus = getDutyStatus(officer.status)
         let operationalStatus = dutyStatus
@@ -73,7 +75,7 @@ function PersonnelPage() {
         if (sortBy === 'rank') return left.rank.localeCompare(right.rank) || left.name.localeCompare(right.name)
         return left.name.localeCompare(right.name)
       })
-  }, [deferredSearchTerm, personnel, sortBy, statusFilter, tasks])
+  }, [deferredSearchTerm, displayedPersonnel, sortBy, statusFilter, tasks])
 
   const locatePersonnel = (officer) => {
     if (officer.dutyStatus === 'Off Duty' || officer.isLocationStale || officer.isVisibleOnMap === false) return
@@ -82,16 +84,28 @@ function PersonnelPage() {
 
   return (
     <div className="page-container fade-in p-3 p-md-4">
-      <header className="page-header mb-4">
-        <h2 className="page-title">Personnel</h2>
-        <p className="page-subtitle">Registered officers and current deployment status</p>
+      <header className="page-header mb-3 reports-header">
+        <div>
+          <h2 className="page-title">Personnel</h2>
+          <p className="page-subtitle">Registered officers and current deployment status</p>
+        </div>
       </header>
 
-      <div className="widget-card slide-up personnel-roster-card">
-        <div className="personnel-toolbar">
-          <label className="personnel-search">
-            <Search aria-hidden="true" />
+      <div className="widget-card slide-up report-list-panel personnel-roster-card">
+        <div className="report-list-panel__header">
+          <div>
+            <h3 className="widget-title mb-0">Personnel roster</h3>
+            <p>
+              {roster.length} of {displayedPersonnel.length} matching personnel
+              {import.meta.env.DEV && ' (includes 100 mock search records)'}
+            </p>
+          </div>
+        </div>
+
+        <div className="report-list-controls personnel-list-controls">
+          <label className="report-search">
             <span className="visually-hidden">Search personnel</span>
+            <Search className="report-search__icon" aria-hidden="true" />
             <input
               type="search"
               value={searchTerm}
@@ -99,9 +113,12 @@ function PersonnelPage() {
               placeholder="Search name, badge, or rank"
             />
           </label>
-          <label>
+          <label className="report-filter">
             <span>Status</span>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
               <option value="all">All statuses</option>
               <option value="backup-requested">Backup requested</option>
               <option value="outside-cabagan">Outside Cabagan</option>
@@ -111,17 +128,19 @@ function PersonnelPage() {
               <option value="off-duty">Off duty</option>
             </select>
           </label>
-          <label>
+          <label className="report-filter">
             <span>Sort by</span>
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+            >
               <option value="name">Name</option>
               <option value="rank">Rank</option>
               <option value="status">Status</option>
             </select>
           </label>
-          <small>{roster.length} of {personnel.length} personnel</small>
         </div>
-        <div className="personnel-table-wrap">
+        <div className="report-list personnel-table-wrap record-scroll-container">
         <table className="personnel-table table align-middle mb-0">
           <thead>
             <tr>
@@ -156,7 +175,12 @@ function PersonnelPage() {
                 }}
               >
                 <td className="personnel-badge">{officer.badge ?? officer.id.toUpperCase()}</td>
-                <td>{officer.name}</td>
+                <td>
+                  <span>{officer.name}</span>
+                  {officer.isMockPersonnel && (
+                    <small className="personnel-mock-label">Mock search record</small>
+                  )}
+                </td>
                 <td>{officer.rank}</td>
                 <td>
                   <span

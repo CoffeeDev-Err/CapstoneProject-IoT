@@ -11,10 +11,11 @@
     "test:validation": "node scripts/account-validation-check.mjs",
     "test:auth": "node scripts/auth-route-check.mjs",
     "test:feedback": "node scripts/workflow-feedback-check.mjs",
+    "test:analytics": "node scripts/barangay-analytics-check.mjs",
     "test:evidence": "node scripts/evidence-viewer-check.mjs",
     "test:theme": "node scripts/theme-coverage-check.mjs",
     "test:typography": "node scripts/typography-scale-check.mjs",
-    "check": "npm run lint && npm run test:validation && npm run test:auth && npm run test:feedback && npm run test:map && npm run test:evidence && npm run test:theme && npm run test:typography && npm run build",
+    "check": "npm run lint && npm run test:validation && npm run test:auth && npm run test:feedback && npm run test:analytics && npm run test:map && npm run test:evidence && npm run test:theme && npm run test:typography && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {

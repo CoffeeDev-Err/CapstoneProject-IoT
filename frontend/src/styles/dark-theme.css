@@ -147,16 +147,12 @@
   color: #94a3b8;
 }
 
-[data-theme="dark"] .supervisor-btn { border-color: #334155; }
+[data-theme="dark"] .supervisor-btn { border: 0; }
 [data-theme="dark"] .supervisor-btn:hover,
 [data-theme="dark"] .supervisor-btn[aria-expanded='true'] {
-  border-color: #3b82f6;
-  background: rgba(37, 99, 235, 0.18);
-  color: #93c5fd;
+  background: transparent;
 }
-[data-theme="dark"] .supervisor-name { color: #f1f5f9; }
-[data-theme="dark"] .supervisor-role { color: #64748b; }
-[data-theme="dark"] .supervisor-avatar { border-color: #334155; }
+[data-theme="dark"] .supervisor-avatar { border: 0; }
 
 [data-theme="dark"] .supervisor-dropdown {
   background: #1e293b;
@@ -164,8 +160,8 @@
   box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.55);
 }
 [data-theme="dark"] .dropdown-name { color: #f1f5f9; }
-[data-theme="dark"] .dropdown-rank { color: #64748b; }
-[data-theme="dark"] .dropdown-avatar { border-color: #334155; }
+[data-theme="dark"] .dropdown-rank,
+[data-theme="dark"] .dropdown-role { color: #94a3b8; }
 [data-theme="dark"] .dropdown-divider { background: #334155; }
 [data-theme="dark"] .dropdown-item { color: #cbd5e1; }
 [data-theme="dark"] .dropdown-item:hover { background: #263b63; }
@@ -789,6 +785,9 @@
 }
 [data-theme="dark"] .assignment-field__hint {
   color: #9eabc0;
+}
+[data-theme="dark"] .assignment-field__hint.is-error {
+  color: var(--color-danger);
 }
 [data-theme="dark"] .assignment-form .settings-input {
   border-color: #2a3a56;
@@ -1457,24 +1456,6 @@
 
   .top-bar p {
     display: none;
-  }
-
-  .supervisor-btn {
-    padding: 0.2rem;
-    border-radius: 999px;
-    min-width: 40px;
-    justify-content: center;
-    gap: 0;
-  }
-
-  .supervisor-info,
-  .supervisor-chevron {
-    display: none !important;
-  }
-
-  .supervisor-name,
-  .supervisor-role {
-    display: none !important;
   }
 
   .supervisor-dropdown {

@@ -49,6 +49,31 @@ export const getReportsPage = async ({
   }
 }
 
+export const getReportsList = async (options = {}) => {
+  const limit = Math.min(100, Math.max(1, Number(options.limit) || 100))
+  const firstPage = await getReportsPage({ ...options, page: 1, limit })
+  const remainingPageNumbers = Array.from(
+    { length: Math.max(0, firstPage.pagination.totalPages - 1) },
+    (_, index) => index + 2,
+  )
+  const remainingPages = await Promise.all(
+    remainingPageNumbers.map((page) => getReportsPage({ ...options, page, limit })),
+  )
+  const data = [firstPage, ...remainingPages].flatMap((result) => result.data)
+
+  return {
+    data,
+    pagination: {
+      ...firstPage.pagination,
+      page: 1,
+      limit: data.length,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  }
+}
+
 export const getReport = async (reportId) => {
   const payload = await apiRequest(
     `/api/reports/${encodeURIComponent(reportId)}`,

@@ -75,5 +75,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .global-feedback { animation: none; }
+  :root:not([data-motion="full"]) .global-feedback { animation: none; }
 }

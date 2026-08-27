@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Eye, Search } from 'lucide-react'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
 import { ReportListSkeleton } from '../components/LoadingSkeleton'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { getReportsPage, updateReportValidation } from '../services/operations'
+import { getReportsList, updateReportValidation } from '../services/operations'
 
-const REPORTS_PER_PAGE = 10
+const REPORTS_PER_REQUEST = 100
 const REPORT_TYPES = ['incident', 'patrol', 'checkpoint', 'others']
 const EMPTY_PAGINATION = {
   page: 1,
-  limit: REPORTS_PER_PAGE,
+  limit: REPORTS_PER_REQUEST,
   total: 0,
   totalPages: 1,
   hasNextPage: false,
@@ -94,7 +94,6 @@ function ReportsPage() {
   const [caseStatusFilter, setCaseStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('submitted_at')
   const [sortOrder, setSortOrder] = useState('desc')
-  const [currentPage, setCurrentPage] = useState(1)
   const [reportResults, setReportResults] = useState({
     data: [],
     pagination: EMPTY_PAGINATION,
@@ -108,7 +107,6 @@ function ReportsPage() {
     message: '',
   })
   const requestKey = [
-    currentPage,
     debouncedSearchTerm,
     reportTypeFilter,
     caseStatusFilter,
@@ -123,9 +121,8 @@ function ReportsPage() {
     const requestController = new AbortController()
     let isCurrent = true
 
-    getReportsPage({
-      page: currentPage,
-      limit: REPORTS_PER_PAGE,
+    getReportsList({
+      limit: REPORTS_PER_REQUEST,
       search: debouncedSearchTerm,
       reportType: reportTypeFilter,
       caseStatus: caseStatusFilter,
@@ -135,17 +132,13 @@ function ReportsPage() {
     })
       .then((result) => {
         if (!isCurrent) return
-        if (currentPage > result.pagination.totalPages) {
-          setCurrentPage(result.pagination.totalPages)
-          return
-        }
         setReportResults({ ...result, requestKey, error: '' })
       })
       .catch((error) => {
         if (!isCurrent || error?.name === 'AbortError') return
         setReportResults({
           data: [],
-          pagination: { ...EMPTY_PAGINATION, page: currentPage },
+          pagination: EMPTY_PAGINATION,
           requestKey,
           error: error.message || 'Reports could not be loaded.',
         })
@@ -157,7 +150,6 @@ function ReportsPage() {
     }
   }, [
     caseStatusFilter,
-    currentPage,
     debouncedSearchTerm,
     refreshVersion,
     reportTypeFilter,
@@ -170,21 +162,6 @@ function ReportsPage() {
   const reports = reportResults.data
   const pagination = reportResults.pagination
   const reportsError = reportResults.error
-  const totalPages = pagination.totalPages
-  const activePage = pagination.page
-  const pageStartIndex = (activePage - 1) * REPORTS_PER_PAGE
-  const firstVisibleReport = pagination.total === 0 ? 0 : pageStartIndex + 1
-  const lastVisibleReport = Math.min(pageStartIndex + reports.length, pagination.total)
-  const visiblePageNumbers = Array.from(
-    { length: Math.min(5, totalPages) },
-    (_, index) => {
-      const firstPage = Math.min(
-        Math.max(1, activePage - 2),
-        Math.max(1, totalPages - 4),
-      )
-      return firstPage + index
-    },
-  )
   const selectedReport = reports.find((report) => report.id === selectedReportId) || null
 
   const handleCloseReport = useCallback(() => {
@@ -224,23 +201,19 @@ function ReportsPage() {
 
   const updateSearchTerm = (value) => {
     setSearchTerm(value)
-    setCurrentPage(1)
   }
 
   const updateReportTypeFilter = (value) => {
     setReportTypeFilter(value)
-    setCurrentPage(1)
   }
 
   const updateCaseStatusFilter = (value) => {
     setCaseStatusFilter(value)
-    setCurrentPage(1)
   }
 
   const updateSort = (field) => {
     setSortOrder((currentOrder) => (sortBy === field && currentOrder === 'desc' ? 'asc' : 'desc'))
     setSortBy(field)
-    setCurrentPage(1)
   }
 
   const renderSortHeading = (label, field) => {
@@ -319,7 +292,7 @@ function ReportsPage() {
           </label>
         </div>
 
-        <div className="report-list" role="table" aria-label="Submitted police reports">
+        <div className="report-list record-scroll-container" role="table" aria-label="Submitted police reports">
           <div className="report-list__header" role="row">
             <span role="columnheader">Officer</span>
             <span role="columnheader">{renderSortHeading('Type', 'report_type')}</span>
@@ -397,48 +370,6 @@ function ReportsPage() {
           )}
         </div>
 
-        <nav className="report-pagination" aria-label="Report list pagination">
-          <span className="report-pagination__summary">
-            Showing {firstVisibleReport}-{lastVisibleReport} of {pagination.total}
-          </span>
-
-          <div className="report-pagination__controls">
-            <button
-              type="button"
-              className="report-page-btn"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={activePage === 1}
-              aria-label="Previous page"
-              title="Previous page"
-            >
-              <ChevronLeft aria-hidden="true" />
-            </button>
-
-            {visiblePageNumbers.map((pageNumber) => (
-              <button
-                key={pageNumber}
-                type="button"
-                className={`report-page-btn ${activePage === pageNumber ? 'is-active' : ''}`}
-                onClick={() => setCurrentPage(pageNumber)}
-                aria-label={`Page ${pageNumber}`}
-                aria-current={activePage === pageNumber ? 'page' : undefined}
-              >
-                {pageNumber}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className="report-page-btn"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={activePage === totalPages}
-              aria-label="Next page"
-              title="Next page"
-            >
-              <ChevronRight aria-hidden="true" />
-            </button>
-          </div>
-        </nav>
       </div>
 
       <ReportDetailDrawer

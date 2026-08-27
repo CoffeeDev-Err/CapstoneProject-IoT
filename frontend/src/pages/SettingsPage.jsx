@@ -6,6 +6,7 @@
  * do not need an in-app signup flow.
  */
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import ActionNoticeModal from '../components/ActionNoticeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import InitialsAvatar from '../components/InitialsAvatar'
 import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton'
@@ -122,6 +123,7 @@ function SettingsPage() {
   const [devicesSetupPending, setDevicesSetupPending] = useState(false)
   const [accountsLoading, setAccountsLoading] = useState(true)
   const [accountRequestPending, setAccountRequestPending] = useState(false)
+  const [accountActionNotice, setAccountActionNotice] = useState(null)
 
   useEffect(() => {
     if (formMessage) showFeedback(formMessage, { type: formMessageKind })
@@ -193,21 +195,6 @@ function SettingsPage() {
   const isEditingSupervisor = editingAccount?.role === 'Supervisor'
   const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
   const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount
-  const isAccountFormComplete = useMemo(() => {
-    const requiredValues = isEditingSupervisor
-      ? [accountForm.fullName, accountForm.rank, accountForm.loginId, accountForm.officialEmail]
-      : [
-          accountForm.fullName,
-          accountForm.badgeNumber,
-          accountForm.rank,
-          accountForm.loginId,
-          accountForm.officialEmail,
-          ...(!editingAccountId ? [accountForm.temporaryPassword] : []),
-          ...(requiresGpsDevice ? [accountForm.imei, accountForm.flespiDeviceId] : []),
-        ]
-    return requiredValues.every((value) => String(value || '').trim())
-  }, [accountForm, editingAccountId, isEditingSupervisor, requiresGpsDevice])
-
   const handleFieldChange = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
 
@@ -318,7 +305,7 @@ function SettingsPage() {
       const duplicateBadge = createdAccounts.some(
         (account) => (
           account.id !== editingAccountId
-          && account.badgeNumber.toLowerCase() === accountForm.badgeNumber.trim().toLowerCase()
+          && String(account.badgeNumber || '').toLowerCase() === accountForm.badgeNumber.trim().toLowerCase()
         )
       )
       if (!errors.badgeNumber && duplicateBadge) {
@@ -342,7 +329,7 @@ function SettingsPage() {
     const duplicateLogin = createdAccounts.some(
       (account) => (
         account.id !== editingAccountId
-        && account.loginId.toLowerCase() === accountForm.loginId.trim().toLowerCase()
+        && String(account.loginId || '').toLowerCase() === accountForm.loginId.trim().toLowerCase()
       )
     )
     if (!errors.loginId && duplicateLogin) {
@@ -403,7 +390,7 @@ function SettingsPage() {
 
     resetFormToCreate()
     setFormMessage(getAccountEditCancelledMessage(accountLabel))
-    setFormMessageKind('success')
+    setFormMessageKind('info')
   }
 
   const handleEditAccount = (accountId) => {
@@ -432,7 +419,7 @@ function SettingsPage() {
     setFormErrors({})
     const accountLabel = account.fullName || account.loginId
     setFormMessage(`Editing ${accountLabel}. Update details then click Save Changes.`)
-    setFormMessageKind('success')
+    setFormMessageKind('info')
   }
 
   const handleDeleteAccount = (accountId) => {
@@ -496,6 +483,24 @@ function SettingsPage() {
     setFormErrors(errors)
 
     if (Object.keys(errors).length > 0) {
+      const fieldLabels = {
+        fullName: 'Enter a valid full name.',
+        badgeNumber: 'Enter a valid and unique badge number.',
+        rank: 'Select a valid rank.',
+        imei: devicesLoading
+          ? 'Wait for registered GPS devices to finish loading.'
+          : 'Select an available registered GPS device.',
+        loginId: 'Enter a valid and unique Login ID.',
+        officialEmail: 'Enter a valid and unique official email address.',
+        temporaryPassword: 'Provide a temporary password that meets all requirements.',
+        mobileNumber: 'Correct the mobile number or leave the optional field blank.',
+        profilePhoto: 'Choose a supported profile photo no larger than 5 MB.',
+      }
+      setAccountActionNotice({
+        title: editingAccountId ? 'Cannot save changes yet' : 'Cannot create account yet',
+        message: 'Complete or correct the highlighted account fields before continuing.',
+        items: [...new Set(Object.keys(errors).map((field) => fieldLabels[field]).filter(Boolean))],
+      })
       return
     }
 
@@ -823,8 +828,7 @@ function SettingsPage() {
                     <button
                       type="submit"
                       className="account-submit-btn"
-	                      disabled={!isAccountFormComplete || accountRequestPending || (requiresGpsDevice && (devicesLoading || flespiDevices.length === 0))}
-	                      title={requiresGpsDevice && flespiDevices.length === 0 ? 'Register a GPS device before creating an account.' : undefined}
+	                      disabled={accountRequestPending}
                     >
                       {accountRequestPending
                         ? 'Saving...'
@@ -979,6 +983,13 @@ function SettingsPage() {
         cancelLabel="Cancel"
         onConfirm={handleConfirmDeleteAccount}
         onCancel={handleCancelDeleteAccount}
+      />
+      <ActionNoticeModal
+        open={Boolean(accountActionNotice)}
+        title={accountActionNotice?.title}
+        message={accountActionNotice?.message}
+        items={accountActionNotice?.items}
+        onClose={() => setAccountActionNotice(null)}
       />
     </div>
   )

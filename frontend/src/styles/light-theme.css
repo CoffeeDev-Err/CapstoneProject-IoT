@@ -28,6 +28,43 @@
   --shadow-lg: 0 20px 46px rgba(31, 55, 86, 0.12);
 }
 
+/* Match the compact dark-theme scrollbar treatment while keeping a light
+   track that belongs with the light surface system. */
+:root:not([data-theme="dark"]),
+:root:not([data-theme="dark"]) *:not(.no-scrollbar) {
+  scrollbar-color: #285681 #eef3f8;
+  scrollbar-width: thin;
+}
+
+:root:not([data-theme="dark"])::-webkit-scrollbar,
+:root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:root:not([data-theme="dark"])::-webkit-scrollbar-track,
+:root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-track {
+  background: #eef3f8;
+}
+
+:root:not([data-theme="dark"])::-webkit-scrollbar-thumb,
+:root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-thumb {
+  border: 2px solid #eef3f8;
+  border-radius: 999px;
+  background: #285681;
+}
+
+:root:not([data-theme="dark"])::-webkit-scrollbar-thumb:hover,
+:root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-thumb:hover {
+  background: #356fa6;
+}
+
+:root:not([data-theme="dark"])::-webkit-scrollbar-button,
+:root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+}
+
 :root:not([data-theme="dark"]) body {
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -52,14 +89,19 @@
   color: var(--text-primary);
 }
 
+:root:not([data-theme="dark"]) .nav-sidebar:not(.nav-sidebar--collapsed) .nav-sidebar__nav {
+  padding-right: 0.75rem;
+  padding-left: 0.75rem;
+}
+
 :root:not([data-theme="dark"]) .nav-sidebar__section-title {
-  color: var(--text-tertiary);
+  color: #4f6d8d;
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__link,
 :root:not([data-theme="dark"]) .nav-sidebar__group-toggle,
 :root:not([data-theme="dark"]) .nav-sidebar__sublink {
-  color: var(--text-secondary);
+  color: #285681;
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__link:hover,
@@ -67,6 +109,7 @@
 :root:not([data-theme="dark"]) .nav-sidebar__sublink:hover {
   background: #f6f9ff;
   color: var(--color-primary-dark);
+  transform: translateX(3px);
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__link--active,
@@ -74,6 +117,14 @@
 :root:not([data-theme="dark"]) .nav-sidebar__sublink--active {
   background: var(--sidebar-active-bg);
   color: var(--sidebar-active-color);
+  transform: none;
+}
+
+/* Keep the resting pill aligned, then add subtle motion only while hovered. */
+:root:not([data-theme="dark"]) .nav-sidebar__link--active:hover,
+:root:not([data-theme="dark"]) .nav-sidebar__group-toggle--active:hover,
+:root:not([data-theme="dark"]) .nav-sidebar__sublink--active:hover {
+  transform: translateX(3px);
 }
 
 /* Keep active navigation clean and pill-like in light mode. */
@@ -83,15 +134,16 @@
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__toggle {
-  border-color: var(--border-color-light);
-  background: #f8fafc;
-  color: var(--text-tertiary);
+  border-color: #bfd0e1;
+  background: #eef4fa;
+  color: #285681;
+  box-shadow: 0 2px 8px rgba(40, 86, 129, 0.1);
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__toggle:hover {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: var(--color-primary-dark);
+  border-color: #285681;
+  background: #e2ecf6;
+  color: #193f65;
 }
 
 :root:not([data-theme="dark"]) .top-bar {
@@ -123,40 +175,16 @@
 }
 
 :root:not([data-theme="dark"]) .supervisor-btn {
-  border-color: #d8e2ed;
-  color: var(--text-primary);
+  border: 0;
 }
 
 :root:not([data-theme="dark"]) .supervisor-btn:hover,
 :root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: var(--color-primary-dark);
-}
-
-:root:not([data-theme="dark"]) .supervisor-btn:hover .supervisor-name,
-:root:not([data-theme="dark"]) .supervisor-btn:hover .supervisor-chevron,
-:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] .supervisor-name,
-:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] .supervisor-chevron {
-  color: var(--color-primary-dark);
-}
-
-:root:not([data-theme="dark"]) .supervisor-btn:hover .supervisor-role,
-:root:not([data-theme="dark"]) .supervisor-btn[aria-expanded='true'] .supervisor-role {
-  color: var(--text-secondary);
+  background: transparent;
 }
 
 :root:not([data-theme="dark"]) .supervisor-avatar {
-  border-color: #d8e2ed;
-}
-
-:root:not([data-theme="dark"]) .supervisor-name {
-  color: var(--text-primary);
-}
-
-:root:not([data-theme="dark"]) .supervisor-role,
-:root:not([data-theme="dark"]) .supervisor-chevron {
-  color: var(--text-tertiary);
+  border: 0;
 }
 
 :root:not([data-theme="dark"]) .notification-dropdown,
@@ -401,6 +429,17 @@
 :root:not([data-theme="dark"]) .assignment-group-menu-dropdown {
   border-color: var(--border-color-light);
   box-shadow: var(--shadow-xs);
+}
+
+:root:not([data-theme="dark"]) .assignment-mode-options {
+  border-color: #bfd0e1;
+  background: #f3f7fb;
+  box-shadow: inset 0 0 0 1px rgba(40, 86, 129, 0.04), var(--shadow-xs);
+}
+
+:root:not([data-theme="dark"]) .assignment-mode-option.is-active,
+:root:not([data-theme="dark"]) .assignment-mode-option.is-active:hover {
+  background: #edf4ff;
 }
 
 :root:not([data-theme="dark"]) .assignment-group-menu-dropdown {

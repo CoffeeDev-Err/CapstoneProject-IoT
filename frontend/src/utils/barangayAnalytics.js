@@ -22,6 +22,8 @@ export const DEPLOYMENT_PRIORITY_WEIGHTS = {
   coverageGap: 0.1,
 }
 
+export const BASELINE_REQUIRED_PERSONNEL = 2
+
 const clampScore = (value) => Math.max(0, Math.min(100, value))
 const roundScore = (value) => Math.round(value * 10) / 10
 
@@ -210,10 +212,14 @@ export const buildBarangayAnalytics = ({
     const incidents = barangayReports.filter(
       (report) => report.is_incident && report.validation_status === 'validated'
     )
-    const coverage = deploymentCoverage.find((item) => item.barangay === barangay) || {
-      assignedPersonnel: 0,
-      availablePersonnel: 0,
-      requiredPersonnel: 0,
+    const recordedCoverage = deploymentCoverage.find((item) => item.barangay === barangay)
+    const coverage = {
+      assignedPersonnel: Number(recordedCoverage?.assignedPersonnel) || 0,
+      availablePersonnel: Number(recordedCoverage?.availablePersonnel) || 0,
+      requiredPersonnel: Math.max(
+        BASELINE_REQUIRED_PERSONNEL,
+        Number(recordedCoverage?.requiredPersonnel) || 0,
+      ),
     }
 
     const averageSeverity = incidents.length > 0

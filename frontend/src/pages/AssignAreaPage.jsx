@@ -1,13 +1,15 @@
 import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import ActionNoticeModal from '../components/ActionNoticeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton'
 import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getManageableDeployments, replaceDeployments } from '../services/operations'
-import { matchesPrefixSearch } from '../utils/searchMatching'
+import { filterDeploymentGroupsByPrefix, matchesPrefixSearch } from '../utils/searchMatching'
 import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
+import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
 
 const DEPLOYMENT_MODES = {
   START_NOW: 'start_now',
@@ -184,11 +186,12 @@ function AssignAreaPage({ view = 'form' }) {
   const requestedGroupFirstAssignment = requestedGroupAssignments[0]
 
   const personnelOptions = useMemo(() => {
-    if (Array.isArray(personnel) && personnel.length > 0) {
-      return personnel.map((member) => ({
+    if (Array.isArray(personnel)) {
+      return appendDevelopmentMockPersonnel(personnel).map((member) => ({
         id: member.id,
         name: member.name,
         rank: member.rank,
+        isMockPersonnel: Boolean(member.isMockPersonnel),
       }))
     }
 
@@ -221,6 +224,7 @@ function AssignAreaPage({ view = 'form' }) {
   )
   const [pendingDeleteAssignment, setPendingDeleteAssignment] = useState(null)
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
+  const [deploymentActionNoticeOpen, setDeploymentActionNoticeOpen] = useState(false)
   const [deploymentSearch, setDeploymentSearch] = useState('')
   const deferredDeploymentSearch = useDeferredValue(deploymentSearch)
   const [activeDeploymentView, setActiveDeploymentView] = useState(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
@@ -271,9 +275,9 @@ function AssignAreaPage({ view = 'form' }) {
   useEffect(() => {
     if (listOnly || !location.state) return
     if (requestedAssignment) {
-      showFeedback(`Re-assigning ${requestedAssignment.id}. Update the details, then save.`, { type: 'info' })
+      showFeedback(`Reassigning ${requestedAssignment.id}. Update the details, then save.`, { type: 'info' })
     } else if (requestedGroupFirstAssignment) {
-      showFeedback(`Re-assigning the group in ${requestedGroupFirstAssignment.patrolArea}. Update the details, then save.`, { type: 'info' })
+      showFeedback(`Reassigning the group in ${requestedGroupFirstAssignment.patrolArea}. Update the details, then save.`, { type: 'info' })
     }
     navigate('/assign-area', { replace: true, state: null })
   }, [
@@ -303,7 +307,7 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   const activePersonnelIds = assignmentForm.personnelIds.filter((id) =>
-    personnelOptions.some((item) => item.id === id)
+    personnelOptions.some((item) => item.id === id && !item.isMockPersonnel)
   )
 
   const selectedPersonnelMembers = personnelOptions.filter((item) =>
@@ -317,14 +321,18 @@ function AssignAreaPage({ view = 'form' }) {
   const hasValidShiftEnd = !Number.isNaN(formShiftEnd.getTime()) && formShiftEnd > formShiftStart
   const isWithinMaximumDuration = hasValidShiftStart && hasValidShiftEnd
     && formShiftEnd.getTime() - formShiftStart.getTime() <= 24 * 60 * 60 * 1000
+  const hasSelectedPersonnel = selectedPersonnelMembers.length > 0
+  const hasPatrolArea = Boolean(assignmentForm.patrolArea.trim())
+  const hasValidPersonnelSelection = hasSelectedPersonnel
+    && (!editingAssignmentId || selectedPersonnelMembers.length === 1)
   const deploymentFormState = {
     canSubmit: !isDeploymentsLoading
-      && selectedPersonnelMembers.length > 0
-      && Boolean(assignmentForm.patrolArea.trim())
+      && hasValidPersonnelSelection
+      && hasPatrolArea
       && hasValidShiftStart
       && hasValidShiftEnd
       && isWithinMaximumDuration
-      && (!editingAssignmentId || selectedPersonnelMembers.length === 1),
+      && !isInitialDataLoading,
     maximumShiftEnd: assignmentForm.shiftStart
       ? addHoursToLocalValue(assignmentForm.shiftStart, 24)
       : '',
@@ -333,6 +341,67 @@ function AssignAreaPage({ view = 'form' }) {
       : minimumSelectableShiftStart,
   }
 
+  const isScheduledDeployment = assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
+  const shiftStartHint = !assignmentForm.shiftStart
+    ? isScheduledDeployment
+      ? 'Choose a future start date and time.'
+      : 'Choose a shift start date and time.'
+    : !hasValidShiftStart
+      ? isScheduledDeployment
+        ? 'The scheduled start must be in the future.'
+        : 'Shift start cannot be earlier than the current time.'
+      : isScheduledDeployment
+        ? 'The deployment will begin at the selected future date and time.'
+        : 'The current date and time are selected. Choose another time if needed.'
+  const isShiftStartHintError = !hasValidShiftStart
+  const shiftEndHint = !assignmentForm.shiftEnd
+    ? 'Choose a shift end date and time.'
+    : !hasValidShiftEnd
+      ? 'Shift end must be later than shift start.'
+      : !isWithinMaximumDuration
+        ? 'The shift duration cannot exceed 24 hours.'
+        : 'Shift end may be up to 24 hours after shift start.'
+  const isShiftEndHintError = !hasValidShiftEnd || !isWithinMaximumDuration
+  const personnelSelectionHint = isInitialDataLoading
+    ? 'Available personnel are still loading.'
+    : personnelOptions.length === 0
+      ? 'No personnel members are currently available for deployment.'
+      : !hasSelectedPersonnel
+        ? 'Select at least one personnel member.'
+        : editingAssignmentId && selectedPersonnelMembers.length !== 1
+          ? 'Select exactly one personnel member when editing an individual deployment.'
+          : `${selectedPersonnelMembers.length} personnel member${selectedPersonnelMembers.length === 1 ? '' : 's'} selected.`
+  const isPersonnelSelectionHintError = !isInitialDataLoading && !hasValidPersonnelSelection
+  const deploymentBlockingReasons = [
+    isDeploymentsLoading ? 'Wait for deployment data to finish loading.' : '',
+    isInitialDataLoading ? 'Wait for available personnel to finish loading.' : '',
+    !isInitialDataLoading && !hasSelectedPersonnel ? 'Select at least one real personnel member.' : '',
+    editingAssignmentId && hasSelectedPersonnel && selectedPersonnelMembers.length !== 1
+      ? 'Select exactly one personnel member when editing an individual deployment.'
+      : '',
+    !hasPatrolArea ? 'Select a patrol area.' : '',
+    !assignmentForm.shiftStart
+      ? 'Choose a shift start date and time.'
+      : !hasValidShiftStart
+        ? isScheduledDeployment
+          ? 'Choose a future start date and time.'
+          : 'Choose a start time that is not in the past.'
+        : '',
+    !assignmentForm.shiftEnd
+      ? 'Choose a shift end date and time.'
+      : !hasValidShiftEnd
+        ? 'Choose an end time later than the shift start.'
+        : !isWithinMaximumDuration
+          ? 'Limit the shift duration to 24 hours.'
+          : '',
+  ].filter(Boolean)
+  const deploymentActionLabel = editingAssignmentId
+    ? 'Save Reassignment'
+    : editingGroupId
+      ? 'Save Group Reassignment'
+      : isScheduledDeployment
+        ? 'Schedule Deployment'
+        : 'Start Deployment'
   const filteredPersonnelOptions = useMemo(() => {
     const searchQuery = deferredPersonnelSearch.trim().toLowerCase()
     if (!searchQuery) {
@@ -388,28 +457,7 @@ function AssignAreaPage({ view = 'form' }) {
   }, [visibleAssignments])
 
   const filteredGroupedAssignments = useMemo(() => {
-    const query = deferredDeploymentSearch.trim().toLowerCase()
-
-    if (!query) {
-      return groupedAssignments
-    }
-
-    return groupedAssignments.flatMap((group) => {
-      if (matchesPrefixSearch(query, [group.patrolArea])) return [group]
-
-      const matchingAssignments = group.assignments.filter((assignment) => (
-        matchesPrefixSearch(query, [
-        assignment.id,
-        assignment.personnelName,
-        assignment.rank,
-        assignment.status,
-        ])
-      ))
-
-      return matchingAssignments.length > 0
-        ? [{ ...group, assignments: matchingAssignments }]
-        : []
-    })
+    return filterDeploymentGroupsByPrefix(groupedAssignments, deferredDeploymentSearch)
   }, [deferredDeploymentSearch, groupedAssignments])
 
   useEffect(() => {
@@ -472,6 +520,8 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   const handlePersonnelToggle = (personnelId) => {
+    if (personnelOptions.some((item) => item.id === personnelId && item.isMockPersonnel)) return
+
     setAssignmentForm((prev) => ({
       ...prev,
       personnelIds: prev.personnelIds.includes(personnelId)
@@ -481,7 +531,9 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   const handleToggleAllFilteredPersonnel = () => {
-    const filteredIds = filteredPersonnelOptions.map((item) => item.id)
+    const filteredIds = filteredPersonnelOptions
+      .filter((item) => !item.isMockPersonnel)
+      .map((item) => item.id)
     if (filteredIds.length === 0) {
       return
     }
@@ -503,8 +555,15 @@ function AssignAreaPage({ view = 'form' }) {
     })
   }
 
-  const areAllFilteredSelected = filteredPersonnelOptions.length > 0
-    && filteredPersonnelOptions.every((item) => activePersonnelIds.includes(item.id))
+  const selectableFilteredPersonnel = filteredPersonnelOptions.filter((item) => !item.isMockPersonnel)
+  const areAllFilteredSelected = selectableFilteredPersonnel.length > 0
+    && selectableFilteredPersonnel.every((item) => activePersonnelIds.includes(item.id))
+
+  const handleDeploymentActionClick = (event) => {
+    if (deploymentFormState.canSubmit) return
+    event.preventDefault()
+    setDeploymentActionNoticeOpen(true)
+  }
 
   const resetAssignmentForm = () => {
     setAssignmentForm(createEmptyAssignmentForm())
@@ -704,7 +763,7 @@ function AssignAreaPage({ view = 'form' }) {
       notes: assignment.notes || '',
     })
     setPersonnelSearch('')
-    showFeedback(`Re-assigning ${assignment.id}. Update details, then save.`, { type: 'info' })
+    showFeedback(`Reassigning ${assignment.id}. Update the details, then save.`, { type: 'info' })
   }
 
   const handleEditGroup = (groupId) => {
@@ -733,7 +792,7 @@ function AssignAreaPage({ view = 'form' }) {
     })
     setPersonnelSearch('')
     setOpenGroupMenuId(null)
-    showFeedback(`Re-assigning the group in ${firstAssignment.patrolArea}. Update details, then save.`, { type: 'info' })
+    showFeedback(`Reassigning the group in ${firstAssignment.patrolArea}. Update the details, then save.`, { type: 'info' })
   }
 
   const handleDeleteAssignment = (assignmentId) => {
@@ -908,13 +967,14 @@ function AssignAreaPage({ view = 'form' }) {
           </fieldset>
 
           <div className="assignment-grid mb-3">
-            <label className="assignment-field assignment-field--area">
+            <div className="assignment-field assignment-field--area">
               <span>Patrol Area</span>
               <div className="assignment-area-picker" ref={patrolAreaPickerRef}>
                 <button
                   type="button"
                   className="settings-input w-100 assignment-area-trigger"
                   onClick={() => setIsPatrolAreaOpen((prev) => !prev)}
+                  aria-label="Select patrol area"
                   aria-expanded={isPatrolAreaOpen}
                   aria-haspopup="listbox"
                 >
@@ -958,9 +1018,9 @@ function AssignAreaPage({ view = 'form' }) {
                   </div>
                 )}
               </div>
-            </label>
+            </div>
 
-            <label className="assignment-field assignment-field--start">
+            <div className="assignment-field assignment-field--start">
               <span>{assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER ? 'Scheduled Start *' : 'Shift Start *'}</span>
               <input
                 type="datetime-local"
@@ -974,19 +1034,22 @@ function AssignAreaPage({ view = 'form' }) {
                   ? 'Scheduled deployment start date and time'
                   : 'Deployment shift start date and time'}
                 title="Click anywhere in this field to open the date and time picker"
+                aria-describedby="assignment-shift-start-hint"
+                aria-invalid={isShiftStartHintError}
                 required
               />
               <small className="assignment-field__datetime-preview">
                 {formatDateTimePreview(assignmentForm.shiftStart)}
               </small>
-              <small className="assignment-field__hint">
-                {assignmentForm.mode === DEPLOYMENT_MODES.START_NOW
-                  ? 'Defaults to now. Click anywhere in the field to adjust it.'
-                  : 'Choose a future date and time; past options are unavailable.'}
+              <small
+                id="assignment-shift-start-hint"
+                className={`assignment-field__hint${isShiftStartHintError ? ' is-error' : ''}`}
+              >
+                {shiftStartHint}
               </small>
-            </label>
+            </div>
 
-            <label className="assignment-field assignment-field--end">
+            <div className="assignment-field assignment-field--end">
               <span>Shift End *</span>
               <input
                 type="datetime-local"
@@ -999,18 +1062,23 @@ function AssignAreaPage({ view = 'form' }) {
                 step="60"
                 aria-label="Deployment shift end date and time"
                 title="Click anywhere in this field to open the date and time picker"
+                aria-describedby="assignment-shift-end-hint"
+                aria-invalid={isShiftEndHintError}
                 required
               />
               <small className="assignment-field__datetime-preview">
                 {formatDateTimePreview(assignmentForm.shiftEnd)}
               </small>
-              <small className="assignment-field__hint">
-                Click anywhere in the field to choose an end time, up to 24 hours after shift start.
+              <small
+                id="assignment-shift-end-hint"
+                className={`assignment-field__hint${isShiftEndHintError ? ' is-error' : ''}`}
+              >
+                {shiftEndHint}
               </small>
-            </label>
+            </div>
 
             <div className="assignment-field assignment-field--personnel">
-              <span>Personnel (Checkbox)</span>
+              <span>Personnel Selection *</span>
               <input
                 type="search"
                 className="settings-input w-100 assignment-search-input"
@@ -1018,6 +1086,7 @@ function AssignAreaPage({ view = 'form' }) {
                 onChange={(event) => setPersonnelSearch(event.target.value)}
                 placeholder="Search personnel name or rank"
                 disabled={isInitialDataLoading}
+                aria-describedby="assignment-personnel-hint"
               />
 
               <div className="assignment-checklist no-scrollbar">
@@ -1029,25 +1098,37 @@ function AssignAreaPage({ view = 'form' }) {
                   <p className="assignment-checklist__empty mb-0">No personnel matches your search.</p>
                 ) : (
                   filteredPersonnelOptions.map((option) => (
-                    <label key={option.id} className="assignment-check-item">
+                    <label
+                      key={option.id}
+                      className={`assignment-check-item${option.isMockPersonnel ? ' is-mock' : ''}`}
+                    >
                       <input
                         type="checkbox"
                         checked={activePersonnelIds.includes(option.id)}
                         onChange={() => handlePersonnelToggle(option.id)}
+                        disabled={option.isMockPersonnel}
                       />
-                      <span>{option.name} - {option.rank}</span>
+                      <span>
+                        {option.name} - {option.rank}
+                        {option.isMockPersonnel && <small>Mock search record</small>}
+                      </span>
                     </label>
                   ))
                 )}
               </div>
 
               <div className="assignment-field__hint-row">
-                <small className="assignment-field__hint">{activePersonnelIds.length} personnel selected.</small>
+                <small
+                  id="assignment-personnel-hint"
+                  className={`assignment-field__hint${isPersonnelSelectionHintError ? ' is-error' : ''}`}
+                >
+                  {personnelSelectionHint}
+                </small>
                 <button
                   type="button"
                   className="assignment-inline-btn"
                   onClick={handleToggleAllFilteredPersonnel}
-                  disabled={isInitialDataLoading || filteredPersonnelOptions.length === 0}
+                  disabled={isInitialDataLoading || selectableFilteredPersonnel.length === 0}
                 >
                   {areAllFilteredSelected ? 'Clear Filtered' : 'Select All Filtered'}
                 </button>
@@ -1070,21 +1151,15 @@ function AssignAreaPage({ view = 'form' }) {
             <button
               type="submit"
               className="report-generate-btn report-generate-btn--assign"
-              disabled={isSaving || !deploymentFormState.canSubmit}
+              disabled={isSaving}
+              onClick={handleDeploymentActionClick}
+              aria-haspopup={deploymentFormState.canSubmit ? undefined : 'dialog'}
             >
-              {isSaving
-                ? 'Saving...'
-                : editingAssignmentId
-                  ? 'Save Re-assignment'
-                  : editingGroupId
-                    ? 'Save Group Re-assignment'
-                    : assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
-                      ? 'Schedule Deployment'
-                      : 'Start Deployment'}
+              {isSaving ? 'Saving...' : deploymentActionLabel}
             </button>
             {(editingAssignmentId || editingGroupId) && (
               <button type="button" className="assignment-inline-btn" onClick={handleCancelEdit}>
-                Cancel Re-assign
+                Cancel Reassignment
               </button>
             )}
           </div>
@@ -1217,7 +1292,7 @@ function AssignAreaPage({ view = 'form' }) {
                               className="assignment-group-edit-btn"
                               onClick={() => handleEditGroup(group.groupId)}
                             >
-                              Re-assign Group
+                              Reassign Group
                             </button>
                             <button
                               type="button"
@@ -1255,7 +1330,7 @@ function AssignAreaPage({ view = 'form' }) {
                             className="assignment-edit-btn"
                             onClick={() => handleEditAssignment(assignment)}
                           >
-                            Re-assign
+                            Reassign
                           </button>
                           <button
                             type="button"
@@ -1299,6 +1374,13 @@ function AssignAreaPage({ view = 'form' }) {
         cancelLabel="Cancel"
         onConfirm={handleConfirmDeleteAssignment}
         onCancel={handleCancelDeleteAssignment}
+      />
+      <ActionNoticeModal
+        open={deploymentActionNoticeOpen}
+        title={`${deploymentActionLabel} unavailable`}
+        message="Complete the following deployment requirements before continuing."
+        items={deploymentBlockingReasons}
+        onClose={() => setDeploymentActionNoticeOpen(false)}
       />
     </div>
   )

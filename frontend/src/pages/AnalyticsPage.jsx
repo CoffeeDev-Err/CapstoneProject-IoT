@@ -8,6 +8,7 @@ import { AnalyticsContentSkeleton } from '../components/LoadingSkeleton'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import {
   BARANGAY_ANALYTICS_PERIODS,
+  BASELINE_REQUIRED_PERSONNEL,
   buildBarangayAnalytics,
 } from '../utils/barangayAnalytics'
 
@@ -52,7 +53,7 @@ function AnalyticsPage() {
         barangay,
         assignedPersonnel: 0,
         availablePersonnel: 0,
-        requiredPersonnel: 2,
+        requiredPersonnel: BASELINE_REQUIRED_PERSONNEL,
       }
       const member = personnelById.get(deployment.personnelId)
       current.assignedPersonnel += 1

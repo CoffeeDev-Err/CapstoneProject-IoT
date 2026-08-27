@@ -1490,17 +1490,9 @@
     font-size: var(--font-size-base);
   }
 
-  .supervisor-info {
-    display: none;
-  }
-
   .connection-pill {
     padding: 0.25rem 0.55rem;
     font-size: var(--font-size-xs);
-  }
-
-  .supervisor-btn {
-    padding-right: 0.45rem;
   }
 
   .dashboard-grid {

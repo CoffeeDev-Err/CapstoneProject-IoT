@@ -15,7 +15,6 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
-  ChevronDown,
   LogOut,
   Moon,
   Sun,
@@ -357,7 +356,7 @@ function TopBar({
           )}
         </div>
 
-        {/* Supervisor account — photo + name + role, opens dropdown on click */}
+        {/* Compact profile trigger; account information stays inside the dropdown. */}
         <div className="supervisor-profile" ref={dropdownRef}>
           <button
             type="button"
@@ -368,24 +367,22 @@ function TopBar({
             }}
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
+            aria-label="Open profile menu"
           >
             <ProfileAvatar className="supervisor-avatar" name={supervisor.name} src={supervisor.photoUrl} />
-            <div className="supervisor-info d-flex flex-column align-items-start">
-              <span className="supervisor-name">{supervisor.name}</span>
-              <span className="supervisor-role mt-1">{supervisor.role}</span>
-            </div>
-            <ChevronDown className="supervisor-chevron" aria-hidden="true" />
           </button>
 
           {/* Dropdown menu — appears below the button */}
           {dropdownOpen && (
             <div className="supervisor-dropdown">
-              {/* Header row with larger photo + name + rank */}
+              {/* Header row with the signed-in account details. */}
               <div className="dropdown-profile-header d-flex align-items-center">
-                <ProfileAvatar className="dropdown-avatar" name={supervisor.name} src={supervisor.photoUrl} />
-                <div>
+                <div className="dropdown-profile-copy">
                   <strong className="dropdown-name">{supervisor.name}</strong>
-                  <span className="dropdown-rank mt-1">{supervisor.rank}</span>
+                  {supervisor.rank && supervisor.rank !== supervisor.role && (
+                    <span className="dropdown-rank">{supervisor.rank}</span>
+                  )}
+                  <span className="dropdown-role">{supervisor.role}</span>
                 </div>
               </div>
 

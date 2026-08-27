@@ -41,4 +41,32 @@ export const matchesPrefixSearch = (query, values = []) => {
   ))
 }
 
+export const filterDeploymentGroupsByPrefix = (groups = [], query = '') => {
+  if (!String(query).trim()) return groups
+
+  return groups.flatMap((group) => {
+    const matchingAssignments = (group.assignments || []).filter((assignment) => (
+      matchesPrefixSearch(query, [
+        assignment.id,
+        assignment.personnelName,
+        assignment.rank,
+        assignment.status,
+        assignment.patrolArea,
+      ])
+    ))
+
+    if (matchingAssignments.length === 0) return []
+
+    const matchingPatrolAreas = [...new Set(
+      matchingAssignments.map((assignment) => assignment.patrolArea).filter(Boolean),
+    )]
+
+    return [{
+      ...group,
+      patrolArea: matchingPatrolAreas.length === 1 ? matchingPatrolAreas[0] : group.patrolArea,
+      assignments: matchingAssignments,
+    }]
+  })
+}
+
 export const searchTokens = tokenizeSearchValue
