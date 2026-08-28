@@ -76,7 +76,11 @@ assert.deepEqual(
 )
 
 const serviceSource = fs.readFileSync(
-	path.join(__dirname, '..', 'src', 'services', 'operationalService.js'),
+	path.join(__dirname, '..', 'src', 'services', 'operations', 'deploymentService.js'),
+	'utf8',
+)
+const taskServiceSource = fs.readFileSync(
+	path.join(__dirname, '..', 'src', 'services', 'operations', 'taskService.js'),
 	'utf8',
 )
 assert.match(
@@ -85,13 +89,13 @@ assert.match(
 	'Automatic shift completion must include the departing officer in realtime recipients',
 )
 assert.match(
-	serviceSource,
-	/completeTask[\s\S]*emitTaskRemoval\([\s\S]*emitTaskToAuthorizedOfficers/,
+	taskServiceSource,
+	/completeTask[\s\S]*emitTaskRemoval\([\s\S]*emitToAuthorizedOfficers/,
 	'Completing a backup must remove stale active cards before sending participant history updates',
 )
 assert.match(
-	serviceSource,
-	/cancelTask[\s\S]*emitTaskRemoval\([\s\S]*emitTaskToAuthorizedOfficers/,
+	taskServiceSource,
+	/cancelTask[\s\S]*emitTaskRemoval\([\s\S]*emitToAuthorizedOfficers/,
 	'Cancelling a backup must remove stale active cards before sending participant history updates',
 )
 

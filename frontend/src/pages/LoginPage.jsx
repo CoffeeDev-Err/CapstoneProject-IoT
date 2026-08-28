@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import pnpLogo from '../assets/pnp-logo.png'
 import VerificationCodeInput from '../components/VerificationCodeInput'
+import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
 import { useAuth } from '../context/useAuth'
 import {
   beginLogin,
@@ -20,9 +21,6 @@ const isStrongPassword = (value) => (
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 )
-
-const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.'
-const COMPLETE_CODE_MESSAGE = 'Enter the complete 6-digit verification code.'
 
 function LoginPage() {
   const [mode, setMode] = useState('login')

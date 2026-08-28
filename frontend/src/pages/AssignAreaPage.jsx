@@ -1,177 +1,32 @@
-import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import ActionNoticeModal from '../components/ActionNoticeModal'
-import ConfirmModal from '../components/ConfirmModal'
-import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton'
-import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getManageableDeployments, replaceDeployments } from '../services/operations'
 import { filterDeploymentGroupsByPrefix, matchesPrefixSearch } from '../utils/searchMatching'
 import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
 import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
+import * as deploymentForm from '../features/deployments/deploymentForm'
+import {
+  DeploymentScheduleFields,
+  DeploymentTimingSelector,
+} from '../features/deployments/DeploymentScheduleFields'
+import DeploymentList from '../features/deployments/DeploymentList'
+import PersonnelSelector from '../features/deployments/PersonnelSelector'
+import { useDeploymentForm } from '../features/deployments/useDeploymentForm'
+import DeploymentDialogs from '../features/deployments/DeploymentDialogs'
 
-const DEPLOYMENT_MODES = {
-  START_NOW: 'start_now',
-  SCHEDULE_LATER: 'schedule_later',
-}
-
-const DEPLOYMENT_LIST_VIEWS = {
-  ACTIVE_NOW: 'active_now',
-  SCHEDULED_LATER: 'scheduled_later',
-}
-
-const patrolAreas = [
-  ...CABAGAN_BARANGAYS.map((barangay) => `Barangay ${barangay}`),
-  'Cabagan Public Market Zone',
-  'Municipal Hall Perimeter',
-  'Barangay Centro Route',
-  'Cabagan-Santa Maria Road',
-  'Cabagan-Tumauini Road',
-  'Maharlika Highway Northbound',
-  'Maharlika Highway Southbound',
-  'National Highway Checkpoint North',
-  'National Highway Checkpoint South',
-  'Highway Checkpoint North',
-  'Highway Checkpoint South',
-  'School Safety Patrol Route',
-  'Bridge Approach Patrol Zone',
-]
-
-const formatDateTime = (isoValue) => {
-  if (!isoValue) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(isoValue))
-}
-
-const getCurrentDateTimeLocalValue = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  const hours = String(now.getHours()).padStart(2, '0')
-  const minutes = String(now.getMinutes()).padStart(2, '0')
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-
-const createEmptyAssignmentForm = () => ({
-  mode: DEPLOYMENT_MODES.START_NOW,
-  personnelIds: [],
-  patrolArea: patrolAreas[0],
-  shiftStart: getCurrentDateTimeLocalValue(),
-  shiftEnd: '',
-  notes: '',
-})
-
-const toDateTimeLocalValue = (value) => {
-  if (!value) {
-    return ''
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
-    return value
-  }
-
-  const parsedDate = new Date(value)
-  if (Number.isNaN(parsedDate.getTime())) {
-    return ''
-  }
-
-  const year = parsedDate.getFullYear()
-  const month = String(parsedDate.getMonth() + 1).padStart(2, '0')
-  const day = String(parsedDate.getDate()).padStart(2, '0')
-  const hours = String(parsedDate.getHours()).padStart(2, '0')
-  const minutes = String(parsedDate.getMinutes()).padStart(2, '0')
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-
-const formatDateTimePreview = (localValue) => {
-  if (!localValue) {
-    return 'No date and time selected'
-  }
-
-  const parsedDate = new Date(localValue)
-  if (Number.isNaN(parsedDate.getTime())) {
-    return 'Invalid date and time'
-  }
-
-  const date = new Intl.DateTimeFormat('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(parsedDate)
-  const time = new Intl.DateTimeFormat('en-PH', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(parsedDate)
-
-  return `${date} • ${time}`
-}
-
-const toIsoDateTime = (value) => {
-  const parsedDate = new Date(value)
-  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString()
-}
-
-const addHoursToLocalValue = (value, hours) => {
-  const parsedDate = new Date(value)
-  if (Number.isNaN(parsedDate.getTime())) return ''
-  parsedDate.setHours(parsedDate.getHours() + hours)
-  return toDateTimeLocalValue(parsedDate.toISOString())
-}
-
-const addMinutesToLocalValue = (value, minutes) => {
-  const parsedDate = new Date(value)
-  if (Number.isNaN(parsedDate.getTime())) return ''
-  parsedDate.setMinutes(parsedDate.getMinutes() + minutes)
-  return toDateTimeLocalValue(parsedDate.toISOString())
-}
-
-const toEditableShiftStart = (value) => {
-  const currentValue = getCurrentDateTimeLocalValue()
-  const requestedValue = toDateTimeLocalValue(value)
-  return requestedValue && requestedValue >= currentValue ? requestedValue : currentValue
-}
-
-const resolveGroupId = (assignment) => assignment.groupId || `${assignment.patrolArea}__${assignment.assignedAt || 'none'}`
-
-const createDeploymentId = (prefix) => {
-  const uniquePart = globalThis.crypto?.randomUUID?.().slice(0, 8)
-    || Math.random().toString(36).slice(2, 10)
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}-${uniquePart.toUpperCase()}`
-}
-
-const getDeploymentMode = (assignment) => (
-  assignment.status === 'scheduled'
-    ? DEPLOYMENT_MODES.SCHEDULE_LATER
-    : DEPLOYMENT_MODES.START_NOW
-)
-
-const formatDeploymentStatus = (status) => (
-  status ? `${status.charAt(0).toUpperCase()}${status.slice(1)}` : 'Active'
-)
-
-const openDateTimePicker = (event) => {
-  const input = event.currentTarget
-  if (typeof input.showPicker !== 'function') return
-
-  try {
-    input.showPicker()
-  } catch {
-    input.focus()
-  }
-}
+const {
+  DEPLOYMENT_LIST_VIEWS,
+  DEPLOYMENT_MODES,
+  createDeploymentId,
+  getDeploymentMode,
+  patrolAreas,
+  resolveGroupId,
+  toDateTimeLocalValue,
+  toEditableShiftStart,
+  toIsoDateTime,
+} = deploymentForm
 
 function AssignAreaPage({ view = 'form' }) {
   const { personnel = [], isInitialDataLoading } = usePersonnelContext()
@@ -198,20 +53,6 @@ function AssignAreaPage({ view = 'form' }) {
     return []
   }, [personnel])
 
-  const [assignmentForm, setAssignmentForm] = useState(() => {
-    const source = requestedAssignment || requestedGroupFirstAssignment
-    if (!source) return createEmptyAssignmentForm()
-    return {
-      mode: getDeploymentMode(source),
-      personnelIds: requestedAssignment
-        ? [requestedAssignment.personnelId]
-        : requestedGroupAssignments.map((item) => item.personnelId),
-      patrolArea: source.patrolArea || patrolAreas[0],
-      shiftStart: toEditableShiftStart(source.shiftStart),
-      shiftEnd: toDateTimeLocalValue(source.shiftEnd),
-      notes: source.notes || '',
-    }
-  })
   const [personnelSearch, setPersonnelSearch] = useState('')
   const [patrolAreaSearch, setPatrolAreaSearch] = useState('')
   const deferredPersonnelSearch = useDeferredValue(personnelSearch)
@@ -231,10 +72,34 @@ function AssignAreaPage({ view = 'form' }) {
   const [openGroupMenuId, setOpenGroupMenuId] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeploymentsLoading, setIsDeploymentsLoading] = useState(true)
-  const [minimumShiftDateTime, setMinimumShiftDateTime] = useState(getCurrentDateTimeLocalValue)
-  const minimumSelectableShiftStart = assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
-    ? addMinutesToLocalValue(minimumShiftDateTime, 1)
-    : minimumShiftDateTime
+  const {
+    assignmentForm,
+    setAssignmentForm,
+    resetAssignmentFormState,
+    minimumSelectableShiftStart,
+    activePersonnelIds,
+    selectedPersonnelMembers,
+    isShiftStartHintError,
+    isShiftEndHintError,
+    isPersonnelSelectionHintError,
+    isScheduledDeployment,
+    deploymentFormState,
+    shiftStartHint,
+    shiftEndHint,
+    personnelSelectionHint,
+    deploymentBlockingReasons,
+    handleFormChange,
+    handleModeChange,
+    handlePersonnelToggle,
+  } = useDeploymentForm({
+    editingAssignmentId,
+    isDeploymentsLoading,
+    isInitialDataLoading,
+    personnelOptions,
+    requestedAssignment,
+    requestedGroupAssignments,
+    requestedGroupFirstAssignment,
+  })
   const patrolAreaPickerRef = useRef(null)
   const patrolAreaSearchInputRef = useRef(null)
 
@@ -256,21 +121,6 @@ function AssignAreaPage({ view = 'form' }) {
       isCurrent = false
     }
   }, [showFeedback])
-
-  useEffect(() => {
-    const updateMinimum = () => {
-      const nextMinimum = getCurrentDateTimeLocalValue()
-      setMinimumShiftDateTime(nextMinimum)
-      setAssignmentForm((currentForm) => (
-        currentForm.mode === DEPLOYMENT_MODES.START_NOW
-          && currentForm.shiftStart < nextMinimum
-          ? { ...currentForm, shiftStart: nextMinimum }
-          : currentForm
-      ))
-    }
-    const intervalId = window.setInterval(updateMinimum, 30_000)
-    return () => window.clearInterval(intervalId)
-  }, [])
 
   useEffect(() => {
     if (listOnly || !location.state) return
@@ -306,95 +156,6 @@ function AssignAreaPage({ view = 'form' }) {
     }
   }
 
-  const activePersonnelIds = assignmentForm.personnelIds.filter((id) =>
-    personnelOptions.some((item) => item.id === id && !item.isMockPersonnel)
-  )
-
-  const selectedPersonnelMembers = personnelOptions.filter((item) =>
-    activePersonnelIds.includes(item.id)
-  )
-
-  const formShiftStart = new Date(assignmentForm.shiftStart)
-  const formShiftEnd = new Date(assignmentForm.shiftEnd)
-  const hasValidShiftStart = !Number.isNaN(formShiftStart.getTime())
-    && formShiftStart >= new Date(minimumSelectableShiftStart)
-  const hasValidShiftEnd = !Number.isNaN(formShiftEnd.getTime()) && formShiftEnd > formShiftStart
-  const isWithinMaximumDuration = hasValidShiftStart && hasValidShiftEnd
-    && formShiftEnd.getTime() - formShiftStart.getTime() <= 24 * 60 * 60 * 1000
-  const hasSelectedPersonnel = selectedPersonnelMembers.length > 0
-  const hasPatrolArea = Boolean(assignmentForm.patrolArea.trim())
-  const hasValidPersonnelSelection = hasSelectedPersonnel
-    && (!editingAssignmentId || selectedPersonnelMembers.length === 1)
-  const deploymentFormState = {
-    canSubmit: !isDeploymentsLoading
-      && hasValidPersonnelSelection
-      && hasPatrolArea
-      && hasValidShiftStart
-      && hasValidShiftEnd
-      && isWithinMaximumDuration
-      && !isInitialDataLoading,
-    maximumShiftEnd: assignmentForm.shiftStart
-      ? addHoursToLocalValue(assignmentForm.shiftStart, 24)
-      : '',
-    minimumShiftEnd: assignmentForm.shiftStart > minimumSelectableShiftStart
-      ? assignmentForm.shiftStart
-      : minimumSelectableShiftStart,
-  }
-
-  const isScheduledDeployment = assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
-  const shiftStartHint = !assignmentForm.shiftStart
-    ? isScheduledDeployment
-      ? 'Choose a future start date and time.'
-      : 'Choose a shift start date and time.'
-    : !hasValidShiftStart
-      ? isScheduledDeployment
-        ? 'The scheduled start must be in the future.'
-        : 'Shift start cannot be earlier than the current time.'
-      : isScheduledDeployment
-        ? 'The deployment will begin at the selected future date and time.'
-        : 'The current date and time are selected. Choose another time if needed.'
-  const isShiftStartHintError = !hasValidShiftStart
-  const shiftEndHint = !assignmentForm.shiftEnd
-    ? 'Choose a shift end date and time.'
-    : !hasValidShiftEnd
-      ? 'Shift end must be later than shift start.'
-      : !isWithinMaximumDuration
-        ? 'The shift duration cannot exceed 24 hours.'
-        : 'Shift end may be up to 24 hours after shift start.'
-  const isShiftEndHintError = !hasValidShiftEnd || !isWithinMaximumDuration
-  const personnelSelectionHint = isInitialDataLoading
-    ? 'Available personnel are still loading.'
-    : personnelOptions.length === 0
-      ? 'No personnel members are currently available for deployment.'
-      : !hasSelectedPersonnel
-        ? 'Select at least one personnel member.'
-        : editingAssignmentId && selectedPersonnelMembers.length !== 1
-          ? 'Select exactly one personnel member when editing an individual deployment.'
-          : `${selectedPersonnelMembers.length} personnel member${selectedPersonnelMembers.length === 1 ? '' : 's'} selected.`
-  const isPersonnelSelectionHintError = !isInitialDataLoading && !hasValidPersonnelSelection
-  const deploymentBlockingReasons = [
-    isDeploymentsLoading ? 'Wait for deployment data to finish loading.' : '',
-    isInitialDataLoading ? 'Wait for available personnel to finish loading.' : '',
-    !isInitialDataLoading && !hasSelectedPersonnel ? 'Select at least one real personnel member.' : '',
-    editingAssignmentId && hasSelectedPersonnel && selectedPersonnelMembers.length !== 1
-      ? 'Select exactly one personnel member when editing an individual deployment.'
-      : '',
-    !hasPatrolArea ? 'Select a patrol area.' : '',
-    !assignmentForm.shiftStart
-      ? 'Choose a shift start date and time.'
-      : !hasValidShiftStart
-        ? isScheduledDeployment
-          ? 'Choose a future start date and time.'
-          : 'Choose a start time that is not in the past.'
-        : '',
-    !assignmentForm.shiftEnd
-      ? 'Choose a shift end date and time.'
-      : !hasValidShiftEnd
-        ? 'Choose an end time later than the shift start.'
-        : !isWithinMaximumDuration
-          ? 'Limit the shift duration to 24 hours.'
-          : '',
-  ].filter(Boolean)
   const deploymentActionLabel = editingAssignmentId
     ? 'Save Reassignment'
     : editingGroupId
@@ -502,34 +263,6 @@ function AssignAreaPage({ view = 'form' }) {
     }
   }, [openGroupMenuId])
 
-  const handleFormChange = (field) => (event) => {
-    setAssignmentForm((prev) => ({
-      ...prev,
-      [field]: event.target.value,
-    }))
-  }
-
-  const handleModeChange = (mode) => {
-    setAssignmentForm((prev) => ({
-      ...prev,
-      mode,
-      shiftStart: mode === DEPLOYMENT_MODES.START_NOW
-        ? getCurrentDateTimeLocalValue()
-        : '',
-    }))
-  }
-
-  const handlePersonnelToggle = (personnelId) => {
-    if (personnelOptions.some((item) => item.id === personnelId && item.isMockPersonnel)) return
-
-    setAssignmentForm((prev) => ({
-      ...prev,
-      personnelIds: prev.personnelIds.includes(personnelId)
-        ? prev.personnelIds.filter((id) => id !== personnelId)
-        : [...prev.personnelIds, personnelId],
-    }))
-  }
-
   const handleToggleAllFilteredPersonnel = () => {
     const filteredIds = filteredPersonnelOptions
       .filter((item) => !item.isMockPersonnel)
@@ -566,7 +299,7 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   const resetAssignmentForm = () => {
-    setAssignmentForm(createEmptyAssignmentForm())
+    resetAssignmentFormState()
     setPersonnelSearch('')
     setPatrolAreaSearch('')
     setIsPatrolAreaOpen(false)
@@ -918,53 +651,11 @@ function AssignAreaPage({ view = 'form' }) {
         <h3 className="widget-title mb-3">Assign Personnel</h3>
 
         <form className="assignment-form" onSubmit={handleAssignPersonnel}>
-          <fieldset className="assignment-mode-selector mb-3" disabled={isSaving}>
-            <legend>Deployment Timing</legend>
-            <div
-              className="assignment-mode-options smooth-underline-control"
-              style={{ '--smooth-underline-left': assignmentForm.mode === DEPLOYMENT_MODES.START_NOW ? '25%' : '75%' }}
-            >
-              <label className={`assignment-mode-option${assignmentForm.mode === DEPLOYMENT_MODES.START_NOW ? ' is-active' : ''}`}>
-                <input
-                  type="radio"
-                  name="deployment-mode"
-                  value={DEPLOYMENT_MODES.START_NOW}
-                  checked={assignmentForm.mode === DEPLOYMENT_MODES.START_NOW}
-                  onChange={() => handleModeChange(DEPLOYMENT_MODES.START_NOW)}
-                />
-                <span>
-                  <strong>Start Now</strong>
-                  <small>Begin using the current date and time.</small>
-                </span>
-              </label>
-              <label className={`assignment-mode-option${assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER ? ' is-active' : ''}`}>
-                <input
-                  type="radio"
-                  name="deployment-mode"
-                  value={DEPLOYMENT_MODES.SCHEDULE_LATER}
-                  checked={assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER}
-                  onChange={() => handleModeChange(DEPLOYMENT_MODES.SCHEDULE_LATER)}
-                />
-                <span>
-                  <strong>Schedule for Later</strong>
-                  <small>Keep personnel Off Duty until the future shift begins.</small>
-                </span>
-              </label>
-            </div>
-            <div
-              className={`assignment-mode-status assignment-mode-status--${assignmentForm.mode === DEPLOYMENT_MODES.START_NOW ? 'start' : 'scheduled'}`}
-              aria-live="polite"
-            >
-              <span className="assignment-mode-status__dot" aria-hidden="true" />
-              <span>
-                <strong>{assignmentForm.mode === DEPLOYMENT_MODES.START_NOW ? 'Start Now' : 'Schedule for Later'}</strong>
-                {' → '}
-                {assignmentForm.mode === DEPLOYMENT_MODES.START_NOW
-                  ? 'Personnel becomes On Duty immediately.'
-                  : 'Personnel remains Off Duty until shift start.'}
-              </span>
-            </div>
-          </fieldset>
+          <DeploymentTimingSelector
+            disabled={isSaving}
+            mode={assignmentForm.mode}
+            onChange={handleModeChange}
+          />
 
           <div className="assignment-grid mb-3">
             <div className="assignment-field assignment-field--area">
@@ -1020,121 +711,32 @@ function AssignAreaPage({ view = 'form' }) {
               </div>
             </div>
 
-            <div className="assignment-field assignment-field--start">
-              <span>{assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER ? 'Scheduled Start *' : 'Shift Start *'}</span>
-              <input
-                type="datetime-local"
-                className="settings-input w-100 assignment-datetime-input"
-                value={assignmentForm.shiftStart}
-                onChange={handleFormChange('shiftStart')}
-                onClick={openDateTimePicker}
-                min={minimumSelectableShiftStart}
-                step="60"
-                aria-label={assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
-                  ? 'Scheduled deployment start date and time'
-                  : 'Deployment shift start date and time'}
-                title="Click anywhere in this field to open the date and time picker"
-                aria-describedby="assignment-shift-start-hint"
-                aria-invalid={isShiftStartHintError}
-                required
-              />
-              <small className="assignment-field__datetime-preview">
-                {formatDateTimePreview(assignmentForm.shiftStart)}
-              </small>
-              <small
-                id="assignment-shift-start-hint"
-                className={`assignment-field__hint${isShiftStartHintError ? ' is-error' : ''}`}
-              >
-                {shiftStartHint}
-              </small>
-            </div>
-
-            <div className="assignment-field assignment-field--end">
-              <span>Shift End *</span>
-              <input
-                type="datetime-local"
-                className="settings-input w-100 assignment-datetime-input"
-                value={assignmentForm.shiftEnd}
-                onChange={handleFormChange('shiftEnd')}
-                onClick={openDateTimePicker}
-                min={deploymentFormState.minimumShiftEnd}
-                max={deploymentFormState.maximumShiftEnd}
-                step="60"
-                aria-label="Deployment shift end date and time"
-                title="Click anywhere in this field to open the date and time picker"
-                aria-describedby="assignment-shift-end-hint"
-                aria-invalid={isShiftEndHintError}
-                required
-              />
-              <small className="assignment-field__datetime-preview">
-                {formatDateTimePreview(assignmentForm.shiftEnd)}
-              </small>
-              <small
-                id="assignment-shift-end-hint"
-                className={`assignment-field__hint${isShiftEndHintError ? ' is-error' : ''}`}
-              >
-                {shiftEndHint}
-              </small>
-            </div>
-
-            <div className="assignment-field assignment-field--personnel">
-              <span>Personnel Selection *</span>
-              <input
-                type="search"
-                className="settings-input w-100 assignment-search-input"
-                value={personnelSearch}
-                onChange={(event) => setPersonnelSearch(event.target.value)}
-                placeholder="Search personnel name or rank"
-                disabled={isInitialDataLoading}
-                aria-describedby="assignment-personnel-hint"
-              />
-
-              <div className="assignment-checklist no-scrollbar">
-                {isInitialDataLoading ? (
-                  Array.from({ length: 4 }, (_, index) => (
-                    <SkeletonBlock key={index} width={`${78 + (index % 3) * 7}%`} height="2.25rem" />
-                  ))
-                ) : filteredPersonnelOptions.length === 0 ? (
-                  <p className="assignment-checklist__empty mb-0">No personnel matches your search.</p>
-                ) : (
-                  filteredPersonnelOptions.map((option) => (
-                    <label
-                      key={option.id}
-                      className={`assignment-check-item${option.isMockPersonnel ? ' is-mock' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={activePersonnelIds.includes(option.id)}
-                        onChange={() => handlePersonnelToggle(option.id)}
-                        disabled={option.isMockPersonnel}
-                      />
-                      <span>
-                        {option.name} - {option.rank}
-                        {option.isMockPersonnel && <small>Mock search record</small>}
-                      </span>
-                    </label>
-                  ))
-                )}
-              </div>
-
-              <div className="assignment-field__hint-row">
-                <small
-                  id="assignment-personnel-hint"
-                  className={`assignment-field__hint${isPersonnelSelectionHintError ? ' is-error' : ''}`}
-                >
-                  {personnelSelectionHint}
-                </small>
-                <button
-                  type="button"
-                  className="assignment-inline-btn"
-                  onClick={handleToggleAllFilteredPersonnel}
-                  disabled={isInitialDataLoading || selectableFilteredPersonnel.length === 0}
-                >
-                  {areAllFilteredSelected ? 'Clear Filtered' : 'Select All Filtered'}
-                </button>
-              </div>
-            </div>
-
+            <DeploymentScheduleFields
+              maximumShiftEnd={deploymentFormState.maximumShiftEnd}
+              minimumShiftEnd={deploymentFormState.minimumShiftEnd}
+              minimumShiftStart={minimumSelectableShiftStart}
+              mode={assignmentForm.mode}
+              onChange={(field, value) => setAssignmentForm((previous) => ({ ...previous, [field]: value }))}
+              shiftEnd={assignmentForm.shiftEnd}
+              shiftEndHint={shiftEndHint}
+              shiftEndInvalid={isShiftEndHintError}
+              shiftStart={assignmentForm.shiftStart}
+              shiftStartHint={shiftStartHint}
+              shiftStartInvalid={isShiftStartHintError}
+            />
+            <PersonnelSelector
+              activePersonnelIds={activePersonnelIds}
+              areAllFilteredSelected={areAllFilteredSelected}
+              filteredPersonnelOptions={filteredPersonnelOptions}
+              isInitialDataLoading={isInitialDataLoading}
+              isSelectionInvalid={isPersonnelSelectionHintError}
+              onSearchChange={setPersonnelSearch}
+              onToggle={handlePersonnelToggle}
+              onToggleAll={handleToggleAllFilteredPersonnel}
+              search={personnelSearch}
+              selectableCount={selectableFilteredPersonnel.length}
+              selectionHint={personnelSelectionHint}
+            />
             <label className="assignment-field assignment-field--notes">
               <span>Notes</span>
               <textarea
@@ -1168,219 +770,39 @@ function AssignAreaPage({ view = 'form' }) {
       )}
 
       {listOnly && (
-      <div className="widget-card deployment-list-card slide-up overflow-auto no-scrollbar">
-        <div className="assignment-list-header mb-3">
-          <h3 className="widget-title mb-0">Assigned Deployment List</h3>
-          <input
-            type="search"
-            className="settings-input assignment-list-search"
-            value={deploymentSearch}
-            onChange={(event) => setDeploymentSearch(event.target.value)}
-            placeholder="Search personnel name, rank, barangay, or assignment ID"
-          />
-        </div>
-
-        <div
-          className="deployment-view-nav smooth-underline-control mb-3"
-          role="tablist"
-          aria-label="Deployment list views"
-          style={{ '--smooth-underline-left': activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? '25%' : '75%' }}
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW}
-            aria-controls="deployment-list-panel"
-            className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? ' deployment-view-tab--active' : ''}`}
-            onClick={() => {
-              setActiveDeploymentView(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
-              setOpenGroupMenuId(null)
-            }}
-          >
-            Active Now
-            <span className="deployment-view-count">{deploymentViewCounts.active}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER}
-            aria-controls="deployment-list-panel"
-            className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? ' deployment-view-tab--active' : ''}`}
-            onClick={() => {
-              setActiveDeploymentView(DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER)
-              setOpenGroupMenuId(null)
-            }}
-          >
-            Scheduled Later
-            <span className="deployment-view-count">{deploymentViewCounts.scheduled}</span>
-          </button>
-        </div>
-
-        <div id="deployment-list-panel" role="tabpanel" className="deployment-list-panel">
-          {isDeploymentsLoading ? (
-            <table className="personnel-table assignment-list-table table align-middle mb-0" aria-busy="true">
-              <thead>
-                <tr className="assignment-group-table">
-                  <th>Assignment ID</th>
-                  <th>Personnel</th>
-                  <th>Patrol Area</th>
-                  <th>Shift Start</th>
-                  <th>Shift End</th>
-                  <th>Status</th>
-                  <th>Assigned At</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <TableSkeletonRows columns={8} rows={5} label="Loading deployments" />
-              </tbody>
-            </table>
-          ) : assignments.length === 0 ? (
-            <p className="text-body-secondary mb-0 small">No deployment assignments yet.</p>
-          ) : visibleAssignments.length === 0 ? (
-            <p className="text-body-secondary mb-0 small">
-              {activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
-                ? 'No deployments are scheduled for later.'
-                : 'No deployments are active now.'}
-            </p>
-          ) : filteredGroupedAssignments.length === 0 ? (
-            <p className="text-body-secondary mb-0 small">
-              No deployment group matched "{deploymentSearch}".
-            </p>
-          ) : (
-            <table className="personnel-table assignment-list-table table align-middle mb-0">
-            <thead>
-              <tr className="assignment-group-table">
-                <th>Assignment ID</th>
-                <th>Personnel</th>
-                <th>Patrol Area</th>
-                <th>Shift Start</th>
-                <th>Shift End</th>
-                <th>Status</th>
-                <th>Assigned At</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredGroupedAssignments.map((group) => (
-                <Fragment key={group.groupId}>
-                  <tr className="assignment-group-row">
-                    <td colSpan={7} className="assignment-group-cell">
-                      <div className="assignment-group-content">
-                        <strong className="assignment-group-label">{group.patrolArea}</strong>
-                        <small className="assignment-group-meta">
-                          {group.assignments.length} personnel assigned in this deployment group
-                        </small>
-                      </div>
-                    </td>
-                    <td className="assignment-group-actions-cell">
-                      <div className="assignment-group-actions assignment-group-menu">
-                        <button
-                          type="button"
-                          className="assignment-group-menu-trigger"
-                          onClick={() => handleToggleGroupMenu(group.groupId)}
-                          aria-expanded={openGroupMenuId === group.groupId}
-                          aria-haspopup="menu"
-                        >
-                          Group Actions
-                        </button>
-
-                        {openGroupMenuId === group.groupId && (
-                          <div className="assignment-group-menu-dropdown" role="menu">
-                            <button
-                              type="button"
-                              className="assignment-group-edit-btn"
-                              onClick={() => handleEditGroup(group.groupId)}
-                            >
-                              Reassign Group
-                            </button>
-                            <button
-                              type="button"
-                              className="assignment-group-delete-btn"
-                              onClick={() => handleRequestDeleteGroup(group)}
-                            >
-                              Delete Group
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-
-                  {group.assignments.map((assignment) => (
-                    <tr key={assignment.id} className="personnel-row">
-                      <td className="personnel-badge">{assignment.id}</td>
-                      <td>
-                        <strong className="d-block assignment-personnel-name">{assignment.personnelName}</strong>
-                        <small className="assignment-personnel-rank">{assignment.rank}</small>
-                      </td>
-                      <td>{assignment.patrolArea}</td>
-                      <td>{assignment.shiftStart ? formatDateTime(assignment.shiftStart) : '-'}</td>
-                      <td>{assignment.shiftEnd ? formatDateTime(assignment.shiftEnd) : '-'}</td>
-                      <td>
-                        <span className={`deployment-status deployment-status--${assignment.status || 'active'}`}>
-                          {formatDeploymentStatus(assignment.status)}
-                        </span>
-                      </td>
-                      <td>{formatDateTime(assignment.assignedAt)}</td>
-                      <td className="assignment-actions-cell">
-                        <div className="assignment-table-actions">
-                          <button
-                            type="button"
-                            className="assignment-edit-btn"
-                            onClick={() => handleEditAssignment(assignment)}
-                          >
-                            Reassign
-                          </button>
-                          <button
-                            type="button"
-                            className="assignment-delete-btn"
-                            onClick={() => handleRequestDeleteAssignment(assignment)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </Fragment>
-              ))}
-            </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+        <DeploymentList
+          activeDeploymentView={activeDeploymentView}
+          assignments={assignments}
+          deploymentSearch={deploymentSearch}
+          deploymentViewCounts={deploymentViewCounts}
+          filteredGroupedAssignments={filteredGroupedAssignments}
+          isDeploymentsLoading={isDeploymentsLoading}
+          onDeleteAssignment={handleRequestDeleteAssignment}
+          onDeleteGroup={handleRequestDeleteGroup}
+          onEditAssignment={handleEditAssignment}
+          onEditGroup={handleEditGroup}
+          onSearchChange={setDeploymentSearch}
+          onToggleGroupMenu={handleToggleGroupMenu}
+          onViewChange={(nextView) => {
+            setActiveDeploymentView(nextView)
+            setOpenGroupMenuId(null)
+          }}
+          openGroupMenuId={openGroupMenuId}
+          visibleAssignments={visibleAssignments}
+        />
       )}
 
-      <ConfirmModal
-        open={Boolean(pendingDeleteGroup)}
-        title="Delete Deployment Group?"
-        message={pendingDeleteGroup
-          ? `Delete all ${pendingDeleteGroup.assignments.length} assignment(s) under ${pendingDeleteGroup.patrolArea}? This cannot be undone.`
-          : ''}
-        confirmLabel="Delete Group"
-        cancelLabel="Cancel"
-        onConfirm={handleConfirmDeleteGroup}
-        onCancel={handleCancelDeleteGroup}
-      />
-
-      <ConfirmModal
-        open={Boolean(pendingDeleteAssignment)}
-        title="Delete Deployment Assignment?"
-        message={pendingDeleteAssignment
-          ? `Delete ${pendingDeleteAssignment.id} for ${pendingDeleteAssignment.personnelName}? This cannot be undone.`
-          : ''}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        onConfirm={handleConfirmDeleteAssignment}
-        onCancel={handleCancelDeleteAssignment}
-      />
-      <ActionNoticeModal
-        open={deploymentActionNoticeOpen}
-        title={`${deploymentActionLabel} unavailable`}
-        message="Complete the following deployment requirements before continuing."
-        items={deploymentBlockingReasons}
-        onClose={() => setDeploymentActionNoticeOpen(false)}
+      <DeploymentDialogs
+        actionLabel={deploymentActionLabel}
+        actionNoticeOpen={deploymentActionNoticeOpen}
+        deploymentBlockingReasons={deploymentBlockingReasons}
+        onCancelDeleteAssignment={handleCancelDeleteAssignment}
+        onCancelDeleteGroup={handleCancelDeleteGroup}
+        onCloseActionNotice={() => setDeploymentActionNoticeOpen(false)}
+        onConfirmDeleteAssignment={handleConfirmDeleteAssignment}
+        onConfirmDeleteGroup={handleConfirmDeleteGroup}
+        pendingDeleteAssignment={pendingDeleteAssignment}
+        pendingDeleteGroup={pendingDeleteGroup}
       />
     </div>
   )

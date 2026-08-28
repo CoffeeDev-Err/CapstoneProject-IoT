@@ -8,14 +8,19 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const queue = read('src/services/offlineReportQueue.ts');
 const webQueue = read('src/services/offlineReportQueue.web.ts');
 const cipher = read('src/services/offlineQueueCipher.ts');
-const reports = read('src/screens/ReportsScreen.tsx');
-const context = read('src/context/OperationalContext.tsx');
+const reports = read('src/screens/ReportsScreen.tsx')
+  + read('src/features/reports/useReportFormController.ts');
+const context = read('src/context/OperationalContext.tsx')
+  + read('src/features/reports/useOfflineReportSync.ts')
+  + read('src/features/operations/useOperationalSocket.ts');
 const app = read('App.tsx');
 const profile = read('src/screens/OfficerProfileScreen.tsx');
 const mapCache = read('src/services/mapCache.ts');
 const webMapCache = read('src/services/mapCache.web.ts');
-const backendModel = read('../backend/src/models/index.js');
-const backendController = read('../backend/src/controllers/operationalController.js');
+const backendModel = read('../backend/src/models/index.js')
+  + read('../backend/src/models/operationalModels.js');
+const backendController = read('../backend/src/controllers/operationalController.js')
+  + read('../backend/src/controllers/operations/reportController.js');
 
 assert.match(queue, /new Directory\(Paths\.document, EVIDENCE_DIRECTORY_NAME\)/,
   'Unsynced evidence must live outside evictable cache storage');

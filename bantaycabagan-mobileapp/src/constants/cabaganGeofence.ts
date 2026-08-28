@@ -45,7 +45,25 @@ export const CABAGAN_BOUNDARY_FEATURE = {
   },
 };
 
+const isPointOnSegment = (
+  point: [number, number],
+  start: [number, number],
+  end: [number, number],
+) => {
+  const [x, y] = point;
+  const [x1, y1] = start;
+  const [x2, y2] = end;
+  const cross = (y - y1) * (x2 - x1) - (x - x1) * (y2 - y1);
+  if (Math.abs(cross) > 1e-12) return false;
+
+  const dot = (x - x1) * (x2 - x1) + (y - y1) * (y2 - y1);
+  if (dot < 0) return false;
+  return dot <= (x2 - x1) ** 2 + (y2 - y1) ** 2;
+};
+
 export const isInsideCabagan = (latitude: number, longitude: number) => {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+
   let inside = false;
   for (
     let current = 0, previous = CABAGAN_BOUNDARY_LAT_LNG.length - 1;
@@ -54,6 +72,11 @@ export const isInsideCabagan = (latitude: number, longitude: number) => {
   ) {
     const [currentLatitude, currentLongitude] = CABAGAN_BOUNDARY_LAT_LNG[current];
     const [previousLatitude, previousLongitude] = CABAGAN_BOUNDARY_LAT_LNG[previous];
+    if (isPointOnSegment(
+      [longitude, latitude],
+      [previousLongitude, previousLatitude],
+      [currentLongitude, currentLatitude],
+    )) return true;
     const intersects = (currentLatitude > latitude) !== (previousLatitude > latitude)
       && longitude < (previousLongitude - currentLongitude)
         * (latitude - currentLatitude)

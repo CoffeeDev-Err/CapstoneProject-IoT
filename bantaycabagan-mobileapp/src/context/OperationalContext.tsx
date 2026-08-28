@@ -4,38 +4,19 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import * as Network from 'expo-network';
-import { Alert, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import {
-  ApiRequestError,
   acceptOperationalTask,
   acknowledgeDeploymentAssignment,
   cancelOperationalTask,
   fetchOperations,
   fetchLivePersonnel,
-  fetchReportPage,
-  fetchTaskHistoryPage,
-  operationsSocket,
   requestBackup,
   resolveApiAssetUrl,
   resolveIncidentReport,
-  submitPoliceReport,
 } from '../services/operationsApi';
-import {
-  cleanupConfirmedReports,
-  cleanupOrphanedPickerEvidence,
-  completePendingReport,
-  discardRejectedPendingReport,
-  getPendingReports,
-  markPendingReportFailed,
-  markPendingReportUploading,
-  stagePendingReport,
-  type PendingReport,
-} from '../services/offlineReportQueue';
 import type {
   DeploymentAssignment,
   LivePersonnel,
@@ -43,6 +24,11 @@ import type {
   PoliceReport,
   SubmitReportInput,
 } from '../types/operations';
+import { isActiveTask, mergeById, upsertById } from '../features/operations/operationalState';
+import { useOperationalSocket } from '../features/operations/useOperationalSocket';
+import { useOfflineReportSync } from '../features/reports/useOfflineReportSync';
+import { useReportPagination } from '../features/reports/useReportPagination';
+import { useTaskHistoryPagination } from '../features/tasks/useTaskHistoryPagination';
 
 type OperationalContextValue = {
   tasks: OperationalTask[];
@@ -79,25 +65,6 @@ const resolvePersonnelPhoto = (member: LivePersonnel): LivePersonnel => ({
   photoUrl: resolveApiAssetUrl(member.photoUrl),
 });
 
-const upsertById = <T extends { id: string }>(items: T[], incoming: T) => {
-  const exists = items.some((item) => item.id === incoming.id);
-  return exists
-    ? items.map((item) => (item.id === incoming.id ? incoming : item))
-    : [incoming, ...items];
-};
-
-const mergeById = <T extends { id: string }>(first: T[], second: T[]) => {
-  const merged = new Map<string, T>();
-  [...first, ...second].forEach((item) => merged.set(item.id, item));
-  return [...merged.values()];
-};
-
-const isActiveTask = (task: OperationalTask) => (
-  task.status === 'open' || task.status === 'full'
-);
-
-const OFFLINE_REPORT_RETRY_INTERVAL_MS = 30_000;
-
 export function OperationalProvider({ children }: { children: React.ReactNode }) {
   const { applyIdentityUpdate, clearSession, token, user } = useAuth();
   const currentPersonnelId = user?.personnelId || '';
@@ -106,21 +73,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const [deployments, setDeployments] = useState<DeploymentAssignment[]>([]);
   const [upcomingDeployment, setUpcomingDeployment] = useState<DeploymentAssignment | null>(null);
   const [personnel, setPersonnel] = useState<LivePersonnel[]>([]);
-  const [isConnected, setIsConnected] = useState(operationsSocket.connected);
   const [isLoading, setIsLoading] = useState(true);
-  const [isReportsLoading, setIsReportsLoading] = useState(false);
-  const [isReportsLoadingMore, setIsReportsLoadingMore] = useState(false);
-  const [reportsHasMore, setReportsHasMore] = useState(false);
-  const [reportCursor, setReportCursor] = useState<string | null>(null);
-  const [reportCategory, setReportCategory] = useState<'all' | 'incident' | 'routine'>('all');
-  const [isTaskHistoryLoading, setIsTaskHistoryLoading] = useState(false);
-  const [isTaskHistoryLoadingMore, setIsTaskHistoryLoadingMore] = useState(false);
-  const [taskHistoryHasMore, setTaskHistoryHasMore] = useState(false);
-  const [taskHistoryCursor, setTaskHistoryCursor] = useState<string | null>(null);
-  const reportRequestId = useRef(0);
-  const taskHistoryRequestId = useRef(0);
-  const reportSyncRunning = useRef(false);
-  const reportedQueueFailureIds = useRef(new Set<string>());
 
   const currentOfficer = useMemo<LivePersonnel>(() => {
     const liveProfile = personnel.find((member) => member.id === currentPersonnelId);
@@ -150,6 +103,42 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     station: 'Cabagan Police Station',
   }), [currentOfficer.name, currentPersonnelId]);
 
+  const isConnected = useOperationalSocket({
+    applyIdentityUpdate,
+    clearSession,
+    currentPersonnelId,
+    setDeployments,
+    setPersonnel,
+    setReports,
+    setTasks,
+    setUpcomingDeployment,
+    token,
+  });
+  const { submitReport } = useOfflineReportSync({
+    actor,
+    currentPersonnelId,
+    deployments,
+    isConnected,
+    setReports,
+    token,
+  });
+  const {
+    isReportsLoading,
+    isReportsLoadingMore,
+    reportsHasMore,
+    refreshReports,
+    loadMoreReports,
+    resetReportPagination,
+  } = useReportPagination({ currentPersonnelId, setReports, token });
+  const {
+    isTaskHistoryLoading,
+    isTaskHistoryLoadingMore,
+    taskHistoryHasMore,
+    refreshTaskHistory,
+    loadMoreTaskHistory,
+    resetTaskHistoryPagination,
+  } = useTaskHistoryPagination({ currentPersonnelId, setTasks, token });
+
   useEffect(() => {
     if (!currentPersonnelId) {
       setUpcomingDeployment(null);
@@ -159,10 +148,8 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
 
     setIsLoading(true);
     setReports([]);
-    setReportCursor(null);
-    setReportsHasMore(false);
-    setTaskHistoryCursor(null);
-    setTaskHistoryHasMore(false);
+    resetReportPagination();
+    resetTaskHistoryPagination();
     Promise.all([
       fetchOperations(currentPersonnelId, token),
       fetchLivePersonnel(token),
@@ -178,243 +165,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       })
       .catch(() => undefined)
       .finally(() => setIsLoading(false));
-  }, [currentPersonnelId, token]);
-
-  useEffect(() => {
-    let effectActive = true;
-    operationsSocket.auth = token ? { token } : {};
-    const onConnect = () => setIsConnected(true);
-    const onDisconnect = () => setIsConnected(false);
-    const onPersonnelBootstrap = (payload: LivePersonnel[]) => {
-      setPersonnel(payload.map(resolvePersonnelPhoto));
-    };
-    const onPersonnelUpdate = (payload: LivePersonnel[]) => {
-      setPersonnel(payload.map(resolvePersonnelPhoto));
-    };
-    const onPersonnelIdentityUpdated = (payload: {
-      personnelId?: string;
-      name?: string;
-      badgeNumber?: string;
-      rank?: string;
-      mobileNumber?: string;
-      photoUrl?: string;
-      loginId?: string;
-      officialEmail?: string;
-      emailVerified?: boolean;
-      accountStatus?: string;
-    }) => {
-      if (!payload.personnelId) return;
-      if (payload.accountStatus?.toLowerCase() === 'inactive') {
-        Alert.alert(
-          'Account deactivated',
-          'Your account was deactivated by a supervisor. Contact your administrator for assistance.',
-        );
-        clearSession().catch(() => undefined);
-        return;
-      }
-      applyIdentityUpdate(payload);
-      setPersonnel((items) => items.map((member) => (
-        member.id === payload.personnelId
-          ? {
-            ...member,
-            name: payload.name || member.name,
-            rank: payload.rank || member.rank,
-            photoUrl: payload.photoUrl ? resolveApiAssetUrl(payload.photoUrl) : member.photoUrl,
-          }
-          : member
-      )));
-      setReports((items) => items.map((report) => (
-        report.personnel_id === payload.personnelId
-          ? { ...report, officer: payload.name || report.officer }
-          : report
-      )));
-      setDeployments((items) => items.map((assignment) => (
-        assignment.personnelId === payload.personnelId
-          ? {
-            ...assignment,
-            personnelName: payload.name || assignment.personnelName,
-            rank: payload.rank || assignment.rank,
-          }
-          : assignment
-      )));
-    };
-    const onTasksBootstrap = (payload: OperationalTask[]) => setTasks((items) => {
-      const history = items.filter((task) => !isActiveTask(task));
-      return mergeById(payload, history);
-    });
-    const onTaskCreated = (task: OperationalTask) => setTasks((items) => upsertById(items, task));
-    const onTaskUpdated = (task: OperationalTask) => setTasks((items) => upsertById(items, task));
-    const onTaskRemoved = (payload: { id?: string }) => {
-      if (!payload.id) return;
-      setTasks((items) => items.filter((task) => task.id !== payload.id));
-    };
-    const onReportSubmitted = (report: PoliceReport) => {
-      if (report.personnel_id === currentPersonnelId) {
-        setReports((items) => upsertById(items, report));
-      }
-    };
-    const onReportResolved = (report: PoliceReport) => {
-      if (report.personnel_id === currentPersonnelId) {
-        setReports((items) => upsertById(items, report));
-      }
-    };
-    const onReportUpdated = (report: PoliceReport) => {
-      if (report.personnel_id === currentPersonnelId) {
-        setReports((items) => upsertById(items, report));
-      }
-    };
-    const refreshAuthorizedOperations = () => {
-      fetchOperations(currentPersonnelId, token)
-        .then((operationsPayload) => {
-          if (!effectActive) return;
-          setUpcomingDeployment(operationsPayload.upcomingDeployment);
-          setTasks((items) => {
-            const history = items.filter((task) => !isActiveTask(task));
-            return mergeById(operationsPayload.tasks, history);
-          });
-        })
-        .catch(() => undefined);
-    };
-    const onDeploymentsBootstrap = (payload: DeploymentAssignment[]) => {
-      setDeployments(payload.filter((assignment) => (
-        assignment.personnelId === currentPersonnelId
-        && assignment.isCurrentShift !== false
-      )));
-      refreshAuthorizedOperations();
-    };
-    const onDeploymentsUpdated = (payload: DeploymentAssignment[]) => {
-      setDeployments(payload.filter((assignment) => (
-        assignment.personnelId === currentPersonnelId
-        && assignment.isCurrentShift !== false
-      )));
-      refreshAuthorizedOperations();
-    };
-    const onDeploymentAcknowledged = (assignment: DeploymentAssignment) => {
-      if (assignment.personnelId !== currentPersonnelId) return;
-      setDeployments((items) => upsertById(items, assignment));
-    };
-    const onPersonnelInactivity = (payload: {
-      personnelId?: string;
-      inactivityMinutes?: number;
-    }) => {
-      if (payload.personnelId !== currentPersonnelId) return;
-      Alert.alert(
-        'Movement check required',
-        `No movement has been detected for ${payload.inactivityMinutes || 5} minutes. Please confirm your status or move if safe to do so.`,
-      );
-    };
-
-    operationsSocket.on('connect', onConnect);
-    operationsSocket.on('disconnect', onDisconnect);
-    operationsSocket.on('personnel:bootstrap', onPersonnelBootstrap);
-    operationsSocket.on('personnel:update', onPersonnelUpdate);
-    operationsSocket.on('personnel:identity-updated', onPersonnelIdentityUpdated);
-    operationsSocket.on('tasks:bootstrap', onTasksBootstrap);
-    operationsSocket.on('task:created', onTaskCreated);
-    operationsSocket.on('task:updated', onTaskUpdated);
-    operationsSocket.on('task:removed', onTaskRemoved);
-    operationsSocket.on('report:submitted', onReportSubmitted);
-    operationsSocket.on('report:resolved', onReportResolved);
-    operationsSocket.on('report:updated', onReportUpdated);
-    operationsSocket.on('deployments:bootstrap', onDeploymentsBootstrap);
-    operationsSocket.on('deployments:updated', onDeploymentsUpdated);
-    operationsSocket.on('deployment:acknowledged', onDeploymentAcknowledged);
-    operationsSocket.on('personnel:inactivity', onPersonnelInactivity);
-    setIsConnected(operationsSocket.connected);
-    if (!operationsSocket.connected) operationsSocket.connect();
-
-    return () => {
-      effectActive = false;
-      operationsSocket.off('connect', onConnect);
-      operationsSocket.off('disconnect', onDisconnect);
-      operationsSocket.off('personnel:bootstrap', onPersonnelBootstrap);
-      operationsSocket.off('personnel:update', onPersonnelUpdate);
-      operationsSocket.off('personnel:identity-updated', onPersonnelIdentityUpdated);
-      operationsSocket.off('tasks:bootstrap', onTasksBootstrap);
-      operationsSocket.off('task:created', onTaskCreated);
-      operationsSocket.off('task:updated', onTaskUpdated);
-      operationsSocket.off('task:removed', onTaskRemoved);
-      operationsSocket.off('report:submitted', onReportSubmitted);
-      operationsSocket.off('report:resolved', onReportResolved);
-      operationsSocket.off('report:updated', onReportUpdated);
-      operationsSocket.off('deployments:bootstrap', onDeploymentsBootstrap);
-      operationsSocket.off('deployments:updated', onDeploymentsUpdated);
-      operationsSocket.off('deployment:acknowledged', onDeploymentAcknowledged);
-      operationsSocket.off('personnel:inactivity', onPersonnelInactivity);
-      operationsSocket.disconnect();
-    };
-  }, [applyIdentityUpdate, clearSession, currentPersonnelId, token]);
-
-  const refreshReports = useCallback(async (
-    category: 'all' | 'incident' | 'routine',
-  ) => {
-    if (!currentPersonnelId) return;
-    const requestId = ++reportRequestId.current;
-    setReportCategory(category);
-    setIsReportsLoading(true);
-    setReportCursor(null);
-    try {
-      const payload = await fetchReportPage({
-        personnelId: currentPersonnelId,
-        category,
-      }, token);
-      if (requestId !== reportRequestId.current) return;
-      setReports(payload.data);
-      setReportCursor(payload.pagination.nextCursor);
-      setReportsHasMore(payload.pagination.hasNextPage);
-    } finally {
-      if (requestId === reportRequestId.current) setIsReportsLoading(false);
-    }
-  }, [currentPersonnelId, token]);
-
-  const loadMoreReports = useCallback(async () => {
-    if (!currentPersonnelId || !reportCursor || isReportsLoadingMore) return;
-    setIsReportsLoadingMore(true);
-    try {
-      const payload = await fetchReportPage({
-        personnelId: currentPersonnelId,
-        category: reportCategory,
-        cursor: reportCursor,
-      }, token);
-      setReports((items) => mergeById(items, payload.data));
-      setReportCursor(payload.pagination.nextCursor);
-      setReportsHasMore(payload.pagination.hasNextPage);
-    } finally {
-      setIsReportsLoadingMore(false);
-    }
-  }, [currentPersonnelId, isReportsLoadingMore, reportCategory, reportCursor, token]);
-
-  const refreshTaskHistory = useCallback(async () => {
-    if (!currentPersonnelId) return;
-    const requestId = ++taskHistoryRequestId.current;
-    setIsTaskHistoryLoading(true);
-    setTaskHistoryCursor(null);
-    try {
-      const payload = await fetchTaskHistoryPage({ personnelId: currentPersonnelId }, token);
-      if (requestId !== taskHistoryRequestId.current) return;
-      setTasks((items) => mergeById(items.filter(isActiveTask), payload.data));
-      setTaskHistoryCursor(payload.pagination.nextCursor);
-      setTaskHistoryHasMore(payload.pagination.hasNextPage);
-    } finally {
-      if (requestId === taskHistoryRequestId.current) setIsTaskHistoryLoading(false);
-    }
-  }, [currentPersonnelId, token]);
-
-  const loadMoreTaskHistory = useCallback(async () => {
-    if (!currentPersonnelId || !taskHistoryCursor || isTaskHistoryLoadingMore) return;
-    setIsTaskHistoryLoadingMore(true);
-    try {
-      const payload = await fetchTaskHistoryPage({
-        personnelId: currentPersonnelId,
-        cursor: taskHistoryCursor,
-      }, token);
-      setTasks((items) => mergeById(items, payload.data));
-      setTaskHistoryCursor(payload.pagination.nextCursor);
-      setTaskHistoryHasMore(payload.pagination.hasNextPage);
-    } finally {
-      setIsTaskHistoryLoadingMore(false);
-    }
-  }, [currentPersonnelId, isTaskHistoryLoadingMore, taskHistoryCursor, token]);
+  }, [currentPersonnelId, resetReportPagination, resetTaskHistoryPagination, token]);
 
   const acceptTask = useCallback(async (taskId: string) => {
     const response = await acceptOperationalTask(taskId, actor, token);
@@ -430,110 +181,6 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     const response = await requestBackup(actor, deployments[0], token);
     setTasks((items) => upsertById(items, response.task));
   }, [actor, deployments, token]);
-
-  const uploadPendingReport = useCallback(async (pending: PendingReport) => {
-    await markPendingReportUploading(pending.id);
-    try {
-      const response = await submitPoliceReport(pending.input, actor, deployments[0], token);
-      if (pending.input.evidence_photo && !response.report.evidence_photo?.url) {
-        throw new Error('The backend did not confirm the uploaded evidence.');
-      }
-      await completePendingReport(pending);
-      reportedQueueFailureIds.current.delete(pending.id);
-      setReports((items) => upsertById(items, response.report));
-      return response.report;
-    } catch (error) {
-      await markPendingReportFailed(pending.id, error);
-      throw error;
-    }
-  }, [actor, deployments, token]);
-
-  const submitReport = useCallback(async (input: SubmitReportInput) => {
-    const preparedInput = {
-      ...input,
-      assigned_area: input.assigned_area || deployments[0]?.patrolArea || actor.station,
-    };
-    const pending = await stagePendingReport(preparedInput, currentPersonnelId);
-    if (!pending) {
-      const response = await submitPoliceReport(preparedInput, actor, deployments[0], token);
-      setReports((items) => upsertById(items, response.report));
-      return 'submitted' as const;
-    }
-
-    try {
-      await uploadPendingReport(pending);
-      return 'submitted' as const;
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status >= 400 && error.status < 500) {
-        await discardRejectedPendingReport(pending);
-        throw error;
-      }
-      return 'queued' as const;
-    }
-  }, [actor, currentPersonnelId, deployments, token, uploadPendingReport]);
-
-  const synchronizePendingReports = useCallback(async () => {
-    if (!currentPersonnelId || !token || reportSyncRunning.current) return;
-    reportSyncRunning.current = true;
-    try {
-      await cleanupConfirmedReports();
-      const { reports: pendingReports, failures } = await getPendingReports(currentPersonnelId);
-      const newFailures = failures.filter((failure) => (
-        !reportedQueueFailureIds.current.has(failure.id)
-      ));
-      newFailures.forEach((failure) => reportedQueueFailureIds.current.add(failure.id));
-      if (newFailures.length > 0) {
-        Alert.alert(
-          'Offline report needs attention',
-          `${newFailures.length} saved report${newFailures.length === 1 ? '' : 's'} could not be opened. `
-          + 'The report data and evidence were preserved on this device for recovery.',
-        );
-      }
-      for (const pending of pendingReports) {
-        try {
-          await uploadPendingReport(pending);
-        } catch {
-          // Keep every unconfirmed report and its evidence for a later retry.
-        }
-      }
-    } finally {
-      reportSyncRunning.current = false;
-    }
-  }, [currentPersonnelId, token, uploadPendingReport]);
-
-  useEffect(() => {
-    cleanupOrphanedPickerEvidence().catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!isConnected) return;
-    synchronizePendingReports().catch(() => undefined);
-  }, [isConnected, synchronizePendingReports]);
-
-  useEffect(() => {
-    if (!currentPersonnelId || !token) return undefined;
-    const retryPendingReports = () => {
-      // Report uploads use the REST API, so they must not depend on the
-      // Socket.IO connection being established. This also supports a local
-      // laptop hotspot that has LAN access but no public internet connection.
-      synchronizePendingReports().catch(() => undefined);
-    };
-    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') retryPendingReports();
-    });
-    const networkSubscription = Network.addNetworkStateListener((state) => {
-      if (state.isConnected) retryPendingReports();
-    });
-    const retryInterval = setInterval(
-      retryPendingReports,
-      OFFLINE_REPORT_RETRY_INTERVAL_MS,
-    );
-    return () => {
-      appStateSubscription.remove();
-      networkSubscription.remove();
-      clearInterval(retryInterval);
-    };
-  }, [currentPersonnelId, synchronizePendingReports, token]);
 
   const resolveReport = useCallback(async (reportId: string, resolutionNotes: string) => {
     const response = await resolveIncidentReport(reportId, resolutionNotes, actor, token);

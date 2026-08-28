@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { confirmPasswordChange, requestPasswordChange, resendVerificationCode } from '../services/auth'
 import VerificationCodeInput from './VerificationCodeInput'
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
+import { PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
 
 const strongPassword = (value) => (
   value.length >= 10
@@ -12,8 +13,6 @@ const strongPassword = (value) => (
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 )
-
-const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.'
 
 function PasswordChangeModal({ open, onClose, onChanged }) {
   const [step, setStep] = useState('password')

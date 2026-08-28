@@ -8,6 +8,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+  },
   build: {
     // MapLibre is intentionally isolated behind lazy map components. Its raw
     // bundle is large, but it is no longer part of the initial application load.

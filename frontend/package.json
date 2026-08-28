@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "test:map": "node scripts/map-behavior-check.mjs",
     "test:validation": "node scripts/account-validation-check.mjs",
     "test:auth": "node scripts/auth-route-check.mjs",
@@ -15,7 +16,7 @@
     "test:evidence": "node scripts/evidence-viewer-check.mjs",
     "test:theme": "node scripts/theme-coverage-check.mjs",
     "test:typography": "node scripts/typography-scale-check.mjs",
-    "check": "npm run lint && npm run test:validation && npm run test:auth && npm run test:feedback && npm run test:analytics && npm run test:map && npm run test:evidence && npm run test:theme && npm run test:typography && npm run build",
+    "check": "npm run lint && npm test && npm run test:validation && npm run test:auth && npm run test:feedback && npm run test:analytics && npm run test:map && npm run test:evidence && npm run test:theme && npm run test:typography && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -32,6 +33,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -39,6 +42,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "vite": "^7.3.1"
+    "jsdom": "^29.1.1",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.11"
   }
 }

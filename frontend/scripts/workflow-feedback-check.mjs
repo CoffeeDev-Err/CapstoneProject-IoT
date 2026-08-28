@@ -48,7 +48,13 @@ assert.deepEqual(
 )
 
 const assignmentSource = read('src/pages/AssignAreaPage.jsx')
+  + read('src/features/deployments/DeploymentScheduleFields.jsx')
+  + read('src/features/deployments/DeploymentList.jsx')
+  + read('src/features/deployments/DeploymentDialogs.jsx')
+  + read('src/features/deployments/useDeploymentForm.js')
 const settingsSource = read('src/pages/SettingsPage.jsx')
+  + read('src/features/accounts/AccountDialogs.jsx')
+  + read('src/features/accounts/useAccountForm.js')
 const personnelSource = read('src/pages/PersonnelPage.jsx')
 const reportsSource = read('src/pages/ReportsPage.jsx')
 const reportsStyles = read('src/styles/reports.css')
@@ -58,9 +64,9 @@ const navigationSource = read('src/components/NavSidebar.jsx')
 const feedbackSource = read('src/context/FeedbackContext.jsx')
 const feedbackStyles = read('src/styles/feedback.css')
 
-assert.match(assignmentSource, /min=\{minimumSelectableShiftStart\}/,
+assert.match(assignmentSource, /minimumShiftStart=\{minimumSelectableShiftStart\}[\s\S]*min=\{minimumShiftStart\}/,
   'Past shift dates must be unavailable for both deployment modes')
-assert.match(assignmentSource, /max=\{deploymentFormState\.maximumShiftEnd\}/,
+assert.match(assignmentSource, /maximumShiftEnd=\{deploymentFormState\.maximumShiftEnd\}[\s\S]*max=\{maximumShiftEnd\}/,
   'The shift-end picker must enforce the 24-hour maximum')
 assert.match(assignmentSource, /onClick=\{openDateTimePicker\}/,
   'Clicking anywhere in each date-time field must open its picker')

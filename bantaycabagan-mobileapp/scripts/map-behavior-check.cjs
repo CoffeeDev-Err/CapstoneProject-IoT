@@ -13,6 +13,12 @@ const nativeMapSource = fs.readFileSync(
 const officerMapScreenSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'screens', 'OfficerMapScreen.tsx'),
 	'utf8',
+) + '\n' + fs.readFileSync(
+	path.join(projectRoot, 'src', 'features', 'maps', 'leafletMapHtml.ts'),
+	'utf8',
+) + '\n' + fs.readFileSync(
+	path.join(projectRoot, 'src', 'features', 'maps', 'MapControls.tsx'),
+	'utf8',
 )
 const mainTabsSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'navigation', 'MainTabs.tsx'),

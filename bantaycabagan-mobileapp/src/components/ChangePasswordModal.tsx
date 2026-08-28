@@ -12,6 +12,7 @@ import { mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
 import { SwipeDismissSheet } from './SwipeDismissSheet';
 import VerificationCodeInput from './VerificationCodeInput';
+import { PASSWORD_REQUIREMENTS } from '../features/auth/authCopy';
 import {
   confirmPasswordChange,
   requestPasswordChange,
@@ -27,8 +28,6 @@ const isStrongPassword = (value: string) => (
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 );
-
-const PASSWORD_REQUIREMENTS = 'Use 10-128 characters, including an uppercase letter, lowercase letter, number, and symbol.';
 
 type Props = {
   visible: boolean;

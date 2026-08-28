@@ -3,7 +3,9 @@
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,
-    "resolvePackageJsonExports": false
+    "resolvePackageJsonExports": false,
+    "resolveJsonModule": true,
+    "types": ["jest", "node"]
   },
   "include": [
     "App.tsx",

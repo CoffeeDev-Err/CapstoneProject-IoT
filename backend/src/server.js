@@ -51,16 +51,9 @@ const gpsDeviceService = require('./services/gpsDeviceService')
 const notificationService = require('./services/notificationService')
 const createOperationalService = require('./services/operationalService')
 const personnelService = require('./services/personnelService')
-const {
-	emitPersonnelCollection,
-	evaluatePersonnelInactivity,
-	evaluatePersonnelGeofences,
-	getPersonnelMember,
-	getPersonnelWithLocations,
-	scopePersonnelForActor,
-	updateMockLocations,
-} = personnelService
 const seedDatabase = require('./services/seedService')
+const registerSocketGateway = require('./runtime/socketGateway')
+const createOperationalRuntime = require('./runtime/operationalRuntime')
 
 const PORT = process.env.PORT || 4000
 const GPS_UPDATE_INTERVAL_MS = 2500
@@ -144,174 +137,29 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(errorHandler)
 
-io.use(async (socket, next) => {
-	const bearerToken = String(socket.handshake.auth?.token || '')
-	// Officers (mobile) pass the Bearer token in the handshake auth payload;
-	// the web dashboard sends none, so fall back to the httpOnly session cookie
-	// carried on the handshake request headers.
-	const token = bearerToken || readSessionCookie(socket.handshake.headers?.cookie)
-	try {
-		socket.data.auth = await authService.authenticate(token)
-		return next()
-	} catch (error) {
-		return next(error)
-	}
+registerSocketGateway({
+	io,
+	authService,
+	operationalService,
+	personnelService,
+	readSessionCookie,
 })
 
-io.on('connection', async (socket) => {
-	try {
-		const personnelId = socket.data.auth?.user?.personnelId
-		if (personnelId) socket.join(`personnel:${personnelId}`)
-		const role = socket.data.auth?.user?.role
-		if (role) socket.join(`role:${role}`)
-		const bootstrapMode = String(socket.handshake.auth?.bootstrapMode || '')
-		if (bootstrapMode !== 'rest') {
-			const personnel = await getPersonnelWithLocations()
-			socket.emit(
-				'personnel:bootstrap',
-				scopePersonnelForActor(personnel, socket.data.auth?.user),
-			)
-			await operationalService.registerSocket(socket, socket.data.auth?.user)
-		}
-	} catch (error) {
-		console.error('Socket bootstrap failed:', error)
-	}
-
-	socket.on('emergency:request', async ({ id } = {}) => {
-		try {
-			const requestingUser = socket.data.auth?.user
-			if (
-				requestingUser?.role === 'officer'
-				&& requestingUser.personnelId !== id
-			) {
-				socket.emit('emergency:status', {
-					success: false,
-					message: 'Backup can only be requested for your assigned profile.',
-				})
-				return
-			}
-			const member = await getPersonnelMember(id)
-			if (!member) {
-				socket.emit('emergency:status', {
-					success: false,
-					message: 'Personnel not found.',
-				})
-				return
-			}
-
-			io.to('role:supervisor').emit('emergency:alert', {
-				id: member.id,
-				name: member.name,
-				rank: member.rank,
-				locationName: member.locationName,
-				latitude: member.latitude,
-				longitude: member.longitude,
-				timestamp: new Date().toISOString(),
-				message: `${member.rank} ${member.name} requested backup.`,
-			})
-			await operationalService.createTask({
-				type: 'backup',
-				requested_by: member.id,
-				requester_name: member.name,
-				title: `Backup requested by ${member.name}`,
-				description: 'Responders are needed at the officer current location.',
-				location: member.locationName,
-				latitude: member.latitude,
-				longitude: member.longitude,
-				required_responders: 3,
-			})
-			socket.emit('emergency:status', {
-				success: true,
-				message: 'Backup request has been sent.',
-			})
-		} catch (error) {
-			console.error('Emergency request failed:', error)
-			socket.emit('emergency:status', {
-				success: false,
-				message: 'Backup request could not be saved.',
-			})
-		}
-	})
+const operationalRuntime = createOperationalRuntime({
+	io,
+	isDatabaseReady: () => mongoose.connection.readyState === 1,
+	operationalService,
+	personnelService,
+	flespiSyncService,
+	createFlespiMqttService,
+	flespiToken: process.env.FLESPI_TOKEN,
+	intervals: {
+		gpsUpdate: GPS_UPDATE_INTERVAL_MS,
+		flespiSync: FLESPI_SYNC_INTERVAL_MS,
+		historySample: HISTORY_SAMPLE_INTERVAL_MS,
+		deploymentStatus: DEPLOYMENT_STATUS_INTERVAL_MS,
+	},
 })
-
-let locationUpdateRunning = false
-let lastHistorySampleAt = 0
-let flespiSyncRunning = false
-let flespiSyncAllPending = false
-const pendingFlespiDeviceIds = new Set()
-let flespiMqttService = null
-let lifecycleCheckRunning = false
-
-const broadcastMockLocations = async () => {
-	if (locationUpdateRunning || mongoose.connection.readyState !== 1) return
-	locationUpdateRunning = true
-
-	try {
-		const now = Date.now()
-		const sampleHistory = now - lastHistorySampleAt >= HISTORY_SAMPLE_INTERVAL_MS
-		const personnel = await updateMockLocations({ sampleHistory })
-		if (sampleHistory) lastHistorySampleAt = now
-		emitPersonnelCollection(io, 'personnel:update', personnel)
-	} catch (error) {
-		console.error('Mock GPS update failed:', error)
-	} finally {
-		locationUpdateRunning = false
-	}
-}
-
-const broadcastFlespiLocations = async ({ deviceIds = [] } = {}) => {
-	if (deviceIds.length === 0) flespiSyncAllPending = true
-	else deviceIds.forEach((deviceId) => pendingFlespiDeviceIds.add(String(deviceId)))
-
-	if (flespiSyncRunning || mongoose.connection.readyState !== 1) return
-	flespiSyncRunning = true
-
-	try {
-		while (flespiSyncAllPending || pendingFlespiDeviceIds.size > 0) {
-			const syncAll = flespiSyncAllPending
-			flespiSyncAllPending = false
-			const selectedDeviceIds = syncAll
-				? []
-				: [...pendingFlespiDeviceIds]
-			pendingFlespiDeviceIds.clear()
-
-			const result = await flespiSyncService.syncAssignedLocations({
-				deviceIds: selectedDeviceIds,
-			})
-			if (result.accepted > 0) {
-				emitPersonnelCollection(
-					io,
-					'personnel:update',
-					await getPersonnelWithLocations(),
-				)
-			}
-		}
-	} catch (error) {
-		console.error('Flespi GPS sync failed:', error.message)
-	} finally {
-		flespiSyncRunning = false
-	}
-}
-
-const runFlespiFallbackSync = () => {
-	if (flespiMqttService?.isConnected()) return
-	void broadcastFlespiLocations()
-}
-
-const runOperationalLifecycleCheck = async () => {
-	if (lifecycleCheckRunning || mongoose.connection.readyState !== 1) return
-	lifecycleCheckRunning = true
-	try {
-		await operationalService.reconcileDeploymentShifts()
-		await evaluatePersonnelInactivity({ io })
-		await evaluatePersonnelGeofences({ io })
-		await operationalService.finalizeReportRouteSnapshots()
-	} catch (error) {
-		console.error('Operational lifecycle check failed:', error.message)
-	} finally {
-		lifecycleCheckRunning = false
-	}
-}
 
 const start = async () => {
 	try {
@@ -323,25 +171,7 @@ const start = async () => {
 		server.listen(PORT, () => {
 			console.log(`GeoSentri backend server running on port ${PORT}`)
 		})
-		setInterval(broadcastMockLocations, GPS_UPDATE_INTERVAL_MS)
-		setInterval(runOperationalLifecycleCheck, DEPLOYMENT_STATUS_INTERVAL_MS)
-		if (process.env.FLESPI_TOKEN) {
-			flespiMqttService = createFlespiMqttService({
-				onDeviceTelemetry: (deviceId) => broadcastFlespiLocations({
-					deviceIds: [deviceId],
-				}),
-			})
-			const mqttEnabled = flespiMqttService.start()
-			console.log(mqttEnabled
-				? 'Flespi MQTT realtime sync enabled'
-				: 'Flespi MQTT disabled; using REST polling')
-			console.log(`Flespi REST fallback enabled (${FLESPI_SYNC_INTERVAL_MS}ms interval)`)
-			// Seed the UI with the latest complete snapshot even before the next MQTT event.
-			setTimeout(() => void broadcastFlespiLocations(), 1000)
-			setInterval(runFlespiFallbackSync, FLESPI_SYNC_INTERVAL_MS)
-		} else {
-			console.log('Flespi GPS sync disabled: FLESPI_TOKEN is not configured')
-		}
+		operationalRuntime.start()
 	} catch (error) {
 		console.error('Backend startup failed:', error)
 		process.exitCode = 1

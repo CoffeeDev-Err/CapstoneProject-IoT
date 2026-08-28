@@ -4,13 +4,10 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import { Image as CachedImage } from 'expo-image';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -24,78 +21,32 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import Animated, {
-  FadeIn,
-  FadeOut,
-} from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { ReportLocationPickerModal } from '../components/ReportLocationPickerModal';
 import {
   SheetScrollView,
   SwipeDismissSheet,
 } from '../components/SwipeDismissSheet';
-import {
-  CABAGAN_BARANGAYS,
-  findCabaganBarangay,
-  isCabaganBarangay,
-} from '../constants/cabaganBarangays';
+import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import { resolveApiAssetUrl } from '../services/operationsApi';
 import { discardTemporaryEvidence } from '../services/offlineReportQueue';
-import type {
-  PoliceReport,
-  ReportEvidenceInput,
-  SubmitReportInput,
-} from '../types/operations';
+import type { PoliceReport } from '../types/operations';
+import {
+  REPORT_FILTERS,
+  REPORT_TYPES,
+} from '../features/reports/reportForm';
+import { ReportCard } from '../features/reports/ReportCard';
+import { ReportEvidenceField } from '../features/reports/ReportEvidenceField';
+import { ReportResolutionSheet } from '../features/reports/ReportResolutionSheet';
+import { ReportLocationFields } from '../features/reports/ReportLocationFields';
+import { useReportFormController } from '../features/reports/useReportFormController';
 
-const reportTypes = ['incident', 'patrol', 'checkpoint', 'others'];
-const reportFilters = ['all', 'incident', 'routine'] as const;
+const reportTypes = REPORT_TYPES;
+const reportFilters = REPORT_FILTERS;
 const SUBMIT_MODAL_TOP_OFFSET = 1;
-const CARD_CONTENT_ENTER = FadeIn.duration(170);
-const CARD_CONTENT_EXIT = FadeOut.duration(130);
-
-type ReportForm = SubmitReportInput & {
-  occurred_at: string;
-  assigned_area: string;
-  location_source: 'gps' | 'manual';
-};
-
-type SheetClose = (afterClose?: () => void) => void;
-
-const emptyForm: ReportForm = {
-  report_type: 'incident',
-  title: '',
-  description: '',
-  location: '',
-  barangay: '',
-  severity: 2,
-  occurred_at: '',
-  assigned_area: '',
-  location_source: 'manual',
-  latitude: undefined as number | undefined,
-  longitude: undefined as number | undefined,
-};
-
-const getBarangayFromArea = (area?: string) => {
-  const value = (area || '').trim();
-  if (!value) return '';
-  const exactMatch = findCabaganBarangay(value);
-  if (exactMatch) return exactMatch;
-
-  const normalized = value
-    .replace(/^barangay\s+/i, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-
-  return CABAGAN_BARANGAYS.find((barangay) => {
-    const candidate = barangay.toLowerCase();
-    return normalized === candidate
-      || normalized.startsWith(`${candidate},`)
-      || normalized.startsWith(`${candidate} `);
-  }) || '';
-};
 
 export default function ReportsScreen() {
   const { colors, isDark } = useMobileTheme();
@@ -113,16 +64,40 @@ export default function ReportsScreen() {
     isReportsLoading,
     isReportsLoadingMore,
   } = useOperationalContext();
+  const {
+    barangayPickerVisible,
+    chooseEvidenceCamera,
+    evidencePhoto,
+    form,
+    formVisible,
+    handleResolve,
+    handleSubmit,
+    isSaving,
+    locationPickerVisible,
+    openSubmitForm,
+    resolutionNotes,
+    resolveTarget,
+    selectBarangay,
+    selectedReport,
+    setBarangayPickerVisible,
+    setEvidencePhoto,
+    setFormVisible,
+    setLocationPickerVisible,
+    setResolutionNotes,
+    setResolveTarget,
+    setSelectedReport,
+    updateForm,
+    updateManualLocation,
+    useCurrentGpsSuggestion,
+    usePinnedLocation,
+  } = useReportFormController({
+    currentPersonnelId,
+    deployments,
+    personnel,
+    resolveReport,
+    submitReport,
+  });
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
-  const [formVisible, setFormVisible] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
-  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<PoliceReport | null>(null);
-  const [resolveTarget, setResolveTarget] = useState<PoliceReport | null>(null);
-  const [resolutionNotes, setResolutionNotes] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [evidencePhoto, setEvidencePhoto] = useState<ReportEvidenceInput | null>(null);
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
   const toggleReport = useCallback((reportId: string) => {
     setExpandedReportIds((current) => {
@@ -148,281 +123,15 @@ export default function ReportsScreen() {
     return true;
   }), [filter, reports]);
 
-  const currentDeployment = deployments.find(
-    (deployment) => deployment.personnelId === currentPersonnelId,
-  ) || deployments[0];
-
-  const openSubmitForm = () => {
-    const assignedArea = currentDeployment?.patrolArea || '';
-    setForm({
-      ...emptyForm,
-      occurred_at: new Date().toISOString(),
-      assigned_area: assignedArea,
-      barangay: getBarangayFromArea(assignedArea),
-    });
-    setEvidencePhoto(null);
-    setFormVisible(true);
-  };
-
-  const captureEvidencePhoto = async (cameraFacing: 'front' | 'back') => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        'Camera permission required',
-        'Allow camera access in your phone settings to capture report evidence.',
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      cameraType: cameraFacing === 'front'
-        ? ImagePicker.CameraType.front
-        : ImagePicker.CameraType.back,
-      quality: 0.72,
-      allowsEditing: false,
-      exif: false,
-    });
-
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
-    const mimeType = asset.mimeType || 'image/jpeg';
-    const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-    const previousEvidenceUri = evidencePhoto?.uri;
-    setEvidencePhoto({
-      uri: asset.uri,
-      name: asset.fileName || `report-evidence-${Date.now()}.${extension}`,
-      type: mimeType,
-      camera_facing: cameraFacing,
-      captured_at: new Date().toISOString(),
-    });
-    if (previousEvidenceUri && previousEvidenceUri !== asset.uri) {
-      discardTemporaryEvidence(previousEvidenceUri).catch(() => undefined);
-    }
-  };
-
-  const chooseEvidenceCamera = () => {
-    Alert.alert(
-      evidencePhoto ? 'Retake photo evidence' : 'Capture photo evidence',
-      'Choose which camera to use.',
-      [
-        { text: 'Back camera', onPress: () => captureEvidencePhoto('back') },
-        { text: 'Front camera', onPress: () => captureEvidencePhoto('front') },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
-  };
-
-  const updateForm = <Field extends keyof ReportForm>(
-    field: Field,
-    value: ReportForm[Field],
-  ) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const selectBarangay = (barangay: string) => {
-    setForm((current) => ({
-      ...current,
-      barangay,
-      location_source: 'manual',
-      latitude: undefined,
-      longitude: undefined,
-    }));
-  };
-
-  const updateManualLocation = (location: string) => {
-    setForm((current) => ({
-      ...current,
-      location,
-      location_source: 'manual',
-      latitude: current.location_source === 'gps' ? undefined : current.latitude,
-      longitude: current.location_source === 'gps' ? undefined : current.longitude,
-    }));
-  };
-
-  const usePinnedLocation = (coordinates: { latitude: number; longitude: number }) => {
-    setForm((current) => ({
-      ...current,
-      location_source: 'manual',
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-    }));
-    setLocationPickerVisible(false);
-  };
-
-  const useCurrentGpsSuggestion = () => {
-    const liveOfficer = personnel.find((member) => member.id === currentPersonnelId);
-    const latitude = liveOfficer?.latitude;
-    const longitude = liveOfficer?.longitude;
-    const hasCurrentCoordinates = liveOfficer?.locationStatus === 'current'
-      && liveOfficer.isLocationStale !== true
-      && typeof latitude === 'number'
-      && Number.isFinite(latitude)
-      && typeof longitude === 'number'
-      && Number.isFinite(longitude);
-    if (!liveOfficer || !hasCurrentCoordinates) {
-      Alert.alert(
-        'GPS unavailable',
-        'You can still submit the report manually. Select the Cabagan barangay and enter the exact incident place.',
-      );
-      return;
-    }
-
-    const detectedBarangay = getBarangayFromArea(liveOfficer.locationName);
-    if (!detectedBarangay) {
-      Alert.alert(
-        'Current GPS is outside Cabagan',
-        'The current position cannot be used as the incident barangay. Select the actual Cabagan barangay and enter the place manually.',
-      );
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      barangay: detectedBarangay,
-      location: liveOfficer.locationName,
-      location_source: 'gps',
-      latitude,
-      longitude,
-    }));
-  };
-
-  const handleSubmit = async (close: SheetClose) => {
-    if (
-      !form.title.trim()
-      || !form.description.trim()
-      || !form.location.trim()
-      || !isCabaganBarangay(form.barangay)
-    ) {
-      Alert.alert('Complete the report', 'Title, description, location, and barangay are required.');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const submissionResult = await submitReport({
-        ...form,
-        ...(evidencePhoto && { evidence_photo: evidencePhoto }),
-      });
-      await discardTemporaryEvidence(evidencePhoto?.uri);
-      setEvidencePhoto(null);
-      setForm(emptyForm);
-      close(() => {
-        Alert.alert(
-          submissionResult === 'queued' ? 'Report saved offline' : 'Report submitted',
-          submissionResult === 'queued'
-            ? 'The report and its evidence are secured on this device and will synchronize automatically.'
-            : form.report_type === 'incident'
-              ? 'The incident is open and can now be resolved from Report History.'
-              : 'The activity report was saved to your history.',
-        );
-      });
-    } catch (error) {
-      Alert.alert('Submission failed', (error as Error).message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleResolve = async (close: SheetClose) => {
-    if (!resolveTarget || !resolutionNotes.trim()) {
-      Alert.alert('Resolution notes required', 'Describe the action taken before resolving the incident.');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await resolveReport(resolveTarget.id, resolutionNotes.trim());
-      close(() => {
-        setResolutionNotes('');
-        Alert.alert('Incident resolved', 'Web Reports and Analytics were updated automatically.');
-      });
-    } catch (error) {
-      Alert.alert('Unable to resolve incident', (error as Error).message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const renderReport = useCallback(({ item }: { item: PoliceReport }) => {
-    const canResolve = item.is_incident && item.case_status !== 'resolved';
-    const expanded = expandedReportIds.has(item.id);
-
-    return (
-      <View
-        style={[
-          styles.reportCard,
-          isDark && themeStyles.surface,
-          item.is_incident ? styles.reportCardIncident : styles.reportCardRoutine,
-        ]}
-      >
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          activeOpacity={0.76}
-          onPress={() => toggleReport(item.id)}
-        >
-          <View style={styles.reportTopRow}>
-            <View style={[styles.typeBadge, item.is_incident ? styles.incidentBadge : styles.routineBadge]}>
-              <Text style={styles.typeBadgeText}>{item.report_type}</Text>
-            </View>
-            <View style={styles.reportTopActions}>
-              {item.is_incident && (
-                <View style={[styles.caseBadge, item.case_status === 'resolved' ? styles.resolvedBadge : styles.openBadge]}>
-                  <Text style={styles.caseBadgeText}>{item.case_status}</Text>
-                </View>
-              )}
-              <Icon name={expanded ? 'expand-less' : 'expand-more'} size={21} color={colors.textMuted} />
-            </View>
-          </View>
-
-          <Text style={[styles.reportTitle, isDark && themeStyles.text]}>{item.title}</Text>
-          <Text style={[styles.reportMeta, isDark && themeStyles.muted]}>
-            {new Date(item.date_time).toLocaleString([], {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </Text>
-          <View style={styles.locationRow}>
-            <Icon name="place" size={16} color={colors.textMuted} />
-            <Text style={[styles.locationText, isDark && themeStyles.muted]} numberOfLines={1}>{item.location}</Text>
-          </View>
-        </TouchableOpacity>
-
-        {expanded && (
-          <Animated.View
-            entering={CARD_CONTENT_ENTER}
-            exiting={CARD_CONTENT_EXIT}
-            style={[styles.reportExpanded, isDark && themeStyles.border]}
-          >
-            <Text style={[styles.reportDescription, isDark && themeStyles.muted]}>
-              {item.description || 'No description provided.'}
-            </Text>
-            <View style={styles.reportActions}>
-              {canResolve && (
-                <TouchableOpacity style={styles.resolveButton} onPress={() => setResolveTarget(item)}>
-                  <Icon name="check-circle" size={17} color="#ffffff" />
-                  <Text style={styles.resolveButtonText}>Resolve Incident</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={[styles.viewButton, isDark && themeStyles.surfaceMuted]} onPress={() => setSelectedReport(item)}>
-                <Icon name="visibility" size={17} color={mobileTheme.purple} />
-                <Text style={styles.viewButtonText}>View</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
-      </View>
-    );
-  }, [
-    colors.textMuted,
-    expandedReportIds,
-    isDark,
-    toggleReport,
-  ]);
+  const renderReport = useCallback(({ item }: { item: PoliceReport }) => (
+    <ReportCard
+      expanded={expandedReportIds.has(item.id)}
+      onResolve={setResolveTarget}
+      onToggle={toggleReport}
+      onView={setSelectedReport}
+      report={item}
+    />
+  ), [expandedReportIds, toggleReport]);
 
   return (
     <SafeAreaView style={[styles.container, isDark && themeStyles.screen]} edges={[]}>
@@ -572,62 +281,13 @@ export default function ReportsScreen() {
               </Text>
             </View>
 
-            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>BARANGAY</Text>
-            <TouchableOpacity
-              style={[styles.selectField, isDark && themeStyles.input]}
-              onPress={() => setBarangayPickerVisible(true)}
-            >
-              <Icon name="map" size={18} color={mobileTheme.purple} />
-              <Text style={[styles.autoFieldText, isDark && themeStyles.text, !form.barangay && styles.placeholderText]}>
-                {form.barangay || 'Select a Cabagan barangay'}
-              </Text>
-              <Icon name="keyboard-arrow-down" size={21} color={colors.textMuted} />
-            </TouchableOpacity>
-
-            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>EXACT INCIDENT PLACE / LANDMARK</Text>
-            <TextInput
-              style={[styles.input, isDark && themeStyles.input]}
-              value={form.location}
-              onChangeText={updateManualLocation}
-              placeholder="Example: Anao Public Market entrance"
-              placeholderTextColor={colors.textMuted}
+            <ReportLocationFields
+              form={form}
+              onEditLocation={updateManualLocation}
+              onOpenBarangays={() => setBarangayPickerVisible(true)}
+              onOpenMap={() => setLocationPickerVisible(true)}
+              onUseCurrentGps={useCurrentGpsSuggestion}
             />
-            <View style={styles.locationAssistRow}>
-              <View style={styles.locationSource}>
-                <Icon
-                  name={form.location_source === 'gps' ? 'gps-fixed' : 'edit-location-alt'}
-                  size={15}
-                  color={colors.textMuted}
-                />
-                <Text style={[styles.locationSourceText, isDark && themeStyles.muted]}>
-                  {form.location_source === 'gps' ? 'Current GPS suggestion' : 'Manual incident location'}
-                </Text>
-              </View>
-              <TouchableOpacity style={[styles.gpsSuggestionButton, isDark && themeStyles.surfaceMuted]} onPress={useCurrentGpsSuggestion}>
-                <Icon name="my-location" size={16} color={mobileTheme.purple} />
-                <Text style={styles.gpsSuggestionText}>Use current GPS</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={[styles.mapPickerButton, isDark && themeStyles.input]}
-              onPress={() => setLocationPickerVisible(true)}
-            >
-              <View style={styles.mapPickerIcon}>
-                <Icon name="add-location-alt" size={20} color={mobileTheme.purple} />
-              </View>
-              <View style={styles.mapPickerCopy}>
-                <Text style={[styles.mapPickerTitle, isDark && themeStyles.text]}>Pick the incident point on map</Text>
-                <Text style={[styles.mapPickerMeta, isDark && themeStyles.muted]}>
-                  {typeof form.latitude === 'number' && typeof form.longitude === 'number'
-                    ? `${form.latitude.toFixed(6)}, ${form.longitude.toFixed(6)}`
-                    : 'Recommended when the report is submitted after leaving the scene'}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={22} color={colors.textMuted} />
-            </TouchableOpacity>
-            <Text style={[styles.locationHelper, isDark && themeStyles.muted]}>
-              Verify the actual incident place. Your current position may be different if you submit later.
-            </Text>
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>DESCRIPTION</Text>
             <TextInput
@@ -641,49 +301,14 @@ export default function ReportsScreen() {
             />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE (OPTIONAL)</Text>
-            {evidencePhoto ? (
-              <View style={[styles.evidencePreview, isDark && themeStyles.surfaceMuted]}>
-                <Image source={{ uri: evidencePhoto.uri }} style={styles.evidencePreviewImage} />
-                <View style={styles.evidencePreviewInfo}>
-                  <View style={styles.evidencePreviewCopy}>
-                    <Text style={[styles.evidencePreviewTitle, isDark && themeStyles.text]}>Photo ready</Text>
-                    <Text style={[styles.evidencePreviewMeta, isDark && themeStyles.muted]}>
-                      {evidencePhoto.camera_facing === 'front' ? 'Front camera' : 'Back camera'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.evidenceIconButton, isDark && themeStyles.border]}
-                    onPress={() => {
-                      discardTemporaryEvidence(evidencePhoto.uri).catch(() => undefined);
-                      setEvidencePhoto(null);
-                    }}
-                    accessibilityLabel="Remove photo evidence"
-                  >
-                    <Icon name="delete-outline" size={20} color={mobileTheme.danger} />
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.retakeButton} onPress={chooseEvidenceCamera}>
-                  <Icon name="cameraswitch" size={18} color={mobileTheme.purple} />
-                  <Text style={styles.retakeButtonText}>Retake photo</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.captureButton, isDark && themeStyles.input]}
-                onPress={chooseEvidenceCamera}
-              >
-                <View style={styles.captureButtonIcon}>
-                  <Icon name="photo-camera" size={22} color={mobileTheme.purple} />
-                </View>
-                <View style={styles.captureButtonCopy}>
-                  <Text style={[styles.captureButtonTitle, isDark && themeStyles.text]}>Capture evidence</Text>
-                  <Text style={[styles.captureButtonMeta, isDark && themeStyles.muted]}>
-                    Use the front or back camera. Maximum upload: 5 MB.
-                  </Text>
-                </View>
-                <Icon name="chevron-right" size={22} color={colors.textMuted} />
-              </TouchableOpacity>
-            )}
+            <ReportEvidenceField
+              evidence={evidencePhoto}
+              onCapture={chooseEvidenceCamera}
+              onRemove={() => {
+                discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
+                setEvidencePhoto(null);
+              }}
+            />
 
             {form.report_type === 'incident' && (
               <>
@@ -828,38 +453,14 @@ export default function ReportsScreen() {
         </View>
       </CenteredDialog>
 
-      <SwipeDismissSheet
-        visible={Boolean(resolveTarget)}
+      <ReportResolutionSheet
+        notes={resolutionNotes}
+        onChangeNotes={setResolutionNotes}
         onClose={() => setResolveTarget(null)}
-        sheetStyle={[styles.resolveModal, isDark && themeStyles.surface]}
-      >
-        {({ close }) => (
-          <View style={styles.resolveContent}>
-            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Resolve Incident</Text>
-            <Text style={[styles.resolveCopy, isDark && themeStyles.muted]}>
-              Confirm that {resolveTarget?.title} has been handled. This will update the web dashboard.
-            </Text>
-            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>RESOLUTION NOTES</Text>
-            <TextInput
-              style={[styles.input, styles.textArea, isDark && themeStyles.input]}
-              value={resolutionNotes}
-              onChangeText={setResolutionNotes}
-              placeholder="Describe the action taken and outcome"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              textAlignVertical="top"
-            />
-            <View style={styles.resolveActions}>
-              <TouchableOpacity style={[styles.cancelButton, isDark && themeStyles.border]} onPress={() => close()}>
-                <Text style={[styles.cancelButtonText, isDark && themeStyles.text]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButtonCompact} onPress={() => handleResolve(close)} disabled={isSaving}>
-                <Text style={styles.primaryButtonText}>{isSaving ? 'Saving...' : 'Confirm Resolve'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </SwipeDismissSheet>
+        onResolve={handleResolve}
+        saving={isSaving}
+        target={resolveTarget}
+      />
     </SafeAreaView>
   );
 }

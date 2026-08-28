@@ -1,14 +1,14 @@
 .deployment-form-card,
 .deployment-list-card {
-  --deployment-navy: #0f172a;
-  --deployment-navy-soft: #1e3a5f;
-  --deployment-blue: #2563eb;
-  --deployment-blue-dark: #1d4ed8;
-  --deployment-blue-soft: #dbeafe;
-  --deployment-blue-surface: #eff6ff;
-  --deployment-surface-muted: #f8fafc;
-  --deployment-border: #d7e0eb;
-  --deployment-text-muted: #64748b;
+  --deployment-navy: var(--text-primary);
+  --deployment-navy-soft: var(--sidebar-active-bg);
+  --deployment-blue: var(--interactive-primary);
+  --deployment-blue-dark: var(--interactive-primary-hover);
+  --deployment-blue-soft: var(--color-info-border);
+  --deployment-blue-surface: var(--surface-selected);
+  --deployment-surface-muted: var(--surface-muted);
+  --deployment-border: var(--border-color);
+  --deployment-text-muted: var(--text-muted);
   position: relative;
 }
 
@@ -244,13 +244,13 @@
   min-height: 44px;
   border-color: var(--deployment-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface-card);
   color: var(--deployment-navy);
   box-shadow: none;
 }
 
 .assignment-form .settings-input:hover:not(:disabled) {
-  border-color: #94a3b8;
+  border-color: var(--border-strong);
   box-shadow: none;
 }
 
@@ -266,7 +266,7 @@
 
 .assignment-form .settings-input:focus {
   border-color: var(--deployment-blue);
-  background: #ffffff;
+  background: var(--surface-card);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
@@ -323,7 +323,7 @@
   z-index: 100;
   border: 1px solid var(--deployment-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface-card);
   padding: 0.5rem;
   box-shadow: 0 16px 32px -18px rgba(15, 23, 42, 0.32);
 }
@@ -425,7 +425,7 @@
 }
 
 .assignment-check-item:hover {
-  background: #ffffff;
+  background: var(--surface-card);
 }
 
 .assignment-check-item:has(input:checked) {
@@ -466,7 +466,7 @@
 }
 
 .assignment-checklist__empty {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: var(--font-size-sm);
 }
 
@@ -559,19 +559,19 @@
 
 .deployment-status--scheduled {
   border-color: #bfdbfe;
-  background: #eff6ff;
+  background: var(--surface-selected);
   color: #1d4ed8;
 }
 
 .deployment-status--active {
   border-color: #bfdbfe;
-  background: #eff6ff;
+  background: var(--surface-selected);
   color: #1d4ed8;
 }
 
 .deployment-status--completed {
   border-color: #dbe2ea;
-  background: #f8fafc;
+  background: var(--surface-muted);
   color: #475569;
 }
 
@@ -597,7 +597,7 @@
   border: 1px solid #246bfd;
   border-radius: 10px;
   background: #246bfd;
-  color: #fff;
+  color: var(--text-on-accent);
   font-size: var(--font-size-sm);
   font-weight: 700;
 }

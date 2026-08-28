@@ -18,6 +18,9 @@ const authContextSource = fs.readFileSync(
 const operationalContextSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'context', 'OperationalContext.tsx'),
 	'utf8',
+) + '\n' + fs.readFileSync(
+	path.join(projectRoot, 'src', 'features', 'operations', 'useOperationalSocket.ts'),
+	'utf8',
 )
 const accountServiceSource = fs.readFileSync(
 	path.join(projectRoot, '..', 'backend', 'src', 'services', 'accountService.js'),

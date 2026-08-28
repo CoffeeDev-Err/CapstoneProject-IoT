@@ -41,6 +41,16 @@ assert.match(validateRank('Police Hacker'), /valid Philippine National Police ra
 
 const projectRoot = path.resolve(import.meta.dirname, '..')
 const settingsPage = fs.readFileSync(path.join(projectRoot, 'src/pages/SettingsPage.jsx'), 'utf8')
+  + '\n'
+  + fs.readFileSync(path.join(projectRoot, 'src/features/accounts/AccountRankPicker.jsx'), 'utf8')
+  + '\n'
+  + fs.readFileSync(path.join(projectRoot, 'src/features/accounts/useAccountForm.js'), 'utf8')
+  + '\n'
+  + fs.readFileSync(path.join(projectRoot, 'src/features/accounts/AccountTable.jsx'), 'utf8')
+  + '\n'
+  + fs.readFileSync(path.join(projectRoot, 'src/features/accounts/AccountGpsSelector.jsx'), 'utf8')
+  + '\n'
+  + fs.readFileSync(path.join(projectRoot, 'src/features/accounts/AccountDialogs.jsx'), 'utf8')
 const settingsStyles = fs.readFileSync(path.join(projectRoot, 'src/styles/settings.css'), 'utf8')
 const topBar = fs.readFileSync(path.join(projectRoot, 'src/components/TopBar.jsx'), 'utf8')
 assert.match(settingsPage, /className="account-rank-options" role="listbox"/,

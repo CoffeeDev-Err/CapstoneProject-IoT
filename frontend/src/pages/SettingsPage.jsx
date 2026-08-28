@@ -5,11 +5,7 @@
  * Includes a supervisor-only account provisioning form so mobile users
  * do not need an in-app signup flow.
  */
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import ActionNoticeModal from '../components/ActionNoticeModal'
-import ConfirmModal from '../components/ConfirmModal'
-import InitialsAvatar from '../components/InitialsAvatar'
-import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useFeedback } from '../context/useFeedback'
 import {
   createAccount,
@@ -21,100 +17,31 @@ import { getRegisteredFlespiDevices } from '../services/flespiDevices'
 import { resolveApiAssetUrl } from '../services/apiAssets'
 import {
   ACCOUNT_FIELD_LIMITS,
-  POLICE_RANKS,
   normalizeBadgeNumber,
   normalizeEmail,
   normalizeHumanName,
   normalizeLoginId,
   normalizeMobileNumber,
-  validateBadgeNumber,
-  validateFullName,
-  validateLoginId,
-  validateMobileNumber,
-  validateOfficialEmail,
-  validateRank,
 } from '../utils/accountValidation'
 import { getAccountEditCancelledMessage } from '../utils/workflowFeedback'
 import { matchesPrefixSearch } from '../utils/searchMatching'
-
-const rankOptions = POLICE_RANKS
-
-const createTempPassword = (length = 12) => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?'
-  let value = ''
-
-  if (!globalThis.crypto?.getRandomValues) {
-    throw new Error('Secure password generation is unavailable in this browser.')
-  }
-
-  const upperBound = 256 - (256 % chars.length)
-  while (value.length < length) {
-    const bytes = new Uint8Array(Math.max(16, length - value.length))
-    globalThis.crypto.getRandomValues(bytes)
-    bytes.forEach((byte) => {
-      if (value.length < length && byte < upperBound) value += chars[byte % chars.length]
-    })
-  }
-
-  return value
-}
-
-const initialFormState = {
-  fullName: '',
-  badgeNumber: '',
-  imei: '',
-  flespiDeviceId: '',
-  flespiDeviceName: '',
-  rank: rankOptions[0],
-  loginId: '',
-  officialEmail: '',
-  temporaryPassword: createTempPassword(),
-  mobileNumber: '',
-}
-
-const getDeviceCode = (device, index = 0) => {
-  const source = `${device?.deviceCode || ''} ${device?.name || ''} ${device?.flespiDeviceName || ''}`
-  const match = source.match(/\bGPS[-\s]?\d{1,4}\b/i)
-
-  if (match) {
-    const digits = match[0].match(/\d+/)?.[0] || String(index + 1)
-    return `GPS-${digits.padStart(3, '0')}`
-  }
-
-  return `GPS-${String(index + 1).padStart(3, '0')}`
-}
-
-const formatGpsOptionLabel = ({ device, index, assignedAccount }) => {
-  const statusLabel = assignedAccount ? `Assigned to ${assignedAccount.fullName}` : 'Available'
-  return `${getDeviceCode(device, index)} | Device ID: ${device.imei} | ${statusLabel}`
-}
-
-const formatDateTime = (isoValue) => {
-  if (!isoValue) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(isoValue))
-}
+import {
+  rankOptions,
+} from '../features/accounts/accountPresentation'
+import AccountRankPicker from '../features/accounts/AccountRankPicker'
+import AccountTable from '../features/accounts/AccountTable'
+import AccountGpsSelector from '../features/accounts/AccountGpsSelector'
+import { useAccountForm } from '../features/accounts/useAccountForm'
+import AccountDialogs from '../features/accounts/AccountDialogs'
 
 function SettingsPage() {
   const { showFeedback } = useFeedback()
-  const [accountForm, setAccountForm] = useState(initialFormState)
-  const [profilePhoto, setProfilePhoto] = useState(null)
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
   const [createdAccounts, setCreatedAccounts] = useState([])
   const [accountSearch, setAccountSearch] = useState('')
   const deferredAccountSearch = useDeferredValue(accountSearch)
   const [editingAccountId, setEditingAccountId] = useState(null)
   const [activeAccountView, setActiveAccountView] = useState('create')
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState(null)
-  const [formErrors, setFormErrors] = useState({})
   const [formMessage, setFormMessage] = useState('')
   const [formMessageKind, setFormMessageKind] = useState('success')
   const [flespiDevices, setFlespiDevices] = useState([])
@@ -192,199 +119,32 @@ function SettingsPage() {
     () => createdAccounts.find((account) => account.id === editingAccountId) || null,
     [createdAccounts, editingAccountId]
   )
-  const isEditingSupervisor = editingAccount?.role === 'Supervisor'
-  const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
-  const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount
-  const handleFieldChange = (field) => (event) => {
-    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
-
-    setAccountForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-
-    setFormErrors((prev) => {
-      if (!prev[field]) {
-        return prev
-      }
-
-      const nextErrors = { ...prev }
-      delete nextErrors[field]
-      return nextErrors
-    })
-  }
-
-  const handleDeviceChange = (event) => {
-    const imei = event.target.value
-    const device = flespiDevices.find((item) => item.imei === imei)
-
-    setAccountForm((prev) => ({
-      ...prev,
-      imei,
-      flespiDeviceId: device?.id || '',
-      flespiDeviceName: device?.name || '',
-    }))
-
-    setFormErrors((prev) => {
-      if (!prev.imei) return prev
-      const nextErrors = { ...prev }
-      delete nextErrors.imei
-      return nextErrors
-    })
-  }
-
-  const handleRankChange = (rank) => {
-    setAccountForm((prev) => ({ ...prev, rank }))
-    setFormErrors((prev) => {
-      if (!prev.rank) return prev
-      const nextErrors = { ...prev }
-      delete nextErrors.rank
-      return nextErrors
-    })
-  }
-
-  const handleFieldBlur = (field) => () => {
-    const nextError = validateAccountForm()[field]
-    setFormErrors((prev) => {
-      const nextErrors = { ...prev }
-      if (nextError) nextErrors[field] = nextError
-      else delete nextErrors[field]
-      return nextErrors
-    })
-  }
-
-  const handleProfilePhotoChange = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp']
-    if (!supportedTypes.includes(file.type)) {
-      setProfilePhoto(null)
-      setFormErrors((prev) => ({ ...prev, profilePhoto: 'Use a JPEG, PNG, or WebP image.' }))
-      event.target.value = ''
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setProfilePhoto(null)
-      setFormErrors((prev) => ({ ...prev, profilePhoto: 'Profile photo must be 5 MB or smaller.' }))
-      event.target.value = ''
-      return
-    }
-
-    setProfilePhoto(file)
-    setFormErrors((prev) => {
-      const nextErrors = { ...prev }
-      delete nextErrors.profilePhoto
-      return nextErrors
-    })
-    const reader = new FileReader()
-    reader.onload = () => setProfilePhotoPreview(String(reader.result || ''))
-    reader.readAsDataURL(file)
-  }
-
-  const validateAccountForm = () => {
-    const errors = {}
-
-    const fullNameError = validateFullName(accountForm.fullName)
-    const rankError = validateRank(accountForm.rank)
-    if (fullNameError) errors.fullName = fullNameError
-    if (rankError) errors.rank = rankError
-
-    if (!isEditingSupervisor) {
-      const badgeNumberError = validateBadgeNumber(accountForm.badgeNumber)
-      const mobileNumberError = validateMobileNumber(accountForm.mobileNumber)
-      if (badgeNumberError) errors.badgeNumber = badgeNumberError
-      if (mobileNumberError) errors.mobileNumber = mobileNumberError
-
-      if (requiresGpsDevice && !accountForm.imei.trim()) {
-        errors.imei = 'GPS device ID is required.'
-      } else if (accountForm.imei.trim() && !flespiDevices.some((device) => device.imei === accountForm.imei)) {
-        errors.imei = 'Select a device ID registered in Flespi.'
-      }
-
-      const duplicateBadge = createdAccounts.some(
-        (account) => (
-          account.id !== editingAccountId
-          && String(account.badgeNumber || '').toLowerCase() === accountForm.badgeNumber.trim().toLowerCase()
-        )
-      )
-      if (!errors.badgeNumber && duplicateBadge) {
-        errors.badgeNumber = 'Badge number already exists.'
-      }
-
-      const duplicateImei = accountForm.imei.trim() && createdAccounts.some(
-        (account) => account.id !== editingAccountId && account.imei === accountForm.imei.trim()
-      )
-      if (duplicateImei) {
-        errors.imei = 'Device ID is already assigned to another personnel account.'
-      }
-    }
-
-    const loginIdError = validateLoginId(accountForm.loginId, {
-      accountType: isEditingSupervisor ? 'supervisor' : 'officer',
-      existingLoginId: editingAccount?.loginId || '',
-    })
-    if (loginIdError) errors.loginId = loginIdError
-
-    const duplicateLogin = createdAccounts.some(
-      (account) => (
-        account.id !== editingAccountId
-        && String(account.loginId || '').toLowerCase() === accountForm.loginId.trim().toLowerCase()
-      )
-    )
-    if (!errors.loginId && duplicateLogin) {
-      errors.loginId = 'Login ID already exists.'
-    }
-
-    const normalizedEmail = normalizeEmail(accountForm.officialEmail)
-    const emailError = validateOfficialEmail(normalizedEmail)
-    if (emailError) errors.officialEmail = emailError
-
-    const duplicateEmail = createdAccounts.some(
-      (account) => (
-        account.id !== editingAccountId
-        && account.officialEmail?.toLowerCase() === normalizedEmail
-      )
-    )
-    if (!errors.officialEmail && duplicateEmail) {
-      errors.officialEmail = 'Official email already belongs to another account.'
-    }
-
-    const passwordValue = accountForm.temporaryPassword
-    const passwordRulesPassed =
-      passwordValue.length >= 10
-      && passwordValue.length <= ACCOUNT_FIELD_LIMITS.password
-      && /[A-Z]/.test(passwordValue)
-      && /[a-z]/.test(passwordValue)
-      && /\d/.test(passwordValue)
-      && /[^A-Za-z0-9]/.test(passwordValue)
-
-    if ((!editingAccountId || passwordValue) && !passwordRulesPassed) {
-      errors.temporaryPassword = `Use 10-${ACCOUNT_FIELD_LIMITS.password} characters, including an uppercase letter, lowercase letter, number, and symbol.`
-    }
-
-    return errors
-  }
-
-  const handleGenerateTemporaryPassword = () => {
-    setAccountForm((prev) => ({
-      ...prev,
-      temporaryPassword: createTempPassword(),
-    }))
-  }
-
-  const resetFormToCreate = () => {
-    setEditingAccountId(null)
-    setAccountForm({
-      ...initialFormState,
-      temporaryPassword: createTempPassword(),
-      rank: accountForm.rank,
-    })
-    setFormErrors({})
-    setProfilePhoto(null)
-    setProfilePhotoPreview('')
-  }
-
+  const {
+    accountForm,
+    setAccountForm,
+    formErrors,
+    setFormErrors,
+    profilePhoto,
+    setProfilePhoto,
+    profilePhotoPreview,
+    setProfilePhotoPreview,
+    isEditingSupervisor,
+    requiresGpsDevice,
+    validateAccountForm,
+    handleFieldChange,
+    handleDeviceChange,
+    handleRankChange,
+    handleFieldBlur,
+    handleProfilePhotoChange,
+    handleGenerateTemporaryPassword,
+    resetFormToCreate,
+  } = useAccountForm({
+    createdAccounts,
+    editingAccount,
+    editingAccountId,
+    flespiDevices,
+    setEditingAccountId,
+  })
   const handleCancelEditAccount = () => {
     const accountLabel = editingAccount?.fullName || editingAccount?.loginId
 
@@ -671,7 +431,7 @@ function SettingsPage() {
 
                 <div className="account-field">
 	                  <span id="account-rank-label">Rank *</span>
-                  <RankPicker
+                <AccountRankPicker
                     value={accountForm.rank}
                     onChange={handleRankChange}
                     invalid={Boolean(formErrors.rank)}
@@ -680,65 +440,20 @@ function SettingsPage() {
 	                </div>
 
                 {!isEditingSupervisor && (
-                <div className="account-field account-field--wide">
-                  <span>Registered GPS Device {requiresGpsDevice ? '*' : '(Optional)'}</span>
-                  {devicesLoading ? (
-                    <div className="inline-loading-skeleton" role="status" aria-label="Loading registered GPS devices">
-                      <SkeletonBlock width="100%" height="2.65rem" />
-                      <SkeletonBlock width="6.5rem" height="2.65rem" />
-                    </div>
-                  ) : (
-                  <div className="account-password-row">
-                    <select
-                      className={`settings-input w-100 ${formErrors.imei ? 'settings-input--error' : ''}`}
-                      value={accountForm.imei}
-                      onChange={handleDeviceChange}
-                      disabled={devicesLoading}
-                    >
-                      <option value="">
-                        {devicesLoading
-                          ? 'Loading registered GPS devices...'
-                          : flespiDevices.length === 0
-                            ? 'No GPS device registered'
-                            : 'Select a registered GPS device'}
-                      </option>
-                      {accountForm.imei && !flespiDevices.some((device) => device.imei === accountForm.imei) && (
-                        <option value={accountForm.imei}>
-                          {accountForm.flespiDeviceName || 'Assigned GPS'} | Device ID: {accountForm.imei}
-                        </option>
-                      )}
-                      {flespiDevices.map((device, index) => {
-                        const assignedAccount = assignedImeiToAccount.get(device.imei)
-                        const assignedElsewhere = assignedAccount && assignedAccount.id !== editingAccountId
-
-                        return (
-                          <option key={device.id} value={device.imei} disabled={assignedElsewhere}>
-                            {formatGpsOptionLabel({ device, index, assignedAccount: assignedElsewhere ? assignedAccount : null })}
-                            {device.connected ? ' | Online' : ' | Offline'}
-                          </option>
-                        )
-                      })}
-                    </select>
-                    <button
-                      type="button"
-                      className="account-action-btn"
-                      onClick={() => loadFlespiDevices({ refresh: true })}
-                      disabled={devicesLoading}
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                  )}
-                  {devicesError && <small className="field-error">{devicesError}</small>}
-                  {!devicesLoading && !devicesError && flespiDevices.length === 0 && (
-                    <small className="settings-hint">
-                      {devicesSetupPending
-                        ? 'Register the GPS tracker in Flespi after its SIM is active, then refresh this list to continue.'
-                        : 'No registered GPS device is available. Register a device in Flespi, then refresh this list.'}
-                    </small>
-                  )}
-                  {formErrors.imei && <small className="field-error">{formErrors.imei}</small>}
-                </div>
+                <AccountGpsSelector
+                  assignedImeiToAccount={assignedImeiToAccount}
+                  currentAccountId={editingAccountId}
+                  deviceError={devicesError}
+                  devices={flespiDevices}
+                  loading={devicesLoading}
+                  onChange={handleDeviceChange}
+                  onRefresh={() => loadFlespiDevices({ refresh: true })}
+                  requiresDevice={requiresGpsDevice}
+                  selectedDeviceName={accountForm.flespiDeviceName}
+                  selectedImei={accountForm.imei}
+                  setupPending={devicesSetupPending}
+                  validationError={formErrors.imei}
+                />
                 )}
 
                 <label className="account-field">
@@ -849,265 +564,28 @@ function SettingsPage() {
             )}
 
             {activeAccountView === 'manage' && (
-              <div className="account-table-section account-table-section--standalone">
-                <h4 className="settings-label mb-2">Recently Provisioned Accounts</h4>
-                <div className="account-table-toolbar">
-                  <small className="settings-hint account-table-meta">
-                    {filteredAccounts.length} of {createdAccounts.length} account(s)
-                  </small>
-                  <input
-                    type="search"
-                    className="settings-input account-table-search"
-                    value={accountSearch}
-                    onChange={(event) => setAccountSearch(event.target.value)}
-                    placeholder="Search name, badge, email, device ID, or login"
-                    aria-label="Search provisioned accounts"
-                  />
-                </div>
-
-                <div className="account-table-wrap">
-                  <table className="personnel-table table align-middle mb-0">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Rank</th>
-                        <th>Badge</th>
-                        <th>GPS Device</th>
-                        <th>Login ID</th>
-                        <th>Official Email</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accountsLoading ? (
-                        <TableSkeletonRows columns={9} rows={5} label="Loading accounts" />
-                      ) : filteredAccounts.length === 0 ? (
-                        <tr className="personnel-row">
-                          <td colSpan={9} className="text-body-secondary small">
-                            No account matched your search.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredAccounts.map((account, index) => (
-                          <tr key={account.id} className="personnel-row">
-	                            <td>
-	                              <div className="account-name-cell">
-	                                <InitialsAvatar
-	                                  className="account-table-avatar account-table-avatar--fallback"
-	                                  src={account.photoUrl ? resolveApiAssetUrl(account.photoUrl) : ''}
-	                                  name={account.fullName || account.loginId || 'Personnel'}
-	                                  alt=""
-	                                />
-	                                <span>{account.fullName || 'Supervisor account'}</span>
-	                              </div>
-	                            </td>
-	                            <td>{account.rank || account.role}</td>
-	                            <td className="personnel-badge">{account.role === 'Supervisor' ? '-' : account.badgeNumber}</td>
-	                            <td>
-	                              {account.role === 'Supervisor' ? (
-	                                <span className="text-body-secondary">Not required</span>
-	                              ) : account.isMockAccount && !account.imei ? (
-	                                <span className="text-body-secondary">No GPS device assigned</span>
-	                              ) : (
-	                                <>
-	                                  <span>{getDeviceCode(account, index)} | {account.flespiDeviceName || 'Registered GPS'}</span>
-	                                  <small className="d-block text-body-secondary">{account.imei}</small>
-	                                </>
-	                              )}
-                            </td>
-                            <td>{account.loginId}</td>
-                            <td>
-                              <span>{account.officialEmail || '-'}</span>
-                              <small className="d-block text-body-secondary">
-                                {account.emailVerified ? 'Verified' : 'Verification pending'}
-                              </small>
-                            </td>
-                            <td>
-                              <span
-                                className="status-badge"
-                                style={{ '--status-color': account.accountStatus === 'Active' ? 'var(--color-success)' : '#64748b' }}
-                              >
-                                {account.accountStatus}
-                              </span>
-                            </td>
-                            <td>{formatDateTime(account.createdAt)}</td>
-                            <td className="account-actions-cell">
-                              <div className="account-table-actions">
-                                <button
-                                  type="button"
-                                  className="account-table-btn account-table-btn--edit"
-                                  onClick={() => handleEditAccount(account.id)}
-                                  disabled={accountRequestPending}
-                                >
-                                  Edit
-                                </button>
-                                {account.isProtected || account.role === 'Supervisor' ? (
-                                  <span className="account-protected-label" title="COP/admin accounts cannot be deactivated.">
-                                    Protected
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="account-table-btn account-table-btn--delete"
-                                    onClick={() => handleDeleteAccount(account.id)}
-                                    disabled={accountRequestPending || account.accountStatus === 'Inactive'}
-                                  >
-                                    Deactivate
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <AccountTable
+                accountRequestPending={accountRequestPending}
+                accountSearch={accountSearch}
+                accounts={createdAccounts}
+                accountsLoading={accountsLoading}
+                filteredAccounts={filteredAccounts}
+                onDeactivate={handleDeleteAccount}
+                onEdit={handleEditAccount}
+                onSearchChange={setAccountSearch}
+              />
             )}
           </div>
         </div>
       </div>
 
-      <ConfirmModal
-        open={Boolean(pendingDeleteAccount)}
-        title="Deactivate Account?"
-        message={pendingDeleteAccount
-          ? pendingDeleteAccount.role === 'Supervisor'
-            ? `Deactivate ${pendingDeleteAccount.loginId}? Web administration access will stop.`
-            : `Deactivate ${pendingDeleteAccount.fullName}? Mobile access will stop and the GPS device will be released for reassignment.`
-          : ''}
-        confirmLabel="Deactivate"
-        cancelLabel="Cancel"
-        onConfirm={handleConfirmDeleteAccount}
-        onCancel={handleCancelDeleteAccount}
+      <AccountDialogs
+        actionNotice={accountActionNotice}
+        onCancelDeactivate={handleCancelDeleteAccount}
+        onCloseActionNotice={() => setAccountActionNotice(null)}
+        onConfirmDeactivate={handleConfirmDeleteAccount}
+        pendingAccount={pendingDeleteAccount}
       />
-      <ActionNoticeModal
-        open={Boolean(accountActionNotice)}
-        title={accountActionNotice?.title}
-        message={accountActionNotice?.message}
-        items={accountActionNotice?.items}
-        onClose={() => setAccountActionNotice(null)}
-      />
-    </div>
-  )
-}
-
-function RankPicker({ value, onChange, invalid }) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [dropdownLayout, setDropdownLayout] = useState({ placement: 'below', maxHeight: 260 })
-  const pickerRef = useRef(null)
-  const filteredRanks = useMemo(() => (
-    rankOptions.filter((rank) => matchesPrefixSearch(search, [rank]))
-  ), [search])
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    const handlePointerDownOutside = (event) => {
-      if (!pickerRef.current?.contains(event.target)) {
-        setOpen(false)
-        setSearch('')
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDownOutside)
-    return () => document.removeEventListener('pointerdown', handlePointerDownOutside)
-  }, [open])
-
-  const closePicker = () => {
-    setOpen(false)
-    setSearch('')
-  }
-
-  const togglePicker = () => {
-    if (open) {
-      closePicker()
-      return
-    }
-
-    const pickerBounds = pickerRef.current?.getBoundingClientRect()
-    const topBarBottom = document.querySelector('.top-bar')?.getBoundingClientRect().bottom || 0
-    const viewportHeight = window.innerHeight
-    const desiredHeight = Math.min(260, viewportHeight * 0.38)
-    const spaceBelow = Math.max(0, viewportHeight - (pickerBounds?.bottom || 0) - 12)
-    const spaceAbove = Math.max(0, (pickerBounds?.top || 0) - topBarBottom - 12)
-    const placement = spaceBelow >= Math.min(180, desiredHeight) || spaceBelow >= spaceAbove
-      ? 'below'
-      : 'above'
-    const availableSpace = placement === 'below' ? spaceBelow : spaceAbove
-
-    setDropdownLayout({
-      placement,
-      maxHeight: Math.min(desiredHeight, availableSpace),
-    })
-    setSearch('')
-    setOpen(true)
-  }
-
-  return (
-    <div
-      ref={pickerRef}
-      className="account-rank-picker"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') closePicker()
-      }}
-    >
-      <button
-        type="button"
-        className={`settings-input account-rank-trigger${invalid ? ' settings-input--error' : ''}`}
-        onClick={togglePicker}
-        aria-labelledby="account-rank-label account-rank-value"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls="account-rank-options"
-        aria-invalid={invalid}
-      >
-        <span id="account-rank-value">{value}</span>
-        <span className="account-rank-trigger__icon" aria-hidden="true">⌄</span>
-      </button>
-
-      {open && (
-        <div
-          className={`account-rank-dropdown account-rank-dropdown--${dropdownLayout.placement}`}
-          style={{ '--account-rank-max-height': `${dropdownLayout.maxHeight}px` }}
-        >
-          <div className="account-rank-search">
-            <input
-              type="search"
-              className="settings-input"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search rank"
-              aria-label="Search police rank"
-              autoFocus
-            />
-          </div>
-          <div id="account-rank-options" className="account-rank-options" role="listbox">
-            {filteredRanks.length === 0 ? (
-              <p className="account-rank-empty">No matching rank.</p>
-            ) : filteredRanks.map((rank) => (
-              <button
-                key={rank}
-                type="button"
-                role="option"
-                aria-selected={value === rank}
-                className={`account-rank-option${value === rank ? ' is-selected' : ''}`}
-                onClick={() => {
-                  onChange(rank)
-                  closePicker()
-                }}
-              >
-                <span>{rank}</span>
-                {value === rank && <span aria-hidden="true">✓</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
