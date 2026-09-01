@@ -274,7 +274,6 @@
 :root:not([data-theme="dark"]) .personnel-toolbar select,
 :root:not([data-theme="dark"]) .report-search input,
 :root:not([data-theme="dark"]) .report-filter select,
-:root:not([data-theme="dark"]) .analytics-chart-filter__select,
 :root:not([data-theme="dark"]) .form-control,
 :root:not([data-theme="dark"]) .form-select {
   border-color: #d8e2ed;
@@ -299,7 +298,6 @@
 :root:not([data-theme="dark"]) .personnel-toolbar select:focus,
 :root:not([data-theme="dark"]) .report-search input:focus,
 :root:not([data-theme="dark"]) .report-filter select:focus,
-:root:not([data-theme="dark"]) .analytics-chart-filter__select:focus-visible,
 :root:not([data-theme="dark"]) .form-control:focus,
 :root:not([data-theme="dark"]) .form-select:focus {
   border-color: var(--color-primary);
@@ -341,13 +339,6 @@
 :root:not([data-theme="dark"]) .report-list {
   border-radius: 12px;
   background: #ffffff;
-}
-
-/* Analytics chart and deployment form surfaces */
-:root:not([data-theme="dark"]) .analytics-chart-canvas-wrap {
-  border-color: var(--border-color-light);
-  background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: var(--shadow-xs);
 }
 
 /* Officer profile overlays should feel like the rest of the light workspace;
@@ -404,11 +395,6 @@
   background: #f0f4f8;
 }
 
-:root:not([data-theme="dark"]) .analytics-chart-canvas-wrap:hover {
-  border-color: #d5e4f7;
-  box-shadow: var(--shadow-sm);
-}
-
 :root:not([data-theme="dark"]) .deployment-form-card,
 :root:not([data-theme="dark"]) .deployment-list-card {
   --deployment-navy: var(--text-primary);
@@ -438,8 +424,9 @@
 }
 
 :root:not([data-theme="dark"]) .assignment-mode-option.is-active,
-:root:not([data-theme="dark"]) .assignment-mode-option.is-active:hover {
-  background: #edf4ff;
+:root:not([data-theme="dark"]) .assignment-mode-option.is-active:hover,
+:root:not([data-theme="dark"]) .assignment-mode-option.is-active:focus-within {
+  background: transparent;
 }
 
 :root:not([data-theme="dark"]) .assignment-group-menu-dropdown {
@@ -589,4 +576,55 @@
 
 :root:not([data-theme="dark"]) .login-submit-btn {
   border-radius: 10px !important;
+}
+
+/* The selected fill and underline travel as one. The underline sits inside
+   the fill and is inset by the fill's corner radius at both endpoints. */
+:root:not([data-theme="dark"]) .assignment-mode-options,
+:root:not([data-theme="dark"]) .analytics-segmented-control--compact,
+:root:not([data-theme="dark"]) .deployment-view-nav,
+:root:not([data-theme="dark"]) .account-view-nav {
+  --smooth-selection-width: calc(50% - 0.75rem);
+  --smooth-underline-width: calc(var(--smooth-selection-width) - 1.125rem);
+  --smooth-underline-bottom: 0.42rem;
+}
+
+:root:not([data-theme="dark"]) .analytics-segmented-control--compact {
+  --smooth-selection-width: calc(50% - 0.5rem);
+}
+
+:root:not([data-theme="dark"]) .assignment-mode-options::before,
+:root:not([data-theme="dark"]) .analytics-segmented-control--compact::before,
+:root:not([data-theme="dark"]) .deployment-view-nav::before,
+:root:not([data-theme="dark"]) .account-view-nav::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: var(--smooth-underline-left);
+  width: var(--smooth-selection-width);
+  border-radius: 9px;
+  background: #dbeafe;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition:
+    left 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root:not([data-theme="dark"]) .analytics-segmented-control--compact button,
+:root:not([data-theme="dark"]) .deployment-view-tab,
+:root:not([data-theme="dark"]) .account-view-tab {
+  position: relative;
+  z-index: 1;
+}
+
+:root:not([data-theme="dark"]) .analytics-segmented-control--compact button.is-active,
+:root:not([data-theme="dark"]) .analytics-segmented-control--compact button.is-active:hover,
+:root:not([data-theme="dark"]) .deployment-view-tab--active,
+:root:not([data-theme="dark"]) .deployment-view-tab--active:hover,
+:root:not([data-theme="dark"]) .account-view-tab--active,
+:root:not([data-theme="dark"]) .account-view-tab--active:hover {
+  background: transparent;
 }

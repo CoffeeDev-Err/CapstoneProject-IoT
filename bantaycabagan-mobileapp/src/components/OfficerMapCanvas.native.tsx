@@ -204,6 +204,7 @@ function PersonnelMarker({
 
 const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProps>(({
   assignment,
+  compassTop = 150,
   currentPersonnelId,
   emergencyPulse,
   enable3D,
@@ -376,7 +377,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         touchPitch
         compass
         compassHiddenFacingNorth
-        compassPosition={{ top: 150, left: 12 }}
+        compassPosition={{ top: compassTop, left: 20 }}
         attribution={false}
         logo={false}
         onWillStartLoadingMap={() => setStyleLoading(true)}

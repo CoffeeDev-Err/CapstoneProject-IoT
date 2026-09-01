@@ -110,6 +110,10 @@
   scrollbar-gutter: stable;
 }
 
+.report-list-panel--reports .record-scroll-container {
+  height: clamp(280px, calc(100dvh - var(--top-bar-h) - 21rem), 560px);
+}
+
 .report-list.record-scroll-container > .report-list__header {
   position: sticky;
   top: 0;

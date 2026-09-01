@@ -32,7 +32,7 @@ function DeploymentList({
             className="settings-input assignment-list-search"
             value={deploymentSearch}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search personnel name, rank, barangay, or assignment ID"
+            placeholder="Search Deployment Information"
           />
         </div>
 

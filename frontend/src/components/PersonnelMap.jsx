@@ -208,6 +208,7 @@ function PersonnelMap({
   initialDataError = '',
   lastPersonnelSyncAt = '',
   onRetry,
+  developmentPreviewCount = 0,
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -260,11 +261,7 @@ function PersonnelMap({
   const renderClusters = useCallback(() => {
     const map = mapRef.current
     const index = clusterIndexRef.current
-    if (!map || !index || !map.loaded()) return
-
-    markerStatesRef.current.forEach((state) => {
-      state.element.style.display = 'none'
-    })
+    if (!map || !index || !map.isStyleLoaded()) return
 
     const bounds = map.getBounds()
     const clusters = index.getClusters(
@@ -273,10 +270,10 @@ function PersonnelMap({
     )
 
     const activeClusterKeys = new Set()
+    const visibleMemberIds = new Set()
     clusters.forEach((feature) => {
       if (!feature.properties.cluster) {
-        const markerState = markerStatesRef.current.get(feature.properties.memberId)
-        if (markerState) markerState.element.style.display = ''
+        visibleMemberIds.add(String(feature.properties.memberId))
         return
       }
 
@@ -366,8 +363,22 @@ function PersonnelMap({
       clusterMarkerStatesRef.current.delete(clusterKey)
     })
 
-    markerStatesRef.current.forEach((state) => {
-      if (state.element.classList.contains('is-followed')) state.element.style.display = ''
+    markerStatesRef.current.forEach((state, memberId) => {
+      const shouldRender = visibleMemberIds.has(String(memberId))
+        || state.element.classList.contains('is-followed')
+      if (shouldRender && !state.isOnMap) {
+        state.marker.addTo(map)
+        state.isOnMap = true
+        return
+      }
+      if (shouldRender || !state.isOnMap) return
+
+      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      state.animationFrame = null
+      state.currentPosition = [...state.targetPosition]
+      state.marker.setLngLat([state.targetPosition[1], state.targetPosition[0]])
+      state.marker.remove()
+      state.isOnMap = false
     })
   }, [])
 
@@ -429,7 +440,7 @@ function PersonnelMap({
       dragRotate: true,
       touchZoomRotate: true,
       touchPitch: true,
-      antialias: true,
+      antialias: false,
       attributionControl: false,
       fadeDuration: 200,
     })
@@ -442,13 +453,24 @@ function PersonnelMap({
       setMapReady(true)
       map.once('idle', rebuildClusterIndex)
     }
-    const handleMoveEnd = () => renderClusters()
+    let clusterZoomBucket = Math.floor(map.getZoom())
+    const handleZoom = () => {
+      const nextZoomBucket = Math.floor(map.getZoom())
+      if (nextZoomBucket === clusterZoomBucket) return
+      clusterZoomBucket = nextZoomBucket
+      renderClusters()
+    }
+    const handleMoveEnd = () => {
+      clusterZoomBucket = Math.floor(map.getZoom())
+      renderClusters()
+    }
     const handleFocusLiveMap = () => {
       map.resize()
       map.easeTo({ center: LIVE_MAP_DEFAULT_CENTER, zoom: LIVE_MAP_DEFAULT_ZOOM, pitch: 0, duration: 700 })
     }
 
     map.on('style.load', handleStyleLoad)
+    map.on('zoom', handleZoom)
     map.on('moveend', handleMoveEnd)
     window.addEventListener('focus-live-map', handleFocusLiveMap)
 
@@ -460,6 +482,8 @@ function PersonnelMap({
       removeNavigationListeners()
       resizeObserver.disconnect()
       window.removeEventListener('focus-live-map', handleFocusLiveMap)
+      map.off('zoom', handleZoom)
+      map.off('moveend', handleMoveEnd)
       markerStates.forEach((state) => {
         if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
         state.marker.remove()
@@ -494,7 +518,6 @@ function PersonnelMap({
         })
         const marker = new maplibregl.Marker({ element: markerElement.button, anchor: 'bottom' })
           .setLngLat([Number(member.longitude), Number(member.latitude)])
-          .addTo(map)
         state = {
           marker,
           element: markerElement.button,
@@ -508,6 +531,7 @@ function PersonnelMap({
           confirmedFix: confirmedFixFromMember(member),
           motionDuration: 0,
           animationFrame: null,
+          isOnMap: false,
         }
         markerStatesRef.current.set(member.id, state)
       }
@@ -543,6 +567,11 @@ function PersonnelMap({
       state.motionDuration = motion.durationMs
       if (from[0] === target[0] && from[1] === target[1]) return
       if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      if (!state.isOnMap && member.id !== followedPersonnelId) {
+        state.currentPosition = target
+        state.marker.setLngLat([target[1], target[0]])
+        return
+      }
       if (member.id === followedPersonnelId) {
         map.easeTo({
           center: [target[1], target[0]],
@@ -653,6 +682,7 @@ function PersonnelMap({
       <div className={`map-connection-badge${isConnected ? ' is-live' : ' is-offline'}`} role="status">
         <span aria-hidden="true" />
         {isConnected ? 'Live data' : 'Connection lost'}
+        {developmentPreviewCount > 0 && <small>Development preview · {developmentPreviewCount} mock markers</small>}
         {lastPersonnelSyncAt && <small>Last sync {new Date(lastPersonnelSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>}
       </div>
       {initialDataError && (

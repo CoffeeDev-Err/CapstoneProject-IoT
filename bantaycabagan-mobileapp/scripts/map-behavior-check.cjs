@@ -137,7 +137,14 @@ assert.doesNotMatch(
 	/mapModeControlExpanded:\s*\{[^}]*width:/,
 	'Expanded mobile map controls must retain their compact fixed width',
 )
-assert.match(nativeMapSource, /compassPosition=\{\{\s*top:\s*150,\s*left:\s*12\s*\}\}/, 'The compass must not sit behind the expanded map control')
+assert.match(nativeMapSource, /compassPosition=\{\{\s*top:\s*compassTop,\s*left:\s*20\s*\}\}/, 'The compass must use the screen-aligned top position')
+assert.match(officerMapScreenSource, /headerVisibility\.addListener\(\(\{ value \}\)/, 'The compass must follow the animated page header')
+assert.match(officerMapScreenSource, /getMapTopControlPosition\([\s\S]*headerVisibilityValue/, 'The compass and top controls must share the animated vertical position')
+assert.match(officerMapScreenSource, /<View style=\{styles\.mapControlStack\}>[\s\S]*<MapControls[\s\S]*<MapLegendControl/, 'The legend must stay directly beneath the expandable layers control')
+assert.match(officerMapScreenSource, /mapControlStack:\s*\{[\s\S]*width:\s*46[\s\S]*gap:\s*8/, 'The stacked map controls must keep matching widths and spacing')
+assert.doesNotMatch(officerMapScreenSource, /legendControl:\s*\{/, 'The legend must not return to a detached lower-left position')
+assert.match(officerMapScreenSource, /Animated\.timing\(revealProgress,[\s\S]*duration:\s*expanded \? 220 : 170[\s\S]*useNativeDriver:\s*true/, 'The legend must animate smoothly in both directions on the native thread')
+assert.match(officerMapScreenSource, /opacity:\s*revealProgress[\s\S]*translateX:[\s\S]*scale:/, 'The legend reveal must combine fade, slide, and scale motion')
 assert.match(nativeMapSource, /nativeEvent\.userInteraction/, 'Header visibility must react only to manual native map gestures')
 assert.match(mainTabsSource, /useNativeDriver:\s*true/, 'Header hiding must stay on the native animation thread')
 assert.match(
@@ -162,7 +169,26 @@ assert.match(
 )
 assert.doesNotMatch(nativeMapSource, /geosentri-patrol-area/, 'The obsolete dashed patrol-radius guide must stay hidden')
 assert.doesNotMatch(officerMapScreenSource, /L\.circle\(/, 'The web fallback must not restore the patrol-radius guide')
-assert.match(officerMapScreenSource, /backgroundColor:\s*'#0b1528'/, 'The backup control must use the navy map-control surface')
+assert.match(
+	officerMapScreenSource,
+	/\{ backgroundColor:\s*colors\.surface,\s*borderColor:\s*colors\.border \}/,
+	'The idle backup control must use the active theme surface and border',
+)
+assert.match(
+	officerMapScreenSource,
+	/activeOwnBackupRequest\s*&&\s*\{ backgroundColor:\s*colors\.danger,\s*borderColor:\s*colors\.danger \}/,
+	'The active backup control must use the danger color',
+)
+assert.match(
+	officerMapScreenSource,
+	/backupActionPending\s*&&\s*!activeOwnBackupRequest\s*&&\s*\{[\s\S]*backgroundColor:\s*colors\.warningSoft,[\s\S]*borderColor:\s*colors\.warning/,
+	'The pending backup control must use the warning theme colors',
+)
+assert.match(
+	officerMapScreenSource,
+	/backupActionPending\s*\?\s*colors\.warning\s*:\s*colors\.text/,
+	'The idle and pending backup icons must remain readable in either theme',
+)
 // The mapHtml memo runs on native too (hooks are unconditional), and Hermes
 // defines `window` but leaves `window.location` undefined, so the host-origin
 // pin must guard the location itself — not just `window` — or the native APK

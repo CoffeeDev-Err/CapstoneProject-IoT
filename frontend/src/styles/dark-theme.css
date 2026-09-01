@@ -237,25 +237,6 @@
 [data-theme="dark"] .coverage-pct       { color: var(--text-muted); }
 
 /* Analytics */
-[data-theme="dark"] .analytics-chart-filter {
-  color: var(--text-muted);
-}
-
-[data-theme="dark"] .analytics-chart-filter__select {
-  border-color: var(--surface-border);
-  background: var(--bg-secondary);
-  color: #e2e8f0;
-}
-
-[data-theme="dark"] .analytics-chart-canvas-wrap {
-  border-color: rgba(148, 163, 184, 0.2);
-  background: var(--bg-secondary);
-}
-
-[data-theme="dark"] .analytics-chart-note {
-  color: var(--text-muted);
-}
-
 [data-theme="dark"] .barangay-analytics__header p,
 [data-theme="dark"] .barangay-analytics__section-header span,
 [data-theme="dark"] .barangay-analytics__summary span,

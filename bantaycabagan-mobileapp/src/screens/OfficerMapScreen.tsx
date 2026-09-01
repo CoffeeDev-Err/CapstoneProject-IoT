@@ -36,7 +36,12 @@ import {
   selectVisiblePersonnel,
 } from '../features/maps/officerMapState';
 import { createLeafletMapHtml } from '../features/maps/leafletMapHtml';
-import { MapControls, type MapMode } from '../features/maps/MapControls';
+import {
+  getMapTopControlPosition,
+  MapControls,
+  MapLegendControl,
+  type MapMode,
+} from '../features/maps/MapControls';
 import { OfficerDetailSheet } from '../features/maps/OfficerDetailSheet';
 import { useMapSelectionController } from '../features/maps/useMapSelectionController';
 
@@ -82,6 +87,7 @@ export default function OfficerMapScreen({
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [backupActionPending, setBackupActionPending] = useState(false);
+  const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>('street');
@@ -96,6 +102,26 @@ export default function OfficerMapScreen({
     inputRange: [0, 1],
     outputRange: [-headerContentHeight, 0],
   }) || 0;
+  const compassTop = getMapTopControlPosition(
+    headerTopInset,
+    headerContentHeight,
+    headerVisibilityValue,
+  );
+
+  useEffect(() => {
+    if (!headerVisibility) {
+      setHeaderVisibilityValue(1);
+      return undefined;
+    }
+
+    const listenerId = headerVisibility.addListener(({ value }) => {
+      setHeaderVisibilityValue((current) => (
+        Math.abs(current - value) < 0.01 ? current : value
+      ));
+    });
+
+    return () => headerVisibility.removeListener(listenerId);
+  }, [headerVisibility]);
 
   useEffect(() => {
     Animated.timing(mapControlsProgress, {
@@ -177,6 +203,10 @@ export default function OfficerMapScreen({
     ? emergencyPersonnelIds.has(selectedOfficer.id)
     : false;
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
+
+  useEffect(() => {
+    if (selectedOfficer) setLegendExpanded(false);
+  }, [selectedOfficer]);
 
   useEffect(() => {
     if (!hasCriticalPersonnel) {
@@ -324,6 +354,7 @@ export default function OfficerMapScreen({
           <OfficerMapCanvas
             ref={nativeMapRef}
             assignment={assignment}
+            compassTop={compassTop}
             currentPersonnelId={currentPersonnelId}
             emergencyPulse={emergencyPulse}
             enable3D={threeDEnabled}
@@ -403,18 +434,25 @@ export default function OfficerMapScreen({
             </View>
           )}
 
-          <MapControls
-            colors={colors}
-            expanded={mapControlsExpanded}
-            legendExpanded={legendExpanded}
-            mapMode={mapMode}
-            progress={mapControlsProgress}
-            setExpanded={setMapControlsExpanded}
-            setLegendExpanded={setLegendExpanded}
-            setMapMode={setMapMode}
-            setThreeDEnabled={setThreeDEnabled}
-            threeDEnabled={threeDEnabled}
-          />
+          <View style={styles.mapControlStack}>
+            <MapControls
+              colors={colors}
+              expanded={mapControlsExpanded}
+              mapMode={mapMode}
+              progress={mapControlsProgress}
+              setExpanded={setMapControlsExpanded}
+              setMapMode={setMapMode}
+              setThreeDEnabled={setThreeDEnabled}
+              threeDEnabled={threeDEnabled}
+            />
+            {!selectedOfficer && (
+              <MapLegendControl
+                colors={colors}
+                expanded={legendExpanded}
+                setExpanded={setLegendExpanded}
+              />
+            )}
+          </View>
         </View>
 
       </AnimatedSafeAreaView>
@@ -467,16 +505,31 @@ export default function OfficerMapScreen({
       {!selectedOfficer && (
         <TouchableOpacity
           accessibilityLabel={activeOwnBackupRequest ? 'Cancel backup request' : 'Request backup'}
-          accessibilityState={{ disabled: backupActionPending }}
+          accessibilityState={{
+            busy: backupActionPending,
+            disabled: backupActionPending,
+            selected: Boolean(activeOwnBackupRequest),
+          }}
           style={[
             styles.backupButton,
-            activeOwnBackupRequest && styles.backupButtonActive,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            activeOwnBackupRequest && { backgroundColor: colors.danger, borderColor: colors.danger },
+            backupActionPending && !activeOwnBackupRequest && {
+              backgroundColor: colors.warningSoft,
+              borderColor: colors.warning,
+            },
             backupActionPending && styles.backupButtonPending,
           ]}
           onPress={activeOwnBackupRequest ? handleCancelBackupRequest : handleBackupRequest}
           disabled={backupActionPending}
         >
-          <Icon name={activeOwnBackupRequest ? 'close' : 'campaign'} size={24} color="#ffffff" />
+          <Icon
+            name={activeOwnBackupRequest ? 'close' : 'campaign'}
+            size={24}
+            color={activeOwnBackupRequest
+              ? '#ffffff'
+              : (backupActionPending ? colors.warning : colors.text)}
+          />
         </TouchableOpacity>
       )}
 
@@ -544,6 +597,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'flex-start',
+    gap: 8,
+  },
+  mapControlStack: {
+    width: 46,
+    alignItems: 'flex-end',
     gap: 8,
   },
   deploymentPill: {
@@ -649,18 +707,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#2a3a56',
     borderRadius: 27,
-    backgroundColor: '#0b1528',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.22,
     shadowRadius: 8,
     elevation: 7,
+    zIndex: 11,
   },
-  backupButtonActive: {
-    borderColor: '#ef4444',
-    backgroundColor: mobileTheme.danger,
-  },
-  backupButtonPending: { opacity: 0.6 },
+  backupButtonPending: { opacity: 0.72 },
 });

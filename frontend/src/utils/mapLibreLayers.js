@@ -5,6 +5,16 @@ const TERRAIN_SOURCE_ID = 'geosentri-terrain'
 const HILLSHADE_LAYER_ID = 'geosentri-terrain-hillshade'
 const BUILDINGS_LAYER_ID = 'geosentri-3d-buildings'
 
+const CABAGAN_TERRAIN_BOUNDS = CABAGAN_BOUNDARY_COORDS.reduce(
+  (bounds, [latitude, longitude]) => [
+    Math.min(bounds[0], longitude),
+    Math.min(bounds[1], latitude),
+    Math.max(bounds[2], longitude),
+    Math.max(bounds[3], latitude),
+  ],
+  [Infinity, Infinity, -Infinity, -Infinity],
+)
+
 const closeRing = (coordinates) => {
   if (coordinates.length === 0) return coordinates
   const [firstLongitude, firstLatitude] = coordinates[0]
@@ -84,19 +94,20 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
       type: 'raster-dem',
       url: getMapTilerWebTerrainUrl(),
       tileSize: 512,
-      maxzoom: 14,
+      maxzoom: 12,
       encoding: 'mapbox',
+      bounds: CABAGAN_TERRAIN_BOUNDS,
     })
   }
 
-  map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.12 })
+  map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.05 })
   if (!map.getLayer(HILLSHADE_LAYER_ID)) {
     addLayerBelowLabels(map, {
       id: HILLSHADE_LAYER_ID,
       type: 'hillshade',
       source: TERRAIN_SOURCE_ID,
       paint: {
-        'hillshade-exaggeration': 0.32,
+        'hillshade-exaggeration': 0.22,
         'hillshade-shadow-color': '#071326',
         'hillshade-highlight-color': '#d8e8ff',
       },
@@ -110,7 +121,8 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
       type: 'fill-extrusion',
       source: basemapSourceId,
       'source-layer': 'building',
-      minzoom: 15,
+      minzoom: 16,
+      filter: ['any', ['has', 'render_height'], ['has', 'height']],
       paint: {
         'fill-extrusion-color': '#b8c4d6',
         'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
@@ -120,6 +132,6 @@ export const applyThreeDimensionalTerrain = (map, enabled) => {
     })
   }
 
-  map.easeTo({ pitch: 52, duration: 650 })
+  map.easeTo({ pitch: 45, duration: 550 })
   return true
 }

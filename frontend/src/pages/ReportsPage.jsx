@@ -63,7 +63,7 @@ function ReportsPage() {
         </div>
       </header>
 
-      <div className="widget-card slide-up report-list-panel">
+      <div className="widget-card slide-up report-list-panel report-list-panel--reports">
         <div className="report-list-panel__header">
           <div>
             <h3 className="widget-title mb-0">Submitted reports</h3>

@@ -16,6 +16,7 @@ export type OfficerMapCanvasHandle = {
 
 export type OfficerMapCanvasProps = {
   assignment?: DeploymentAssignment;
+  compassTop?: number;
   currentPersonnelId: string;
   emergencyPulse: Animated.Value;
   enable3D: boolean;

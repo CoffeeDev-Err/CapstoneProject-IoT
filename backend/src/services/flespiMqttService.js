@@ -7,48 +7,56 @@ const parseEnabled = (value) => !['0', 'false', 'no', 'off'].includes(
 	String(value ?? 'true').trim().toLowerCase(),
 )
 
-const createFlespiMqttService = ({ onDeviceTelemetry }) => {
+const createFlespiMqttService = ({
+	onDeviceTelemetry,
+	mqttConnect = mqtt.connect,
+	environment = process.env,
+	setTimer = setTimeout,
+	clearTimer = clearTimeout,
+	clock = Date.now,
+	logger = console,
+}) => {
 	let client = null
 	let connected = false
 	const pendingDevices = new Map()
 
 	const debounceMs = Math.max(
 		100,
-		Number(process.env.FLESPI_MQTT_DEBOUNCE_MS) || 250,
+		Number(environment.FLESPI_MQTT_DEBOUNCE_MS) || 250,
 	)
-	const topic = String(process.env.FLESPI_MQTT_TOPIC || DEFAULT_TOPIC).trim()
+	const topic = String(environment.FLESPI_MQTT_TOPIC || DEFAULT_TOPIC).trim()
 
 	const clearPendingDevices = () => {
-		for (const timeout of pendingDevices.values()) clearTimeout(timeout)
+		for (const timeout of pendingDevices.values()) clearTimer(timeout)
 		pendingDevices.clear()
 	}
 
 	const scheduleDeviceSync = (deviceId) => {
 		const previousTimeout = pendingDevices.get(deviceId)
-		if (previousTimeout) clearTimeout(previousTimeout)
+		if (previousTimeout) clearTimer(previousTimeout)
 
-		pendingDevices.set(deviceId, setTimeout(async () => {
+		pendingDevices.set(deviceId, setTimer(async () => {
 			pendingDevices.delete(deviceId)
 			try {
 				await onDeviceTelemetry(deviceId)
 			} catch (error) {
-				console.error(`Flespi MQTT device sync failed (${deviceId}):`, error.message)
+				logger.error(`Flespi MQTT device sync failed (${deviceId}):`, error.message)
 			}
 		}, debounceMs))
 	}
 
 	const start = () => {
-		if (!parseEnabled(process.env.FLESPI_MQTT_ENABLED)) return false
+		if (!parseEnabled(environment.FLESPI_MQTT_ENABLED)) return false
 
-		const token = String(process.env.FLESPI_TOKEN || '').trim()
+		const token = String(environment.FLESPI_TOKEN || '').trim()
 		if (!token) return false
 
 		const brokerUrl = String(
-			process.env.FLESPI_MQTT_URL || DEFAULT_BROKER_URL,
+			environment.FLESPI_MQTT_URL || DEFAULT_BROKER_URL,
 		).trim()
-		client = mqtt.connect(brokerUrl, {
+		client = mqttConnect(brokerUrl, {
 			username: token,
-			clientId: `geosentri-backend-${process.pid}-${Date.now().toString(36)}`,
+			clientId: `geosentri-backend-${process.pid}-${clock().toString(36)}`,
 			clean: true,
 			connectTimeout: 10_000,
 			reconnectPeriod: 3_000,
@@ -59,11 +67,11 @@ const createFlespiMqttService = ({ onDeviceTelemetry }) => {
 			client.subscribe(topic, { qos: 1 }, (error) => {
 				if (error) {
 					connected = false
-					console.error('Flespi MQTT subscription failed:', error.message)
+					logger.error('Flespi MQTT subscription failed:', error.message)
 					return
 				}
 				connected = true
-				console.log(`Flespi MQTT connected and subscribed to ${topic}`)
+				logger.log(`Flespi MQTT connected and subscribed to ${topic}`)
 			})
 		})
 
@@ -85,7 +93,7 @@ const createFlespiMqttService = ({ onDeviceTelemetry }) => {
 		})
 		client.on('error', (error) => {
 			connected = false
-			console.error('Flespi MQTT connection error:', error.message)
+			logger.error('Flespi MQTT connection error:', error.message)
 		})
 
 		return true

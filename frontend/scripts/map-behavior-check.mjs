@@ -44,6 +44,10 @@ const mapNavigationSource = fs.readFileSync(
   path.join(projectRoot, 'src', 'utils', 'mapNavigation.js'),
   'utf8',
 )
+const mapPreviewSource = fs.readFileSync(
+  path.join(projectRoot, 'src', 'utils', 'mockMapPersonnel.js'),
+  'utf8',
+)
 const darkThemeSource = fs.readFileSync(
   path.join(projectRoot, 'src', 'styles', 'dark-theme.css'),
   'utf8',
@@ -141,6 +145,11 @@ assert.match(personnelMapSource, /classList\.contains\('is-followed'\)/, 'The fo
 assert.match(personnelMapSource, /cancelAnimationFrame/, 'Superseded marker animations must be cancelled')
 assert.match(personnelMapSource, /markerMotionForFixes/, 'Web markers must use adaptive confirmed-fix motion')
 assert.match(personnelMapSource, /motionDuration/, 'Web cluster centroids must inherit adaptive motion timing')
+assert.match(personnelMapSource, /map\.on\('zoom', handleZoom\)/, 'Clusters must regroup automatically while zooming')
+assert.match(personnelMapSource, /state\.marker\.remove\(\)[\s\S]*state\.isOnMap = false/, 'Clustered DOM markers must leave the active map render loop')
+assert.match(personnelMapSource, /!state\.isOnMap && member\.id !== followedPersonnelId/, 'Hidden clustered markers must skip redundant individual animations')
+assert.match(mapPreviewSource, /import\.meta\.env\.DEV/, 'Mock map markers must remain development-only')
+assert.match(mapPreviewSource, /MOCK_MAP_PERSONNEL_COUNT = 96/, 'Cluster preview must retain a dense marker dataset')
 assert.match(mapControlsSource, /Use street map/, 'Street map control must remain available')
 assert.match(mapControlsSource, /Use satellite map/, 'Satellite map control must remain available')
 assert.match(mapControlsSource, /Enable 3D terrain/, '3D terrain control must remain available')
@@ -182,5 +191,8 @@ assert.match(darkThemeSource, /maptiler-credit/, 'Map attribution must remain re
 assert.match(darkThemeSource, /personnel-table thead/, 'Personnel table header must support dark mode')
 assert.match(mapLayersSource, /setTerrain/, '3D terrain must be applied through MapLibre')
 assert.match(mapLayersSource, /fill-extrusion/, '3D building extrusion must remain configured')
+assert.match(mapLayersSource, /maxzoom:\s*12/, '3D terrain must cap source detail for responsive rendering')
+assert.match(mapLayersSource, /bounds:\s*CABAGAN_TERRAIN_BOUNDS/, '3D terrain requests must stay scoped to Cabagan')
+assert.match(mapLayersSource, /\['has', 'render_height'\]/, '3D buildings must skip polygons without extrusion height data')
 
 process.stdout.write('Web MapLibre checks passed: adaptive confirmed-fix interpolation, speed fallback, jitter suppression, animated clustering, Map/Satellite styles, dark theme, 3D terrain/buildings, and report-route rendering.\n')
