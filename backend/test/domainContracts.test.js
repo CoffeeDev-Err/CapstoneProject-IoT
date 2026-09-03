@@ -12,6 +12,7 @@ const {
 	validateFullName,
 	validateLoginId,
 	validateMobileNumber,
+	validateOfficialEmail,
 } = require('../src/utils/accountValidation')
 
 const isValid = (validator, value, options) => validator(value, options) === ''
@@ -44,6 +45,9 @@ describe('cross-platform domain contracts', () => {
 				isValid(validateLoginId, testCase.value, { accountType: 'officer' }),
 				testCase.valid,
 			)
+		}
+		for (const testCase of contracts.validationCases.officialEmail) {
+			assert.equal(isValid(validateOfficialEmail, testCase.value), testCase.valid)
 		}
 		for (const testCase of contracts.validationCases.mobileNumber) {
 			assert.equal(isValid(validateMobileNumber, testCase.value), testCase.valid)

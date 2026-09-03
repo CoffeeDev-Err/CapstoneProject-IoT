@@ -12,6 +12,7 @@ import {
   validateFullName,
   validateLoginId,
   validateMobileNumber,
+  validateOfficialEmail,
 } from './accountValidation'
 
 const isValid = (validator, value, options) => validator(value, options) === ''
@@ -36,6 +37,9 @@ describe('cross-platform domain contracts', () => {
     })
     contracts.validationCases.officerLoginId.forEach(({ value, valid }) => {
       expect(isValid(validateLoginId, value, { accountType: 'officer' })).toBe(valid)
+    })
+    contracts.validationCases.officialEmail.forEach(({ value, valid }) => {
+      expect(isValid(validateOfficialEmail, value)).toBe(valid)
     })
     contracts.validationCases.mobileNumber.forEach(({ value, valid }) => {
       expect(isValid(validateMobileNumber, value)).toBe(valid)

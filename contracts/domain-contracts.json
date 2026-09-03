@@ -51,6 +51,13 @@
       { "value": "01-2002", "valid": true },
       { "value": "012002", "valid": false }
     ],
+    "officialEmail": [
+      { "value": "leo.b.gannad@isu.edu.ph", "valid": true },
+      { "value": "officer@pnp.gov.ph", "valid": true },
+      { "value": "leo.b.gannad@isu.edu.p", "valid": false },
+      { "value": "officer@pnp", "valid": false },
+      { "value": "officerpnp.gov.ph", "valid": false }
+    ],
     "mobileNumber": [
       { "value": "09108479412", "valid": true },
       { "value": "+639108479412", "valid": true },

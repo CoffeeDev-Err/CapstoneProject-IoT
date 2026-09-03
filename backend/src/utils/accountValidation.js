@@ -34,6 +34,7 @@ const LOGIN_ID_PATTERN = /^\d{2}-\d{4}$/
 const PH_MOBILE_PATTERN = /^(?:09\d{9}|\+639\d{9})$/
 
 const EMAIL_DOMAIN_CORRECTIONS = new Map([
+	['isu.edu.p', 'isu.edu.ph'],
 	['gmai.com', 'gmail.com'],
 	['gmail.co', 'gmail.com'],
 	['gmail.cm', 'gmail.com'],
@@ -113,6 +114,10 @@ const validateOfficialEmail = (value) => {
 			return `Check the email domain. Did you mean ${localPart}@${correctedDomain}?`
 		}
 		if (localPart.length > 64) return 'The email username must not exceed 64 characters.'
+		const topLevelDomain = domain.split('.').at(-1)
+		if (!/^[a-z]{2,63}$/i.test(topLevelDomain || '')) {
+			return 'Enter a complete email address with a valid domain, such as name@isu.edu.ph.'
+		}
 	}
 
 	if (!EMAIL_PATTERN.test(email)) {
