@@ -19,6 +19,11 @@ import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from './features/auth/au
 import { mobileTheme } from './constants/mobileTheme';
 import { useAuth } from './context/AuthContext';
 import {
+  validateLoginIdInput,
+  validateRecoveryIdentifier,
+} from './utils/authValidation';
+import {
+  AuthApiError,
   beginLogin,
   requestPasswordReset,
   resendVerificationCode,
@@ -28,6 +33,7 @@ import {
 } from './services/authApi';
 
 type Mode = 'login' | 'verify' | 'forgot' | 'reset';
+type FieldErrors = Partial<Record<'loginId' | 'password' | 'identifier', string>>;
 
 const isStrongPassword = (value: string) => (
   value.length >= 10
@@ -51,6 +57,16 @@ export default function LoginScreen() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  const clearFieldError = (field: keyof FieldErrors) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
 
   const run = async (operation: () => Promise<void>) => {
     setPending(true);
@@ -65,14 +81,22 @@ export default function LoginScreen() {
     }
   };
 
-  const submitLogin = () => run(async () => {
-    if (!loginId.trim()) throw new Error('Enter your Login ID.');
-    if (!password) throw new Error('Enter your password.');
-    const response = await beginLogin(loginId.trim(), password);
-    setChallenge(response);
-    setCode('');
-    setMode('verify');
-  });
+  const submitLogin = () => {
+    setError('');
+    setMessage('');
+    const loginIdError = validateLoginIdInput(loginId);
+    const nextFieldErrors: FieldErrors = {};
+    if (loginIdError) nextFieldErrors.loginId = loginIdError;
+    if (!password) nextFieldErrors.password = 'Enter your password.';
+    setFieldErrors(nextFieldErrors);
+    if (Object.keys(nextFieldErrors).length > 0) return;
+    return run(async () => {
+      const response = await beginLogin(loginId.trim(), password);
+      setChallenge(response);
+      setCode('');
+      setMode('verify');
+    });
+  };
 
   const submitVerification = () => run(async () => {
     if (!challenge) return;
@@ -81,17 +105,35 @@ export default function LoginScreen() {
     await establishSession(session);
   });
 
-  const submitForgot = () => run(async () => {
-    if (!identifier.trim()) throw new Error('Enter your Login ID or official email.');
-    const response = await requestPasswordReset(identifier.trim());
-    if (response.challengeId) {
-      setChallenge(response);
-      setCode('');
-      setMode('reset');
-      return;
-    }
-    setMessage(response.message || 'If the account exists, a verification code was sent.');
-  });
+  const submitForgot = () => {
+    setError('');
+    setMessage('');
+    const identifierError = validateRecoveryIdentifier(identifier);
+    setFieldErrors(identifierError ? { identifier: identifierError } : {});
+    if (identifierError) return;
+    return run(async () => {
+      try {
+        const response = await requestPasswordReset(identifier.trim());
+        if (response.challengeId) {
+          setChallenge(response);
+          setCode('');
+          setMode('reset');
+          return;
+        }
+        setMessage(response.message || 'A verification code was sent.');
+      } catch (requestError) {
+        if (
+          requestError instanceof AuthApiError
+          && ['ACCOUNT_NOT_FOUND', 'INVALID_LOGIN_ID_FORMAT', 'INVALID_RESET_INPUT']
+            .includes(requestError.code)
+        ) {
+          setFieldErrors({ identifier: requestError.message });
+          return;
+        }
+        throw requestError;
+      }
+    });
+  };
 
   const submitReset = () => run(async () => {
     if (!challenge) return;
@@ -115,13 +157,11 @@ export default function LoginScreen() {
 
   const resend = () => run(async () => {
     if (mode === 'reset') {
-      // Resend through the uniform reset endpoint (never the challenge-scoped
-      // resend) so a resend cannot reveal whether the account exists or leak its
-      // masked email — that would reopen the enumeration the reset flow closes.
+      // Start a fresh reset challenge from the original account identifier.
       const response = await requestPasswordReset(identifier.trim());
       setChallenge(response);
       setCode('');
-      setMessage(response.message || 'If the account exists, a new code was sent.');
+      setMessage(response.message || 'A new verification code was sent.');
     } else {
       if (!challenge) return;
       const response = await resendVerificationCode(challenge.challengeId);
@@ -137,6 +177,7 @@ export default function LoginScreen() {
     setCode('');
     setError('');
     setMessage('');
+    setFieldErrors({});
   };
 
   const handleVerificationCodeChange = (nextCode: string) => {
@@ -186,20 +227,30 @@ export default function LoginScreen() {
                 <Field
                   label="Login ID"
                   value={loginId}
-                  onChangeText={setLoginId}
+                  onChangeText={(value) => {
+                    setLoginId(value);
+                    clearFieldError('loginId');
+                    if (error) setError('');
+                  }}
                   placeholder="e.g., 01-2002"
                   autoCapitalize="none"
                   autoComplete="username"
-                  maxLength={50}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={7}
+                  error={fieldErrors.loginId}
                 />
                 <Field
                   label="Password"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    clearFieldError('password');
+                  }}
                   placeholder="Enter your password"
                   secureTextEntry
                   autoComplete="current-password"
                   maxLength={128}
+                  error={fieldErrors.password}
                 />
                 <TouchableOpacity
                   style={styles.textActionRight}
@@ -208,6 +259,7 @@ export default function LoginScreen() {
                     setMode('forgot');
                     setError('');
                     setMessage('');
+                    setFieldErrors({});
                   }}
                 >
                   <Text style={styles.textAction}>Forgot password?</Text>
@@ -237,11 +289,16 @@ export default function LoginScreen() {
                 <Field
                   label="Login ID or Official Email"
                   value={identifier}
-                  onChangeText={setIdentifier}
+                  onChangeText={(value) => {
+                    setIdentifier(value);
+                    clearFieldError('identifier');
+                    if (error) setError('');
+                  }}
                   placeholder="e.g., 01-2002 or example@gmail.com"
                   autoCapitalize="none"
                   autoComplete="email"
                   maxLength={254}
+                  error={fieldErrors.identifier}
                 />
                 <Feedback error={error} message={message} />
                 <SubmitButton label="Send Reset Code" pending={pending} onPress={submitForgot} />
@@ -284,10 +341,11 @@ export default function LoginScreen() {
 
 function Field({
   label,
+  error,
   style,
   secureTextEntry = false,
   ...props
-}: React.ComponentProps<typeof TextInput> & { label: string }) {
+}: React.ComponentProps<typeof TextInput> & { label: string; error?: string }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   return (
@@ -297,8 +355,14 @@ function Field({
         <TextInput
           {...props}
           secureTextEntry={secureTextEntry && !passwordVisible}
-          style={[styles.input, secureTextEntry && styles.passwordInput, style]}
+          style={[
+            styles.input,
+            secureTextEntry && styles.passwordInput,
+            error && styles.inputError,
+            style,
+          ]}
           placeholderTextColor="#94a3b8"
+          accessibilityHint={error || props.accessibilityHint}
         />
         {secureTextEntry ? (
           <TouchableOpacity
@@ -317,6 +381,7 @@ function Field({
           </TouchableOpacity>
         ) : null}
       </View>
+      {error ? <Text style={styles.fieldError} accessibilityRole="alert">{error}</Text> : null}
     </View>
   );
 }
@@ -435,6 +500,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#0e1a30',
     color: '#f8fafc',
     fontSize: 14,
+  },
+  inputError: {
+    borderColor: mobileTheme.danger,
+  },
+  fieldError: {
+    marginTop: 6,
+    color: '#ef4444',
+    fontSize: 12,
+    lineHeight: 17,
   },
   passwordInputShell: {
     position: 'relative',

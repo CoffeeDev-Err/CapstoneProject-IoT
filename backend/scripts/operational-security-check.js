@@ -280,51 +280,43 @@ assert.match(headers['Content-Security-Policy'], /default-src 'self'/)
 assert.equal(headers['Strict-Transport-Security'], 'max-age=31536000; includeSubDomains')
 assert.equal(headers['Cache-Control'], 'no-store')
 
-// --- Password reset must not enable account enumeration (regression guard) ---
-// The reset endpoint must return an IDENTICAL response for a non-existent account and
-// for a real account whose code cannot be delivered (rate limited / no email / send
-// failure): same keys, same message, a synthetic 24-hex challengeId, and NO maskedEmail.
-// This locks in the enumeration hardening so a future edit cannot silently reopen the
-// oracle (via body shape, status, rate-limit state, or a leaked masked email).
+// --- Password reset must reject unknown accounts before OTP (product requirement) ---
+// The client must never receive a synthetic challenge that advances an unknown Login ID
+// or email to the verification-code screen. Route-level throttling still limits probing.
 ;(async () => {
 	const authService = require('../src/services/authService')
 	const models = require('../src/models')
 	const originalFindOne = models.User.findOne
-	const originalCount = models.EmailVerification.countDocuments
-	const originalConsoleError = console.error
 
 	try {
-		// (i) Account does not exist -> uniform response, no challenge work done.
+		await assert.rejects(
+			() => authService.login({ username: 'admin', password: 'StrongPass1!' }),
+			(error) => error.status === 400 && error.code === 'INVALID_LOGIN_ID_FORMAT',
+		)
 		models.User.findOne = async () => null
-		const missing = await authService.requestPasswordReset(
-			{ identifier: 'ghost@cabagan.gov.ph' },
-			{ requestIp: '203.0.113.10' },
+		await assert.rejects(
+			() => authService.requestPasswordReset(
+				{ identifier: 'ghost@cabagan.gov.ph' },
+				{ requestIp: '203.0.113.10' },
+			),
+			(error) => error.status === 404 && error.code === 'ACCOUNT_NOT_FOUND',
 		)
-
-		// (ii) Account exists but is over the per-user OTP cap -> must look identical.
-		models.User.findOne = async () => ({ _id: 'user-1', email: 'officer@cabagan.gov.ph' })
-		models.EmailVerification.countDocuments = async () => 999
-		console.error = () => {} // swallow the expected server-side "code not delivered" log
-		const throttled = await authService.requestPasswordReset(
-			{ identifier: 'officer@cabagan.gov.ph' },
-			{ requestIp: '203.0.113.10' },
+		await assert.rejects(
+			() => authService.requestPasswordReset(
+				{ identifier: '99-9999' },
+				{ requestIp: '203.0.113.10' },
+			),
+			(error) => error.status === 404 && error.code === 'ACCOUNT_NOT_FOUND',
 		)
-		console.error = originalConsoleError
-
-		const expectedKeys = ['accepted', 'challengeId', 'expiresAt', 'message']
-		assert.deepEqual(Object.keys(missing).sort(), expectedKeys)
-		assert.deepEqual(Object.keys(throttled).sort(), expectedKeys)
-		assert.equal(missing.accepted, true)
-		assert.equal(throttled.accepted, true)
-		assert.equal(missing.message, throttled.message)
-		assert.equal('maskedEmail' in missing, false)
-		assert.equal('maskedEmail' in throttled, false)
-		assert.match(missing.challengeId, /^[0-9a-f]{24}$/)
-		assert.match(throttled.challengeId, /^[0-9a-f]{24}$/)
+		await assert.rejects(
+			() => authService.requestPasswordReset(
+				{ identifier: 'letters-are-not-a-login-id' },
+				{ requestIp: '203.0.113.10' },
+			),
+			(error) => error.status === 400 && error.code === 'INVALID_LOGIN_ID_FORMAT',
+		)
 	} finally {
 		models.User.findOne = originalFindOne
-		models.EmailVerification.countDocuments = originalCount
-		console.error = originalConsoleError
 	}
 
 	// --- Supervisor notification endpoints must ignore a client recipient id ---

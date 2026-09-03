@@ -774,6 +774,10 @@
   height: 44px;
 }
 
+.maplibre-personnel-marker.is-followed {
+  z-index: 10;
+}
+
 .maplibre-personnel-cluster {
   width: 46px;
   height: 46px;

@@ -21,6 +21,10 @@ assert.doesNotMatch(loginPage, /disabled=\{!accountId|disabled=\{code\.length|di
   'Primary authentication actions must remain clickable when required fields are empty')
 assert.match(loginPage, /Login ID is required\.[\s\S]*Password is required\./,
   'Clicking Sign In with empty fields must produce field-level required messages')
+assert.match(loginPage, /LOGIN_ID_PATTERN\.test\(accountId\.trim\(\)\)/,
+  'Web sign-in must reject Login IDs outside the NN-NNNN format')
+assert.match(loginPage, /getRecoveryIdentifierError\(identifier\)/,
+  'Web password recovery must validate a Login ID or official email before requesting OTP')
 assert.match(loginPage, /setFieldErrors\(\{ code: COMPLETE_CODE_MESSAGE \}\)/,
   'Clicking Verify with an incomplete code must explain the missing requirement')
 assert.match(authStyles, /\.login-field-error\s*\{/,

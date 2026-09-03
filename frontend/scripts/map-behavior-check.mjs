@@ -142,6 +142,11 @@ assert.match(personnelMapSource, /STREET_FOCUS_ZOOM = 16/, 'Following must prese
 assert.match(personnelMapSource, /SATELLITE_FOCUS_ZOOM = 15/, 'Following must not over-zoom satellite imagery')
 assert.match(personnelMapSource, /member\.id === followedPersonnelId/, 'The map must follow only the selected officer')
 assert.match(personnelMapSource, /classList\.contains\('is-followed'\)/, 'The followed officer must remain visible outside clusters')
+assert.match(
+  monitoringStyles,
+  /\.maplibre-personnel-marker\.is-followed\s*\{[\s\S]*?z-index:\s*10/,
+  'The followed officer must render above overlapping cluster markers',
+)
 assert.match(personnelMapSource, /cancelAnimationFrame/, 'Superseded marker animations must be cancelled')
 assert.match(personnelMapSource, /markerMotionForFixes/, 'Web markers must use adaptive confirmed-fix motion')
 assert.match(personnelMapSource, /motionDuration/, 'Web cluster centroids must inherit adaptive motion timing')

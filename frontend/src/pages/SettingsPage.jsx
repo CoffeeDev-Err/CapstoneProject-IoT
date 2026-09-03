@@ -463,18 +463,18 @@ function SettingsPage() {
                     value={accountForm.loginId}
                     onChange={handleFieldChange('loginId')}
                     onBlur={handleFieldBlur('loginId')}
-                    placeholder={isEditingSupervisor ? 'e.g., supervisor' : 'e.g., 01-2002'}
+                    placeholder="e.g., 12-2004"
                     inputMode="text"
-                    maxLength={isEditingSupervisor ? ACCOUNT_FIELD_LIMITS.loginId : 7}
+                    maxLength={7}
                     autoComplete="username"
                     spellCheck="false"
                     aria-invalid={Boolean(formErrors.loginId)}
                   />
-                  {!formErrors.loginId && !isEditingSupervisor && (
+                  {!formErrors.loginId && (
                     <small className="settings-hint">
                       {editingAccount?.loginId && !/^\d{2}-\d{4}$/.test(editingAccount.loginId)
-                        ? 'Existing legacy Login ID remains valid. Use the NN-NNNN format if you replace it.'
-                        : 'Use the NN-NNNN format, such as 01-2002.'}
+                        ? 'Replace this legacy Login ID with NN-NNNN before the account signs in again.'
+                        : 'Use the NN-NNNN format, such as 12-2004.'}
                     </small>
                   )}
                   {formErrors.loginId && <small className="field-error">{formErrors.loginId}</small>}

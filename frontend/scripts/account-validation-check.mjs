@@ -27,7 +27,8 @@ assert.equal(validateLoginId('leo.gannad', {
   accountType: 'officer',
   existingLoginId: 'leo.gannad',
 }), '')
-assert.equal(validateLoginId('supervisor', { accountType: 'supervisor' }), '')
+assert.equal(validateLoginId('12-2004', { accountType: 'supervisor' }), '')
+assert.match(validateLoginId('supervisor', { accountType: 'supervisor' }), /NN-NNNN/)
 assert.equal(validateOfficialEmail('officer@gmail.com'), '')
 assert.equal(validateOfficialEmail('officer@pnp.gov.ph'), '')
 assert.match(validateOfficialEmail('officergmail.com'), /complete email/)

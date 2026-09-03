@@ -18,6 +18,10 @@ const {
 } = require('../utils/verification')
 const { sendVerificationCode } = require('./emailService')
 const { toMediaAccessPath } = require('./mediaStorageService')
+const {
+	LOGIN_ID_PATTERN,
+	validateOfficialEmail,
+} = require('../utils/accountValidation')
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const OTP_DURATION_MS = 10 * 60 * 1000
@@ -233,6 +237,13 @@ const login = async (
 	) {
 		throw createAuthError('Login ID and password are required.', 400, 'INVALID_LOGIN_INPUT')
 	}
+	if (!LOGIN_ID_PATTERN.test(normalizedUsername)) {
+		throw createAuthError(
+			'Login ID must use the NN-NNNN format, such as 12-2004.',
+			400,
+			'INVALID_LOGIN_ID_FORMAT',
+		)
+	}
 
 	const user = await User.findOne({
 		username: normalizedUsername,
@@ -316,17 +327,17 @@ const requestPasswordReset = async (
 			'INVALID_RESET_INPUT',
 		)
 	}
-	// Keep the response identical whether or not the account exists — and whether or not
-	// a code could actually be sent — so the endpoint cannot be used to enumerate accounts
-	// (via body, status code, rate-limit state, or delivery failure) or leak a masked email.
-	// Per-IP abuse throttling is handled uniformly by the route rate limiter.
-	const uniformMessage = 'If the account exists, a verification code was sent.'
-	const uniformResponse = () => ({
-		accepted: true,
-		message: uniformMessage,
-		challengeId: randomBytes(12).toString('hex'),
-		expiresAt: new Date(Date.now() + OTP_DURATION_MS).toISOString(),
-	})
+	const isEmailIdentifier = normalizedIdentifier.includes('@')
+	if (isEmailIdentifier) {
+		const emailError = validateOfficialEmail(normalizedIdentifier)
+		if (emailError) throw createAuthError(emailError, 400, 'INVALID_RESET_INPUT')
+	} else if (!LOGIN_ID_PATTERN.test(normalizedIdentifier)) {
+		throw createAuthError(
+			'Login ID must use the NN-NNNN format, such as 12-2004.',
+			400,
+			'INVALID_LOGIN_ID_FORMAT',
+		)
+	}
 	const user = await User.findOne({
 		status: 'active',
 		$or: [
@@ -334,25 +345,22 @@ const requestPasswordReset = async (
 			{ email: normalizedIdentifier },
 		],
 	})
-	if (!user) return uniformResponse()
+	if (!user) {
+		throw createAuthError(
+			'No account was found for that Login ID or official email.',
+			404,
+			'ACCOUNT_NOT_FOUND',
+		)
+	}
 
-	try {
-		const challenge = await createVerificationChallenge(user, 'reset_password', {
-			deviceName,
-			requestIp,
-		})
-		return {
-			accepted: true,
-			message: uniformMessage,
-			challengeId: challenge.challengeId,
-			expiresAt: challenge.expiresAt,
-		}
-	} catch (error) {
-		// A rate-limited account, one with no email configured, or a delivery failure must
-		// look exactly like a non-existent account to the caller. Log server-side for ops;
-		// the per-user cap inside createVerificationChallenge still prevents email flooding.
-		console.error(`Password reset code not delivered for user ${user._id}: ${error.code || error.message}`)
-		return uniformResponse()
+	const challenge = await createVerificationChallenge(user, 'reset_password', {
+		deviceName,
+		requestIp,
+	})
+	return {
+		accepted: true,
+		message: `A verification code was sent to ${challenge.maskedEmail}.`,
+		...challenge,
 	}
 }
 

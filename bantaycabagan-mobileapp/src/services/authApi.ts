@@ -37,6 +37,18 @@ type RequestOptions = RequestInit & {
   token?: string;
 };
 
+export class AuthApiError extends Error {
+  status: number;
+  code: string;
+
+  constructor(message: string, status: number, code = '') {
+    super(message);
+    this.name = 'AuthApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
   const { token, ...fetchOptions } = options;
   let response: Response;
@@ -54,7 +66,11 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.message || 'Unable to complete the request.');
+    throw new AuthApiError(
+      payload.message || 'Unable to complete the request.',
+      response.status,
+      payload.code || '',
+    );
   }
   return payload as T;
 };

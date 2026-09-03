@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto')
 const { Notification, PushDevice } = require('../models')
+const { findCursorPage } = require('./operations/pagination')
 
 const PERSONNEL_ROOM_PREFIX = 'personnel:'
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
@@ -136,6 +137,27 @@ const getNotifications = async (recipientId = 'supervisor') => {
 	return notifications.map(toNotificationPayload)
 }
 
+const getNotificationPage = async (recipientId, query = {}) => {
+	const limit = Math.min(50, Math.max(1, Number.parseInt(query.limit, 10) || 10))
+	const recipientFilter = { recipientId: { $in: [recipientId, 'all'] } }
+	const unreadCountPromise = Notification.countDocuments({
+		...recipientFilter,
+		isRead: false,
+	})
+	const page = await findCursorPage({
+		model: Notification,
+		filter: { ...recipientFilter },
+		dateField: 'createdAt',
+		limit,
+		cursor: query.cursor,
+	})
+	return {
+		notifications: page.data.map(toNotificationPayload),
+		pagination: page.pagination,
+		unreadCount: await unreadCountPromise,
+	}
+}
+
 const markNotificationRead = async (notificationId, recipientId) => {
 	const notification = await Notification.findOneAndUpdate(
 		{
@@ -195,6 +217,7 @@ module.exports = {
 	createNotification,
 	deleteNotifications,
 	deliverNotification,
+	getNotificationPage,
 	getNotifications,
 	markAllNotificationsRead,
 	markNotificationRead,

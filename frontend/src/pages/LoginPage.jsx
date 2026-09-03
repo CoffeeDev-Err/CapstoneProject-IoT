@@ -6,6 +6,10 @@ import VerificationCodeInput from '../components/VerificationCodeInput'
 import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
 import { useAuth } from '../context/useAuth'
 import {
+  LOGIN_ID_PATTERN,
+  validateOfficialEmail,
+} from '../utils/accountValidation'
+import {
   beginLogin,
   requestPasswordReset,
   resendVerificationCode,
@@ -21,6 +25,15 @@ const isStrongPassword = (value) => (
   && /\d/.test(value)
   && /[^A-Za-z0-9]/.test(value)
 )
+
+const LOGIN_ID_FORMAT_MESSAGE = 'Login ID must use the NN-NNNN format, such as 12-2004.'
+
+const getRecoveryIdentifierError = (value) => {
+  const identifier = value.trim()
+  if (!identifier) return 'Login ID or official email is required.'
+  if (identifier.includes('@')) return validateOfficialEmail(identifier)
+  return LOGIN_ID_PATTERN.test(identifier) ? '' : LOGIN_ID_FORMAT_MESSAGE
+}
 
 function LoginPage() {
   const [mode, setMode] = useState('login')
@@ -58,6 +71,9 @@ function LoginPage() {
     clearFeedback()
     const nextFieldErrors = {}
     if (!accountId.trim()) nextFieldErrors.accountId = 'Login ID is required.'
+    else if (!LOGIN_ID_PATTERN.test(accountId.trim())) {
+      nextFieldErrors.accountId = LOGIN_ID_FORMAT_MESSAGE
+    }
     if (!password) nextFieldErrors.password = 'Password is required.'
     setFieldErrors(nextFieldErrors)
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -99,8 +115,9 @@ function LoginPage() {
   const handleForgotPassword = async (event) => {
     event.preventDefault()
     clearFeedback()
-    if (!identifier.trim()) {
-      setFieldErrors({ identifier: 'Login ID or official email is required.' })
+    const identifierError = getRecoveryIdentifierError(identifier)
+    if (identifierError) {
+      setFieldErrors({ identifier: identifierError })
       return
     }
     setFieldErrors({})
@@ -163,13 +180,11 @@ function LoginPage() {
     setPending(true)
     try {
       if (mode === 'reset') {
-        // Resend through the uniform reset endpoint (never the challenge-scoped
-        // resend) so a resend cannot reveal whether the account exists or leak
-        // its masked email — that would reopen the enumeration the reset flow closes.
+        // Start a fresh reset challenge from the original account identifier.
         const nextChallenge = await requestPasswordReset(identifier.trim())
         setChallenge(nextChallenge)
         setCode('')
-        setMessage(nextChallenge.message || 'If the account exists, a new code was sent.')
+        setMessage(nextChallenge.message || 'A new verification code was sent.')
       } else {
         const nextChallenge = await resendVerificationCode(challenge.challengeId)
         setChallenge(nextChallenge)
@@ -249,9 +264,12 @@ function LoginPage() {
                   onChange={(event) => {
                     setAccountId(event.target.value)
                     clearFieldError('accountId')
+                    if (error) setError('')
                   }}
                   autoComplete="username"
-                  maxLength={50}
+                  inputMode="numeric"
+                  pattern="[0-9]{2}-[0-9]{4}"
+                  maxLength={7}
                   required
                   aria-invalid={Boolean(fieldErrors.accountId)}
                 />
@@ -322,8 +340,10 @@ function LoginPage() {
                   onChange={(event) => {
                     setIdentifier(event.target.value)
                     clearFieldError('identifier')
+                    if (error) setError('')
                   }}
                   maxLength={254}
+                  autoComplete="username"
                   required
                   aria-invalid={Boolean(fieldErrors.identifier)}
                 />

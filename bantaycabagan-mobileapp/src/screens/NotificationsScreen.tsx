@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -43,6 +43,45 @@ const formatTimestamp = (value: string) => {
   });
 };
 
+type NotificationRow =
+  | { kind: 'heading'; id: string; label: string }
+  | { kind: 'notification'; id: string; notification: OfficerNotification };
+
+const startOfDay = (date: Date) => new Date(
+  date.getFullYear(),
+  date.getMonth(),
+  date.getDate(),
+);
+
+const dateHeading = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Earlier';
+  const dayDifference = Math.round(
+    (startOfDay(new Date()).getTime() - startOfDay(date).getTime()) / 86_400_000,
+  );
+  if (dayDifference === 0) return 'Today';
+  if (dayDifference === 1) return 'Yesterday';
+  return date.toLocaleDateString('en-PH', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const groupNotifications = (notifications: OfficerNotification[]): NotificationRow[] => {
+  const rows: NotificationRow[] = [];
+  let previousHeading = '';
+  notifications.forEach((notification) => {
+    const heading = dateHeading(notification.timestamp);
+    if (heading !== previousHeading) {
+      rows.push({ kind: 'heading', id: `heading-${heading}`, label: heading });
+      previousHeading = heading;
+    }
+    rows.push({ kind: 'notification', id: notification.id, notification });
+  });
+  return rows;
+};
+
 export default function NotificationsScreen({
   onClose,
 }: {
@@ -53,38 +92,52 @@ export default function NotificationsScreen({
     notifications,
     unreadCount,
     isLoading,
+    isLoadingMore,
+    notificationsHasMore,
+    notificationsError,
+    loadMoreNotifications,
     markAllRead,
     openNotification,
+    refreshNotifications,
   } = useNotifications();
+  const rows = useMemo(() => groupNotifications(notifications), [notifications]);
 
   const handleOpen = useCallback((notification: OfficerNotification) => {
     onClose(() => openNotification(notification));
   }, [onClose, openNotification]);
 
-  const renderNotification = useCallback(({ item }: { item: OfficerNotification }) => {
-    const accent = colorFor(item, colors);
+  const renderNotification = useCallback(({ item }: { item: NotificationRow }) => {
+    if (item.kind === 'heading') {
+      return (
+        <Text style={[styles.dateHeading, { color: colors.textMuted }]}>
+          {item.label}
+        </Text>
+      );
+    }
+    const notification = item.notification;
+    const accent = colorFor(notification, colors);
     return (
       <TouchableOpacity
         activeOpacity={0.75}
         style={[
           styles.notificationCard,
           { borderColor: colors.border, backgroundColor: colors.surfaceMuted },
-          !item.isRead && { borderLeftColor: accent, borderLeftWidth: 3 },
+          !notification.isRead && { borderLeftColor: accent, borderLeftWidth: 3 },
         ]}
-        onPress={() => handleOpen(item)}
+        onPress={() => handleOpen(notification)}
       >
         <View style={[styles.iconShell, { backgroundColor: isDark ? '#132442' : mobileTheme.blueSoft }]}>
-          <Icon name={iconFor(item)} size={20} color={accent} />
+          <Icon name={iconFor(notification)} size={20} color={accent} />
         </View>
         <View style={styles.notificationCopy}>
           <View style={styles.notificationTopRow}>
             <Text style={[styles.notificationTitle, { color: colors.text }]} numberOfLines={1}>
-              {item.title}
+              {notification.title}
             </Text>
-            {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: accent }]} />}
+            {!notification.isRead && <View style={[styles.unreadDot, { backgroundColor: accent }]} />}
           </View>
-          <Text style={[styles.notificationMessage, { color: colors.textMuted }]}>{item.message}</Text>
-          <Text style={[styles.notificationTime, { color: colors.textMuted }]}>{formatTimestamp(item.timestamp)}</Text>
+          <Text style={[styles.notificationMessage, { color: colors.textMuted }]}>{notification.message}</Text>
+          <Text style={[styles.notificationTime, { color: colors.textMuted }]}>{formatTimestamp(notification.timestamp)}</Text>
         </View>
         <Icon name="chevron-right" size={20} color={colors.textMuted} />
       </TouchableOpacity>
@@ -108,7 +161,7 @@ export default function NotificationsScreen({
       </View>
 
       <SheetFlatList
-        data={notifications}
+        data={rows}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
@@ -116,17 +169,59 @@ export default function NotificationsScreen({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
         renderItem={renderNotification}
+        ListFooterComponent={notifications.length > 0 && (notificationsHasMore || notificationsError) ? (
+          <View style={styles.footer}>
+            {notificationsError ? (
+              <Text style={[styles.footerError, { color: mobileTheme.danger }]}>
+                {notificationsError}
+              </Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.loadMoreButton, { borderColor: colors.border }]}
+              onPress={() => loadMoreNotifications().catch(() => undefined)}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? (
+                <ActivityIndicator size="small" color={mobileTheme.blue} />
+              ) : (
+                <Icon name={notificationsError ? 'refresh' : 'expand-more'} size={19} color={mobileTheme.blue} />
+              )}
+              <Text style={styles.loadMoreText}>
+                {isLoadingMore ? 'Loading...' : notificationsError ? 'Try again' : 'See previous notifications'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         ListEmptyComponent={(
           <View style={styles.emptyState}>
             {isLoading ? (
               <ActivityIndicator size="small" color={mobileTheme.blue} />
             ) : (
-              <Icon name="notifications-none" size={38} color={colors.textMuted} />
+              <Icon
+                name={notificationsError ? 'cloud-off' : 'notifications-none'}
+                size={38}
+                color={notificationsError ? mobileTheme.danger : colors.textMuted}
+              />
             )}
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              {isLoading ? 'Loading notifications...' : 'No notifications yet'}
+              {isLoading
+                ? 'Loading notifications...'
+                : notificationsError ? 'Notifications could not be loaded' : 'No notifications yet'}
             </Text>
-            {!isLoading && (
+            {!isLoading && notificationsError ? (
+              <>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                  {notificationsError}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.loadMoreButton, styles.emptyRetryButton, { borderColor: colors.border }]}
+                  onPress={() => refreshNotifications().catch(() => undefined)}
+                >
+                  <Icon name="refresh" size={19} color={mobileTheme.blue} />
+                  <Text style={styles.loadMoreText}>Try again</Text>
+                </TouchableOpacity>
+              </>
+            ) : !isLoading && (
               <Text style={[styles.emptyText, { color: colors.textMuted }]}>
                 Deployment, backup, shift, report, and boundary alerts will appear here.
               </Text>
@@ -147,6 +242,7 @@ const styles = StyleSheet.create({
   readAllButton: { minHeight: 40, paddingHorizontal: 8, justifyContent: 'center' },
   readAllText: { color: mobileTheme.blue, fontSize: 11, fontWeight: '800' },
   list: { paddingHorizontal: 20, paddingBottom: 28, gap: 10, flexGrow: 1 },
+  dateHeading: { marginTop: 6, marginBottom: -2, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   notificationCard: { minHeight: 90, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderRadius: 8 },
   iconShell: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   notificationCopy: { flex: 1 },
@@ -158,4 +254,9 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, minHeight: 280, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
   emptyTitle: { marginTop: 12, fontSize: 15, fontWeight: '800' },
   emptyText: { marginTop: 5, fontSize: 11, lineHeight: 17, textAlign: 'center' },
+  footer: { paddingTop: 4, alignItems: 'center' },
+  footerError: { marginBottom: 8, fontSize: 11, lineHeight: 16, textAlign: 'center' },
+  loadMoreButton: { minHeight: 42, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8 },
+  loadMoreText: { color: mobileTheme.blue, fontSize: 11, fontWeight: '800' },
+  emptyRetryButton: { marginTop: 14 },
 });

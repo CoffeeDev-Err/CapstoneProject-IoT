@@ -30,6 +30,8 @@ import { PolicePageHeader } from '../components/PolicePageHeader';
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
 const PAGE_HEADER_CONTENT_HEIGHT = 54;
+const TAB_BAR_MIN_BOTTOM_OFFSET = 16;
+const TAB_BAR_SYSTEM_GAP = 12;
 
 const tabIcons: Record<string, keyof typeof Icon.glyphMap> = {
   Map: 'map',
@@ -61,6 +63,11 @@ function FloatingTabBar({
   clearNavigationRequest,
 }: FloatingTabBarProps) {
   const { colors, isDark } = useMobileTheme();
+  const insets = useSafeAreaInsets();
+  const bottomOffset = Math.max(
+    TAB_BAR_MIN_BOTTOM_OFFSET,
+    insets.bottom + TAB_BAR_SYSTEM_GAP,
+  );
 
   useEffect(() => {
     if (!navigationRequest) return;
@@ -70,7 +77,13 @@ function FloatingTabBar({
   }, [clearNavigationRequest, navigation, navigationRequest, openTaskModal]);
 
   return (
-    <View style={[styles.floatingBar, isDark && styles.floatingBarDark]}>
+    <View
+      style={[
+        styles.floatingBar,
+        { bottom: bottomOffset },
+        isDark && styles.floatingBarDark,
+      ]}
+    >
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const isTasks = route.name === 'Tasks';
@@ -268,9 +281,8 @@ const styles = StyleSheet.create({
   floatingBar: {
     position: 'absolute',
     right: 45,
-    bottom: 16,
     left: 45,
-    height: 50,
+    height: 58,
     paddingHorizontal: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,13 +302,13 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    height: 55,
+    height: 58,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconShell: {
-    width: 58,
-    height: 43,
+    width: 62,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,

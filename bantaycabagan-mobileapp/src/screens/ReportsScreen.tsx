@@ -1,7 +1,5 @@
 import React, {
   useCallback,
-  useEffect,
-  useMemo,
   useState,
 } from 'react';
 import { Image as CachedImage } from 'expo-image';
@@ -47,6 +45,24 @@ import { useReportFormController } from '../features/reports/useReportFormContro
 const reportTypes = REPORT_TYPES;
 const reportFilters = REPORT_FILTERS;
 const SUBMIT_MODAL_TOP_OFFSET = 1;
+type ReportDatePreset = 'all' | 'today' | '7days' | '30days';
+
+const datePresetLabels: Record<ReportDatePreset, string> = {
+  all: 'All dates',
+  today: 'Today',
+  '7days': 'Last 7 days',
+  '30days': 'Last 30 days',
+};
+
+const dateRangeFor = (preset: ReportDatePreset) => {
+  if (preset === 'all') return {};
+  const to = new Date();
+  const from = new Date(to);
+  if (preset === 'today') from.setHours(0, 0, 0, 0);
+  if (preset === '7days') from.setDate(from.getDate() - 7);
+  if (preset === '30days') from.setDate(from.getDate() - 30);
+  return { from: from.toISOString(), to: to.toISOString() };
+};
 
 export default function ReportsScreen() {
   const { colors, isDark } = useMobileTheme();
@@ -61,6 +77,7 @@ export default function ReportsScreen() {
     refreshReports,
     loadMoreReports,
     reportsHasMore,
+    reportsError,
     isReportsLoading,
     isReportsLoadingMore,
   } = useOperationalContext();
@@ -98,6 +115,8 @@ export default function ReportsScreen() {
     submitReport,
   });
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
+  const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
+  const [dateFiltersVisible, setDateFiltersVisible] = useState(false);
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
   const toggleReport = useCallback((reportId: string) => {
     setExpandedReportIds((current) => {
@@ -111,17 +130,14 @@ export default function ReportsScreen() {
   const selectFilter = useCallback((nextFilter: (typeof reportFilters)[number]) => {
     if (nextFilter === filter) return;
     setFilter(nextFilter);
-  }, [filter]);
+    refreshReports(nextFilter, dateRangeFor(datePreset)).catch(() => undefined);
+  }, [datePreset, filter, refreshReports]);
 
-  useEffect(() => {
-    refreshReports('all').catch(() => undefined);
-  }, [refreshReports]);
-
-  const filteredReports = useMemo(() => reports.filter((report) => {
-    if (filter === 'incident') return report.is_incident;
-    if (filter === 'routine') return !report.is_incident;
-    return true;
-  }), [filter, reports]);
+  const selectDatePreset = useCallback((nextPreset: ReportDatePreset) => {
+    setDatePreset(nextPreset);
+    setDateFiltersVisible(false);
+    refreshReports(filter, dateRangeFor(nextPreset)).catch(() => undefined);
+  }, [filter, refreshReports]);
 
   const renderReport = useCallback(({ item }: { item: PoliceReport }) => (
     <ReportCard
@@ -167,10 +183,52 @@ export default function ReportsScreen() {
         ))}
       </View>
 
+      <View style={styles.dateFilterRow}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ expanded: dateFiltersVisible }}
+          style={[styles.dateFilterButton, isDark && themeStyles.filterButton]}
+          onPress={() => setDateFiltersVisible((visible) => !visible)}
+        >
+          <Icon name="calendar-today" size={16} color={mobileTheme.blue} />
+          <Text style={[styles.dateFilterText, isDark && themeStyles.text]}>
+            {datePresetLabels[datePreset]}
+          </Text>
+          <Icon
+            name={dateFiltersVisible ? 'expand-less' : 'expand-more'}
+            size={18}
+            color={colors.textMuted}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {dateFiltersVisible && (
+        <View style={[styles.datePresetMenu, isDark && themeStyles.surfaceMuted]}>
+          {(Object.keys(datePresetLabels) as ReportDatePreset[]).map((preset) => (
+            <TouchableOpacity
+              key={preset}
+              style={styles.datePresetOption}
+              onPress={() => selectDatePreset(preset)}
+            >
+              <Text style={[
+                styles.datePresetText,
+                isDark && themeStyles.text,
+                datePreset === preset && styles.datePresetTextActive,
+              ]}>
+                {datePresetLabels[preset]}
+              </Text>
+              {datePreset === preset && (
+                <Icon name="check" size={18} color={mobileTheme.blue} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       <View style={styles.listTransition}>
         <FlatList
           key={`reports-${filter}`}
-          data={filteredReports}
+          data={reports}
           keyExtractor={(item) => item.id}
           renderItem={renderReport}
           style={styles.listViewport}
@@ -180,31 +238,55 @@ export default function ReportsScreen() {
           windowSize={7}
           removeClippedSubviews={false}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={reportsHasMore ? (
-            <TouchableOpacity
-              style={[styles.loadMoreButton, isDark && themeStyles.surfaceMuted]}
-              onPress={() => loadMoreReports().catch(() => undefined)}
-              disabled={isReportsLoadingMore}
-            >
-              {isReportsLoadingMore ? (
-                <ActivityIndicator size="small" color={mobileTheme.blue} />
-              ) : (
-                <Icon name="expand-more" size={20} color={mobileTheme.blue} />
-              )}
-              <Text style={styles.loadMoreText}>
-                {isReportsLoadingMore ? 'Loading...' : 'Load more'}
-              </Text>
-            </TouchableOpacity>
+          ListFooterComponent={reports.length > 0 && (reportsHasMore || reportsError) ? (
+            <View style={styles.listFooter}>
+              {reportsError ? (
+                <Text style={styles.listFooterError}>{reportsError}</Text>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.loadMoreButton, isDark && themeStyles.surfaceMuted]}
+                onPress={() => loadMoreReports().catch(() => undefined)}
+                disabled={isReportsLoadingMore}
+              >
+                {isReportsLoadingMore ? (
+                  <ActivityIndicator size="small" color={mobileTheme.blue} />
+                ) : (
+                  <Icon name={reportsError ? 'refresh' : 'expand-more'} size={20} color={mobileTheme.blue} />
+                )}
+                <Text style={styles.loadMoreText}>
+                  {isReportsLoadingMore
+                    ? 'Loading...'
+                    : reportsError ? 'Try again' : 'See previous reports'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
           ListEmptyComponent={(
             <View style={styles.emptyState}>
-              <Icon name="description" size={34} color={colors.textMuted} />
+              <Icon
+                name={reportsError ? 'cloud-off' : 'description'}
+                size={34}
+                color={reportsError ? mobileTheme.danger : colors.textMuted}
+              />
               <Text style={[styles.emptyTitle, isDark && themeStyles.text]}>
-                {isReportsLoading ? 'Loading reports...' : 'No submitted reports'}
+                {isReportsLoading
+                  ? 'Loading reports...'
+                  : reportsError ? 'Reports could not be loaded' : 'No matching reports'}
               </Text>
               <Text style={[styles.emptyText, isDark && themeStyles.muted]}>
-                {isReportsLoading ? 'Getting your latest records.' : 'Reports you submit will appear here.'}
+                {isReportsLoading
+                  ? 'Getting your latest records.'
+                  : reportsError || 'Try another report type or date filter.'}
               </Text>
+              {!isReportsLoading && reportsError ? (
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => refreshReports(filter, dateRangeFor(datePreset)).catch(() => undefined)}
+                >
+                  <Icon name="refresh" size={17} color="#ffffff" />
+                  <Text style={styles.retryButtonText}>Try again</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           )}
         />
@@ -550,6 +632,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  dateFilterRow: { marginHorizontal: 22, marginTop: -7, marginBottom: 12, alignItems: 'flex-end' },
+  dateFilterButton: {
+    minHeight: 40,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
+  },
+  dateFilterText: { color: mobileTheme.text, fontSize: 11, fontWeight: '700' },
+  datePresetMenu: {
+    marginHorizontal: 22,
+    marginTop: -6,
+    marginBottom: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: mobileTheme.border,
+    borderRadius: 8,
+    backgroundColor: mobileTheme.surface,
+  },
+  datePresetOption: {
+    minHeight: 42,
+    paddingHorizontal: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  datePresetText: { color: mobileTheme.text, fontSize: 12, fontWeight: '600' },
+  datePresetTextActive: { color: mobileTheme.blue, fontWeight: '800' },
   listTransition: { flex: 1 },
   listViewport: { flex: 1 },
   filterButton: {
@@ -604,7 +718,11 @@ const styles = StyleSheet.create({
   viewButtonText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
   emptyState: { paddingTop: 80, alignItems: 'center' },
   emptyTitle: { marginTop: 10, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },
-  emptyText: { marginTop: 4, color: mobileTheme.textMuted, fontSize: 12 },
+  emptyText: { marginTop: 4, paddingHorizontal: 24, color: mobileTheme.textMuted, fontSize: 12, textAlign: 'center' },
+  retryButton: { marginTop: 14, minHeight: 42, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, backgroundColor: mobileTheme.blue },
+  retryButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  listFooter: { marginTop: 3 },
+  listFooterError: { marginBottom: 8, paddingHorizontal: 16, color: mobileTheme.danger, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   loadMoreButton: {
     minHeight: 44,
     marginTop: 3,

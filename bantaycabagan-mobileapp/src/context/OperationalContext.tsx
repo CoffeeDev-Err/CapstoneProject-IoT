@@ -28,6 +28,7 @@ import { isActiveTask, mergeById, upsertById } from '../features/operations/oper
 import { useOperationalSocket } from '../features/operations/useOperationalSocket';
 import { useOfflineReportSync } from '../features/reports/useOfflineReportSync';
 import { useReportPagination } from '../features/reports/useReportPagination';
+import type { ReportDateRange } from '../features/reports/useReportPagination';
 import { useTaskHistoryPagination } from '../features/tasks/useTaskHistoryPagination';
 
 type OperationalContextValue = {
@@ -41,6 +42,7 @@ type OperationalContextValue = {
   isReportsLoading: boolean;
   isReportsLoadingMore: boolean;
   reportsHasMore: boolean;
+  reportsError: string;
   isTaskHistoryLoading: boolean;
   isTaskHistoryLoadingMore: boolean;
   taskHistoryHasMore: boolean;
@@ -52,7 +54,10 @@ type OperationalContextValue = {
   submitReport: (input: SubmitReportInput) => Promise<'submitted' | 'queued'>;
   resolveReport: (reportId: string, resolutionNotes: string) => Promise<void>;
   acknowledgeDeployment: (assignmentId: string) => Promise<void>;
-  refreshReports: (category: 'all' | 'incident' | 'routine') => Promise<void>;
+  refreshReports: (
+    category: 'all' | 'incident' | 'routine',
+    dateRange?: ReportDateRange,
+  ) => Promise<void>;
   loadMoreReports: () => Promise<void>;
   refreshTaskHistory: () => Promise<void>;
   loadMoreTaskHistory: () => Promise<void>;
@@ -126,6 +131,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,
+    reportsError,
     refreshReports,
     loadMoreReports,
     resetReportPagination,
@@ -150,6 +156,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setReports([]);
     resetReportPagination();
     resetTaskHistoryPagination();
+    refreshReports('all').catch(() => undefined);
     Promise.all([
       fetchOperations(currentPersonnelId, token),
       fetchLivePersonnel(token),
@@ -165,7 +172,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       })
       .catch(() => undefined)
       .finally(() => setIsLoading(false));
-  }, [currentPersonnelId, resetReportPagination, resetTaskHistoryPagination, token]);
+  }, [currentPersonnelId, refreshReports, resetReportPagination, resetTaskHistoryPagination, token]);
 
   const acceptTask = useCallback(async (taskId: string) => {
     const response = await acceptOperationalTask(taskId, actor, token);
@@ -203,6 +210,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,
+    reportsError,
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,
@@ -231,6 +239,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,
+    reportsError,
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,

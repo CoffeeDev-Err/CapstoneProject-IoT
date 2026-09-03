@@ -5,10 +5,11 @@ const SUPERVISOR_RECIPIENT = 'supervisor'
 
 const createNotificationController = (notificationService) => ({
 	getMyNotifications: async (req, res) => {
-		const notifications = await notificationService.getNotifications(
+		const page = await notificationService.getNotificationPage(
 			req.auth.user.personnelId,
+			req.query,
 		)
-		res.json({ notifications })
+		res.json(page)
 	},
 
 	markMyNotificationRead: async (req, res) => {

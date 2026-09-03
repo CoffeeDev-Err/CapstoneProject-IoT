@@ -86,14 +86,11 @@ export default function OfficerProfileScreen() {
               <Icon name="verified" size={18} color={mobileTheme.blue}/>
             )}
           </View>
-          <Text style={[styles.email, isDark && styles.mutedDark]}>{officer.email}</Text>
           <Text style={styles.rank}>{officer.rank}</Text>
         </View>
 
         <DetailSection title="Personal details">
-          <DetailRow label="Full name" value={officer.name} />
           <DetailRow label="Badge number" value={officer.badge} />
-          <DetailRow label="Rank" value={officer.rank} />
           <DetailRow label="Station" value={officer.station} />
           <DetailRow label="Phone number" value={officer.contact} />
           <DetailRow label="Email" value={officer.email} />
@@ -137,7 +134,7 @@ export default function OfficerProfileScreen() {
             <View style={styles.themeCopy}>
               <Text style={[styles.themeTitle, isDark && styles.textDark]}>Dark Theme</Text>
               <Text style={[styles.themeDescription, isDark && styles.mutedDark]}>
-                Use the secure black-navy interface.
+                Switch between light and dark appearance.
               </Text>
             </View>
             <Switch
@@ -247,7 +244,6 @@ const styles = StyleSheet.create({
   },
   nameLine: { marginTop: 13, flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { color: mobileTheme.text, fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  email: { marginTop: 4, color: mobileTheme.textMuted, fontSize: 13, textAlign: 'center' },
   rank: { marginTop: 5, color: mobileTheme.blue, fontSize: 12, fontWeight: '700' },
   section: { paddingHorizontal: 22, paddingTop: 14 },
   sectionTitle: { marginBottom: 8, color: mobileTheme.text, fontSize: 15, fontWeight: '800' },

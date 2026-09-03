@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Platform } from 'react-native';
@@ -37,11 +38,15 @@ type NotificationContextValue = {
   notifications: OfficerNotification[];
   unreadCount: number;
   isLoading: boolean;
+  isLoadingMore: boolean;
+  notificationsHasMore: boolean;
+  notificationsError: string;
   navigationRequest: NotificationNavigationRequest | null;
   clearNavigationRequest: () => void;
   markAllRead: () => Promise<void>;
   openNotification: (notification: OfficerNotification) => void;
   refreshNotifications: () => Promise<void>;
+  loadMoreNotifications: () => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
@@ -67,8 +72,7 @@ const mergeNotification = (
   return [...byId.values()]
     .sort((first, second) => (
       new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime()
-    ))
-    .slice(0, 100);
+    ));
 };
 
 const destinationFor = (notification: OfficerNotification) => {
@@ -82,24 +86,75 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const { token } = useAuth();
   const [notifications, setNotifications] = useState<OfficerNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [notificationsHasMore, setNotificationsHasMore] = useState(false);
+  const [notificationsError, setNotificationsError] = useState('');
+  const [notificationCursor, setNotificationCursor] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [navigationRequest, setNavigationRequest] = useState<NotificationNavigationRequest | null>(null);
+  const requestIdRef = useRef(0);
 
   const refreshNotifications = useCallback(async () => {
-    if (!token) return;
-    const payload = await fetchMyNotifications(token);
-    setNotifications(payload.notifications);
+    if (!token) {
+      setNotifications([]);
+      setNotificationCursor(null);
+      setNotificationsHasMore(false);
+      setUnreadCount(0);
+      return;
+    }
+    const requestId = ++requestIdRef.current;
+    setIsLoading(true);
+    setNotificationsError('');
+    try {
+      const payload = await fetchMyNotifications(token);
+      if (requestId !== requestIdRef.current) return;
+      setNotifications(payload.notifications);
+      setNotificationCursor(payload.pagination.nextCursor);
+      setNotificationsHasMore(payload.pagination.hasNextPage);
+      setUnreadCount(payload.unreadCount);
+    } catch (error) {
+      if (requestId === requestIdRef.current) {
+        setNotificationsError(error instanceof Error
+          ? error.message
+          : 'Unable to load notifications. Check your connection and try again.');
+      }
+      throw error;
+    } finally {
+      if (requestId === requestIdRef.current) setIsLoading(false);
+    }
   }, [token]);
 
+  const loadMoreNotifications = useCallback(async () => {
+    if (!token || !notificationCursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    setNotificationsError('');
+    try {
+      const payload = await fetchMyNotifications(token, { cursor: notificationCursor });
+      setNotifications((items) => payload.notifications.reduce(mergeNotification, items));
+      setNotificationCursor(payload.pagination.nextCursor);
+      setNotificationsHasMore(payload.pagination.hasNextPage);
+      setUnreadCount(payload.unreadCount);
+    } catch (error) {
+      setNotificationsError(error instanceof Error
+        ? error.message
+        : 'Unable to load previous notifications. Check your connection and try again.');
+      throw error;
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, notificationCursor, token]);
+
   useEffect(() => {
-    setIsLoading(true);
-    refreshNotifications()
-      .catch(() => undefined)
-      .finally(() => setIsLoading(false));
+    refreshNotifications().catch(() => undefined);
   }, [refreshNotifications]);
 
   useEffect(() => {
     const onCreated = (notification: OfficerNotification) => {
-      setNotifications((items) => mergeNotification(items, notification));
+      setNotifications((items) => {
+        const isNew = !items.some((item) => item.id === notification.id);
+        if (isNew && !notification.isRead) setUnreadCount((count) => count + 1);
+        return mergeNotification(items, notification);
+      });
     };
     operationsSocket.on('notification:created', onCreated);
     return () => {
@@ -121,6 +176,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         setNotifications((items) => items.map((item) => (
           item.id === data.notificationId ? { ...item, isRead: true } : item
         )));
+        setUnreadCount((count) => Math.max(0, count - 1));
         markMyNotificationRead(data.notificationId, token).catch(() => undefined);
       }
       setNavigationRequest({
@@ -196,11 +252,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
   }, [token]);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((notification) => !notification.isRead).length,
-    [notifications],
-  );
-
   useEffect(() => {
     if (Platform.OS !== 'web') Notifications.setBadgeCountAsync(unreadCount).catch(() => undefined);
   }, [unreadCount]);
@@ -210,6 +261,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       item.id === notification.id ? { ...item, isRead: true } : item
     )));
     if (token && !notification.isRead) {
+      setUnreadCount((count) => Math.max(0, count - 1));
       markMyNotificationRead(notification.id, token).catch(() => undefined);
     }
     setNavigationRequest({
@@ -222,6 +274,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const markAllRead = useCallback(async () => {
     if (!token) return;
     setNotifications((items) => items.map((item) => ({ ...item, isRead: true })));
+    setUnreadCount(0);
     await markAllMyNotificationsRead(token);
   }, [token]);
 
@@ -229,16 +282,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     notifications,
     unreadCount,
     isLoading,
+    isLoadingMore,
+    notificationsHasMore,
+    notificationsError,
     navigationRequest,
     clearNavigationRequest: () => setNavigationRequest(null),
     markAllRead,
     openNotification,
     refreshNotifications,
+    loadMoreNotifications,
   }), [
     isLoading,
+    isLoadingMore,
+    loadMoreNotifications,
     markAllRead,
     navigationRequest,
     notifications,
+    notificationsError,
+    notificationsHasMore,
     openNotification,
     refreshNotifications,
     unreadCount,

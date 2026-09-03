@@ -11,6 +11,10 @@ const loginSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'LoginScreen.tsx'),
 	'utf8',
 )
+const authValidationSource = fs.readFileSync(
+	path.join(projectRoot, 'src', 'utils', 'authValidation.ts'),
+	'utf8',
+)
 const authContextSource = fs.readFileSync(
 	path.join(projectRoot, 'src', 'context', 'AuthContext.tsx'),
 	'utf8',
@@ -36,6 +40,18 @@ assert.match(verificationCodeSource, /end:\s*normalizedValue\[index\]\s*\?\s*sta
 assert.match(verificationCodeSource, /selection=\{selection\}/)
 assert.match(loginSource, /handleVerificationCodeChange/)
 assert.match(loginSource, /if \(error\) setError\(''\)/)
+assert.ok(authValidationSource.includes('export const LOGIN_ID_PATTERN = /^\\d{2}-\\d{4}$/;'),
+	'Mobile Login IDs must use exactly NN-NNNN')
+assert.match(loginSource, /validateLoginIdInput\(loginId\)/,
+	'Mobile sign-in must validate the Login ID before contacting the backend')
+assert.match(loginSource, /validateRecoveryIdentifier\(identifier\)/,
+	'Mobile password recovery must validate its identifier before requesting OTP')
+assert.match(loginSource, /error=\{fieldErrors\.loginId\}/,
+	'Mobile Login ID validation must render beside the Login ID field')
+assert.match(loginSource, /error=\{fieldErrors\.identifier\}/,
+	'Mobile recovery errors must render beside the recovery identifier field')
+assert.match(loginSource, /requestError instanceof AuthApiError[\s\S]*ACCOUNT_NOT_FOUND[\s\S]*setFieldErrors\(\{ identifier:/,
+	'A nonexistent recovery account must render as an identifier field error')
 assert.doesNotMatch(authContextSource, /expo-secure-store/)
 assert.match(authContextSource, /mobileNumber: identity\.mobileNumber \?\? current\.profile\.mobileNumber/,
 	'The signed-in officer phone number must update without requiring a new login')

@@ -11,6 +11,7 @@ const {
 } = require('../models')
 const { hashPassword } = require('../utils/password')
 const { CABAGAN_BARANGAYS } = require('../constants/cabaganBarangays')
+const { LOGIN_ID_PATTERN } = require('../utils/accountValidation')
 
 const point = (longitude, latitude) => ({
 	type: 'Point',
@@ -109,6 +110,35 @@ const findProvisionedUser = ({ username, email, personnelId }) => {
 	return identities.length
 		? User.findOne({ $or: identities })
 		: null
+}
+
+const migrateProvisionedLoginId = async (
+	user,
+	desiredLoginId,
+	expectedRole,
+	userModel = User,
+) => {
+	if (!user || user.username === desiredLoginId) return false
+	if (user.role !== expectedRole) {
+		throw new Error(`The configured ${expectedRole} identity belongs to a different account role.`)
+	}
+	const conflict = await userModel.findOne({
+		username: desiredLoginId,
+		_id: { $ne: user._id },
+	}).select('_id').lean()
+	if (conflict) {
+		throw new Error(`Login ID ${desiredLoginId} is already assigned to another account.`)
+	}
+	const previousLoginId = user.username
+	user.username = desiredLoginId
+	console.log(`Migrated ${expectedRole} Login ID from ${previousLoginId} to ${desiredLoginId}`)
+	return true
+}
+
+const requireProvisionedLoginId = (loginId, label) => {
+	if (loginId && !LOGIN_ID_PATTERN.test(loginId)) {
+		throw new Error(`${label} must use the NN-NNNN format, such as 12-2004.`)
+	}
 }
 
 const removeLegacySeedData = async () => {
@@ -237,6 +267,7 @@ const seedDatabase = async (models) => {
 	const supervisorPassword = String(process.env.SUPERVISOR_TEMP_PASSWORD || '')
 	const supervisorFullName = String(process.env.SUPERVISOR_FULL_NAME || '').trim()
 	const supervisorRank = String(process.env.SUPERVISOR_RANK || '').trim()
+	requireProvisionedLoginId(supervisorLoginId, 'SUPERVISOR_LOGIN_ID')
 	if (supervisorLoginId && supervisorEmail && supervisorPassword) {
 		const existingSupervisor = await findProvisionedUser({
 			username: supervisorLoginId,
@@ -255,6 +286,7 @@ const seedDatabase = async (models) => {
 			})
 			console.log(`Created initial supervisor account: ${supervisorLoginId}`)
 		} else {
+			await migrateProvisionedLoginId(existingSupervisor, supervisorLoginId, 'supervisor')
 			if (!existingSupervisor.email) existingSupervisor.email = supervisorEmail
 			if (supervisorFullName) existingSupervisor.fullName = supervisorFullName
 			if (supervisorRank) existingSupervisor.rank = supervisorRank
@@ -267,6 +299,7 @@ const seedDatabase = async (models) => {
 	const officerEmail = String(process.env.DEMO_OFFICER_EMAIL || '').trim().toLowerCase()
 	const officerPassword = String(process.env.DEMO_OFFICER_TEMP_PASSWORD || '')
 	const officerPersonnelId = String(process.env.DEMO_OFFICER_PERSONNEL_ID || '').trim()
+	requireProvisionedLoginId(officerLoginId, 'DEMO_OFFICER_LOGIN_ID')
 	if (officerLoginId && officerEmail && officerPassword && officerPersonnelId) {
 		const existingOfficer = await findProvisionedUser({
 			username: officerLoginId,
@@ -285,7 +318,11 @@ const seedDatabase = async (models) => {
 			})
 			console.log(`Created demo officer account: ${officerLoginId}`)
 		} else {
-			let shouldSave = false
+			let shouldSave = await migrateProvisionedLoginId(
+				existingOfficer,
+				officerLoginId,
+				'officer',
+			)
 			if (!existingOfficer.email) {
 				existingOfficer.email = officerEmail
 				shouldSave = true
@@ -310,6 +347,7 @@ const seedDatabase = async (models) => {
 				'mock-officer',
 			),
 		).trim().toLowerCase()
+		requireProvisionedLoginId(mockLoginId, 'MOCK_OFFICER_LOGIN_ID')
 
 		// A committed default password would be a publicly known credential for a
 		// real, loginable officer account, so the operator must supply one.
@@ -347,6 +385,7 @@ const seedDatabase = async (models) => {
 			})
 			console.log(`Created mock officer account: ${mockLoginId}`)
 		} else {
+			await migrateProvisionedLoginId(existingMockOfficer, mockLoginId, 'officer')
 			existingMockOfficer.personnelId = mockOfficerPersonnelId
 			existingMockOfficer.isMockAccount = true
 			if (!existingMockOfficer.email) existingMockOfficer.email = mockEmail
@@ -454,3 +493,5 @@ const seedDatabase = async (models) => {
 
 module.exports = seedDatabase
 module.exports.buildMockDeploymentSeedUpdate = buildMockDeploymentSeedUpdate
+module.exports.migrateProvisionedLoginId = migrateProvisionedLoginId
+module.exports.requireProvisionedLoginId = requireProvisionedLoginId

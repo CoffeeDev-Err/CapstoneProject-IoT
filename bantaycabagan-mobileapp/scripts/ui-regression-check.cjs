@@ -19,6 +19,14 @@ const reportsSource = readFileSync(
   resolve(projectRoot, 'src/screens/ReportsScreen.tsx'),
   'utf8',
 );
+const mainTabsSource = readFileSync(
+  resolve(projectRoot, 'src/navigation/MainTabs.tsx'),
+  'utf8',
+);
+const profileSource = readFileSync(
+  resolve(projectRoot, 'src/screens/OfficerProfileScreen.tsx'),
+  'utf8',
+);
 
 assert.match(operationsApiSource, /import \{ File \} from 'expo-file-system'/);
 assert.match(operationsApiSource, /new File\(input\.evidence_photo\.uri\)/);
@@ -50,6 +58,31 @@ assert.doesNotMatch(
   reportsSource,
   /LinearTransition|layout=\{[^}]*CARD_LAYOUT/,
   'Animated card layout measurements cause large stale gaps after report filter changes',
+);
+assert.match(
+  mainTabsSource,
+  /const bottomOffset = Math\.max\([\s\S]*insets\.bottom \+ TAB_BAR_SYSTEM_GAP/,
+  'The floating tab bar must stay above Android gesture and three-button navigation areas',
+);
+assert.match(
+  mainTabsSource,
+  /floatingBar:[\s\S]*height:\s*58[\s\S]*tabItem:[\s\S]*height:\s*58/,
+  'Bottom navigation must retain a comfortable 58dp touch target',
+);
+assert.doesNotMatch(
+  profileSource,
+  /<Text style=\{\[styles\.email/,
+  'The profile header must show only the officer name and rank below the photo',
+);
+assert.doesNotMatch(
+  profileSource,
+  /<DetailRow label="(?:Full name|Rank)"/,
+  'Personal details must not duplicate the name and rank already shown in the profile header',
+);
+assert.match(
+  profileSource,
+  /Switch between light and dark appearance\./,
+  'The theme preference must use clear user-facing copy',
 );
 
 console.log('Mobile upload and dark-theme UI regression checks passed.');

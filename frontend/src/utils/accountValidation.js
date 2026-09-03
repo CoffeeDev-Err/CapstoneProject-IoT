@@ -29,8 +29,7 @@ export const ACCOUNT_FIELD_LIMITS = Object.freeze({
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
 const FULL_NAME_PATTERN = /^[\p{L}\s.'’-]+$/u
 const BADGE_NUMBER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i
-const OFFICER_LOGIN_ID_PATTERN = /^\d{2}-\d{4}$/
-const SUPERVISOR_LOGIN_ID_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{2,48}[a-z0-9])$/i
+export const LOGIN_ID_PATTERN = /^\d{2}-\d{4}$/
 const PH_MOBILE_PATTERN = /^(?:09\d{9}|\+639\d{9})$/
 
 const EMAIL_DOMAIN_CORRECTIONS = new Map([
@@ -81,23 +80,17 @@ export const validateRank = (value) => (
     : 'Select a valid Philippine National Police rank.'
 )
 
-export const validateLoginId = (value, { accountType = 'officer', existingLoginId = '' } = {}) => {
+export const validateLoginId = (value, { existingLoginId = '' } = {}) => {
   const loginId = normalizeLoginId(value)
   if (!loginId) return 'Login ID is required.'
   if (loginId.length > ACCOUNT_FIELD_LIMITS.loginId) {
     return `Login ID must not exceed ${ACCOUNT_FIELD_LIMITS.loginId} characters.`
   }
-  if (accountType === 'supervisor') {
-    return SUPERVISOR_LOGIN_ID_PATTERN.test(loginId)
-      ? ''
-      : 'Supervisor Login ID must contain 4-50 letters, numbers, periods, underscores, or hyphens.'
-  }
-
   const unchangedLegacyLogin = existingLoginId && loginId === normalizeLoginId(existingLoginId)
   if (unchangedLegacyLogin) return ''
-  return OFFICER_LOGIN_ID_PATTERN.test(loginId)
+  return LOGIN_ID_PATTERN.test(loginId)
     ? ''
-    : 'Officer Login ID must use the NN-NNNN format, such as 01-2002.'
+    : 'Login ID must use the NN-NNNN format, such as 12-2004.'
 }
 
 export const validateOfficialEmail = (value) => {
