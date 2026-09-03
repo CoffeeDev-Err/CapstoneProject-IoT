@@ -701,12 +701,11 @@ nano /var/www/geosentri/backend/.env
 
 ```dotenv
 SUPERVISOR_LOGIN_ID=00-0001
-DEMO_OFFICER_LOGIN_ID=12-2004
 ```
 
-The next startup finds the existing provisioned accounts through their official
-email/personnel identity and changes only their Login ID. It refuses to take an
-ID that already belongs to another account.
+Do not change `DEMO_OFFICER_LOGIN_ID` during this deployment. The next startup
+finds the existing supervisor through its official email and changes only its
+Login ID. It refuses to take an ID that already belongs to another account.
 
 Install, validate, build, and restart:
 
@@ -732,6 +731,21 @@ curl http://127.0.0.1/api/health
 The expected migration log includes the supervisor Login ID changing to
 `00-0001`. Sign in through the web portal with that Login ID, the existing
 supervisor password, and the OTP sent to the official supervisor email.
+
+If an earlier deployment created both a legacy `supervisor` record and a new
+`00-0001` record, reconcile them before signing in. Review the dry-run plan,
+then apply it:
+
+```bash
+cd /var/www/geosentri/backend
+npm run migrate:supervisor-login
+npm run migrate:supervisor-login -- --apply
+```
+
+The guarded migration only removes an unused, never-logged-in placeholder,
+then assigns `00-0001` to the established active supervisor. It preserves the
+established password and account identity and aborts if the records are
+ambiguous or the placeholder has ever been used.
 
 After the backend is healthy, build the mobile preview APK from the local
 computer. EAS uploads the local mobile project, so GitHub is not required for

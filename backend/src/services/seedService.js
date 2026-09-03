@@ -112,6 +112,20 @@ const findProvisionedUser = ({ username, email, personnelId }) => {
 		: null
 }
 
+const findProvisionedSupervisor = async ({ username, email }, userModel = User) => {
+	const emailMatch = email ? await userModel.findOne({ email }) : null
+	if (emailMatch) return emailMatch
+	const usernameMatch = username ? await userModel.findOne({ username }) : null
+	if (usernameMatch) return usernameMatch
+	const supervisors = await userModel.find({ role: 'supervisor' }).limit(2)
+	if (supervisors.length > 1) {
+		throw new Error(
+			'Multiple supervisor accounts exist but none matches the configured Login ID or email.',
+		)
+	}
+	return supervisors[0] || null
+}
+
 const migrateProvisionedLoginId = async (
 	user,
 	desiredLoginId,
@@ -269,7 +283,7 @@ const seedDatabase = async (models) => {
 	const supervisorRank = String(process.env.SUPERVISOR_RANK || '').trim()
 	requireProvisionedLoginId(supervisorLoginId, 'SUPERVISOR_LOGIN_ID')
 	if (supervisorLoginId && supervisorEmail && supervisorPassword) {
-		const existingSupervisor = await findProvisionedUser({
+		const existingSupervisor = await findProvisionedSupervisor({
 			username: supervisorLoginId,
 			email: supervisorEmail,
 		})
@@ -299,7 +313,6 @@ const seedDatabase = async (models) => {
 	const officerEmail = String(process.env.DEMO_OFFICER_EMAIL || '').trim().toLowerCase()
 	const officerPassword = String(process.env.DEMO_OFFICER_TEMP_PASSWORD || '')
 	const officerPersonnelId = String(process.env.DEMO_OFFICER_PERSONNEL_ID || '').trim()
-	requireProvisionedLoginId(officerLoginId, 'DEMO_OFFICER_LOGIN_ID')
 	if (officerLoginId && officerEmail && officerPassword && officerPersonnelId) {
 		const existingOfficer = await findProvisionedUser({
 			username: officerLoginId,
@@ -318,11 +331,7 @@ const seedDatabase = async (models) => {
 			})
 			console.log(`Created demo officer account: ${officerLoginId}`)
 		} else {
-			let shouldSave = await migrateProvisionedLoginId(
-				existingOfficer,
-				officerLoginId,
-				'officer',
-			)
+			let shouldSave = false
 			if (!existingOfficer.email) {
 				existingOfficer.email = officerEmail
 				shouldSave = true
@@ -493,5 +502,6 @@ const seedDatabase = async (models) => {
 
 module.exports = seedDatabase
 module.exports.buildMockDeploymentSeedUpdate = buildMockDeploymentSeedUpdate
+module.exports.findProvisionedSupervisor = findProvisionedSupervisor
 module.exports.migrateProvisionedLoginId = migrateProvisionedLoginId
 module.exports.requireProvisionedLoginId = requireProvisionedLoginId
