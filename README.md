@@ -27,11 +27,11 @@ BantayCabagan is an IoT-enabled public safety and police operations platform for
 
 ```text
 CapstoneProject-IoT/
-â”œâ”€â”€ backend/                    # API, realtime services, and integrations
-â”œâ”€â”€ frontend/                   # Web operations dashboard
-â”œâ”€â”€ bantaycabagan-mobileapp/    # Expo mobile application
-â”œâ”€â”€ contracts/                  # Shared domain contracts and fixtures
-â””â”€â”€ docs/                       # API, security, storage, and deployment notes
+├── backend/                    # API, realtime services, and integrations
+├── frontend/                   # Web operations dashboard
+├── bantaycabagan-mobileapp/    # Expo mobile application
+├── contracts/                  # Shared domain contracts and fixtures
+└── docs/                       # API, security, storage, and deployment notes
 ```
 
 ## Requirements
@@ -63,9 +63,9 @@ AWS S3 and Gmail credentials are optional integrations for private media storage
 
 3. Create local environment files from these templates and replace the placeholder values:
 
-   - `backend/.env.example` â†’ `backend/.env`
-   - `frontend/.env.example` â†’ `frontend/.env`
-   - `bantaycabagan-mobileapp/.env.example` â†’ `bantaycabagan-mobileapp/.env`
+   - `backend/.env.example` → `backend/.env`
+   - `frontend/.env.example` → `frontend/.env`
+   - `bantaycabagan-mobileapp/.env.example` → `bantaycabagan-mobileapp/.env`
 
 4. Start the backend and web dashboard together.
 
