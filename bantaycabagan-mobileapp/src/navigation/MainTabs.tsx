@@ -30,8 +30,8 @@ import { PolicePageHeader } from '../components/PolicePageHeader';
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
 const PAGE_HEADER_CONTENT_HEIGHT = 54;
-const TAB_BAR_MIN_BOTTOM_OFFSET = 16;
-const TAB_BAR_SYSTEM_GAP = 12;
+const TAB_BAR_MIN_BOTTOM_OFFSET = 8;
+const TAB_BAR_SYSTEM_GAP = 4;
 
 const tabIcons: Record<string, keyof typeof Icon.glyphMap> = {
   Map: 'map',
@@ -118,7 +118,7 @@ function FloatingTabBar({
             <View style={[styles.iconShell, focused && styles.iconShellActive]}>
               <Icon
                 name={tabIcons[route.name]}
-                size={24}
+                size={22}
                 color={focused ? '#ffffff' : colors.textMuted}
               />
               {isTasks && openTaskCount > 0 && (
@@ -282,19 +282,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 45,
     left: 45,
-    height: 58,
+    height: 52,
     paddingHorizontal: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: mobileTheme.borderSoft,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: '#ffffff',
     shadowColor: mobileTheme.navy,
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 8,
   },
   floatingBarDark: {
     borderColor: '#22314a',
@@ -302,13 +302,13 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    height: 58,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconShell: {
-    width: 62,
-    height: 48,
+    width: 58,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   iconShellActive: {
     backgroundColor: mobileTheme.blue,
-    borderRadius: 15,
+    borderRadius: 14,
   },
   tabLabel: {
     fontSize: 8,

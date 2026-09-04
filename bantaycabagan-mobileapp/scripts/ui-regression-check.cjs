@@ -60,14 +60,24 @@ assert.doesNotMatch(
   'Animated card layout measurements cause large stale gaps after report filter changes',
 );
 assert.match(
+  reportsSource,
+  /contentContainerStyle=\{styles\.dateFilterChips\}[\s\S]*Object\.keys\(datePresetLabels\)/,
+  'Date presets must remain directly visible as compact, horizontally scrollable chips',
+);
+assert.doesNotMatch(
+  reportsSource,
+  /dateFiltersVisible|datePresetMenu/,
+  'Fixed report date presets must not open an oversized dropdown or modal',
+);
+assert.match(
   mainTabsSource,
   /const bottomOffset = Math\.max\([\s\S]*insets\.bottom \+ TAB_BAR_SYSTEM_GAP/,
   'The floating tab bar must stay above Android gesture and three-button navigation areas',
 );
 assert.match(
   mainTabsSource,
-  /floatingBar:[\s\S]*height:\s*58[\s\S]*tabItem:[\s\S]*height:\s*58/,
-  'Bottom navigation must retain a comfortable 58dp touch target',
+  /TAB_BAR_SYSTEM_GAP = 4[\s\S]*floatingBar:[\s\S]*height:\s*52[\s\S]*tabItem:[\s\S]*height:\s*52/,
+  'Bottom navigation must stay compact while retaining a touch target above the Android safe area',
 );
 assert.doesNotMatch(
   profileSource,

@@ -50,8 +50,8 @@ type ReportDatePreset = 'all' | 'today' | '7days' | '30days';
 const datePresetLabels: Record<ReportDatePreset, string> = {
   all: 'All dates',
   today: 'Today',
-  '7days': 'Last 7 days',
-  '30days': 'Last 30 days',
+  '7days': '7 days',
+  '30days': '30 days',
 };
 
 const dateRangeFor = (preset: ReportDatePreset) => {
@@ -116,7 +116,6 @@ export default function ReportsScreen() {
   });
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
   const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
-  const [dateFiltersVisible, setDateFiltersVisible] = useState(false);
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
   const toggleReport = useCallback((reportId: string) => {
     setExpandedReportIds((current) => {
@@ -134,10 +133,10 @@ export default function ReportsScreen() {
   }, [datePreset, filter, refreshReports]);
 
   const selectDatePreset = useCallback((nextPreset: ReportDatePreset) => {
+    if (nextPreset === datePreset) return;
     setDatePreset(nextPreset);
-    setDateFiltersVisible(false);
     refreshReports(filter, dateRangeFor(nextPreset)).catch(() => undefined);
-  }, [filter, refreshReports]);
+  }, [datePreset, filter, refreshReports]);
 
   const renderReport = useCallback(({ item }: { item: PoliceReport }) => (
     <ReportCard
@@ -184,46 +183,46 @@ export default function ReportsScreen() {
       </View>
 
       <View style={styles.dateFilterRow}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ expanded: dateFiltersVisible }}
-          style={[styles.dateFilterButton, isDark && themeStyles.filterButton]}
-          onPress={() => setDateFiltersVisible((visible) => !visible)}
+        <ScrollView
+          horizontal
+          contentContainerStyle={styles.dateFilterChips}
+          showsHorizontalScrollIndicator={false}
         >
-          <Icon name="calendar-today" size={16} color={mobileTheme.blue} />
-          <Text style={[styles.dateFilterText, isDark && themeStyles.text]}>
-            {datePresetLabels[datePreset]}
-          </Text>
-          <Icon
-            name={dateFiltersVisible ? 'expand-less' : 'expand-more'}
-            size={18}
-            color={colors.textMuted}
-          />
-        </TouchableOpacity>
+          {(Object.keys(datePresetLabels) as ReportDatePreset[]).map((preset) => {
+            const selected = datePreset === preset;
+            return (
+              <TouchableOpacity
+                key={preset}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                style={[
+                  styles.datePresetChip,
+                  isDark && themeStyles.filterButton,
+                  selected && styles.datePresetChipActive,
+                  isDark && selected && themeStyles.filterButtonActive,
+                ]}
+                onPress={() => selectDatePreset(preset)}
+              >
+                {preset === 'all' && (
+                  <Icon
+                    name="calendar-today"
+                    size={15}
+                    color={selected ? mobileTheme.blue : colors.textMuted}
+                  />
+                )}
+                <Text style={[
+                  styles.datePresetChipText,
+                  isDark && themeStyles.muted,
+                  selected && styles.datePresetChipTextActive,
+                  isDark && selected && themeStyles.text,
+                ]}>
+                  {datePresetLabels[preset]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
-
-      {dateFiltersVisible && (
-        <View style={[styles.datePresetMenu, isDark && themeStyles.surfaceMuted]}>
-          {(Object.keys(datePresetLabels) as ReportDatePreset[]).map((preset) => (
-            <TouchableOpacity
-              key={preset}
-              style={styles.datePresetOption}
-              onPress={() => selectDatePreset(preset)}
-            >
-              <Text style={[
-                styles.datePresetText,
-                isDark && themeStyles.text,
-                datePreset === preset && styles.datePresetTextActive,
-              ]}>
-                {datePresetLabels[preset]}
-              </Text>
-              {datePreset === preset && (
-                <Icon name="check" size={18} color={mobileTheme.blue} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
       <View style={styles.listTransition}>
         <FlatList
@@ -632,38 +631,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  dateFilterRow: { marginHorizontal: 22, marginTop: -7, marginBottom: 12, alignItems: 'flex-end' },
-  dateFilterButton: {
+  dateFilterRow: { marginTop: -7, marginBottom: 12 },
+  dateFilterChips: {
+    paddingHorizontal: 22,
+    gap: 8,
+  },
+  datePresetChip: {
     minHeight: 40,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 7,
     borderWidth: 1,
     borderColor: mobileTheme.border,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: mobileTheme.surface,
   },
-  dateFilterText: { color: mobileTheme.text, fontSize: 11, fontWeight: '700' },
-  datePresetMenu: {
-    marginHorizontal: 22,
-    marginTop: -6,
-    marginBottom: 12,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: mobileTheme.border,
-    borderRadius: 8,
-    backgroundColor: mobileTheme.surface,
-  },
-  datePresetOption: {
-    minHeight: 42,
-    paddingHorizontal: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  datePresetText: { color: mobileTheme.text, fontSize: 12, fontWeight: '600' },
-  datePresetTextActive: { color: mobileTheme.blue, fontWeight: '800' },
+  datePresetChipActive: { borderColor: mobileTheme.blue, backgroundColor: '#edf4ff' },
+  datePresetChipText: { color: mobileTheme.textMuted, fontSize: 11, fontWeight: '700' },
+  datePresetChipTextActive: { color: mobileTheme.blue, fontWeight: '800' },
   listTransition: { flex: 1 },
   listViewport: { flex: 1 },
   filterButton: {
