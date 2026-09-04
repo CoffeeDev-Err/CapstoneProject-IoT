@@ -21,7 +21,7 @@ BantayCabagan is an IoT-enabled public safety and police operations platform for
 | --- | --- | --- |
 | `frontend` | Supervisor and operations dashboard | React, Vite, Bootstrap, MapLibre GL |
 | `bantaycabagan-mobileapp` | Field personnel mobile application | Expo, React Native, TypeScript, MapLibre |
-| `backend` | REST API, realtime events, telemetry, and persistence | Node.js, Express, MongoDB, Socket.IO, MQTT |
+| `backend` | REST API, realtime events, telemetry, and persistence | Node.js, Express, MongoDB, Socket.IO, MQTT, AWS SDK |
 
 ## Project structure
 
@@ -42,8 +42,19 @@ CapstoneProject-IoT/
 - MapTiler API key for map tiles
 - Flespi credentials for live GPS devices
 - Expo development environment for the mobile app
+- An AWS account with EC2, S3, and IAM access for the recommended production deployment
 
-AWS S3 and Gmail credentials are optional integrations for private media storage and email delivery.
+Local development can use filesystem media storage. In production, the recommended architecture runs the web dashboard and API on a single AWS EC2 instance and stores private media in Amazon S3.
+
+## AWS infrastructure
+
+- **Amazon EC2** hosts the built dashboard and the always-on Node.js API.
+- **Amazon S3** stores private officer profile photos and report evidence.
+- **AWS IAM** restricts the backend to the required S3 bucket and media prefixes.
+- **Elastic IP** provides a stable address for DNS and the MongoDB Atlas allowlist.
+- **Nginx, TLS, and PM2** proxy HTTPS/WebSocket traffic and keep the application running on EC2.
+
+The backend must run as a single process because it owns the realtime socket rooms, GPS broadcasts, Flespi synchronization, and operational timers. See [AWS deployment](docs/AWS_DEPLOYMENT.md) and [S3 media storage](docs/S3_MEDIA_STORAGE.md) for the complete production setup.
 
 ## Local development
 
