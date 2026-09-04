@@ -13,8 +13,9 @@
     "test:map": "node scripts/map-behavior-check.cjs",
     "test:storage": "node scripts/storage-lifecycle-check.cjs",
     "test:security": "node scripts/asset-security-check.cjs",
+    "test:build-config": "node scripts/build-config-check.cjs",
     "test:ui": "node scripts/ui-regression-check.cjs",
-    "check": "npm run test:security && npm run typecheck && npm test && npm run test:auth && npm run test:map && npm run test:storage && npm run test:ui"
+    "check": "npm run test:security && npm run test:build-config && npm run typecheck && npm test && npm run test:auth && npm run test:map && npm run test:storage && npm run test:ui"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
