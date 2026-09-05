@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useCachedPageData } from '../../hooks/useCachedPageData'
 import { getReportsList, updateReportValidation } from '../../services/operations'
 import {
   downloadReportCsv,
@@ -15,13 +16,17 @@ export function useReportsPageState({ refreshReports, reportsRevision, showFeedb
   const [caseStatusFilter, setCaseStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('submitted_at')
   const [sortOrder, setSortOrder] = useState('desc')
-  const [reportResults, setReportResults] = useState({
-    data: [], pagination: EMPTY_PAGINATION, requestKey: '', error: '',
-  })
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [reviewState, setReviewState] = useState({ isSaving: false, error: '', message: '' })
-  const requestKey = [debouncedSearchTerm, reportTypeFilter, caseStatusFilter,
-    sortBy, sortOrder, refreshVersion, reportsRevision].join('|')
+  // Revisions trigger a refresh, not a new cache entry. Filter variants must
+  // stay separate so a previous query's rows are never shown for a new query.
+  const queryKey = JSON.stringify([debouncedSearchTerm, reportTypeFilter,
+    caseStatusFilter, sortBy, sortOrder])
+  const requestKey = JSON.stringify([queryKey, refreshVersion, reportsRevision])
+  const [reportResults, setReportResults, hasReports] = useCachedPageData(`reports:${queryKey}`, {
+    data: [], pagination: EMPTY_PAGINATION,
+  })
+  const [requestOutcome, setRequestOutcome] = useState({ requestKey: '', error: '' })
 
   useEffect(() => {
     const requestController = new AbortController()
@@ -35,11 +40,13 @@ export function useReportsPageState({ refreshReports, reportsRevision, showFeedb
       sortOrder,
       signal: requestController.signal,
     }).then((result) => {
-      if (isCurrent) setReportResults({ ...result, requestKey, error: '' })
+      if (!isCurrent) return
+      setReportResults(result)
+      setRequestOutcome({ requestKey, error: '' })
     }).catch((error) => {
       if (!isCurrent || error?.name === 'AbortError') return
-      setReportResults({
-        data: [], pagination: EMPTY_PAGINATION, requestKey,
+      setRequestOutcome({
+        requestKey,
         error: error.message || 'Reports could not be loaded.',
       })
     })
@@ -48,7 +55,7 @@ export function useReportsPageState({ refreshReports, reportsRevision, showFeedb
       requestController.abort()
     }
   }, [caseStatusFilter, debouncedSearchTerm, refreshVersion, reportTypeFilter,
-    reportsRevision, requestKey, sortBy, sortOrder])
+    reportsRevision, requestKey, setReportResults, sortBy, sortOrder])
 
   const reports = reportResults.data
   const selectedReport = reports.find((report) => report.id === selectedReportId) || null
@@ -89,11 +96,12 @@ export function useReportsPageState({ refreshReports, reportsRevision, showFeedb
     handleDownloadReport,
     handleOpenReport,
     handleValidationChange,
-    isReportsLoading: reportResults.requestKey !== requestKey,
+    isReportsLoading: !hasReports && requestOutcome.requestKey !== requestKey,
     pagination: reportResults.pagination,
     reportTypeFilter,
     reports,
-    reportsError: reportResults.error,
+    reportsError: requestOutcome.requestKey === requestKey ? requestOutcome.error : '',
+    retryReports: () => setRefreshVersion((version) => version + 1),
     reviewState,
     searchTerm,
     selectedReport,

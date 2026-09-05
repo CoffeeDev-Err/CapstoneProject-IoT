@@ -149,3 +149,109 @@
   .personnel-search,
   .personnel-toolbar > small { grid-column: 1; }
 }
+
+/* Match the Reports identity, filter, and action treatment without a tall empty table. */
+.personnel-page { min-width: 0; }
+.personnel-roster-heading { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.personnel-roster-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--bg-primary));
+  color: var(--color-primary);
+}
+.personnel-roster-icon svg { width: 22px; height: 22px; }
+.personnel-demo-note { color: var(--text-tertiary); font-size: var(--font-size-xs); }
+.personnel-roster-card .record-scroll-container {
+  height: auto;
+  max-height: min(65dvh, 680px);
+  scrollbar-gutter: auto;
+}
+.personnel-roster-card .personnel-table { table-layout: fixed; }
+.personnel-roster-card .personnel-table th { border-bottom-width: 1px; }
+.personnel-roster-card .personnel-table th:nth-child(1) { width: 26%; }
+.personnel-roster-card .personnel-table th:nth-child(2) { width: 18%; }
+.personnel-roster-card .personnel-table th:nth-child(3) { width: 17%; }
+.personnel-roster-card .personnel-table th:nth-child(4) { width: 23%; }
+.personnel-roster-card .personnel-table th:nth-child(5) { width: 16%; }
+.personnel-roster-card .personnel-row td {
+  padding: 1rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color-light);
+  overflow-wrap: anywhere;
+}
+.personnel-roster-card .personnel-row:last-child td { border-bottom: 0; }
+.personnel-roster-card .personnel-row:hover { background: var(--bg-secondary); }
+.personnel-roster-card .report-list__officer strong,
+.personnel-roster-card .report-list__officer small { white-space: normal; overflow-wrap: anywhere; }
+.personnel-roster-card .report-list__avatar { width: 40px; height: 40px; border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent); }
+.personnel-rank { color: var(--text-secondary); font-weight: 600; }
+.personnel-roster-card .status-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: var(--font-size-xs); }
+.personnel-status-dot { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+[data-theme="dark"] .personnel-roster-card .status-badge {
+  color: color-mix(in srgb, var(--status-color) 55%, white);
+}
+.personnel-location { display: flex; align-items: flex-start; gap: 0.4rem; line-height: 1.5; }
+.personnel-location svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 0.15rem; color: var(--text-muted); }
+.personnel-roster-card .personnel-actions-heading,
+.personnel-roster-card .personnel-actions { text-align: right; }
+.personnel-roster-card .personnel-actions .report-action-btn { white-space: normal; min-height: 40px; }
+.personnel-roster-card .report-action-btn:disabled {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.personnel-roster-card button:focus-visible,
+.personnel-table-wrap:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.personnel-map-unavailable { display: block; color: var(--text-tertiary); font-size: var(--font-size-xs); margin-top: 0.35rem; }
+.personnel-roster-note { display: flex; align-items: flex-start; gap: 0.4rem; margin: 0.85rem 0 0; color: var(--text-tertiary); font-size: var(--font-size-xs); }
+.personnel-roster-note svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.personnel-mobile-label { display: none; }
+.personnel-empty .report-list-empty { border: 0; }
+.personnel-empty .report-list-empty > svg { margin: 0 auto 0.5rem; }
+.personnel-empty .report-action-btn { justify-self: center; margin-top: 0.75rem; }
+
+@media (max-width: 900px) {
+  .personnel-roster-card .personnel-table { min-width: 0; display: block; }
+  .personnel-roster-card .personnel-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .personnel-roster-card .personnel-table tbody { display: block; }
+  .personnel-roster-card .personnel-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .personnel-roster-card .personnel-row:last-child { border-bottom: 0; }
+  .personnel-roster-card .personnel-row td { display: block; min-width: 0; padding: 0; border: 0; }
+  .personnel-roster-card .personnel-identity-cell,
+  .personnel-roster-card .personnel-row td:nth-child(4),
+  .personnel-roster-card .personnel-actions { grid-column: 1 / -1; }
+  .personnel-roster-card .personnel-actions { text-align: left; }
+  .personnel-mobile-label { display: block; margin-bottom: 0.3rem; font-size: var(--font-size-xs); color: var(--text-tertiary); font-weight: 700; }
+  .personnel-roster-card .personnel-empty { display: block; height: auto; }
+  .personnel-roster-card .record-scroll-container { max-height: none; }
+  .personnel-roster-card .personnel-list-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .personnel-list-controls .report-search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .personnel-roster-card .personnel-list-controls,
+  .personnel-roster-card .personnel-row { grid-template-columns: minmax(0, 1fr); }
+  .personnel-roster-card .personnel-actions .report-action-btn { width: 100%; }
+}

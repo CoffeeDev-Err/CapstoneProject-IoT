@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationLightTheme,
@@ -85,13 +85,24 @@ function MainAppScreen() {
 }
 
 function AppNavigator() {
-  const { loading, token } = useAuth();
+  const { loading, token, sessionError, retrySession } = useAuth();
 
   if (loading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={mobileTheme.blue} />
         <Text style={styles.loadingText}>Checking secure session...</Text>
+      </View>
+    );
+  }
+
+  if (sessionError) {
+    return (
+      <View style={styles.loading}>
+        <Text accessibilityRole="alert" style={styles.sessionError}>{sessionError}</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={() => void retrySession()} style={styles.retryButton}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -108,6 +119,9 @@ function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
+  sessionError: { color: '#b91c1c', textAlign: 'center', paddingHorizontal: 24 },
+  retryButton: { backgroundColor: mobileTheme.blue, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
+  retryText: { color: '#fff', fontWeight: '700' },
   appRoot: { flex: 1 },
   loading: {
     flex: 1,

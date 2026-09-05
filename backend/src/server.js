@@ -87,7 +87,13 @@ const barangayController = createBarangayController(barangayService)
 const gpsDeviceController = createGpsDeviceController(gpsDeviceService)
 const notificationController = createNotificationController(notificationService)
 const personnelController = createPersonnelController({ io, personnelService })
-const systemController = createSystemController(flespiService)
+const systemController = createSystemController(flespiService, {
+	checkDatabase: async () => {
+		if (mongoose.connection.readyState !== 1) return false
+		await mongoose.connection.db.command({ ping: 1 }, { timeoutMS: 2500 })
+		return true
+	},
+})
 
 app.use('/api', createOperationalRoutes({
 	authService,

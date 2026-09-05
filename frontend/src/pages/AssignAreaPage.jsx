@@ -14,6 +14,7 @@ import {
 import DeploymentList from '../features/deployments/DeploymentList'
 import PersonnelSelector from '../features/deployments/PersonnelSelector'
 import { useDeploymentForm } from '../features/deployments/useDeploymentForm'
+import { useCachedPageData } from '../hooks/useCachedPageData'
 import DeploymentDialogs from '../features/deployments/DeploymentDialogs'
 
 const {
@@ -58,7 +59,7 @@ function AssignAreaPage({ view = 'form' }) {
   const deferredPersonnelSearch = useDeferredValue(personnelSearch)
   const deferredPatrolAreaSearch = useDeferredValue(patrolAreaSearch)
   const [isPatrolAreaOpen, setIsPatrolAreaOpen] = useState(false)
-  const [assignments, setAssignments] = useState([])
+  const [assignments, setAssignments, hasAssignments] = useCachedPageData('deployments', [])
   const [editingAssignmentId, setEditingAssignmentId] = useState(requestedAssignment?.id || null)
   const [editingGroupId, setEditingGroupId] = useState(
     requestedGroupFirstAssignment ? resolveGroupId(requestedGroupFirstAssignment) : null,
@@ -72,6 +73,7 @@ function AssignAreaPage({ view = 'form' }) {
   const [openGroupMenuId, setOpenGroupMenuId] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeploymentsLoading, setIsDeploymentsLoading] = useState(true)
+  const [deploymentsReady, setDeploymentsReady] = useState(false)
   const {
     assignmentForm,
     setAssignmentForm,
@@ -108,7 +110,10 @@ function AssignAreaPage({ view = 'form' }) {
 
     getManageableDeployments()
       .then((deploymentPayload) => {
-        if (isCurrent) setAssignments(deploymentPayload)
+        if (isCurrent) {
+          setAssignments(deploymentPayload)
+          setDeploymentsReady(true)
+        }
       })
       .catch((error) => {
         if (isCurrent) showFeedback(error.message, { type: 'error', title: 'Deployments unavailable' })
@@ -120,7 +125,7 @@ function AssignAreaPage({ view = 'form' }) {
     return () => {
       isCurrent = false
     }
-  }, [showFeedback])
+  }, [setAssignments, showFeedback])
 
   useEffect(() => {
     if (listOnly || !location.state) return
@@ -140,6 +145,10 @@ function AssignAreaPage({ view = 'form' }) {
   ])
 
   const commitAssignments = async (nextAssignments, successMessage) => {
+    if (isDeploymentsLoading || !deploymentsReady) {
+      showFeedback('Wait for deployments to refresh before making changes. If the refresh failed, reopen this page to retry.', { type: 'error' })
+      return false
+    }
     setIsSaving(true)
     showFeedback('Saving deployment changes...', { type: 'info', duration: 2500 })
 
@@ -776,7 +785,7 @@ function AssignAreaPage({ view = 'form' }) {
           deploymentSearch={deploymentSearch}
           deploymentViewCounts={deploymentViewCounts}
           filteredGroupedAssignments={filteredGroupedAssignments}
-          isDeploymentsLoading={isDeploymentsLoading}
+          isDeploymentsLoading={isDeploymentsLoading && !hasAssignments}
           onDeleteAssignment={handleRequestDeleteAssignment}
           onDeleteGroup={handleRequestDeleteGroup}
           onEditAssignment={handleEditAssignment}

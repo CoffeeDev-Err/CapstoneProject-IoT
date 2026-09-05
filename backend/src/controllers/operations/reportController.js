@@ -50,6 +50,14 @@ const createReportController = (operationalService, mediaStorage = {
 			return res.status(201).json({ success: true, report })
 		} catch (error) {
 			if (storedEvidence) await mediaStorage.deleteStoredMedia(storedEvidence).catch(() => {})
+			if (error.code === 11000 && req.body.client_submission_id) {
+				const existingReport = await operationalService.getReportByClientSubmissionId(
+					req.auth.user.personnelId, req.body.client_submission_id,
+				)
+				if (existingReport) {
+					return res.status(200).json({ success: true, report: existingReport, duplicate: true })
+				}
+			}
 			throw error
 		}
 	},

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useAuth } from './AuthContext';
@@ -39,6 +40,8 @@ type OperationalContextValue = {
   personnel: LivePersonnel[];
   isConnected: boolean;
   isLoading: boolean;
+  initialDataError: string;
+  refreshOperations: () => Promise<void>;
   isReportsLoading: boolean;
   isReportsLoadingMore: boolean;
   reportsHasMore: boolean;
@@ -79,6 +82,8 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const [upcomingDeployment, setUpcomingDeployment] = useState<DeploymentAssignment | null>(null);
   const [personnel, setPersonnel] = useState<LivePersonnel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialDataError, setInitialDataError] = useState('');
+  const bootstrapRequest = useRef(0);
 
   const currentOfficer = useMemo<LivePersonnel>(() => {
     const liveProfile = personnel.find((member) => member.id === currentPersonnelId);
@@ -145,34 +150,49 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     resetTaskHistoryPagination,
   } = useTaskHistoryPagination({ currentPersonnelId, setTasks, token });
 
-  useEffect(() => {
-    if (!currentPersonnelId) {
-      setUpcomingDeployment(null);
-      setIsLoading(false);
-      return;
-    }
-
+  const refreshOperations = useCallback(async () => {
+    if (!currentPersonnelId || !token) return;
+    const request = ++bootstrapRequest.current;
     setIsLoading(true);
-    setReports([]);
-    resetReportPagination();
-    resetTaskHistoryPagination();
-    refreshReports('all').catch(() => undefined);
-    Promise.all([
+    setInitialDataError('');
+    const [operations, locations] = await Promise.allSettled([
       fetchOperations(currentPersonnelId, token),
       fetchLivePersonnel(token),
-    ])
-      .then(([operationsPayload, personnelPayload]) => {
-        setTasks((items) => {
-          const history = items.filter((task) => !isActiveTask(task));
-          return mergeById(operationsPayload.tasks, history);
-        });
-        setDeployments(operationsPayload.deployments);
-        setUpcomingDeployment(operationsPayload.upcomingDeployment);
-        setPersonnel(personnelPayload.data.map(resolvePersonnelPhoto));
-      })
-      .catch(() => undefined)
-      .finally(() => setIsLoading(false));
-  }, [currentPersonnelId, refreshReports, resetReportPagination, resetTaskHistoryPagination, token]);
+    ]);
+    if (request !== bootstrapRequest.current) return;
+    const unavailable: string[] = [];
+    if (operations.status === 'fulfilled' && Array.isArray(operations.value?.tasks)
+      && Array.isArray(operations.value?.deployments)) {
+      const operationsPayload = operations.value;
+      setTasks((items) => {
+        const history = items.filter((task) => !isActiveTask(task));
+        return mergeById(operationsPayload.tasks, history);
+      });
+      setDeployments(operationsPayload.deployments);
+      setUpcomingDeployment(operationsPayload.upcomingDeployment);
+    } else unavailable.push('tasks and deployments');
+    if (locations.status === 'fulfilled' && Array.isArray(locations.value?.data)) {
+      setPersonnel(locations.value.data.map(resolvePersonnelPhoto));
+    } else unavailable.push('personnel locations');
+    setInitialDataError(unavailable.length
+      ? `Could not refresh ${unavailable.join(' and ')}. Previously loaded data may be outdated. Check your connection and retry.` : '');
+    setIsLoading(false);
+  }, [currentPersonnelId, token]);
+
+  useEffect(() => {
+    setReports([]);
+    setTasks([]);
+    setDeployments([]);
+    setPersonnel([]);
+    setUpcomingDeployment(null);
+    resetReportPagination();
+    resetTaskHistoryPagination();
+    if (currentPersonnelId && token) {
+      refreshReports('all').catch(() => undefined); // Report pagination exposes its own error/retry UI.
+      void refreshOperations();
+    } else setIsLoading(false);
+    return () => { bootstrapRequest.current += 1; };
+  }, [currentPersonnelId, refreshOperations, refreshReports, resetReportPagination, resetTaskHistoryPagination, token]);
 
   const acceptTask = useCallback(async (taskId: string) => {
     const response = await acceptOperationalTask(taskId, actor, token);
@@ -207,6 +227,8 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     personnel,
     isConnected,
     isLoading,
+    initialDataError,
+    refreshOperations,
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,
@@ -236,6 +258,8 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     upcomingDeployment,
     isConnected,
     isLoading,
+    initialDataError,
+    refreshOperations,
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,

@@ -11,9 +11,10 @@
  */
 
 import { useDeferredValue, useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { MapPin, Search, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { TableSkeletonRows } from '../components/LoadingSkeleton'
+import InitialsAvatar from '../components/InitialsAvatar'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
 
@@ -24,7 +25,7 @@ const dutyStatusColor = {
   'On Operation': '#7c3aed',
   'GPS Stale': '#b45309',
   'On Duty': '#15803d',
-  'Off Duty': '#94a3b8',
+  'Off Duty': '#64748b',
 }
 
 const getDutyStatus = (status = '') => {
@@ -83,7 +84,7 @@ function PersonnelPage() {
   }
 
   return (
-    <div className="page-container fade-in p-3 p-md-4">
+    <div className="page-container fade-in p-3 p-md-4 personnel-page">
       <header className="page-header mb-3 reports-header">
         <div>
           <h2 className="page-title">Personnel</h2>
@@ -93,14 +94,17 @@ function PersonnelPage() {
 
       <div className="widget-card slide-up report-list-panel personnel-roster-card">
         <div className="report-list-panel__header">
-          <div>
-            <h3 className="widget-title mb-0">Personnel roster</h3>
-            <p>
-              {roster.length} of {displayedPersonnel.length} matching personnel
-              {import.meta.env.DEV && ' (includes 100 mock search records)'}
-            </p>
+          <div className="personnel-roster-heading">
+            <span className="personnel-roster-icon" aria-hidden="true"><Users /></span>
+            <div>
+              <h3 className="widget-title mb-0">Personnel roster</h3>
+              <p aria-live="polite">
+                {isInitialDataLoading ? 'Loading registered personnel...' : `${roster.length} of ${displayedPersonnel.length} matching personnel`}
+              </p>
+            </div>
           </div>
         </div>
+        {import.meta.env.DEV && <p className="personnel-demo-note">Includes 100 mock search records in development only.</p>}
 
         <div className="report-list-controls personnel-list-controls">
           <label className="report-search">
@@ -140,22 +144,29 @@ function PersonnelPage() {
             </select>
           </label>
         </div>
-        <div className="report-list personnel-table-wrap record-scroll-container">
-        <table className="personnel-table table align-middle mb-0">
+        <div className="report-list personnel-table-wrap record-scroll-container" tabIndex={0} role="region" aria-label="Personnel roster results">
+        <table className="personnel-table" aria-label="Registered personnel">
           <thead>
             <tr>
-              <th>Badge #</th>
-              <th>Name</th>
-              <th>Rank</th>
-              <th>Status</th>
-              <th>Current location</th>
+              <th scope="col">Officer</th>
+              <th scope="col">Rank</th>
+              <th scope="col">Status</th>
+              <th scope="col">Current location</th>
+              <th scope="col" className="personnel-actions-heading">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isInitialDataLoading ? (
               <TableSkeletonRows columns={5} rows={6} label="Loading personnel" />
             ) : roster.length === 0 ? (
-              <tr><td colSpan={5} className="personnel-empty">No personnel matched the current search and filter.</td></tr>
+              <tr><td colSpan={5} className="personnel-empty">
+                <div className="report-list-empty">
+                  <Users aria-hidden="true" />
+                  <strong>{displayedPersonnel.length ? 'No matching personnel' : 'No registered personnel'}</strong>
+                  <span>{displayedPersonnel.length ? 'Try a different name, badge, rank, or status.' : 'Registered officers will appear here when available.'}</span>
+                  {(searchTerm || statusFilter !== 'all') && <button type="button" className="report-action-btn report-action-btn--secondary" onClick={() => { setSearchTerm(''); setStatusFilter('all') }}>Clear filters</button>}
+                </div>
+              </td></tr>
             ) : roster.map((officer) => {
               const canLocate = officer.dutyStatus !== 'Off Duty'
                 && !officer.isLocationStale
@@ -164,35 +175,50 @@ function PersonnelPage() {
               <tr
                 key={officer.id}
                 className={`personnel-row${canLocate ? ' is-locatable' : ''}`}
-                tabIndex={canLocate ? 0 : undefined}
-                aria-label={canLocate ? `Locate ${officer.name} on the live map` : undefined}
                 onClick={() => locatePersonnel(officer)}
-                onKeyDown={(event) => {
-                  if (canLocate && (event.key === 'Enter' || event.key === ' ')) {
-                    event.preventDefault()
-                    locatePersonnel(officer)
-                  }
-                }}
               >
-                <td className="personnel-badge">{officer.badge ?? officer.id.toUpperCase()}</td>
-                <td>
-                  <span>{officer.name}</span>
-                  {officer.isMockPersonnel && (
-                    <small className="personnel-mock-label">Mock search record</small>
-                  )}
+                <td className="personnel-identity-cell">
+                  <div className="report-list__officer">
+                    <InitialsAvatar name={officer.name} className="report-list__avatar" />
+                    <div>
+                      <strong>{officer.name}</strong>
+                      <small className="personnel-badge">{officer.badge ?? officer.id.toUpperCase()}</small>
+                      {officer.isMockPersonnel && (
+                        <small className="personnel-mock-label">Mock search record</small>
+                      )}
+                    </div>
+                  </div>
                 </td>
-                <td>{officer.rank}</td>
                 <td>
+                  <span className="personnel-mobile-label">Rank</span>
+                  <span className="personnel-rank">{officer.rank || 'Not specified'}</span>
+                </td>
+                <td>
+                  <span className="personnel-mobile-label">Status</span>
                   <span
                     className="status-badge"
                     style={{ '--status-color': dutyStatusColor[officer.operationalStatus] ?? '#94a3b8' }}
                   >
+                    <span className="personnel-status-dot" aria-hidden="true" />
                     {officer.operationalStatus}
                   </span>
                 </td>
                 <td>
-                  <span>{officer.locationName || 'Unavailable'}</span>
-                  {canLocate && <small className="personnel-locate-hint">Open on live map</small>}
+                  <span className="personnel-mobile-label">Current location</span>
+                  <span className="personnel-location"><MapPin aria-hidden="true" /><span>{officer.locationName || 'Unavailable'}</span></span>
+                </td>
+                <td className="personnel-actions">
+                  <button
+                    type="button"
+                    className="report-action-btn report-action-btn--primary"
+                    disabled={!canLocate}
+                    aria-label={`View ${officer.name} on live map`}
+                    title={canLocate ? `Locate ${officer.name}` : 'Map unavailable: officer is off duty or has no current visible GPS fix.'}
+                    onClick={(event) => { event.stopPropagation(); locatePersonnel(officer) }}
+                  >
+                    <MapPin aria-hidden="true" />View on map
+                  </button>
+                  {!canLocate && <small className="personnel-map-unavailable">No live location</small>}
                 </td>
               </tr>
               )
@@ -200,6 +226,7 @@ function PersonnelPage() {
           </tbody>
         </table>
         </div>
+        <p className="personnel-roster-note"><MapPin aria-hidden="true" />Map access is available for on-duty officers with a current visible GPS fix.</p>
       </div>
     </div>
   )

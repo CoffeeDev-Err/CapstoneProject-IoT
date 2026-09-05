@@ -24,6 +24,7 @@ function ReportsPage() {
     reportTypeFilter,
     reports,
     reportsError,
+    retryReports,
     reviewState,
     searchTerm,
     selectedReport,
@@ -111,6 +112,12 @@ function ReportsPage() {
           </label>
         </div>
 
+        {reportsError && reports.length > 0 && (
+          <p className="field-error" role="status">
+            Could not refresh reports. Showing previously loaded data. {reportsError}
+            <button type="button" className="report-action-btn" onClick={retryReports}>Retry</button>
+          </p>
+        )}
         <div className="report-list record-scroll-container" role="table" aria-label="Submitted police reports">
           <div className="report-list__header" role="row">
             <span role="columnheader">Officer</span>
@@ -185,6 +192,7 @@ function ReportsPage() {
             <div className="report-list-empty" role="row">
               <strong>{reportsError ? 'Reports unavailable' : 'No matching reports'}</strong>
               <span>{reportsError || 'Try a different search term or filter.'}</span>
+              {reportsError && <button type="button" className="report-action-btn" onClick={retryReports}>Retry</button>}
             </div>
           )}
         </div>

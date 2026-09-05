@@ -7,6 +7,7 @@ function AccountGpsSelector({
   deviceError,
   devices,
   loading,
+  hasCachedDevices = false,
   onChange,
   onRefresh,
   requiresDevice,
@@ -18,7 +19,7 @@ function AccountGpsSelector({
   return (
     <div className="account-field account-field--wide">
       <span>Registered GPS Device {requiresDevice ? '*' : '(Optional)'}</span>
-      {loading ? (
+      {loading && !hasCachedDevices ? (
         <div className="inline-loading-skeleton" role="status" aria-label="Loading registered GPS devices">
           <SkeletonBlock width="100%" height="2.65rem" />
           <SkeletonBlock width="6.5rem" height="2.65rem" />

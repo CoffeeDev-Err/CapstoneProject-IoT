@@ -3,6 +3,7 @@ import { useFeedback } from '../context/useFeedback'
 import { DashboardContentSkeleton } from '../components/LoadingSkeleton'
 import { getDashboardSummary } from '../services/dashboard'
 import { socket } from '../services/socket'
+import { useCachedPageData } from '../hooks/useCachedPageData'
 
 const initialSummary = {
   totalPersonnel: 0,
@@ -24,28 +25,36 @@ const formatActivityTime = (timestamp) => {
 }
 
 function DashboardPage() {
-  const [summary, setSummary] = useState(initialSummary)
+  const [summary, setSummary, hasSummary] = useCachedPageData('dashboard', initialSummary)
   const [loadMessage, setLoadMessage] = useState('Loading live operational summary...')
+  const [loadError, setLoadError] = useState('')
+  const [retryVersion, setRetryVersion] = useState(0)
   const { showFeedback } = useFeedback()
 
   useEffect(() => {
     let refreshTimer
     let active = true
+    let latestRequest = 0
 
-    const loadSummary = () => getDashboardSummary()
-      .then((payload) => {
-        if (!active) return
-        setSummary({ ...initialSummary, ...payload })
-        setLoadMessage('')
-      })
-      .catch((error) => {
-        if (!active) return
-        setLoadMessage('')
-        showFeedback(error.message || 'Unable to load the dashboard summary.', {
-          type: 'error',
-          title: 'Dashboard unavailable',
+    const loadSummary = () => {
+      const request = ++latestRequest
+      return getDashboardSummary()
+        .then((payload) => {
+          if (!active || request !== latestRequest) return
+          setSummary({ ...initialSummary, ...payload })
+          setLoadMessage('')
+          setLoadError('')
         })
-      })
+        .catch((error) => {
+          if (!active || request !== latestRequest) return
+          setLoadMessage('')
+          setLoadError(error.message || 'Unable to load the dashboard summary.')
+          showFeedback(error.message || 'Unable to load the dashboard summary.', {
+            type: 'error',
+            title: 'Dashboard unavailable',
+          })
+        })
+    }
 
     const scheduleRefresh = () => {
       clearTimeout(refreshTimer)
@@ -72,7 +81,7 @@ function DashboardPage() {
       clearTimeout(refreshTimer)
       refreshEvents.forEach((eventName) => socket.off(eventName, scheduleRefresh))
     }
-  }, [showFeedback])
+  }, [retryVersion, setSummary, showFeedback])
 
   const stats = useMemo(() => [
     {
@@ -119,7 +128,15 @@ function DashboardPage() {
         )}
       </header>
 
-      {loadMessage ? <DashboardContentSkeleton /> : (
+      {loadError && <p role="alert" className="field-error">
+        {loadError} {hasSummary ? 'Showing previously loaded data.' : 'Summary data is unavailable.'}
+        <button type="button" className="account-action-btn" onClick={() => {
+          setLoadError('')
+          setLoadMessage('Loading live operational summary...')
+          setRetryVersion((version) => version + 1)
+        }}>Retry</button>
+      </p>}
+      {loadMessage && !hasSummary ? <DashboardContentSkeleton /> : loadError && !hasSummary ? null : (
       <>
       <div className="stats-grid row g-3 mb-3 mx-0">
         {stats.map((stat) => (

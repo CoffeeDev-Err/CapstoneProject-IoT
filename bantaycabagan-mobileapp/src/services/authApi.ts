@@ -1,4 +1,5 @@
 import { API_URL } from './apiConfig';
+import { requestJson, TransportError } from './requestJson';
 
 export type AuthUser = {
   id: string;
@@ -51,9 +52,8 @@ export class AuthApiError extends Error {
 
 const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
   const { token, ...fetchOptions } = options;
-  let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    const { response, payload } = await requestJson(`${API_URL}${path}`, {
       ...fetchOptions,
       headers: {
         'Content-Type': 'application/json',
@@ -61,18 +61,14 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
         ...fetchOptions.headers,
       },
     });
-  } catch {
-    throw new Error('Unable to connect to the server. Check your connection and try again.');
+    if (!response.ok) {
+      throw new AuthApiError(payload.message || 'Unable to complete the request.', response.status, payload.code || '');
+    }
+    return payload as T;
+  } catch (error) {
+    if (error instanceof TransportError) throw new AuthApiError(error.message, error.status);
+    throw error;
   }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new AuthApiError(
-      payload.message || 'Unable to complete the request.',
-      response.status,
-      payload.code || '',
-    );
-  }
-  return payload as T;
 };
 
 const deviceName = 'GeoSentri mobile app';

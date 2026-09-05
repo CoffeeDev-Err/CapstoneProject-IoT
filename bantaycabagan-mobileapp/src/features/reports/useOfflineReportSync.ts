@@ -20,6 +20,9 @@ import type { DeploymentAssignment, PoliceReport, SubmitReportInput } from '../.
 import { upsertById } from '../operations/operationalState';
 
 const OFFLINE_REPORT_RETRY_INTERVAL_MS = 30_000;
+const isRetryableFailure = (error: unknown) => !(error instanceof ApiRequestError)
+  || error.status === 0 || error.status >= 500
+  || [401, 403, 408, 425, 429].includes(error.status);
 
 type OfflineReportSyncOptions = {
   actor: { id: string; name: string; station: string };
@@ -35,8 +38,19 @@ export function useOfflineReportSync({
 }: OfflineReportSyncOptions) {
   const syncRunning = useRef(false);
   const reportedFailureIds = useRef(new Set<string>());
+  const uploads = useRef(new Map<string, Promise<PoliceReport>>());
+  const authFailureNotified = useRef(false);
+  useEffect(() => { authFailureNotified.current = false; }, [token]);
 
-  const uploadPendingReport = useCallback(async (pending: PendingReport) => {
+  const notifyAuthFailure = useCallback((error: unknown) => {
+    if (error instanceof ApiRequestError && [401, 403].includes(error.status) && !authFailureNotified.current) {
+      authFailureNotified.current = true;
+      Alert.alert('Report synchronization paused',
+        'Your reports and evidence are saved on this device. Sign in again to resume synchronization. If access is still denied, contact your administrator.');
+    }
+  }, []);
+
+  const performUpload = useCallback(async (pending: PendingReport) => {
     await markPendingReportUploading(pending.id);
     try {
       const response = await submitPoliceReport(pending.input, actor, deployments[0], token);
@@ -53,6 +67,14 @@ export function useOfflineReportSync({
     }
   }, [actor, deployments, setReports, token]);
 
+  const uploadPendingReport = useCallback((pending: PendingReport) => {
+    const running = uploads.current.get(pending.id);
+    if (running) return running;
+    const upload = performUpload(pending).finally(() => uploads.current.delete(pending.id));
+    uploads.current.set(pending.id, upload);
+    return upload;
+  }, [performUpload]);
+
   const submitReport = useCallback(async (input: SubmitReportInput) => {
     const preparedInput = {
       ...input,
@@ -68,13 +90,14 @@ export function useOfflineReportSync({
       await uploadPendingReport(pending);
       return 'submitted' as const;
     } catch (error) {
-      if (error instanceof ApiRequestError && error.status >= 400 && error.status < 500) {
+      notifyAuthFailure(error);
+      if (!isRetryableFailure(error)) {
         await discardRejectedPendingReport(pending);
         throw error;
       }
       return 'queued' as const;
     }
-  }, [actor, currentPersonnelId, deployments, setReports, token, uploadPendingReport]);
+  }, [actor, currentPersonnelId, deployments, notifyAuthFailure, setReports, token, uploadPendingReport]);
 
   const synchronizePendingReports = useCallback(async () => {
     if (!currentPersonnelId || !token || syncRunning.current) return;
@@ -92,14 +115,23 @@ export function useOfflineReportSync({
       for (const pending of pendingReports) {
         try {
           await uploadPendingReport(pending);
-        } catch {
+        } catch (error) {
+          notifyAuthFailure(error);
           // Keep every unconfirmed report and its evidence for a later retry.
+          // Stop the batch on connectivity/auth/rate-limit failures instead of
+          // sending every queued report to an unavailable server.
+          if (isRetryableFailure(error)) break;
+          if (!reportedFailureIds.current.has(pending.id)) {
+            reportedFailureIds.current.add(pending.id);
+            Alert.alert('Offline report needs attention',
+              'A saved report was rejected by the server. Its data and evidence remain on this device. Contact your administrator.');
+          }
         }
       }
     } finally {
       syncRunning.current = false;
     }
-  }, [currentPersonnelId, token, uploadPendingReport]);
+  }, [currentPersonnelId, notifyAuthFailure, token, uploadPendingReport]);
 
   useEffect(() => { cleanupOrphanedPickerEvidence().catch(() => undefined); }, []);
   useEffect(() => {

@@ -12,8 +12,8 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://13.229.17.177",
-        "ALLOW_CLEARTEXT_TRAFFIC": "true",
+        "EXPO_PUBLIC_API_URL": "https://13.229.17.177",
+        "ALLOW_CLEARTEXT_TRAFFIC": "false",
         "ANDROID_BUILD_ARCHS": "arm64-v8a"
       },
       "android": {
@@ -21,7 +21,11 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://13.229.17.177",
+        "ALLOW_CLEARTEXT_TRAFFIC": "false"
+      }
     }
   },
   "submit": {

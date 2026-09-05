@@ -1,30 +1,17 @@
 import { API_URL } from './apiConfig';
+import { requestJson } from './requestJson';
 import type { OfficerNotification } from '../types/notifications';
 import type { CursorPagination } from './operationsApi';
 
 const request = async <T>(path: string, token: string, options: RequestInit = {}): Promise<T> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('The server took too long to respond. Check your connection and try again.');
-    }
-    throw new Error('Cannot reach the server. Check your internet connection and try again.');
-  } finally {
-    clearTimeout(timeout);
-  }
-  const payload = await response.json().catch(() => ({}));
+  const { response, payload } = await requestJson(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+  });
   if (!response.ok) throw new Error(payload.message || 'Notification request failed.');
   return payload as T;
 };

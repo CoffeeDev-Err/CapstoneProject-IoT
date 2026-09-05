@@ -339,10 +339,12 @@
 .supervisor-avatar {
   width: 36px;
   height: 36px;
+  box-sizing: border-box;
   border-radius: 50%;
+  overflow: hidden;
   object-fit: cover;
   flex-shrink: 0;
-  border: 0;
+  border: 2px solid var(--color-primary, #2563eb);
 }
 
 .profile-avatar-fallback {

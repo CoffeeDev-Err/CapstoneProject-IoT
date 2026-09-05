@@ -184,7 +184,7 @@
 }
 
 :root:not([data-theme="dark"]) .supervisor-avatar {
-  border: 0;
+  border-color: var(--color-primary, #2563eb);
 }
 
 :root:not([data-theme="dark"]) .notification-dropdown,

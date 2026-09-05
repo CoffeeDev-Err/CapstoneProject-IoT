@@ -5,7 +5,7 @@
  * Includes a supervisor-only account provisioning form so mobile users
  * do not need an in-app signup flow.
  */
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useFeedback } from '../context/useFeedback'
 import {
   createAccount,
@@ -33,10 +33,11 @@ import AccountTable from '../features/accounts/AccountTable'
 import AccountGpsSelector from '../features/accounts/AccountGpsSelector'
 import { useAccountForm } from '../features/accounts/useAccountForm'
 import AccountDialogs from '../features/accounts/AccountDialogs'
+import { useCachedPageData } from '../hooks/useCachedPageData'
 
 function SettingsPage() {
   const { showFeedback } = useFeedback()
-  const [createdAccounts, setCreatedAccounts] = useState([])
+  const [createdAccounts, setCreatedAccounts, hasAccounts] = useCachedPageData('accounts', [])
   const [accountSearch, setAccountSearch] = useState('')
   const deferredAccountSearch = useDeferredValue(accountSearch)
   const [editingAccountId, setEditingAccountId] = useState(null)
@@ -44,55 +45,70 @@ function SettingsPage() {
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState(null)
   const [formMessage, setFormMessage] = useState('')
   const [formMessageKind, setFormMessageKind] = useState('success')
-  const [flespiDevices, setFlespiDevices] = useState([])
+  const [flespiDevices, setFlespiDevices, hasDevices] = useCachedPageData('gps-devices', [])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [devicesError, setDevicesError] = useState('')
   const [devicesSetupPending, setDevicesSetupPending] = useState(false)
   const [accountsLoading, setAccountsLoading] = useState(true)
+  const [accountsError, setAccountsError] = useState('')
   const [accountRequestPending, setAccountRequestPending] = useState(false)
   const [accountActionNotice, setAccountActionNotice] = useState(null)
+  const accountsRequest = useRef(0)
+  const devicesRequest = useRef(0)
 
   useEffect(() => {
     if (formMessage) showFeedback(formMessage, { type: formMessageKind })
   }, [formMessage, formMessageKind, showFeedback])
 
-  const loadAccounts = async () => {
+  const loadAccounts = useCallback(async () => {
+    const request = ++accountsRequest.current
     setAccountsLoading(true)
+    setAccountsError('')
 
     try {
-      setCreatedAccounts(await getAccounts())
+      const accounts = await getAccounts()
+      if (request === accountsRequest.current) setCreatedAccounts(accounts)
     } catch {
+      if (request !== accountsRequest.current) return
+      setAccountsError('Accounts could not be refreshed. Previously loaded data may be outdated.')
       setFormMessage('Accounts could not be loaded from the database. Check the backend connection.')
       setFormMessageKind('error')
     } finally {
-      setAccountsLoading(false)
+      if (request === accountsRequest.current) setAccountsLoading(false)
     }
-  }
+  }, [setCreatedAccounts])
 
-  const loadFlespiDevices = async ({ refresh = false } = {}) => {
+  const loadFlespiDevices = useCallback(async ({ refresh = false } = {}) => {
+    const request = ++devicesRequest.current
     setDevicesLoading(true)
     setDevicesError('')
     setDevicesSetupPending(false)
 
     try {
       const devices = await getRegisteredFlespiDevices({ refresh })
+      if (request !== devicesRequest.current) return
       setFlespiDevices(devices)
     } catch (error) {
-      setFlespiDevices([])
+      if (request !== devicesRequest.current) return
       if (error.code === 'FLESPI_NOT_CONFIGURED') {
+        setFlespiDevices([])
         setDevicesSetupPending(true)
       } else {
         setDevicesError('GPS devices could not be loaded. Check the connection, then refresh.')
       }
     } finally {
-      setDevicesLoading(false)
+      if (request === devicesRequest.current) setDevicesLoading(false)
     }
-  }
+  }, [setFlespiDevices])
 
   useEffect(() => {
     loadFlespiDevices()
     loadAccounts()
-  }, [])
+    return () => {
+      accountsRequest.current += 1
+      devicesRequest.current += 1
+    }
+  }, [loadAccounts, loadFlespiDevices])
 
   const filteredAccounts = useMemo(() => {
     return createdAccounts.filter((account) => (
@@ -207,6 +223,8 @@ function SettingsPage() {
 
     try {
       await deactivateAccount(account.id)
+      accountsRequest.current += 1
+      setAccountsLoading(false)
       setCreatedAccounts((prev) => prev.map((item) => (
         item.id === account.id
           ? { ...item, accountStatus: 'Inactive', imei: '', flespiDeviceId: '', flespiDeviceName: '' }
@@ -294,12 +312,16 @@ function SettingsPage() {
     try {
       if (editingAccountId) {
         const updatedAccount = await updateAccount(editingAccountId, normalizedPayload, profilePhoto)
+        accountsRequest.current += 1
+        setAccountsLoading(false)
         setCreatedAccounts((prev) => prev.map((account) => (
           account.id === editingAccountId ? updatedAccount : account
         )))
         setFormMessage(`${updatedAccount.fullName || updatedAccount.loginId} account updated successfully.`)
       } else {
         const newAccount = await createAccount(normalizedPayload, profilePhoto)
+        accountsRequest.current += 1
+        setAccountsLoading(false)
         setCreatedAccounts((prev) => [newAccount, ...prev])
         setFormMessage(
           `${newAccount.fullName} account created successfully. Temporary password issued for first login.`
@@ -446,6 +468,7 @@ function SettingsPage() {
                   deviceError={devicesError}
                   devices={flespiDevices}
                   loading={devicesLoading}
+                  hasCachedDevices={hasDevices}
                   onChange={handleDeviceChange}
                   onRefresh={() => loadFlespiDevices({ refresh: true })}
                   requiresDevice={requiresGpsDevice}
@@ -564,16 +587,22 @@ function SettingsPage() {
             )}
 
             {activeAccountView === 'manage' && (
+              <>
+              {accountsError && <p role="alert" className="field-error">
+                {accountsError}
+                <button type="button" className="account-action-btn" disabled={accountsLoading} onClick={loadAccounts}>Retry</button>
+              </p>}
               <AccountTable
                 accountRequestPending={accountRequestPending}
                 accountSearch={accountSearch}
                 accounts={createdAccounts}
-                accountsLoading={accountsLoading}
+                accountsLoading={accountsLoading && !hasAccounts}
                 filteredAccounts={filteredAccounts}
                 onDeactivate={handleDeleteAccount}
                 onEdit={handleEditAccount}
                 onSearchChange={setAccountSearch}
               />
+              </>
             )}
           </div>
         </div>

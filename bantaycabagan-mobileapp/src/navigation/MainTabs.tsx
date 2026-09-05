@@ -145,7 +145,7 @@ function FloatingTabBar({
 
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
-  const { tasks } = useOperationalContext();
+  const { tasks, initialDataError, isLoading, refreshOperations } = useOperationalContext();
   const {
     navigationRequest,
     clearNavigationRequest,
@@ -210,6 +210,14 @@ export default function MainTabs() {
           </View>
         </SafeAreaView>
       </Animated.View>
+      {initialDataError ? (
+        <View style={[styles.reliabilityBanner, { top: insets.top + PAGE_HEADER_CONTENT_HEIGHT }]}>
+          <Text accessibilityRole="alert" style={styles.reliabilityMessage}>{initialDataError}</Text>
+          <TouchableOpacity accessibilityRole="button" disabled={isLoading} onPress={() => void refreshOperations()}>
+            <Text style={styles.reliabilityRetry}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <View style={styles.tabSceneArea}>
       <Tab.Navigator
         detachInactiveScreens={false}
@@ -264,6 +272,9 @@ export default function MainTabs() {
 }
 
 const styles = StyleSheet.create({
+  reliabilityBanner: { position: 'absolute', left: 12, right: 12, zIndex: 60, elevation: 12, borderWidth: 1, borderColor: '#fca5a5', borderRadius: 12, padding: 12, backgroundColor: '#fef2f2', flexDirection: 'row', alignItems: 'center', gap: 12 },
+  reliabilityMessage: { flex: 1, color: '#991b1b', fontSize: 12 },
+  reliabilityRetry: { color: '#1d4ed8', fontWeight: '700', padding: 8 },
   appRoot: { flex: 1, backgroundColor: '#ffffff' },
   appRootDark: { backgroundColor: '#050b18' },
   headerOverlay: {

@@ -7,7 +7,7 @@
  *
  * Environment variables:
  *   VITE_SOCKET_URL — (optional) point to the production server URL.
- *                     Falls back to http://localhost:4000 for local dev.
+ *                     Uses the local Vite proxy during development.
  *
  * Exports:
  *   socket            — the shared Socket.IO client instance

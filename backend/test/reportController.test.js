@@ -16,6 +16,25 @@ const createResponse = () => ({
 })
 
 describe('report controller', () => {
+	it('reconciles concurrent retries after a submission-ID uniqueness conflict', async () => {
+		let lookups = 0
+		const deleted = []
+		const existingReport = { id: 'RPT-WINNER' }
+		const controller = createReportController({
+			getReportByClientSubmissionId: async () => ++lookups === 1 ? null : existingReport,
+			submitReport: async () => { throw Object.assign(new Error('duplicate'), { code: 11000 }) },
+		}, {
+			storeUploadedMedia: async () => 'losing-upload.jpg',
+			deleteStoredMedia: async (path) => deleted.push(path),
+		})
+		const res = createResponse()
+		await controller.submitReport({ auth: { user: { personnelId: 'PNP-001' } },
+			body: { client_submission_id: 'mobile-retry' }, file: { originalname: 'photo.jpg' },
+		}, res)
+		assert.equal(res.statusCode, 200)
+		assert.equal(res.body.duplicate, true)
+		assert.deepEqual(deleted, ['losing-upload.jpg'])
+	})
 	it('returns an idempotent submission before storing duplicate evidence', async () => {
 		let storeCalls = 0
 		const existingReport = { id: 'RPT-2026-DUPLICATE' }

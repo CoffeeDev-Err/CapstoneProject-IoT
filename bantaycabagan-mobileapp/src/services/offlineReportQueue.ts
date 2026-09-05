@@ -71,6 +71,9 @@ const getDatabase = async () => {
           ON pending_reports(personnel_id, status, created_at);
       `);
       return database;
+    }).catch((error) => {
+      databasePromise = null;
+      throw error;
     });
   }
   return databasePromise;

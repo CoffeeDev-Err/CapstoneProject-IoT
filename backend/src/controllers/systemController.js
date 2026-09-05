@@ -1,6 +1,27 @@
-const createSystemController = (flespiService) => ({
+const createSystemController = (flespiService, { checkDatabase = async () => false } = {}) => ({
 	getHealth: (_req, res) => {
+		res.set('Cache-Control', 'no-store')
 		res.json({ status: 'ok', service: 'GeoSentri backend' })
+	},
+	getReadiness: async (_req, res) => {
+		let timer
+		let ready
+		try {
+			ready = await Promise.race([
+				checkDatabase(),
+				new Promise((resolve) => { timer = setTimeout(() => resolve(false), 3000) }),
+			])
+		} catch {
+			ready = false
+		} finally {
+			clearTimeout(timer)
+		}
+		res.set('Cache-Control', 'no-store')
+		res.status(ready ? 200 : 503).json({
+			status: ready ? 'ready' : 'unavailable',
+			service: 'GeoSentri backend',
+			database: ready ? 'available' : 'unavailable',
+		})
 	},
 
 	getFlespiDevices: async (req, res) => {

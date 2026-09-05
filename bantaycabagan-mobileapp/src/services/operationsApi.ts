@@ -8,6 +8,7 @@ import type {
   SubmitReportInput,
 } from '../types/operations';
 import { API_URL } from './apiConfig';
+import { requestJson, TransportError } from './requestJson';
 
 export { API_URL } from './apiConfig';
 
@@ -28,35 +29,24 @@ const request = async <T>(
   token?: string | null,
 ): Promise<T> => {
   const isMultipart = options?.body instanceof FormData;
-  const controller = new AbortController();
   const timeoutMs = options?.method && options.method !== 'GET' ? 45_000 : 15_000;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    const { response, payload: body } = await requestJson(`${API_URL}${path}`, {
       ...options,
-      signal: controller.signal,
       headers: {
         ...(!isMultipart ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiRequestError('The server took too long to respond. Check your connection and try again.', 408);
+    }, timeoutMs);
+    if (!response.ok) {
+      throw new ApiRequestError(body.message || 'Unable to complete the request.', response.status);
     }
-    throw new ApiRequestError('Cannot reach the server. Check your internet connection and try again.', 0);
-  } finally {
-    clearTimeout(timeout);
+    return body;
+  } catch (error) {
+    if (error instanceof TransportError) throw new ApiRequestError(error.message, error.status);
+    throw error;
   }
-  const body = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new ApiRequestError(body.message || 'Unable to complete the request.', response.status);
-  }
-
-  return body;
 };
 
 export class ApiRequestError extends Error {

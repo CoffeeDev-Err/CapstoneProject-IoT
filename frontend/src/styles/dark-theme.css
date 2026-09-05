@@ -152,7 +152,7 @@
 [data-theme="dark"] .supervisor-btn[aria-expanded='true'] {
   background: transparent;
 }
-[data-theme="dark"] .supervisor-avatar { border: 0; }
+[data-theme="dark"] .supervisor-avatar { border-color: var(--color-primary, #60a5fa); }
 
 [data-theme="dark"] .supervisor-dropdown {
   background: var(--surface-card);

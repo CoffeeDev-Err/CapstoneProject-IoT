@@ -7,6 +7,7 @@ const createSystemRoutes = ({ authService, controller }) => {
 	const { supervisorOnly } = createAuthorization(authService)
 
 	router.get('/health', controller.getHealth)
+	router.get('/ready', asyncHandler(controller.getReadiness))
 	router.get('/flespi/devices', ...supervisorOnly, asyncHandler(controller.getFlespiDevices))
 
 	return router

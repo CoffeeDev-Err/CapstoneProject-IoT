@@ -43,7 +43,7 @@ In the AWS Lightsail console:
 6. Select **Dual-stack** networking, not IPv6-only.
 7. Select the **$12/month** plan with 2 GB RAM, 2 vCPU, and 60 GB SSD.
 8. Set the instance name to `geosentri-prod`.
-9. Leave **Automatic snapshots** disabled for the defense deployment.
+9. The original defense setup left **Automatic snapshots** disabled. For reliability evaluation, review backup cost/retention and follow [RELIABILITY_VALIDATION.md](./RELIABILITY_VALIDATION.md) before enabling snapshots and performing an isolated restore drill. Instance snapshots do not back up Atlas or S3.
 10. Leave **Advanced settings** unchanged.
 11. Click **Create instance** and wait for the status to become **Running**.
 
@@ -317,8 +317,8 @@ NODE_ENV=production DOTENV_CONFIG_PATH=backend/.env node -r dotenv/config -e "re
 
 Expected result: `production env valid`.
 
-The temporary `ALLOWED_ORIGINS=https://13.229.17.177` must be replaced with the
-exact final HTTPS domain before final login testing.
+Keep `ALLOWED_ORIGINS=https://13.229.17.177` while the IP-based HTTPS portal is
+in use. Replace it with the exact HTTPS domain if the portal migrates later.
 
 ## 12. Start GeoSentri using PM2
 
@@ -523,7 +523,7 @@ certbot --version
 Observed version: `certbot 2.9.0`.
 
 ```bash
-systemctl is-enabled certbot.timer
+systemctl is-enabled snap.certbot.renew.timer
 ```
 
 Expected result: `enabled`. Do not request a certificate until the approved
@@ -567,20 +567,25 @@ application data.
 pm2 logs geosentri --lines 20 --nostream
 ```
 
-## 19. Why the static-IP page is blank before SSL
+## 19. Static-IP HTTPS deployment
 
-Opening `http://13.229.17.177` reaches Nginx, but production Content Security
-Policy uses `upgrade-insecure-requests`. The browser upgrades assets to
-`https://13.229.17.177`, while no trusted HTTPS certificate exists yet. This
-causes `ERR_CONNECTION_REFUSED` and a blank page.
+The production portal is available at `https://13.229.17.177`. The server uses
+a Let's Encrypt short-lived IP-address certificate. Certbot 5.4 or newer is
+required for IP certificates; this instance was upgraded to the Certbot snap.
 
-This is expected and is not a failed frontend build. Do not weaken production
-security to make plain HTTP login work. Complete the approved domain and SSL
-steps instead.
+The certificate is renewed by `snap.certbot.renew.timer`. Its saved deploy hook
+runs `nginx -t` and reloads Nginx after a successful renewal, so the renewed
+certificate is served without restarting the Node.js process. Keep both port 80
+(ACME validation) and port 443 (HTTPS) open in the Lightsail firewall.
 
-## 20. Pending steps after the domain is approved
+Do not remove `/.well-known/acme-challenge/` from the Nginx configuration while
+the IP certificate is in use. Do not weaken the production Content Security
+Policy or enable insecure login over plain HTTP.
 
-These were not yet executed:
+## 20. Optional migration after a domain is approved
+
+The IP-based HTTPS portal works without a domain. If an approved GeoSentri domain
+is purchased later:
 
 1. Confirm the exact domain and whether it is a root domain or subdomain.
 2. In that approved GeoSentri domain's Hostinger DNS, create an A record pointing
@@ -591,7 +596,7 @@ These were not yet executed:
 6. Replace temporary `ALLOWED_ORIGINS=https://13.229.17.177` in `backend/.env`
    with the exact HTTPS domain.
 7. Validate the environment, reload Nginx, and restart PM2.
-8. Request the Let's Encrypt certificate using Certbot.
+8. Request a separate Let's Encrypt domain certificate using Certbot.
 9. Test browser login, OTP, Socket.IO, Flespi, reports, S3 evidence, and mobile.
 
 Example commands only after replacing the placeholder domain:
@@ -627,18 +632,19 @@ sudo certbot renew --dry-run
 Do not run the Certbot example literally. Replace `geosentri.example.com` with
 the final approved domain.
 
-## 21. Mobile application after the domain is live
+## 21. Mobile application HTTPS endpoint
 
-The APK is not hosted on Lightsail. It connects to the cloud backend. After
-HTTPS works, set:
+The APK is not hosted on Lightsail. The preview and production build profiles
+connect to the current HTTPS cloud endpoint:
 
 ```dotenv
-EXPO_PUBLIC_API_URL=https://geosentri.example.com
+EXPO_PUBLIC_API_URL=https://13.229.17.177
+ALLOW_CLEARTEXT_TRAFFIC=false
 ```
 
-Replace the example domain, then bump the mobile version/versionCode when
-appropriate. The project owner builds and signs the APK locally; this deployment
-process must not automatically build an APK.
+When migrating to a domain, replace the IP URL with the exact HTTPS domain and
+build a new APK. The project owner builds and signs the APK locally; this
+deployment process must not automatically build an APK.
 
 ## 22. Updating the deployment later
 
@@ -756,9 +762,8 @@ cd C:\desktop\BantayCabagan-System\bantaycabagan-mobileapp
 npx eas build --platform android --profile preview
 ```
 
-The preview profile targets `http://13.229.17.177`, so the installed APK can use
-any Wi-Fi or mobile-data connection. Rebuild again with the final HTTPS domain
-and disable cleartext traffic after the domain certificate is active.
+The preview profile targets `https://13.229.17.177`, disables cleartext traffic,
+and can use any Wi-Fi or mobile-data connection with Internet access.
 
 ## 23. Local development remains available
 
@@ -785,7 +790,7 @@ sudo nginx -t
 systemctl is-active nginx
 systemctl is-enabled nginx
 systemctl is-enabled pm2-ubuntu
-systemctl is-enabled certbot.timer
+systemctl is-enabled snap.certbot.renew.timer
 ```
 
 It is safe to close the browser SSH terminal. PM2 and Nginx continue running

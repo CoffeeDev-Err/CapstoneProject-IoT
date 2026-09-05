@@ -4,11 +4,13 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
   type AuthSession,
   type AuthUser,
+  AuthApiError,
   getCurrentUser,
   logoutSession,
 } from '../services/authApi';
@@ -22,6 +24,8 @@ const TOKEN_KEY = 'bantaycabagan_auth_token';
 
 type AuthContextValue = {
   loading: boolean;
+  sessionError: string;
+  retrySession: () => Promise<void>;
   token: string | null;
   user: AuthUser | null;
   establishSession: (session: AuthSession) => Promise<void>;
@@ -49,14 +53,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [sessionError, setSessionError] = useState('');
+  const sessionAttempt = useRef(0);
 
   const clearSession = useCallback(async () => {
+    sessionAttempt.current += 1;
+    setSessionError('');
     await deleteStoredAuthToken(TOKEN_KEY);
     setToken(null);
     setUser(null);
   }, []);
 
   const establishSession = useCallback(async (session: AuthSession) => {
+    sessionAttempt.current += 1;
+    setSessionError('');
     await setStoredAuthToken(TOKEN_KEY, session.token);
     setToken(session.token);
     setUser(session.user);
@@ -92,31 +102,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearSession, token]);
 
-  useEffect(() => {
-    const restoreSession = async () => {
+  const retrySession = useCallback(async () => {
+    const attempt = ++sessionAttempt.current;
+    setLoading(true);
+    setSessionError('');
+    try {
       const storedToken = await getStoredAuthToken(TOKEN_KEY);
-      if (!storedToken) return;
-      try {
-        const response = await getCurrentUser(storedToken);
-        setToken(storedToken);
-        setUser(response.user);
-      } catch {
-        await deleteStoredAuthToken(TOKEN_KEY);
+      if (!storedToken || attempt !== sessionAttempt.current) return;
+      const response = await getCurrentUser(storedToken);
+      if (attempt !== sessionAttempt.current) return;
+      if (!response.user?.id) throw new AuthApiError('Invalid session response.', 502);
+      setToken(storedToken);
+      setUser(response.user);
+    } catch (error) {
+      if (attempt !== sessionAttempt.current) return;
+      if (error instanceof AuthApiError && [401, 403].includes(error.status)) {
+        try {
+          await deleteStoredAuthToken(TOKEN_KEY);
+        } catch {
+          setSessionError('Cannot clear the expired saved session. Please tap Retry.');
+        }
+        setToken(null);
+        setUser(null);
+      } else {
+        // Keep the stored token but do not grant access without verification.
+        setSessionError('Cannot verify your saved session. Check your connection and tap Retry. Your saved login has not been removed.');
       }
-    };
-
-    restoreSession().finally(() => setLoading(false));
+    } finally {
+      if (attempt === sessionAttempt.current) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void retrySession();
+    return () => { sessionAttempt.current += 1; };
+  }, [retrySession]);
 
   const value = useMemo(() => ({
     applyIdentityUpdate,
     loading,
+    sessionError,
+    retrySession,
     token,
     user,
     establishSession,
     clearSession,
     logout,
-  }), [applyIdentityUpdate, clearSession, establishSession, loading, logout, token, user]);
+  }), [applyIdentityUpdate, clearSession, establishSession, loading, logout, retrySession, sessionError, token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
