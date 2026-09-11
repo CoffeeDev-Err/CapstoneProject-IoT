@@ -1,6 +1,6 @@
 import { requestErrorMessage } from '../../utils/requestFeedback';
-import { useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { isCabaganBarangay } from '../../constants/cabaganBarangays';
 import { isInsideCabagan } from '../../constants/cabaganGeofence';
@@ -11,7 +11,12 @@ import type {
   ReportEvidenceInput,
   SubmitReportInput,
 } from '../../types/operations';
-import { discardTemporaryEvidence } from '../../services/offlineReportQueue';
+import {
+  clearReportDraft,
+  discardTemporaryEvidence,
+  loadReportDraft,
+  saveReportDraft,
+} from '../../services/offlineReportQueue';
 import { selectPersonnelDeployment } from '../operations/operationalState';
 import type { editPoliceReport } from '../../services/operationsApi';
 import {
@@ -21,6 +26,21 @@ import {
 } from './reportForm';
 
 type SheetClose = (afterClose?: () => void) => void;
+const DRAFT_SAVE_DELAY_MS = 350;
+
+const hasReportDraftContent = (form: ReportForm, evidencePhoto: ReportEvidenceInput | null) => (
+  Boolean(
+    form.title.trim()
+    || form.description.trim()
+    || form.location.trim()
+    || form.barangay.trim()
+    || evidencePhoto
+    || form.latitude !== undefined
+    || form.longitude !== undefined
+  )
+  || form.report_type !== 'incident'
+  || form.severity !== 2
+);
 
 type Options = {
   currentPersonnelId: string;
@@ -50,22 +70,97 @@ export function useReportFormController({
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [evidencePhoto, setEvidencePhoto] = useState<ReportEvidenceInput | null>(null);
+  const draftHydratedRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSaveErrorShownRef = useRef(false);
+  const formRef = useRef(form);
+  const evidencePhotoRef = useRef(evidencePhoto);
+  const editTargetRef = useRef(editTarget);
 
-  const openSubmitForm = () => {
+  formRef.current = form;
+  evidencePhotoRef.current = evidencePhoto;
+  editTargetRef.current = editTarget;
+
+  const cancelScheduledDraftSave = useCallback(() => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+  }, []);
+
+  const persistDraftNow = useCallback(async () => {
+    if (!draftHydratedRef.current || editTargetRef.current || !currentPersonnelId) return;
+    cancelScheduledDraftSave();
+    try {
+      const currentForm = formRef.current;
+      const currentEvidence = evidencePhotoRef.current;
+      if (!hasReportDraftContent(currentForm, currentEvidence)) {
+        await clearReportDraft(currentPersonnelId);
+        return;
+      }
+      const saved = await saveReportDraft(currentPersonnelId, currentForm, currentEvidence);
+      if (
+        saved?.evidencePhoto
+        && currentEvidence?.captured_at === saved.evidencePhoto.captured_at
+        && currentEvidence.uri !== saved.evidencePhoto.uri
+      ) {
+        evidencePhotoRef.current = saved.evidencePhoto;
+        setEvidencePhoto(saved.evidencePhoto);
+        await discardTemporaryEvidence(currentEvidence.uri).catch(() => undefined);
+      }
+      draftSaveErrorShownRef.current = false;
+    } catch {
+      if (!draftSaveErrorShownRef.current) {
+        draftSaveErrorShownRef.current = true;
+        Alert.alert(
+          'Draft could not be saved',
+          'Keep the report open while you finish it. Check available device storage, then try again.',
+        );
+      }
+    }
+  }, [cancelScheduledDraftSave, currentPersonnelId]);
+
+  const openSubmitForm = async () => {
+    cancelScheduledDraftSave();
+    draftHydratedRef.current = false;
     setEditTarget(null);
     setEditReason('');
     const assignedArea = selectPersonnelDeployment(deployments, currentPersonnelId)?.patrolArea || '';
-    setForm({
+    const emptyForm = {
       ...createEmptyReportForm(),
       occurred_at: new Date().toISOString(),
       assigned_area: assignedArea,
       barangay: getBarangayFromArea(assignedArea),
-    });
-    setEvidencePhoto(null);
+    };
+    try {
+      const draft = await loadReportDraft(currentPersonnelId);
+      if (draft) {
+        setForm({
+          ...emptyForm,
+          ...draft.form,
+          assigned_area: draft.form.assigned_area || assignedArea,
+        } as ReportForm);
+        setEvidencePhoto(draft.evidencePhoto);
+      } else {
+        setForm(emptyForm);
+        setEvidencePhoto(null);
+      }
+      draftHydratedRef.current = true;
+      draftSaveErrorShownRef.current = false;
+    } catch {
+      setForm(emptyForm);
+      setEvidencePhoto(null);
+      Alert.alert(
+        'Draft recovery unavailable',
+        'The saved draft was preserved but could not be opened. You can still create and submit a new report.',
+      );
+    }
     setFormVisible(true);
   };
 
   const openEditForm = (report: PoliceReport) => {
+    cancelScheduledDraftSave();
+    draftHydratedRef.current = false;
     setEditTarget(report);
     setEditReason('');
     setEvidencePhoto(null);
@@ -75,6 +170,40 @@ export function useReportFormController({
       location_source: report.location_source || 'manual',
       latitude: report.latitude ?? undefined, longitude: report.longitude ?? undefined });
     setFormVisible(true);
+  };
+
+  useEffect(() => {
+    if (!formVisible || editTarget || !draftHydratedRef.current) return undefined;
+    cancelScheduledDraftSave();
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      persistDraftNow().catch(() => undefined);
+    }, DRAFT_SAVE_DELAY_MS);
+    return cancelScheduledDraftSave;
+  }, [cancelScheduledDraftSave, editTarget, evidencePhoto, form, formVisible, persistDraftNow]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'inactive' || state === 'background') {
+        persistDraftNow().catch(() => undefined);
+      }
+    });
+    return () => {
+      subscription?.remove();
+      cancelScheduledDraftSave();
+    };
+  }, [cancelScheduledDraftSave, persistDraftNow]);
+
+  const closeReportForm = () => {
+    setBarangayPickerVisible(false);
+    setLocationPickerVisible(false);
+    if (editTargetRef.current) {
+      discardTemporaryEvidence(evidencePhotoRef.current?.uri).catch(() => undefined);
+      setEvidencePhoto(null);
+    } else {
+      persistDraftNow().catch(() => undefined);
+    }
+    setFormVisible(false);
   };
 
   const captureEvidencePhoto = async (cameraFacing: 'front' | 'back') => {
@@ -100,16 +229,19 @@ export function useReportFormController({
       const mimeType = asset.mimeType || 'image/jpeg';
       const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
       const previousEvidenceUri = evidencePhoto?.uri;
-      setEvidencePhoto({
+      const capturedEvidence: ReportEvidenceInput = {
         uri: asset.uri,
         name: asset.fileName || `report-evidence-${Date.now()}.${extension}`,
         type: mimeType,
         camera_facing: cameraFacing,
         captured_at: new Date().toISOString(),
-      });
+      };
+      evidencePhotoRef.current = capturedEvidence;
+      setEvidencePhoto(capturedEvidence);
       if (previousEvidenceUri && previousEvidenceUri !== asset.uri) {
         discardTemporaryEvidence(previousEvidenceUri).catch(() => undefined);
       }
+      await persistDraftNow();
     } catch {
       Alert.alert('Camera unavailable', 'Could not open the camera or capture the photo. Close other camera apps, check camera permission, and try again.');
     }
@@ -233,6 +365,9 @@ export function useReportFormController({
         ...form,
         ...(evidencePhoto && { evidence_photo: evidencePhoto }),
       });
+      draftHydratedRef.current = false;
+      cancelScheduledDraftSave();
+      await clearReportDraft(currentPersonnelId).catch(() => undefined);
       await discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
       setEvidencePhoto(null);
       setForm(createEmptyReportForm());
@@ -274,6 +409,7 @@ export function useReportFormController({
   return {
     barangayPickerVisible,
     chooseEvidenceCamera,
+    closeReportForm,
     evidencePhoto,
     form,
     formVisible,
@@ -288,7 +424,6 @@ export function useReportFormController({
     editTarget, editReason, setEditReason, openEditForm,
     setBarangayPickerVisible,
     setEvidencePhoto,
-    setFormVisible,
     setLocationPickerVisible,
     setResolutionNotes,
     setResolveTarget,

@@ -32,8 +32,22 @@ assert.match(queue, /PICKER_ORPHAN_MAX_AGE_MS = 24 \* 60 \* 60 \* 1000/,
   'ImagePicker orphan cleanup must retain recent active captures');
 assert.match(queue, /MAX_PENDING_EVIDENCE_BYTES = 100 \* 1024 \* 1024/,
   'Pending evidence must use a non-destructive 100 MiB admission limit');
+assert.match(queue, /CREATE TABLE IF NOT EXISTS report_drafts/,
+  'Unsubmitted report fields must survive an app restart in SQLite');
+assert.match(queue, /new Directory\(Paths\.document, DRAFT_EVIDENCE_DIRECTORY_NAME\)/,
+  'Draft evidence must move out of the temporary camera cache');
+assert.match(queue, /saveReportDraft[\s\S]*sealReportPayload\([\s\S]*JSON\.stringify\(draft\)/,
+  'Report drafts must be encrypted before they reach SQLite');
 assert.match(reports, /await discardTemporaryEvidence\(evidencePhoto\?\.uri\)/,
   'The temporary ImagePicker copy must be deleted after staging/upload');
+assert.match(reports, /loadReportDraft\(currentPersonnelId\)/,
+  'Opening the report form must restore the current officer draft');
+assert.match(reports, /AppState\.addEventListener\('change'[\s\S]*persistDraftNow\(\)/,
+  'A report draft must flush when the app is backgrounded during a power or app interruption');
+assert.match(reports, /const closeReportForm[\s\S]*persistDraftNow\(\)/,
+  'Closing the report sheet must save instead of discard an unfinished report');
+assert.match(reports, /draftHydratedRef\.current = false;[\s\S]*clearReportDraft\(currentPersonnelId\)/,
+  'A submitted or safely queued report must clear its editable draft copy');
 assert.match(context, /Keep every unconfirmed report and its evidence for a later retry/,
   'Retry cleanup must preserve unconfirmed reports');
 assert.match(app, /configureMapCache\(\)/,

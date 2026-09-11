@@ -91,6 +91,7 @@ export default function ReportsScreen() {
   const {
     barangayPickerVisible,
     chooseEvidenceCamera,
+    closeReportForm,
     evidencePhoto,
     form,
     formVisible,
@@ -105,7 +106,6 @@ export default function ReportsScreen() {
     editTarget, editReason, setEditReason, openEditForm,
     setBarangayPickerVisible,
     setEvidencePhoto,
-    setFormVisible,
     setLocationPickerVisible,
     setResolutionNotes,
     setResolveTarget,
@@ -309,12 +309,7 @@ export default function ReportsScreen() {
         topInset={insets.top + SUBMIT_MODAL_TOP_OFFSET}
         tapOutsideToClose={false}
         sheetStyle={[styles.modalScreen, isDark && themeStyles.screen]}
-        onClose={() => {
-          setBarangayPickerVisible(false);
-          discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
-          setEvidencePhoto(null);
-          setFormVisible(false);
-        }}
+        onClose={closeReportForm}
       >
         {({ close }) => (
         <SafeAreaView
