@@ -8,7 +8,7 @@ const resolveAppConfig = require(resolve(projectRoot, 'app.config.js'));
 const previewEnvironment = easConfig.build.preview.env;
 
 assert.equal(easConfig.build.preview.android.buildType, 'apk');
-assert.equal(previewEnvironment.ANDROID_BUILD_ARCHS, 'arm64-v8a');
+assert.equal(previewEnvironment.ANDROID_BUILD_ARCHS, undefined);
 assert.equal(previewEnvironment.EXPO_PUBLIC_MAP_PREVIEW, 'true');
 assert.equal(easConfig.build.production.env.EXPO_PUBLIC_MAP_PREVIEW, 'false');
 
@@ -32,7 +32,7 @@ try {
     Object.assign(process.env, environment);
     const properties = getAndroidProperties();
     assert.equal(properties.usesCleartextTraffic, false);
-    assert.deepEqual(properties.buildArchs, profileName === 'preview' ? ['arm64-v8a'] : undefined);
+    assert.equal(properties.buildArchs, undefined);
   }
 
   // Default builds stay secure; local HTTP development requires explicit opt-in.
@@ -52,5 +52,5 @@ try {
 }
 
 console.log(
-  'Android build configuration checks passed: release profiles use HTTPS without cleartext; preview APK is arm64-only; default builds retain full architecture support.',
+  'Android build configuration checks passed: release profiles use HTTPS without cleartext and retain full Android architecture support.',
 );
