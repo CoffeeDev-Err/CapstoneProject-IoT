@@ -26,6 +26,7 @@ import { useMobileTheme } from '../context/ThemeContext';
 import type { NotificationNavigationRequest } from '../types/notifications';
 import { SwipeDismissSheet } from '../components/SwipeDismissSheet';
 import { PolicePageHeader } from '../components/PolicePageHeader';
+import { useReportDraftReminder } from '../features/reports/useReportDraftReminder';
 
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
@@ -52,6 +53,8 @@ type FloatingTabBarProps = BottomTabBarProps & {
   openTaskCount: number;
   navigationRequest: NotificationNavigationRequest | null;
   clearNavigationRequest: () => void;
+  unfinishedDraftVisible: boolean;
+  dismissUnfinishedDraft: () => void;
 };
 
 function FloatingTabBar({
@@ -61,6 +64,8 @@ function FloatingTabBar({
   openTaskCount,
   navigationRequest,
   clearNavigationRequest,
+  unfinishedDraftVisible,
+  dismissUnfinishedDraft,
 }: FloatingTabBarProps) {
   const { colors, isDark } = useMobileTheme();
   const insets = useSafeAreaInsets();
@@ -79,8 +84,56 @@ function FloatingTabBar({
     clearNavigationRequest();
   }, [clearNavigationRequest, navigation, navigationRequest, openTaskModal]);
 
+  const continueDraft = () => {
+    dismissUnfinishedDraft();
+    navigation.navigate('Reports', {
+      draftRequestId: Date.now(),
+      reportId: undefined,
+      notificationRequestId: undefined,
+    });
+  };
+
   return (
-    <View
+    <>
+      {unfinishedDraftVisible ? (
+        <View
+          accessibilityRole="alert"
+          style={[
+            styles.draftReminder,
+            { bottom: bottomOffset + 62 },
+            isDark && styles.draftReminderDark,
+          ]}
+        >
+          <View style={styles.draftReminderIcon}>
+            <Icon name="description" size={20} color="#ffffff" />
+          </View>
+          <View style={styles.draftReminderCopy}>
+            <Text style={[styles.draftReminderTitle, isDark && styles.draftReminderTitleDark]}>
+              You have an unfinished report
+            </Text>
+            <Text style={[styles.draftReminderText, isDark && styles.draftReminderTextDark]}>
+              Your latest draft is saved on this device.
+            </Text>
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Continue unfinished report"
+            onPress={continueDraft}
+            style={styles.draftContinueButton}
+          >
+            <Text style={styles.draftContinueText}>Continue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Remind me about the unfinished report later"
+            onPress={dismissUnfinishedDraft}
+            style={styles.draftLaterButton}
+          >
+            <Text style={[styles.draftLaterText, { color: colors.textMuted }]}>Later</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      <View
       style={[
         styles.floatingBar,
         { bottom: bottomOffset },
@@ -142,13 +195,20 @@ function FloatingTabBar({
           </TouchableOpacity>
         );
       })}
-    </View>
+      </View>
+    </>
   );
 }
 
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
-  const { tasks, initialDataError, isLoading, refreshOperations } = useOperationalContext();
+  const {
+    currentPersonnelId,
+    tasks,
+    initialDataError,
+    isLoading,
+    refreshOperations,
+  } = useOperationalContext();
   const {
     navigationRequest,
     clearNavigationRequest,
@@ -159,6 +219,10 @@ export default function MainTabs() {
   const [mapInteracting, setMapInteracting] = useState(false);
   const headerVisibility = useRef(new Animated.Value(1)).current;
   const openTaskCount = tasks.filter((task) => task.status === 'open').length;
+  const {
+    visible: unfinishedDraftVisible,
+    dismiss: dismissUnfinishedDraft,
+  } = useReportDraftReminder(currentPersonnelId);
 
   useEffect(() => {
     Animated.timing(headerVisibility, {
@@ -241,6 +305,8 @@ export default function MainTabs() {
             openTaskModal={() => setTasksVisible(true)}
             navigationRequest={navigationRequest}
             clearNavigationRequest={clearNavigationRequest}
+            unfinishedDraftVisible={unfinishedDraftVisible}
+            dismissUnfinishedDraft={dismissUnfinishedDraft}
           />
         )}
       >
@@ -275,6 +341,56 @@ export default function MainTabs() {
 }
 
 const styles = StyleSheet.create({
+  draftReminder: {
+    position: 'absolute',
+    right: 18,
+    left: 18,
+    zIndex: 45,
+    minHeight: 72,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: mobileTheme.borderSoft,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    shadowColor: mobileTheme.navy,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  draftReminderDark: { borderColor: '#22314a', backgroundColor: '#0b1528' },
+  draftReminderIcon: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: mobileTheme.blue,
+  },
+  draftReminderCopy: { flex: 1 },
+  draftReminderTitle: { color: mobileTheme.navy, fontSize: 12, fontWeight: '800' },
+  draftReminderTitleDark: { color: '#f8fafc' },
+  draftReminderText: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 9, lineHeight: 13 },
+  draftReminderTextDark: { color: '#9eabc0' },
+  draftContinueButton: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: mobileTheme.blue,
+  },
+  draftContinueText: { color: '#ffffff', fontSize: 10, fontWeight: '800' },
+  draftLaterButton: {
+    minHeight: 36,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  draftLaterText: { fontSize: 9, fontWeight: '800' },
   reliabilityBanner: { position: 'absolute', left: 12, right: 12, zIndex: 60, elevation: 12, borderWidth: 1, borderColor: '#fca5a5', borderRadius: 12, padding: 12, backgroundColor: '#fef2f2', flexDirection: 'row', alignItems: 'center', gap: 12 },
   reliabilityMessage: { flex: 1, color: '#991b1b', fontSize: 12 },
   reliabilityRetry: { color: '#1d4ed8', fontWeight: '700', padding: 8 },

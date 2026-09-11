@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
@@ -122,11 +123,24 @@ export default function ReportsScreen() {
     editReport,
   });
   const { token } = useAuth();
-  const route = useRoute<RouteProp<{ Reports: { reportId?: string; notificationRequestId?: number } }, 'Reports'>>();
+  const route = useRoute<RouteProp<{
+    Reports: {
+      reportId?: string;
+      notificationRequestId?: number;
+      draftRequestId?: number;
+    };
+  }, 'Reports'>>();
+  const handledDraftRequestRef = useRef<number | null>(null);
   const { reportId, openReport, selectedReport, loading: detailLoading, error: detailError, refresh: refreshDetail } = useReportDetails(token, reports);
   useEffect(() => {
     if (route.params?.reportId) { openReport(route.params.reportId); refreshDetail(); }
   }, [route.params?.reportId, route.params?.notificationRequestId, openReport, refreshDetail]);
+  useEffect(() => {
+    const requestId = route.params?.draftRequestId;
+    if (!requestId || handledDraftRequestRef.current === requestId) return;
+    handledDraftRequestRef.current = requestId;
+    openSubmitForm().catch(() => undefined);
+  }, [openSubmitForm, route.params?.draftRequestId]);
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
   const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());

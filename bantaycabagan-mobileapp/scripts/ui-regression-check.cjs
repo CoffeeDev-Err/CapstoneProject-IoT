@@ -71,6 +71,21 @@ assert.doesNotMatch(
 );
 assert.match(
   mainTabsSource,
+  /You have an unfinished report[\s\S]*Continue[\s\S]*Later/,
+  'App startup must offer a visible Continue action for an unfinished report draft',
+);
+assert.match(
+  mainTabsSource,
+  /navigation\.navigate\('Reports',[\s\S]*draftRequestId: Date\.now\(\)/,
+  'Continuing a draft must navigate directly to the Reports form',
+);
+assert.match(
+  reportsSource,
+  /route\.params\?\.draftRequestId[\s\S]*openSubmitForm\(\)/,
+  'The Reports screen must open and restore the requested draft automatically',
+);
+assert.match(
+  mainTabsSource,
   /const bottomOffset = Math\.max\([\s\S]*insets\.bottom \+ TAB_BAR_SYSTEM_GAP/,
   'The floating tab bar must stay above Android gesture and three-button navigation areas',
 );
