@@ -112,7 +112,7 @@ function FloatingTabBar({
               You have an unfinished report
             </Text>
             <Text style={[styles.draftReminderText, isDark && styles.draftReminderTextDark]}>
-              Your latest draft is saved on this device.
+              Your progress is saved. Continue where you left off.
             </Text>
           </View>
           <TouchableOpacity
@@ -343,17 +343,17 @@ export default function MainTabs() {
 const styles = StyleSheet.create({
   draftReminder: {
     position: 'absolute',
-    right: 18,
-    left: 18,
+    right: 12,
+    left: 12,
     zIndex: 45,
-    minHeight: 72,
-    padding: 10,
+    minHeight: 64,
+    padding: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     borderWidth: 1,
     borderColor: mobileTheme.borderSoft,
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: '#ffffff',
     shadowColor: mobileTheme.navy,
     shadowOffset: { width: 0, height: 5 },
@@ -363,21 +363,21 @@ const styles = StyleSheet.create({
   },
   draftReminderDark: { borderColor: '#22314a', backgroundColor: '#0b1528' },
   draftReminderIcon: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 11,
+    borderRadius: 10,
     backgroundColor: mobileTheme.blue,
   },
   draftReminderCopy: { flex: 1 },
-  draftReminderTitle: { color: mobileTheme.navy, fontSize: 12, fontWeight: '800' },
+  draftReminderTitle: { color: mobileTheme.navy, fontSize: 11, fontWeight: '800' },
   draftReminderTitleDark: { color: '#f8fafc' },
-  draftReminderText: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 9, lineHeight: 13 },
+  draftReminderText: { marginTop: 1, color: mobileTheme.textMuted, fontSize: 9, lineHeight: 12 },
   draftReminderTextDark: { color: '#9eabc0' },
   draftContinueButton: {
-    minHeight: 36,
-    paddingHorizontal: 12,
+    minHeight: 34,
+    paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   draftContinueText: { color: '#ffffff', fontSize: 10, fontWeight: '800' },
   draftLaterButton: {
-    minHeight: 36,
+    minHeight: 34,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
