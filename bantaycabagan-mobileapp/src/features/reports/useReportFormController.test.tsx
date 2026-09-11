@@ -67,3 +67,40 @@ it('submits corrections to the edit endpoint with original revision, without a n
   expect(editReport.mock.calls[0][1]).not.toHaveProperty('assigned_area');
   expect(options.submitReport).not.toHaveBeenCalled();
 });
+it('keeps an incomplete report open and explains which required fields are missing', async () => {
+  const submitReport = jest.fn();
+  const close = jest.fn();
+  const { result } = await renderHook(() => useReportFormController({ ...options, submitReport }));
+  await act(() => result.current.openSubmitForm());
+  await act(() => result.current.updateForm('title', 'Draft title'));
+  await act(async () => { await result.current.handleSubmit(close); });
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'Complete the report',
+    'Title, description, location, and barangay are required.',
+  );
+  expect(result.current.form.title).toBe('Draft title');
+  expect(submitReport).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+});
+it('prevents two simultaneous form submissions from creating duplicate reports', async () => {
+  let finishUpload: ((value: 'submitted') => void) | undefined;
+  const submitReport = jest.fn(() => new Promise<'submitted'>((resolve) => { finishUpload = resolve; }));
+  const { result } = await renderHook(() => useReportFormController({ ...options, submitReport }));
+  await act(() => {
+    result.current.openSubmitForm();
+    result.current.updateForm('title', 'Patrol observation');
+    result.current.updateForm('description', 'Observed during patrol.');
+    result.current.updateForm('location', 'ISU Cabagan entrance');
+    result.current.updateForm('barangay', 'Catabayungan');
+  });
+  const close = jest.fn();
+  let first: Promise<void>;
+  await act(async () => {
+    first = result.current.handleSubmit(close);
+    await result.current.handleSubmit(close);
+    expect(submitReport).toHaveBeenCalledTimes(1);
+    finishUpload?.('submitted');
+    await first;
+  });
+  expect(submitReport).toHaveBeenCalledTimes(1);
+});

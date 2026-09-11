@@ -10,6 +10,8 @@ export function requestErrorMessage(error, { action = 'complete this request', w
     : message
   if (detail.status === 413 || detail.code === 'LIMIT_FILE_SIZE') return 'The selected file is too large. Choose a smaller file and try again.'
   if (detail.code === 'OTP_ATTEMPTS_EXCEEDED') return 'Too many incorrect attempts. Request a new code to continue.'
+  if (detail.code === 'ACTIVE_BACKUP_REQUEST_EXISTS') return message
+    || 'You already have an active backup request. Open Tasks to view or cancel it.'
   if (detail.status === 429) return 'Too many requests. Wait a moment before trying again.'
   const connection = ['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'INVALID_RESPONSE'].includes(detail.code)
     || detail.status === 0 || detail.status === 408 || detail.name === 'TypeError'

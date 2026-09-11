@@ -38,6 +38,12 @@ const createTaskService = ({
 	const { Deployment, Task } = models
 	const { getPersonnelMember } = personnelService
 	const { createNotification, deliverNotification } = notificationService
+	const createActiveBackupError = () => {
+		const error = new Error('You already have an active backup request. Open Tasks to view or cancel it.')
+		error.status = 409
+		error.code = 'ACTIVE_BACKUP_REQUEST_EXISTS'
+		return error
+	}
 
 	const getOnDutyPersonnelIds = (now = clock()) => Deployment.distinct('personnelId', {
 		status: 'active',
@@ -147,6 +153,7 @@ const createTaskService = ({
 		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
 		task.status = 'completed'
 		task.completedAt = clock()
+		task.activeRequestKey = undefined
 		await task.save()
 		const personnelById = await loadPersonnelMap([task.requestedBy])
 		const serialized = serializeTask(task, personnelById)
@@ -190,6 +197,7 @@ const createTaskService = ({
 		if (task.status !== 'cancelled') {
 			task.status = 'cancelled'
 			task.cancelledAt = clock()
+			task.activeRequestKey = undefined
 			await task.save()
 		}
 		const personnelById = await loadPersonnelMap([task.requestedBy])
@@ -233,6 +241,12 @@ const createTaskService = ({
 				error.code = 'OFF_DUTY_BACKUP_REQUEST'
 				throw error
 			}
+			const existingRequest = await Task.exists({
+				type: 'backup',
+				requestedBy: personnelId,
+				status: { $in: ['open', 'full'] },
+			})
+			if (existingRequest) throw createActiveBackupError()
 		}
 		const requester = payload.requested_by ? await getPersonnelMember(payload.requested_by) : null
 		if (taskType === 'backup' && !requester) {
@@ -286,18 +300,30 @@ const createTaskService = ({
 		}
 
 		const createdAt = clock()
-		const task = await Task.create({
-			taskId: `TSK-${createdAt.getFullYear()}-${idGenerator().slice(0, 8).toUpperCase()}`,
-			type: taskType,
-			title,
-			description,
-			requestedBy: payload.requested_by || 'supervisor',
-			requesterName: requester?.name || 'Duty Supervisor',
-			requiredResponders,
-			locationName,
-			location: point(coordinates.longitude, coordinates.latitude),
-			status: 'open',
-		})
+		let task
+		try {
+			task = await Task.create({
+				taskId: `TSK-${createdAt.getFullYear()}-${idGenerator().slice(0, 8).toUpperCase()}`,
+				...(taskType === 'backup' && {
+					activeRequestKey: `backup:${String(payload.requested_by).trim()}`,
+				}),
+				type: taskType,
+				title,
+				description,
+				requestedBy: payload.requested_by || 'supervisor',
+				requesterName: requester?.name || 'Duty Supervisor',
+				requiredResponders,
+				locationName,
+				location: point(coordinates.longitude, coordinates.latitude),
+				status: 'open',
+			})
+		} catch (error) {
+			if (taskType === 'backup' && error?.code === 11000
+				&& (error.keyPattern?.activeRequestKey || error.keyValue?.activeRequestKey)) {
+				throw createActiveBackupError()
+			}
+			throw error
+		}
 		const serialized = serializeTask(task)
 		await createNotification({
 			type: task.type === 'backup' ? 'emergency' : 'warning',

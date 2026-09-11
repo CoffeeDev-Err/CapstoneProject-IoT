@@ -122,6 +122,7 @@ const responderSchema = new mongoose.Schema({
 
 const taskSchema = new mongoose.Schema({
 	taskId: { type: String, required: true },
+	activeRequestKey: { type: String, trim: true, maxlength: 220 },
 	type: { type: String, enum: ['backup', 'urgent'], default: 'backup' },
 	title: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.taskTitle },
 	description: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.taskDescription },
@@ -140,6 +141,13 @@ const taskSchema = new mongoose.Schema({
 	timestamps: true,
 })
 taskSchema.index({ taskId: 1 }, { unique: true })
+taskSchema.index(
+	{ activeRequestKey: 1 },
+	{
+		unique: true,
+		partialFilterExpression: { activeRequestKey: { $type: 'string' } },
+	},
+)
 taskSchema.index({ status: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ requestedBy: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ 'responders.personnelId': 1, status: 1 })

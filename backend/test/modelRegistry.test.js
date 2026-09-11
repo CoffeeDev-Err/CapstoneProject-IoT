@@ -14,7 +14,7 @@ const EXPECTED_MODEL_CONTRACTS = {
 	Barangay: ['barangays', 3],
 	Deployment: ['deployments', 7],
 	Report: ['reports', 11],
-	Task: ['tasks', 4],
+	Task: ['tasks', 5],
 	Notification: ['notifications', 4],
 	PushDevice: ['push_devices', 2],
 	AuditLog: ['audit_logs', 2],
