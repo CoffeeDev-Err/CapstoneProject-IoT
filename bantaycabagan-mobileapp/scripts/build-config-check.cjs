@@ -1,9 +1,13 @@
 const assert = require('node:assert/strict');
+const { existsSync, readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 
 const projectRoot = resolve(__dirname, '..');
 const easConfig = require(resolve(projectRoot, 'eas.json'));
+const appConfig = require(resolve(projectRoot, 'app.json')).expo;
+const packageMetadata = require(resolve(projectRoot, 'package.json'));
 const resolveAppConfig = require(resolve(projectRoot, 'app.config.js'));
+const androidBuildGradlePath = resolve(projectRoot, 'android/app/build.gradle');
 
 const previewEnvironment = easConfig.build.preview.env;
 
@@ -11,6 +15,12 @@ assert.equal(easConfig.build.preview.android.buildType, 'apk');
 assert.equal(previewEnvironment.ANDROID_BUILD_ARCHS, undefined);
 assert.equal(previewEnvironment.EXPO_PUBLIC_MAP_PREVIEW, 'true');
 assert.equal(easConfig.build.production.env.EXPO_PUBLIC_MAP_PREVIEW, 'false');
+assert.equal(appConfig.version, packageMetadata.version);
+if (existsSync(androidBuildGradlePath)) {
+  const androidBuildGradle = readFileSync(androidBuildGradlePath, 'utf8');
+  assert.match(androidBuildGradle, new RegExp(`versionName\\s+"${appConfig.version.replaceAll('.', '\\.')}"`));
+  assert.match(androidBuildGradle, new RegExp(`versionCode\\s+${appConfig.android.versionCode}\\b`));
+}
 
 const originalEnvironment = {
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
