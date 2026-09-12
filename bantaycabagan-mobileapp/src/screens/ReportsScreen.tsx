@@ -93,6 +93,7 @@ export default function ReportsScreen() {
     barangayPickerVisible,
     chooseEvidenceCamera,
     closeReportForm,
+    confirmCancelReportForm,
     evidencePhoto,
     form,
     formVisible,
@@ -428,9 +429,24 @@ export default function ReportsScreen() {
               <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REASON FOR CORRECTION</Text>
               <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.input]} value={editReason} onChangeText={setEditReason} maxLength={500} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
             </> : null}
-            <TouchableOpacity style={styles.primaryButton} onPress={() => handleSubmit(close)} disabled={isSaving}>
-              <Text style={styles.primaryButtonText}>{isSaving ? 'Submitting...' : editTarget ? 'Submit correction' : 'Submit Report'}</Text>
-            </TouchableOpacity>
+            <View style={styles.formActions}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={[styles.formCancelButton, { borderColor: colors.danger, backgroundColor: colors.surface }]}
+                onPress={() => confirmCancelReportForm(close)}
+                disabled={isSaving}
+              >
+                <Text style={[styles.formCancelButtonText, { color: colors.danger }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={[styles.primaryButton, styles.formPrimaryButton]}
+                onPress={() => handleSubmit(close)}
+                disabled={isSaving}
+              >
+                <Text style={styles.primaryButtonText}>{isSaving ? 'Submitting...' : editTarget ? 'Submit correction' : 'Submit Report'}</Text>
+              </TouchableOpacity>
+            </View>
           </SheetScrollView>
           </SafeAreaView>
         )}
@@ -533,10 +549,12 @@ export default function ReportsScreen() {
             <Detail label="Coordinates" value={selectedReport.latitude != null && selectedReport.longitude != null ? `${selectedReport.latitude.toFixed(6)}, ${selectedReport.longitude.toFixed(6)}` : 'Not recorded'} />
             {selectedReport.submitted_from ? <Detail label="Officer GPS at submission" value={`${selectedReport.submitted_from.latitude.toFixed(6)}, ${selectedReport.submitted_from.longitude.toFixed(6)}`} /> : null}
             <Detail
-              label="Location source"
+              label="Location selected using"
               value={selectedReport.location_source === 'gps'
-                ? 'Current GPS suggestion'
-                : 'Manually entered'}
+                ? "Officer's current GPS"
+                : selectedReport.latitude != null && selectedReport.longitude != null
+                  ? 'Manually selected map pin'
+                  : 'Manually entered place'}
             />
             <Detail label="Description" value={selectedReport.description} />
             {selectedReport.evidence_photo?.url && (
@@ -564,18 +582,18 @@ export default function ReportsScreen() {
             </View>)}
           </ScrollView>
         )}
-        <View style={[styles.dialogFooter, isDark && themeStyles.border]}>
+        <View style={[styles.dialogFooter, styles.detailActions, isDark && themeStyles.border]}>
+          <TouchableOpacity
+            style={[styles.dialogCloseButton, styles.detailActionButton, isDark && themeStyles.surfaceMuted]}
+            onPress={() => openReport(null)}
+          >
+            <Text style={[styles.dialogCloseText, isDark && themeStyles.text]}>Close</Text>
+          </TouchableOpacity>
           {selectedReport && !detailLoading && !detailError && selectedReport.personnel_id === currentPersonnelId ? <TouchableOpacity
-            style={[styles.dialogCloseButton, styles.dialogPrimaryButton]}
+            style={[styles.dialogCloseButton, styles.detailActionButton, styles.dialogPrimaryButton]}
             onPress={() => { openReport(null); openEditForm(selectedReport); }}>
             <Text style={[styles.dialogCloseText, styles.dialogPrimaryText]}>{selectedReport.validation_status === 'validated' ? 'Submit correction' : 'Edit report'}</Text>
           </TouchableOpacity> : null}
-          <TouchableOpacity
-            style={[styles.dialogCloseButton, styles.dialogPrimaryButton]}
-            onPress={() => openReport(null)}
-          >
-            <Text style={[styles.dialogCloseText, styles.dialogPrimaryText]}>Close</Text>
-          </TouchableOpacity>
         </View>
       </CenteredDialog>
 
@@ -822,6 +840,10 @@ const styles = StyleSheet.create({
   severityButtonActive: { borderColor: mobileTheme.purple, backgroundColor: mobileTheme.purple },
   severityText: { color: mobileTheme.textMuted, fontWeight: '800' },
   severityTextActive: { color: '#ffffff' },
+  formActions: { marginTop: 22, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  formCancelButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 24 },
+  formCancelButtonText: { fontSize: 13, fontWeight: '800' },
+  formPrimaryButton: { flex: 1.45, marginTop: 0, paddingHorizontal: 12 },
   primaryButton: { minHeight: 48, marginTop: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: mobileTheme.purple },
   primaryButtonCompact: { minHeight: 44, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: mobileTheme.success },
   primaryButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
@@ -857,6 +879,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: mobileTheme.border,
   },
+  detailActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  detailActionButton: { flex: 1, minWidth: 0 },
   dialogCloseButton: {
     minWidth: 92,
     minHeight: 42,

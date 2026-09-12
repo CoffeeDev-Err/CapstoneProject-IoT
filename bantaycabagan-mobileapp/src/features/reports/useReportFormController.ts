@@ -206,6 +206,68 @@ export function useReportFormController({
     setFormVisible(false);
   };
 
+  const confirmCancelReportForm = (close: SheetClose) => {
+    if (savingRef.current) return;
+    if (editTargetRef.current) {
+      Alert.alert(
+        'Discard your changes?',
+        'Your unsaved corrections will be removed. The original report will remain unchanged.',
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          {
+            text: 'Discard Changes',
+            style: 'destructive',
+            onPress: () => {
+              cancelScheduledDraftSave();
+              draftHydratedRef.current = false;
+              editTargetRef.current = null;
+              evidencePhotoRef.current = null;
+              setEditTarget(null);
+              setEditReason('');
+              setEvidencePhoto(null);
+              setForm(createEmptyReportForm());
+              close();
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Discard this report?',
+      'Your entered information and photo evidence will be permanently removed.',
+      [
+        { text: 'Keep Editing', style: 'cancel' },
+        {
+          text: 'Discard Report',
+          style: 'destructive',
+          onPress: async () => {
+            cancelScheduledDraftSave();
+            draftHydratedRef.current = false;
+            setIsSaving(true);
+            try {
+              await clearReportDraft(currentPersonnelId);
+              await discardTemporaryEvidence(evidencePhotoRef.current?.uri);
+              evidencePhotoRef.current = null;
+              setEvidencePhoto(null);
+              setForm(createEmptyReportForm());
+              close();
+            } catch {
+              draftHydratedRef.current = true;
+              Alert.alert(
+                'Report was not discarded',
+                'The saved draft could not be removed. Check available device storage and try again.',
+              );
+            } finally {
+              setIsSaving(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const captureEvidencePhoto = async (cameraFacing: 'front' | 'back') => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -274,11 +336,18 @@ export function useReportFormController({
     setForm((current) => ({
       ...current,
       location,
-      location_source: 'manual',
+      location_source: current.location_source === 'gps' ? 'gps' : 'manual',
     }));
   };
 
   const usePinnedLocation = (coordinates: { latitude: number; longitude: number }) => {
+    if (!isInsideCabagan(coordinates.latitude, coordinates.longitude)) {
+      Alert.alert(
+        'Selected point is outside Cabagan',
+        'Place the pin on the actual incident location within Cabagan.',
+      );
+      return;
+    }
     setForm((current) => ({
       ...current,
       location_source: 'manual',
@@ -410,6 +479,7 @@ export function useReportFormController({
     barangayPickerVisible,
     chooseEvidenceCamera,
     closeReportForm,
+    confirmCancelReportForm,
     evidencePhoto,
     form,
     formVisible,

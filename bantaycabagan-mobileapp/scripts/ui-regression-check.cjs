@@ -19,6 +19,14 @@ const reportsSource = readFileSync(
   resolve(projectRoot, 'src/screens/ReportsScreen.tsx'),
   'utf8',
 );
+const reportControllerSource = readFileSync(
+  resolve(projectRoot, 'src/features/reports/useReportFormController.ts'),
+  'utf8',
+);
+const reportLocationSource = readFileSync(
+  resolve(projectRoot, 'src/features/reports/ReportLocationFields.tsx'),
+  'utf8',
+);
 const mainTabsSource = readFileSync(
   resolve(projectRoot, 'src/navigation/MainTabs.tsx'),
   'utf8',
@@ -83,6 +91,31 @@ assert.match(
   reportsSource,
   /route\.params\?\.draftRequestId[\s\S]*openSubmitForm\(\)/,
   'The Reports screen must open and restore the requested draft automatically',
+);
+assert.match(
+  reportsSource,
+  /styles\.formActions[\s\S]*confirmCancelReportForm\(close\)[\s\S]*>Cancel<[\s\S]*handleSubmit\(close\)/,
+  'New and correction forms must keep a visible Cancel action beside Submit',
+);
+assert.match(
+  reportsSource,
+  /styles\.dialogFooter, styles\.detailActions[\s\S]*>Close<[\s\S]*(?:Submit correction|Edit report)/,
+  'Report details must keep Close and the available report action in one footer row',
+);
+assert.match(
+  reportControllerSource,
+  /Discard this report\?[\s\S]*Keep Editing[\s\S]*Discard Report[\s\S]*clearReportDraft/,
+  'Explicit cancellation of a new report must require confirmation and remove its saved draft',
+);
+assert.match(
+  reportControllerSource,
+  /Selected point is outside Cabagan[\s\S]*Place the pin on the actual incident location within Cabagan/,
+  'The report map picker must reject incident points outside Cabagan immediately',
+);
+assert.match(
+  reportLocationSource,
+  /Officer's current GPS[\s\S]*Incident point pinned on map[\s\S]*Manually entered incident place/,
+  'The report form must explain how the incident location was selected',
 );
 assert.match(
   mainTabsSource,

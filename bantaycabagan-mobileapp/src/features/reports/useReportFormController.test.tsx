@@ -84,7 +84,26 @@ it('keeps valid coordinates when the address is unknown and the officer selects 
   expect(result.current.barangayPickerVisible).toBe(true);
   expect(Alert.alert).toHaveBeenCalledWith('Select the incident barangay', expect.any(String));
   await act(() => { result.current.selectBarangay('Catabayungan'); result.current.updateManualLocation('ISU entrance'); });
-  expect(result.current.form).toMatchObject({ barangay: 'Catabayungan', latitude: 17.4305, longitude: 121.765 });
+  expect(result.current.form).toMatchObject({ barangay: 'Catabayungan', location_source: 'gps', latitude: 17.4305, longitude: 121.765 });
+});
+it('uses an inside-Cabagan map pin and identifies it as a manual map selection', async () => {
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(() => result.current.setLocationPickerVisible(true));
+  await act(() => result.current.usePinnedLocation({ latitude: 17.4305, longitude: 121.765 }));
+  expect(result.current.form).toMatchObject({ location_source: 'manual', latitude: 17.4305, longitude: 121.765 });
+  expect(result.current.locationPickerVisible).toBe(false);
+  expect(Alert.alert).not.toHaveBeenCalled();
+});
+it('keeps the map picker open when the selected incident point is outside Cabagan', async () => {
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(() => result.current.setLocationPickerVisible(true));
+  await act(() => result.current.usePinnedLocation({ latitude: 14.6, longitude: 121 }));
+  expect(result.current.form.latitude).toBeUndefined();
+  expect(result.current.locationPickerVisible).toBe(true);
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'Selected point is outside Cabagan',
+    'Place the pin on the actual incident location within Cabagan.',
+  );
 });
 it('blocks stale GPS and rejects outside coordinates even with a Cabagan address label', async () => {
   for (const member of [{ ...liveOfficer, isLocationStale: true }, { ...liveOfficer, latitude: 14.6, longitude: 121 },
@@ -195,6 +214,45 @@ it('saves the latest unfinished fields immediately when the report sheet closes'
     }),
     null,
   );
+});
+
+it('permanently removes a new report draft only after explicit discard confirmation', async () => {
+  const close = jest.fn();
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(async () => { await result.current.openSubmitForm(); });
+  await act(() => result.current.updateForm('title', 'Report to discard'));
+
+  await act(() => result.current.confirmCancelReportForm(close));
+  const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
+  const discardButton = buttons?.find((button) => button.text === 'Discard Report');
+  expect(close).not.toHaveBeenCalled();
+
+  await act(async () => { await discardButton?.onPress?.(); });
+
+  expect(clearReportDraft).toHaveBeenCalledWith('one');
+  expect(result.current.form.title).toBe('');
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
+it('discards correction edits while leaving the original report unchanged', async () => {
+  const editReport = jest.fn(async (_id: string, _input: Record<string, unknown>) => ({} as PoliceReport));
+  const close = jest.fn();
+  const report = { id: 'RPT-ONE', title: 'Original title', description: 'Description', location: 'ISU', barangay: 'Catabayungan', severity: 2,
+    report_type: 'incident', occurred_at: new Date().toISOString(), assigned_area: 'Original area', revision: 4, validation_status: 'validated' } as PoliceReport;
+  const { result } = await renderHook(() => useReportFormController({ ...options, editReport }));
+  await act(() => result.current.openEditForm(report));
+  await act(() => result.current.updateForm('title', 'Unsaved correction'));
+
+  await act(() => result.current.confirmCancelReportForm(close));
+  const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
+  const discardButton = buttons?.find((button) => button.text === 'Discard Changes');
+  await act(async () => { await discardButton?.onPress?.(); });
+
+  expect(result.current.editTarget).toBeNull();
+  expect(result.current.form.title).toBe('');
+  expect(editReport).not.toHaveBeenCalled();
+  expect(clearReportDraft).not.toHaveBeenCalled();
+  expect(close).toHaveBeenCalledTimes(1);
 });
 
 it('flushes the unfinished report when Android moves the app to the background', async () => {

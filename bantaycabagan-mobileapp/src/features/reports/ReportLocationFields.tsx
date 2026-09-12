@@ -18,6 +18,11 @@ export function ReportLocationFields({
 }: ReportLocationFieldsProps) {
   const { colors, isDark } = useMobileTheme();
   const inputSurface = isDark ? { backgroundColor: colors.surfaceMuted, borderColor: colors.border } : null;
+  const locationSource = form.location_source === 'gps'
+    ? "Officer's current GPS"
+    : typeof form.latitude === 'number' && typeof form.longitude === 'number'
+      ? 'Incident point pinned on map'
+      : 'Manually entered incident place';
   return (
     <>
       <Text style={[styles.label, { color: colors.textMuted }]}>BARANGAY</Text>
@@ -38,7 +43,7 @@ export function ReportLocationFields({
           <Icon name={form.location_source === 'gps' ? 'gps-fixed' : 'edit-location-alt'}
             size={15} color={colors.textMuted} />
           <Text style={[styles.sourceText, { color: colors.textMuted }]}>
-            {form.location_source === 'gps' ? 'Current GPS suggestion' : 'Manual incident location'}
+            {locationSource}
           </Text>
         </View>
         <TouchableOpacity style={[styles.gpsButton, inputSurface]} onPress={onUseCurrentGps}>
