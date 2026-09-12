@@ -584,10 +584,14 @@ export default function ReportsScreen() {
         )}
         <View style={[styles.dialogFooter, styles.detailActions, isDark && themeStyles.border]}>
           <TouchableOpacity
-            style={[styles.dialogCloseButton, styles.detailActionButton, isDark && themeStyles.surfaceMuted]}
+            style={[
+              styles.dialogCloseButton,
+              styles.detailActionButton,
+              { borderColor: colors.danger, backgroundColor: colors.surface },
+            ]}
             onPress={() => openReport(null)}
           >
-            <Text style={[styles.dialogCloseText, isDark && themeStyles.text]}>Close</Text>
+            <Text style={[styles.dialogCloseText, { color: colors.danger }]}>Close</Text>
           </TouchableOpacity>
           {selectedReport && !detailLoading && !detailError && selectedReport.personnel_id === currentPersonnelId ? <TouchableOpacity
             style={[styles.dialogCloseButton, styles.detailActionButton, styles.dialogPrimaryButton]}

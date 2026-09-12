@@ -103,6 +103,11 @@ assert.match(
   'Report details must keep Close and the available report action in one footer row',
 );
 assert.match(
+  reportsSource,
+  /styles\.detailActionButton,[\s\S]*borderColor: colors\.danger, backgroundColor: colors\.surface[\s\S]*color: colors\.danger[\s\S]*>Close</,
+  'Report details Close must use a danger-colored outline and label in both themes',
+);
+assert.match(
   reportControllerSource,
   /Discard this report\?[\s\S]*Keep Editing[\s\S]*Discard Report[\s\S]*clearReportDraft/,
   'Explicit cancellation of a new report must require confirmation and remove its saved draft',
