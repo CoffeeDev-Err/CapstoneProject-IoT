@@ -28,6 +28,19 @@ import {
 type SheetClose = (afterClose?: () => void) => void;
 const DRAFT_SAVE_DELAY_MS = 350;
 
+const formatGpsReadingAge = (ageMs: number) => {
+  const seconds = Math.max(0, Math.floor(ageMs / 1000));
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'}${remainingSeconds ? ` ${remainingSeconds} second${remainingSeconds === 1 ? '' : 's'}` : ''}`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours} hour${hours === 1 ? '' : 's'}${remainingMinutes ? ` ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}` : ''}`;
+};
+
 const hasReportDraftContent = (form: ReportForm, evidencePhoto: ReportEvidenceInput | null) => (
   Boolean(
     form.title.trim()
@@ -359,28 +372,66 @@ export function useReportFormController({
 
   const useCurrentGpsSuggestion = () => {
     const liveOfficer = personnel.find((member) => member.id === currentPersonnelId);
+    if (!liveOfficer) {
+      Alert.alert(
+        'Current GPS unavailable',
+        'No GPS reading is available for your account. Make sure GPS tracking is active and wait for the next update, or select the Cabagan barangay and enter the incident place manually.',
+      );
+      return;
+    }
+
+    const isOffDuty = liveOfficer.isOnDuty === false
+      || liveOfficer.status?.trim().toLowerCase() === 'off duty';
+    if (isOffDuty) {
+      Alert.alert(
+        'GPS tracking is not active',
+        'Your current GPS cannot be used because you are off duty and tracking is inactive. You can still submit the report by selecting the Cabagan barangay and entering the incident place manually.',
+      );
+      return;
+    }
+
     const latitude = liveOfficer?.latitude;
     const longitude = liveOfficer?.longitude;
-    const readingAge = Date.now() - new Date(liveOfficer?.locationRecordedAt || '').getTime();
-    const staleAfter = (liveOfficer?.locationStaleAfterSeconds || 120) * 1000;
-    const hasCurrentCoordinates = liveOfficer?.locationStatus === 'current'
-      && liveOfficer.isLocationStale !== true
-      && Number.isFinite(readingAge) && readingAge >= -300_000 && readingAge <= staleAfter
-      && typeof latitude === 'number'
+    const hasValidCoordinates = typeof latitude === 'number'
       && Number.isFinite(latitude)
       && typeof longitude === 'number'
       && Number.isFinite(longitude);
-    if (!liveOfficer || !hasCurrentCoordinates) {
+    if (!hasValidCoordinates) {
       Alert.alert(
-        'GPS unavailable',
-        'You can still submit the report manually. Select the Cabagan barangay and enter the exact incident place.',
+        'GPS coordinates unavailable',
+        'The latest GPS update does not contain valid coordinates. Wait for the next GPS update, or select the Cabagan barangay and enter the incident place manually.',
+      );
+      return;
+    }
+
+    const recordedAt = new Date(liveOfficer.locationRecordedAt || '').getTime();
+    const now = Date.now();
+    if (!Number.isFinite(recordedAt) || recordedAt <= 0 || recordedAt - now > 300_000) {
+      Alert.alert(
+        'GPS reading is invalid',
+        'The GPS coordinates do not have a valid reading time, so they cannot be confirmed as current. Wait for the next GPS update, or enter the incident location manually.',
+      );
+      return;
+    }
+
+    const readingAge = Math.max(0, now - recordedAt);
+    const staleAfter = (liveOfficer?.locationStaleAfterSeconds || 120) * 1000;
+    if (
+      liveOfficer.locationStatus !== 'current'
+      || liveOfficer.isLocationStale === true
+      || readingAge > staleAfter
+    ) {
+      const age = readingAge >= 1000 ? ` It was recorded ${formatGpsReadingAge(readingAge)} ago.` : '';
+      Alert.alert(
+        'GPS reading is outdated',
+        `The latest GPS reading is no longer current and cannot be used for this report.${age} Wait for the next GPS update, or enter the incident location manually.`,
       );
       return;
     }
     if (!isInsideCabagan(latitude!, longitude!)) {
       Alert.alert(
         'Current GPS is outside Cabagan',
-        'The current position cannot be used as the incident barangay. Select the actual Cabagan barangay and enter the place manually.',
+        'Your current GPS position is outside the Cabagan service area, so it cannot be used as the incident location. If the incident happened in Cabagan, select its barangay and exact place manually.',
       );
       return;
     }
@@ -395,7 +446,10 @@ export function useReportFormController({
     }));
     if (!detectedBarangay) {
       setBarangayPickerVisible(true);
-      Alert.alert('Select the incident barangay', 'GPS coordinates were added. The barangay could not be identified; select it and check the exact place or landmark.');
+      Alert.alert(
+        'Barangay confirmation needed',
+        'Current GPS coordinates were added, but the Cabagan barangay could not be identified. Select the correct barangay and verify the exact place or landmark.',
+      );
     }
   };
 

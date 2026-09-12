@@ -71,7 +71,7 @@ it('secures captured evidence in the draft immediately', async () => {
   );
 });
 
-const liveOfficer = { id: 'one', latitude: 17.4305, longitude: 121.765, locationName: 'Eastern, Catabayungan, Cabagan', locationStatus: 'current', isLocationStale: false, locationRecordedAt: new Date().toISOString() } as LivePersonnel;
+const liveOfficer = { id: 'one', latitude: 17.4305, longitude: 121.765, locationName: 'Eastern, Catabayungan, Cabagan', status: 'On Duty', isOnDuty: true, locationStatus: 'current', isLocationStale: false, locationRecordedAt: new Date().toISOString() } as LivePersonnel;
 it('uses valid inside-Cabagan GPS even when the barangay follows a locality prefix', async () => {
   const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [liveOfficer] }));
   await act(() => result.current.useCurrentGpsSuggestion());
@@ -82,7 +82,10 @@ it('keeps valid coordinates when the address is unknown and the officer selects 
   const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [{ ...liveOfficer, locationName: 'GPS 17.43050, 121.76500' }] }));
   await act(() => result.current.useCurrentGpsSuggestion());
   expect(result.current.barangayPickerVisible).toBe(true);
-  expect(Alert.alert).toHaveBeenCalledWith('Select the incident barangay', expect.any(String));
+  expect(Alert.alert).toHaveBeenCalledWith(
+    'Barangay confirmation needed',
+    expect.stringContaining('Current GPS coordinates were added'),
+  );
   await act(() => { result.current.selectBarangay('Catabayungan'); result.current.updateManualLocation('ISU entrance'); });
   expect(result.current.form).toMatchObject({ barangay: 'Catabayungan', location_source: 'gps', latitude: 17.4305, longitude: 121.765 });
 });
@@ -105,14 +108,63 @@ it('keeps the map picker open when the selected incident point is outside Cabaga
     'Place the pin on the actual incident location within Cabagan.',
   );
 });
-it('blocks stale GPS and rejects outside coordinates even with a Cabagan address label', async () => {
-  for (const member of [{ ...liveOfficer, isLocationStale: true }, { ...liveOfficer, latitude: 14.6, longitude: 121 },
-    { ...liveOfficer, locationRecordedAt: new Date(Date.now() - 35_000).toISOString(), locationStaleAfterSeconds: 30 }]) {
-    const { result, unmount } = await renderHook(() => useReportFormController({ ...options, personnel: [member] }));
-    await act(() => result.current.useCurrentGpsSuggestion());
-    expect(result.current.form.latitude).toBeUndefined();
-    await unmount();
-  }
+it('explains when no GPS reading is available for the current account', async () => {
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(() => result.current.useCurrentGpsSuggestion());
+  expect(result.current.form.latitude).toBeUndefined();
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'Current GPS unavailable',
+    expect.stringContaining('No GPS reading is available for your account'),
+  );
+});
+it('explains that current GPS is inactive when an off-duty officer creates a report', async () => {
+  const offDutyOfficer = {
+    ...liveOfficer,
+    status: 'Off Duty',
+    isOnDuty: false,
+    locationStatus: 'unavailable' as const,
+    isLocationStale: true,
+  };
+  const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [offDutyOfficer] }));
+  await act(() => result.current.useCurrentGpsSuggestion());
+  expect(result.current.form.latitude).toBeUndefined();
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'GPS tracking is not active',
+    expect.stringContaining('because you are off duty and tracking is inactive'),
+  );
+});
+it('explains the age of a stale GPS reading and keeps it out of the report', async () => {
+  jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-12T10:00:35.000Z').getTime());
+  const member = {
+    ...liveOfficer,
+    locationRecordedAt: '2026-09-12T10:00:00.000Z',
+    locationStaleAfterSeconds: 30,
+  };
+  const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [member] }));
+  await act(() => result.current.useCurrentGpsSuggestion());
+  expect(result.current.form.latitude).toBeUndefined();
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'GPS reading is outdated',
+    expect.stringContaining('It was recorded 35 seconds ago'),
+  );
+});
+it('explains why a current position outside Cabagan cannot be used', async () => {
+  const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [{ ...liveOfficer, latitude: 14.6, longitude: 121 }] }));
+  await act(() => result.current.useCurrentGpsSuggestion());
+  expect(result.current.form.latitude).toBeUndefined();
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'Current GPS is outside Cabagan',
+    expect.stringContaining('outside the Cabagan service area'),
+  );
+});
+it('rejects GPS coordinates that have no trustworthy reading time', async () => {
+  const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [{ ...liveOfficer, locationRecordedAt: 'invalid' }] }));
+  await act(() => result.current.useCurrentGpsSuggestion());
+  expect(result.current.form.latitude).toBeUndefined();
+  expect(Alert.alert).toHaveBeenLastCalledWith(
+    'GPS reading is invalid',
+    expect.stringContaining('valid reading time'),
+  );
 });
 it('submits corrections to the edit endpoint with original revision, without a new/offline submission', async () => {
   const editReport = jest.fn(async (_id: string, _input: Record<string, unknown>) => ({} as PoliceReport));
