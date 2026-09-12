@@ -8,7 +8,7 @@ import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useReportDetails } from '../features/reports/useReportDetails';
 import { ReportDateTimeField } from '../features/reports/ReportDateTimeField';
-import { formatReportDate, historyValue, reportHistoryLabel } from '../features/reports/reportDisplay';
+import { formatReportDate } from '../features/reports/reportDisplay';
 import { Image as CachedImage } from 'expo-image';
 import {
   ActivityIndicator,
@@ -175,6 +175,11 @@ export default function ReportsScreen() {
       report={item}
     />
   ), [expandedReportIds, toggleReport, openReport, refreshDetail, setResolveTarget]);
+
+  const isValidatedCorrection = editTarget?.validation_status === 'validated';
+  const formSubmitLabel = isSaving
+    ? editTarget && !isValidatedCorrection ? 'Saving...' : 'Submitting...'
+    : isValidatedCorrection ? 'Submit correction' : editTarget ? 'Save changes' : 'Submit Report';
 
   return (
     <SafeAreaView style={[styles.container, isDark && themeStyles.screen]} edges={[]}>
@@ -444,7 +449,7 @@ export default function ReportsScreen() {
                 onPress={() => handleSubmit(close)}
                 disabled={isSaving}
               >
-                <Text style={styles.primaryButtonText}>{isSaving ? 'Submitting...' : editTarget ? 'Submit correction' : 'Submit Report'}</Text>
+                <Text style={styles.primaryButtonText}>{formSubmitLabel}</Text>
               </TouchableOpacity>
             </View>
           </SheetScrollView>
@@ -576,10 +581,6 @@ export default function ReportsScreen() {
               <Detail label="Resolution notes" value={selectedReport.resolution_notes} />
             )}
             {selectedReport.resolved_at ? <Detail label="Resolved" value={`${formatReportDate(selectedReport.resolved_at)} · ${selectedReport.resolved_by || selectedReport.officer}`} /> : null}
-            {(selectedReport.history || []).map((entry, index) => <View key={`${entry.at}-${index}`} style={{ marginTop: 14 }}>
-              <Detail label={`${entry.kind === 'review' ? 'Review' : 'Correction'} · ${formatReportDate(entry.at)}`} value={`${entry.name || entry.by}\n${entry.reason}`} />
-              {entry.changes.map((change) => <Detail key={change.field} label={reportHistoryLabel(change.field)} value={`${historyValue(change.before)} → ${historyValue(change.after)}`} />)}
-            </View>)}
           </ScrollView>
         )}
         <View style={[styles.dialogFooter, styles.detailActions, isDark && themeStyles.border]}>

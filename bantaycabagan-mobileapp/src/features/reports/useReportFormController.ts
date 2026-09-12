@@ -481,7 +481,11 @@ export function useReportFormController({
         await editReport(editTarget.id, { ...content,
           latitude: form.latitude ?? null, longitude: form.longitude ?? null,
           reason: editReason.trim(), revision: editTarget.revision || 0 });
-        close(() => Alert.alert('Correction submitted', 'Your changes were recorded in the report history. The report is pending review.'));
+        const isValidatedCorrection = editTarget.validation_status === 'validated';
+        close(() => Alert.alert(
+          isValidatedCorrection ? 'Correction submitted' : 'Report updated',
+          `Your ${isValidatedCorrection ? 'correction' : 'changes'} ${isValidatedCorrection ? 'was' : 'were'} submitted and the report is pending COP review.`,
+        ));
         return;
       }
       const result = await submitReport({

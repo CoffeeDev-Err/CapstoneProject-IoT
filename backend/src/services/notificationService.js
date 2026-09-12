@@ -5,6 +5,17 @@ const { findCursorPage } = require('./operations/pagination')
 const PERSONNEL_ROOM_PREFIX = 'personnel:'
 const SUPERVISOR_ROOM = 'role:supervisor'
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
+const LEGACY_SUPERVISOR_SELF_NOTIFICATION_TITLES = [
+	'Deployment Updated',
+	'Officer Account Created',
+	'Report Review Updated',
+]
+
+const notificationVisibilityFilter = (recipientId) => (
+	recipientId === 'supervisor'
+		? { title: { $nin: LEGACY_SUPERVISOR_SELF_NOTIFICATION_TITLES } }
+		: {}
+)
 
 const toNotificationPayload = (notification) => ({
 	id: notification.notificationId,
@@ -132,6 +143,7 @@ const deliverNotification = async ({ io, ...payload }) => {
 const getNotifications = async (recipientId = 'supervisor') => {
 	const notifications = await Notification.find({
 		recipientId: { $in: [recipientId, 'all'] },
+		...notificationVisibilityFilter(recipientId),
 	})
 		.sort({ createdAt: -1 })
 		.limit(100)
@@ -143,13 +155,15 @@ const getNotifications = async (recipientId = 'supervisor') => {
 const getNotificationPage = async (recipientId, query = {}) => {
 	const limit = Math.min(50, Math.max(1, Number.parseInt(query.limit, 10) || 10))
 	const recipientFilter = { recipientId: { $in: [recipientId, 'all'] } }
+	const visibilityFilter = notificationVisibilityFilter(recipientId)
 	const unreadCountPromise = Notification.countDocuments({
 		...recipientFilter,
+		...visibilityFilter,
 		isRead: false,
 	})
 	const page = await findCursorPage({
 		model: Notification,
-		filter: { ...recipientFilter },
+		filter: { ...recipientFilter, ...visibilityFilter },
 		dateField: 'createdAt',
 		limit,
 		cursor: query.cursor,

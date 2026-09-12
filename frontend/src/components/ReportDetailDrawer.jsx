@@ -8,15 +8,6 @@ import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
 
 const ReportLocationMap = lazy(() => import('./ReportLocationMap'))
-const historyFieldLabel = (field) => ({ title: 'Title', description: 'Description', locationName: 'Place / landmark', reportType: 'Report type', barangayCode: 'Barangay', severity: 'Severity', incidentAt: 'Incident / activity time', locationSource: 'Location source', location: 'Coordinates', validationStatus: 'Review status', caseStatus: 'Case status', isIncident: 'Incident classification' }[field] || field)
-const historyValue = (value) => {
-  if (value == null || value === '') return 'Not recorded'
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  if (Array.isArray(value?.coordinates)) return [...value.coordinates].reverse().join(', ')
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return new Date(value).toLocaleString()
-  return typeof value === 'object' ? JSON.stringify(value) : String(value)
-}
-
 const emptyRouteState = {
   reportId: null,
   status: 'idle',
@@ -218,17 +209,6 @@ function ReportDetailDrawer({
             </dl>
           </section>
 
-          {report.history?.length > 0 && <section className="report-detail-section">
-            <h4>Report history</h4>
-            {report.history.map((entry, index) => <div key={`${entry.at}-${index}`}>
-              <p><strong>{entry.kind === 'review' ? 'Review' : 'Correction'}</strong> · {formatDateTime(entry.at)} · {entry.name || entry.by}</p>
-              <p>{entry.reason}</p>
-              <dl className="report-detail-list">{entry.changes.map((change) => <div key={change.field}>
-                <dt>{historyFieldLabel(change.field)}</dt><dd>{historyValue(change.before)} → {historyValue(change.after)}</dd>
-              </div>)}</dl>
-            </div>)}
-          </section>}
-
           <section className="report-detail-section report-review-panel">
             <div className="report-review-panel__heading">
               <div>
@@ -274,8 +254,6 @@ function ReportDetailDrawer({
                 </a>
               )}
             </div>
-            {report.history?.some((entry) => entry.changes.some((change) => ['incidentAt', 'location'].includes(change.field))) && <p>The route was captured with the original submission. Corrected incident details are recorded in the report history.</p>}
-
             <Suspense fallback={<div className="report-location-map__empty" role="status">Loading report map...</div>}>
               <ReportLocationMap
                 incident={{

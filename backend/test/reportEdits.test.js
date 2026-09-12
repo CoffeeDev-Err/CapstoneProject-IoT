@@ -46,9 +46,31 @@ it('notifies the supervisor with the exact report after a correction', async () 
   }, officer)
   assert.equal(f.notifications.length, 1)
   assert.equal(f.notifications[0].recipientId, 'supervisor')
+  assert.equal(f.notifications[0].title, 'Report correction submitted')
   assert.equal(f.notifications[0].referenceType, 'report')
   assert.equal(f.notifications[0].referenceId, 'RPT-ONE')
   assert.equal(f.notifications[0].data.reportId, 'RPT-ONE')
+})
+it('notifies the supervisor with the exact report after a pending report edit', async () => {
+  const f = fixture('pending')
+  await f.service.editReport('RPT-ONE', {
+    description: 'Updated while pending', revision: 0, reason: 'Corrected details',
+  }, officer)
+  assert.equal(f.notifications.length, 1)
+  assert.equal(f.notifications[0].recipientId, 'supervisor')
+  assert.equal(f.notifications[0].title, 'Report updated')
+  assert.equal(f.notifications[0].referenceType, 'report')
+  assert.equal(f.notifications[0].data.reportId, 'RPT-ONE')
+})
+it('notifies only the submitting officer after a COP review action', async () => {
+  const f = fixture('pending')
+  await f.service.updateReportValidation('RPT-ONE', {
+    validation_status: 'validated', revision: 0,
+  }, { role: 'supervisor', fullName: 'COP One' })
+  assert.equal(f.notifications.length, 1)
+  assert.equal(f.notifications[0].recipientId, 'officer-1')
+  assert.equal(f.notifications[0].title, 'Report Review Updated')
+  assert.equal(f.notifications.some((notification) => notification.recipientId === 'supervisor'), false)
 })
 for (const status of ['validated', 'rejected']) it(`returns ${status} reports to pending review after correction`, async () => {
   const f = fixture(status)

@@ -200,6 +200,7 @@ const createReportService = ({
 			}
 		}
 		const previousStatus = report.validationStatus
+		const isValidatedCorrection = previousStatus === 'validated'
 		report.history ||= []
 		report.history.push({ at: clock(), by: personnelId, name: actor.fullName || report.officerName,
 			kind: previousStatus === 'validated' ? 'correction' : 'edit', reason,
@@ -215,13 +216,13 @@ const createReportService = ({
 			io,
 			recipientId: 'supervisor',
 			type: 'info',
-			title: 'Report correction submitted',
-			message: `${report.reportNumber} was corrected and needs review.`,
+			title: isValidatedCorrection ? 'Report correction submitted' : 'Report updated',
+			message: `${report.reportNumber} was ${isValidatedCorrection ? 'corrected' : 'updated'} and needs review.`,
 			referenceType: 'report',
 			referenceId: report.reportNumber,
 			priority: 'high',
 			data: { destination: 'Reports', reportId: report.reportNumber },
-			dedupeKey: `report:${report.reportNumber}:correction:${serialized.revision}`,
+			dedupeKey: `report:${report.reportNumber}:${isValidatedCorrection ? 'correction' : 'edit'}:${serialized.revision}`,
 		}).catch(() => {})
 		return { status: 200, body: { success: true, report: serialized } }
 	}
