@@ -69,6 +69,7 @@ function AssignAreaPage({ view = 'form' }) {
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
   const [deploymentActionNoticeOpen, setDeploymentActionNoticeOpen] = useState(false)
   const [deploymentSearch, setDeploymentSearch] = useState('')
+  const [highlightedDeploymentId, setHighlightedDeploymentId] = useState(null)
   const deferredDeploymentSearch = useDeferredValue(deploymentSearch)
   const [activeDeploymentView, setActiveDeploymentView] = useState(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)
   const [openGroupMenuId, setOpenGroupMenuId] = useState(null)
@@ -127,6 +128,43 @@ function AssignAreaPage({ view = 'form' }) {
       isCurrent = false
     }
   }, [setAssignments, showFeedback])
+
+  useEffect(() => {
+    const requestedDeploymentId = listOnly ? location.state?.deploymentId : null
+    if (!requestedDeploymentId || !deploymentsReady) return undefined
+    let isCurrent = true
+    let scrollTimer
+    const assignment = assignments.find((item) => (
+      item.id === requestedDeploymentId || resolveGroupId(item) === requestedDeploymentId
+    ))
+    if (!assignment) {
+      showFeedback('The referenced deployment is no longer active or scheduled.', {
+        type: 'info',
+        title: 'Deployment not found',
+      })
+      return undefined
+    }
+
+    queueMicrotask(() => {
+      if (!isCurrent) return
+      setActiveDeploymentView(
+        assignment.status === 'scheduled'
+          ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+          : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW,
+      )
+      setDeploymentSearch(assignment.id)
+      setHighlightedDeploymentId(assignment.id)
+      scrollTimer = window.setTimeout(() => {
+        document.querySelector(`[data-deployment-id="${assignment.id}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
+    })
+    return () => {
+      isCurrent = false
+      window.clearTimeout(scrollTimer)
+    }
+  }, [assignments, deploymentsReady, listOnly, location.state?.deploymentId,
+    location.state?.notificationRequestId, showFeedback])
 
   useEffect(() => {
     if (listOnly || !location.state) return
@@ -787,6 +825,7 @@ function AssignAreaPage({ view = 'form' }) {
           deploymentViewCounts={deploymentViewCounts}
           filteredGroupedAssignments={filteredGroupedAssignments}
           isDeploymentsLoading={isDeploymentsLoading && !hasAssignments}
+          highlightedDeploymentId={highlightedDeploymentId}
           onDeleteAssignment={handleRequestDeleteAssignment}
           onDeleteGroup={handleRequestDeleteGroup}
           onEditAssignment={handleEditAssignment}

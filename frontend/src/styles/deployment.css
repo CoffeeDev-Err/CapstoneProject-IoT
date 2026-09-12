@@ -169,6 +169,15 @@
   gap: 0.45rem;
 }
 
+.assignment-list-table .deployment-row--highlighted td {
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow: inset 0 1px rgba(59, 130, 246, 0.35), inset 0 -1px rgba(59, 130, 246, 0.35);
+}
+
+.assignment-list-table .deployment-row--highlighted td:first-child {
+  box-shadow: inset 3px 0 #2563eb, inset 0 1px rgba(59, 130, 246, 0.35), inset 0 -1px rgba(59, 130, 246, 0.35);
+}
+
 .assignment-group-menu {
   position: relative;
 }

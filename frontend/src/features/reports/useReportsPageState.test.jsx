@@ -1,11 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageCacheProvider } from '../../context/PageCacheProvider'
-import { getReportsList } from '../../services/operations'
+import { getReport, getReportsList } from '../../services/operations'
 import { useReportsPageState } from './useReportsPageState'
 
 vi.mock('../../services/operations', () => ({
-  getReportsList: vi.fn(), updateReportValidation: vi.fn(),
+  getReport: vi.fn(), getReportsList: vi.fn(), updateReportValidation: vi.fn(),
 }))
 
 const refreshReports = vi.fn()
@@ -21,6 +21,16 @@ function Probe({ revision = 0 }) {
 }
 function Page({ active = true, session = 'one', revision = 0 }) {
   return <PageCacheProvider key={session}>{active && <Probe revision={revision} />}</PageCacheProvider>
+}
+function ExactReportProbe({ reportId }) {
+  const state = useReportsPageState({
+    refreshReports,
+    showFeedback,
+    reportsRevision: 0,
+    requestedReportId: reportId,
+    requestedReportRequestId: 1,
+  })
+  return <output data-testid="selected-report">{state.selectedReport?.id || ''}</output>
 }
 const read = () => JSON.parse(screen.getByTestId('result').textContent)
 const payload = (id) => ({ data: id ? [{ id }] : [], pagination: { total: id ? 1 : 0 } })
@@ -99,5 +109,13 @@ describe('reports navigation cache', () => {
     getReportsList.mockReturnValueOnce(new Promise(() => {}))
     page.rerender(<Page session="two" />)
     expect(read()).toEqual({ loading: true, rows: [], error: '' })
+  })
+
+  it('loads and opens the exact report referenced by a notification', async () => {
+    getReportsList.mockResolvedValue(payload('another-report'))
+    getReport.mockResolvedValue({ id: 'RPT-EXACT', title: 'Referenced report' })
+    render(<PageCacheProvider><ExactReportProbe reportId="RPT-EXACT" /></PageCacheProvider>)
+    await waitFor(() => expect(screen.getByTestId('selected-report')).toHaveTextContent('RPT-EXACT'))
+    expect(getReport).toHaveBeenCalledWith('RPT-EXACT')
   })
 })

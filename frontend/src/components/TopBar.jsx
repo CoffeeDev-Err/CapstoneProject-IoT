@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../context/useAuth'
 import { resolveApiAssetUrl } from '../services/apiAssets'
 import { matchesPrefixSearch } from '../utils/searchMatching'
+import { getNotificationNavigationTarget } from '../utils/notificationNavigation'
 import ConfirmModal from './ConfirmModal'
 import PasswordChangeModal from './PasswordChangeModal'
 import pnpLogo from '../assets/pnp-logo.png'
@@ -144,6 +145,7 @@ function TopBar({
   const [notificationHistoryRange, setNotificationHistoryRange] = useState('all')
   const dropdownRef = useRef(null)
   const notificationRef = useRef(null)
+  const notificationRequestSequenceRef = useRef(0)
   const navigate = useNavigate()
   const { clearSession, logout, user } = useAuth()
   const roleLabel = user?.role === 'supervisor' ? 'Supervisor' : 'Officer'
@@ -233,6 +235,20 @@ function TopBar({
 
   const handleCancelClearNotifications = () => {
     setClearConfirmOpen(false)
+  }
+
+  const handleOpenNotification = (notification) => {
+    notificationRequestSequenceRef.current += 1
+    onReadNotification?.(notification.id)
+    const target = getNotificationNavigationTarget(notification)
+    if (!target) return
+    setNotificationOpen(false)
+    navigate(target.pathname, {
+      state: {
+        ...target.state,
+        notificationRequestId: `${notification.id}-${notificationRequestSequenceRef.current}`,
+      },
+    })
   }
 
   return (
@@ -345,7 +361,7 @@ function TopBar({
                       <button
                         type="button"
                         className={`notification-item ${notification.isRead ? '' : 'notification-item--unread'}`}
-                        onClick={() => onReadNotification?.(notification.id)}
+                        onClick={() => handleOpenNotification(notification)}
                       >
                         <div className="notification-item__meta">
                           <span className={`notification-type-pill ${getNotificationTypeClass(notification.type)}`}>

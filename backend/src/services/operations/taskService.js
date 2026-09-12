@@ -37,7 +37,7 @@ const createTaskService = ({
 }) => {
 	const { Deployment, Task } = models
 	const { getPersonnelMember } = personnelService
-	const { createNotification, deliverNotification } = notificationService
+	const { deliverNotification } = notificationService
 	const createActiveBackupError = () => {
 		const error = new Error('You already have an active backup request. Open Tasks to view or cancel it.')
 		error.status = 409
@@ -325,12 +325,23 @@ const createTaskService = ({
 			throw error
 		}
 		const serialized = serializeTask(task)
-		await createNotification({
+		await deliverNotification({
+			io,
+			recipientId: 'supervisor',
 			type: task.type === 'backup' ? 'emergency' : 'warning',
 			title: task.type === 'backup' ? 'Backup Request' : 'Urgent Task',
 			message: `${task.title} at ${task.locationName}.`,
 			referenceType: 'task',
 			referenceId: task.taskId,
+			priority: task.type === 'backup' ? 'critical' : 'high',
+			data: {
+				destination: 'Map',
+				taskId: task.taskId,
+				personnelId: task.requestedBy,
+				latitude: serialized.latitude,
+				longitude: serialized.longitude,
+			},
+			dedupeKey: `task:${task.taskId}:supervisor-created`,
 		})
 		const eligiblePersonnelIds = await Deployment.distinct('personnelId', {
 			status: 'active',

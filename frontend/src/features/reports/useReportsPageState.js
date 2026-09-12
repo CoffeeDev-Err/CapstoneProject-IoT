@@ -2,15 +2,22 @@ import { requestErrorMessage } from '../../utils/requestFeedback'
 import { useCallback, useEffect, useState } from 'react'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useCachedPageData } from '../../hooks/useCachedPageData'
-import { getReportsList, updateReportValidation } from '../../services/operations'
+import { getReport, getReportsList, updateReportValidation } from '../../services/operations'
 import {
   downloadReportCsv,
   EMPTY_PAGINATION,
   REPORTS_PER_REQUEST,
 } from './reportPresentation'
 
-export function useReportsPageState({ refreshReports, reportsRevision, showFeedback }) {
+export function useReportsPageState({
+  refreshReports,
+  reportsRevision,
+  requestedReportId,
+  requestedReportRequestId,
+  showFeedback,
+}) {
   const [selectedReportId, setSelectedReportId] = useState(null)
+  const [selectedReportOverride, setSelectedReportOverride] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 250)
   const [reportTypeFilter, setReportTypeFilter] = useState('all')
@@ -58,21 +65,51 @@ export function useReportsPageState({ refreshReports, reportsRevision, showFeedb
   }, [caseStatusFilter, debouncedSearchTerm, refreshVersion, reportTypeFilter,
     reportsRevision, requestKey, setReportResults, sortBy, sortOrder])
 
+  useEffect(() => {
+    if (!requestedReportId) return undefined
+    let isCurrent = true
+    getReport(requestedReportId).then((report) => {
+      if (!isCurrent) return
+      setSelectedReportOverride(report)
+      setSelectedReportId(report.id)
+    }).catch((error) => {
+      if (!isCurrent) return
+      showFeedback(requestErrorMessage(error, { action: 'open the selected report' }), {
+        type: 'error',
+        title: 'Report could not be opened',
+      })
+    })
+    return () => { isCurrent = false }
+  }, [requestedReportId, requestedReportRequestId, showFeedback])
+
   const reports = reportResults.data
-  const selectedReport = reports.find((report) => report.id === selectedReportId) || null
+  const selectedReportFromList = reports.find((report) => report.id === selectedReportId) || null
+  const matchingOverride = selectedReportOverride?.id === selectedReportId
+    ? selectedReportOverride
+    : null
+  const selectedReport = Number(selectedReportFromList?.revision || 0) > Number(matchingOverride?.revision || 0)
+    ? selectedReportFromList
+    : matchingOverride || selectedReportFromList
   const handleCloseReport = useCallback(() => {
     setSelectedReportId(null)
+    setSelectedReportOverride(null)
     setReviewState({ isSaving: false, error: '', message: '' })
   }, [])
   const handleOpenReport = useCallback((reportId) => {
     setReviewState({ isSaving: false, error: '', message: '' })
+    setSelectedReportOverride(null)
     setSelectedReportId(reportId)
   }, [])
   const handleValidationChange = useCallback(async (validationStatus) => {
     if (!selectedReport || reviewState.isSaving) return
     setReviewState({ isSaving: true, error: '', message: '' })
     try {
-      await updateReportValidation(selectedReport.id, validationStatus, selectedReport.revision || 0)
+      const updatedReport = await updateReportValidation(
+        selectedReport.id,
+        validationStatus,
+        selectedReport.revision || 0,
+      )
+      setSelectedReportOverride(updatedReport)
       await refreshReports()
       setRefreshVersion((version) => version + 1)
       setReviewState({ isSaving: false, error: '', message: '' })

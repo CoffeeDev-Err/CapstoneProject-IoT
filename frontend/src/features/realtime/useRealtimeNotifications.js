@@ -22,7 +22,8 @@ export const useRealtimeNotifications = (isAuthenticated) => {
     notificationSequenceRef.current += 1
 
     return {
-      id: `notif-${Date.now()}-${notificationSequenceRef.current}`,
+      ...payload,
+      id: payload.id || `notif-${Date.now()}-${notificationSequenceRef.current}`,
       type: payload.type || 'info',
       title: payload.title || 'System Update',
       message: payload.message || 'A new update is available.',
@@ -33,7 +34,7 @@ export const useRealtimeNotifications = (isAuthenticated) => {
 
   const addNotification = useCallback((payload) => {
     setNotifications((current) => (
-      [createNotification(payload), ...current].slice(0, MAX_NOTIFICATIONS)
+      mergeNotifications(current, [createNotification(payload)], MAX_NOTIFICATIONS)
     ))
   }, [createNotification])
 

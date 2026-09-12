@@ -90,6 +90,22 @@ export const getTasks = () => (
   getCollection('/api/tasks?view=active&limit=100', 'Unable to load active operations.')
 )
 
+export const getTask = async (taskId) => {
+  const payload = await apiRequest(
+    `/api/tasks/${encodeURIComponent(taskId)}`,
+    { errorMessage: 'Unable to load the backup request.' },
+  )
+  return payload.task
+}
+
+export const completeTask = async (taskId) => {
+  const payload = await apiRequest(
+    `/api/tasks/${encodeURIComponent(taskId)}/complete`,
+    { method: 'PATCH', errorMessage: 'Unable to complete the backup request.' },
+  )
+  return payload.task
+}
+
 export const getManageableDeployments = () => (
   getCollection(
     '/api/deployments?view=manageable&limit=100',

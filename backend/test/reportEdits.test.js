@@ -20,7 +20,10 @@ function fixture(status = 'pending') {
   const notifications = []
   const service = createReportService({ io: { emit: () => {} }, models: { Report }, clock: () => now,
     loadPersonnelMap: async () => new Map(), personnelService: {}, reportRouteService: {},
-    notificationService: { createNotification: async (n) => notifications.push(n), deliverNotification: async () => {} },
+    notificationService: {
+      createNotification: async (notification) => notifications.push(notification),
+      deliverNotification: async (notification) => notifications.push(notification),
+    },
     publish: { emitToSupervisorAndPersonnel: () => {} },
   })
   return { document, service, saves: () => saves, notifications }
@@ -35,6 +38,17 @@ it('records before/after values and preserves submission metadata and evidence',
   assert.equal(f.document.evidencePhoto.path, 'evidence.jpg')
   assert.deepEqual(f.document.history[0].changes[0], { field: 'description', before: 'Original description', after: 'Corrected description' })
   assert.equal(result.body.report.revision, 1)
+})
+it('notifies the supervisor with the exact report after a correction', async () => {
+  const f = fixture('validated')
+  await f.service.editReport('RPT-ONE', {
+    description: 'Corrected description', revision: 0, reason: 'Corrected facts',
+  }, officer)
+  assert.equal(f.notifications.length, 1)
+  assert.equal(f.notifications[0].recipientId, 'supervisor')
+  assert.equal(f.notifications[0].referenceType, 'report')
+  assert.equal(f.notifications[0].referenceId, 'RPT-ONE')
+  assert.equal(f.notifications[0].data.reportId, 'RPT-ONE')
 })
 for (const status of ['validated', 'rejected']) it(`returns ${status} reports to pending review after correction`, async () => {
   const f = fixture(status)

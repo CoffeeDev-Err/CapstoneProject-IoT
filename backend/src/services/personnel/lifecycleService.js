@@ -7,7 +7,7 @@ const createPersonnelLifecycleService = ({
 	notificationService,
 }) => {
 	const { CurrentLocation, Deployment, GpsDeviceAssignment, Personnel } = models
-	const { createNotification, deliverNotification } = notificationService
+	const { deliverNotification } = notificationService
 
 const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 	const inactivityMinutes = Math.max(2, Number(process.env.INACTIVITY_ALERT_MINUTES) || 5)
@@ -62,13 +62,16 @@ const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 		const officerName = profile?.fullName || location.personnelId
 		const message = `${officerName} has no detected movement for ${inactivityMinutes} minutes during an active shift.`
 		const [supervisorNotification] = await Promise.all([
-			createNotification({
+			deliverNotification({
+				io,
 				recipientId: 'supervisor',
 				type: 'warning',
 				title: 'Personnel Inactivity',
 				message,
 				referenceType: 'personnel',
 				referenceId: location.personnelId,
+				data: { destination: 'Map', personnelId: location.personnelId },
+				dedupeKey: `personnel:${location.personnelId}:supervisor-inactivity:${now.toISOString()}`,
 			}),
 			deliverNotification({
 				io,

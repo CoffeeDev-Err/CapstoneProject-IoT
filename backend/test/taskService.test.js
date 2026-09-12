@@ -28,6 +28,7 @@ const createService = ({ deploymentExists = false, task = null } = {}) => create
 const createBackupFixture = ({ existingRequest = false } = {}) => {
 	const now = new Date('2026-09-11T08:00:00Z')
 	const tasks = []
+	const deliveries = []
 	let sequence = 0
 	const Task = {
 		exists: async (filter) => existingRequest || tasks.some((task) => (
@@ -77,12 +78,12 @@ const createBackupFixture = ({ existingRequest = false } = {}) => {
 		},
 		notificationService: {
 			createNotification: async () => {},
-			deliverNotification: async () => {},
+			deliverNotification: async (notification) => deliveries.push(notification),
 		},
 		clock: () => now,
 		idGenerator: () => `${(++sequence).toString(16).padStart(8, '0')}-fixed-id`,
 	})
-	return { service, tasks }
+	return { deliveries, service, tasks }
 }
 
 describe('task authorization', () => {
@@ -112,6 +113,16 @@ describe('backup request concurrency', () => {
 		assert.equal(tasks.length, 4)
 		assert.equal(fixture.tasks.length, 4)
 		assert.equal(new Set(tasks.map((task) => task.id)).size, 4)
+	})
+
+	it('notifies the supervisor with the requester and exact backup request', async () => {
+		const fixture = createBackupFixture()
+		const task = await fixture.service.createTask({ type: 'backup', requested_by: 'PNP-001' })
+		assert.equal(fixture.deliveries.length, 1)
+		assert.equal(fixture.deliveries[0].recipientId, 'supervisor')
+		assert.equal(fixture.deliveries[0].referenceId, task.id)
+		assert.equal(fixture.deliveries[0].data.taskId, task.id)
+		assert.equal(fixture.deliveries[0].data.personnelId, 'PNP-001')
 	})
 
 	it('allows only one active request when the same account submits from two devices', async () => {

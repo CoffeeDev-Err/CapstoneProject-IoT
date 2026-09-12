@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Eye, Search } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
 import { ReportListSkeleton } from '../components/LoadingSkeleton'
 import { useFeedback } from '../context/useFeedback'
@@ -11,6 +12,7 @@ import {
 import { useReportsPageState } from '../features/reports/useReportsPageState'
 
 function ReportsPage() {
+  const location = useLocation()
   const { refreshReports, reportsRevision } = usePersonnelContext()
   const { showFeedback } = useFeedback()
   const {
@@ -34,7 +36,13 @@ function ReportsPage() {
     updateReportTypeFilter,
     updateSearchTerm,
     updateSort,
-  } = useReportsPageState({ refreshReports, reportsRevision, showFeedback })
+  } = useReportsPageState({
+    refreshReports,
+    reportsRevision,
+    requestedReportId: location.state?.reportId,
+    requestedReportRequestId: location.state?.notificationRequestId,
+    showFeedback,
+  })
 
   const renderSortHeading = (label, field) => {
     const isActive = sortBy === field

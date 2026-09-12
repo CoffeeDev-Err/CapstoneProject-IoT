@@ -12,6 +12,7 @@ function DeploymentList({
   deploymentSearch,
   deploymentViewCounts,
   filteredGroupedAssignments,
+  highlightedDeploymentId,
   isDeploymentsLoading,
   onDeleteAssignment,
   onDeleteGroup,
@@ -158,7 +159,11 @@ function DeploymentList({
                   </tr>
 
                   {group.assignments.map((assignment) => (
-                    <tr key={assignment.id} className="personnel-row">
+                    <tr
+                      key={assignment.id}
+                      data-deployment-id={assignment.id}
+                      className={`personnel-row${assignment.id === highlightedDeploymentId ? ' deployment-row--highlighted' : ''}`}
+                    >
                       <td data-label="Assignment ID" className="personnel-badge">{assignment.id}</td>
                       <td data-label="Personnel">
                         <strong className="d-block assignment-personnel-name">{assignment.personnelName}</strong>

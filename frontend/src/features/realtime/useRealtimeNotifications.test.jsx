@@ -58,4 +58,28 @@ describe('notification request failures', () => {
     await act(async () => { reject({ status: 503 }); await pending })
     expect(showFeedback).not.toHaveBeenCalled()
   })
+
+  it('preserves actionable metadata and merges repeated server notifications', async () => {
+    const { result } = await open()
+    await act(async () => {
+      result.current.addNotification({
+        id: 'server-action',
+        title: 'Backup Request',
+        referenceType: 'task',
+        referenceId: 'TSK-ONE',
+        data: { personnelId: 'PNP-ONE' },
+      })
+      result.current.addNotification({
+        id: 'server-action',
+        title: 'Backup Request',
+        referenceType: 'task',
+        referenceId: 'TSK-ONE',
+        data: { personnelId: 'PNP-ONE' },
+      })
+    })
+    expect(result.current.notifications.filter((item) => item.id === 'server-action')).toHaveLength(1)
+    expect(result.current.notifications[0]).toMatchObject({
+      referenceType: 'task', referenceId: 'TSK-ONE', data: { personnelId: 'PNP-ONE' },
+    })
+  })
 })

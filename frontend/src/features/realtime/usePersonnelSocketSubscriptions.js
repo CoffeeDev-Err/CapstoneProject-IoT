@@ -112,7 +112,14 @@ export const usePersonnelSocketSubscriptions = ({
         const message = `${names} ${verb} outside the Cabagan boundary.`
         setStatusMessage(message)
         setOperationalAlert({ type: 'geofence', message, timestamp: new Date().toISOString() })
-        addNotification({ type: 'geofence', title: 'Geofence Alert', message })
+        outsidePersonnel.forEach((member) => addNotification({
+          type: 'geofence',
+          title: 'Personnel Outside Cabagan',
+          message: `${member.name} is outside the Cabagan boundary.`,
+          referenceType: 'personnel',
+          referenceId: member.id,
+          data: { personnelId: member.id },
+        }))
         return
       }
 
@@ -139,7 +146,14 @@ export const usePersonnelSocketSubscriptions = ({
         const message = `${names} ${verb} outside the Cabagan boundary.`
         setStatusMessage(message)
         setOperationalAlert({ type: 'geofence', message, timestamp: new Date().toISOString() })
-        addNotification({ type: 'geofence', title: 'Geofence Alert', message })
+        newlyOutside.forEach((member) => addNotification({
+          type: 'geofence',
+          title: 'Personnel Outside Cabagan',
+          message: `${member.name} is outside the Cabagan boundary.`,
+          referenceType: 'personnel',
+          referenceId: member.id,
+          data: { personnelId: member.id },
+        }))
         return
       }
 
@@ -166,7 +180,6 @@ export const usePersonnelSocketSubscriptions = ({
         message,
         timestamp: payload?.timestamp || new Date().toISOString(),
       })
-      addNotification({ type: 'emergency', title: 'Emergency Alert', message })
     }
 
     const mergeReportUpdates = (updates) => {
@@ -178,12 +191,6 @@ export const usePersonnelSocketSubscriptions = ({
     const onReportSubmitted = (payload) => {
       mergeReportUpdates([payload])
       setReportsRevision((revision) => revision + 1)
-      addNotification({
-        type: 'info',
-        title: 'New Police Report',
-        message: `${payload.officer || 'An officer'} submitted ${payload.id}.`,
-        timestamp: payload.date_time,
-      })
     }
     const onReportResolved = (payload) => {
       const reportId = payload?.report_id || payload?.id
@@ -195,12 +202,6 @@ export const usePersonnelSocketSubscriptions = ({
         resolved_at: payload.resolved_at || new Date().toISOString(),
       }])
       setReportsRevision((revision) => revision + 1)
-      addNotification({
-        type: 'success',
-        title: 'Case Resolved',
-        message: `${reportId} was marked resolved from the mobile app.`,
-        timestamp: payload.resolved_at,
-      })
     }
     const onReportUpdated = (payload) => {
       mergeReportUpdates([payload])
@@ -213,11 +214,6 @@ export const usePersonnelSocketSubscriptions = ({
     const onDeploymentsUpdated = (payload) => {
       if (!Array.isArray(payload)) return
       setDeployments(payload)
-      addNotification({
-        type: 'info',
-        title: 'Deployment Updated',
-        message: `${payload.length} active personnel assignment${payload.length === 1 ? '' : 's'} synced.`,
-      })
     }
 
     const upsertTask = (payload) => {
@@ -235,12 +231,6 @@ export const usePersonnelSocketSubscriptions = ({
           timestamp: payload.created_at || new Date().toISOString(),
         })
       }
-      addNotification({
-        type: 'emergency',
-        title: payload.type === 'backup' ? 'Backup Request' : 'Urgent Task',
-        message: `${payload.title} at ${payload.location}.`,
-        timestamp: payload.created_at,
-      })
     }
 
     const onPersonnelInactivity = (payload) => {
@@ -251,12 +241,10 @@ export const usePersonnelSocketSubscriptions = ({
         message,
         timestamp: payload?.timestamp || new Date().toISOString(),
       })
-      addNotification({
-        type: 'warning',
-        title: payload?.title || 'Personnel Inactivity',
-        message,
-        timestamp: payload?.timestamp,
-      })
+    }
+
+    const onNotificationCreated = (payload) => {
+      if (payload?.id) addNotification(payload)
     }
 
     const onPersonnelIdentityUpdated = (payload) => {
@@ -307,6 +295,7 @@ export const usePersonnelSocketSubscriptions = ({
     socket.on('task:created', onTaskCreated)
     socket.on('task:updated', upsertTask)
     socket.on('personnel:inactivity', onPersonnelInactivity)
+    socket.on('notification:created', onNotificationCreated)
 
     Promise.allSettled([getPersonnel(), getReports(), getDeployments(), getTasks()])
       .then(([personnelResult, reportResult, deploymentResult, taskResult]) => {
@@ -349,6 +338,7 @@ export const usePersonnelSocketSubscriptions = ({
       socket.off('task:created', onTaskCreated)
       socket.off('task:updated', upsertTask)
       socket.off('personnel:inactivity', onPersonnelInactivity)
+      socket.off('notification:created', onNotificationCreated)
       socket.disconnect()
     }
   }, [addNotification, initialLoadVersion, isAuthenticated, outsidePersonnelIdsRef,

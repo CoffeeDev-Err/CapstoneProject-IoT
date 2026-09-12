@@ -47,7 +47,7 @@ const createReportService = ({
 }) => {
 	const { CurrentLocation, Deployment, Report } = models
 	const { getPersonnelMember } = personnelService
-	const { createNotification, deliverNotification } = notificationService
+	const { deliverNotification } = notificationService
 	const emitToSupervisorAndPersonnel = publish.emitToSupervisorAndPersonnel
 
 	const loadReports = async (personnelId) => {
@@ -170,7 +170,6 @@ const createReportService = ({
 			referenceType: 'report',
 			referenceId: report.reportNumber,
 		}
-		await createNotification(notification)
 		await deliverNotification({
 			io,
 			recipientId: report.submittedBy,
@@ -212,8 +211,18 @@ const createReportService = ({
 		emitToSupervisorAndPersonnel('report:updated', serialized, personnelId)
 		io.emit('dashboard:updated')
 		// A notification delivery failure must not turn a saved correction into a failed write.
-		await createNotification({ type: 'info', title: 'Report correction submitted',
-			message: `${report.reportNumber} was corrected and needs review.`, referenceType: 'report', referenceId: report.reportNumber }).catch(() => {})
+		await deliverNotification({
+			io,
+			recipientId: 'supervisor',
+			type: 'info',
+			title: 'Report correction submitted',
+			message: `${report.reportNumber} was corrected and needs review.`,
+			referenceType: 'report',
+			referenceId: report.reportNumber,
+			priority: 'high',
+			data: { destination: 'Reports', reportId: report.reportNumber },
+			dedupeKey: `report:${report.reportNumber}:correction:${serialized.revision}`,
+		}).catch(() => {})
 		return { status: 200, body: { success: true, report: serialized } }
 	}
 
@@ -366,12 +375,16 @@ const createReportService = ({
 			await reportRouteService.captureSnapshot(report)
 			const personnelById = await loadPersonnelMap([report.submittedBy])
 			const serialized = serializeReport(report, personnelById)
-			await createNotification({
+			await deliverNotification({
+				io,
+				recipientId: 'supervisor',
 				type: 'info',
 				title: 'New Police Report',
 				message: `${report.officerName} submitted ${report.reportNumber}.`,
 				referenceType: 'report',
 				referenceId: report.reportNumber,
+				data: { destination: 'Reports', reportId: report.reportNumber },
+				dedupeKey: `report:${report.reportNumber}:submitted`,
 			})
 			emitToSupervisorAndPersonnel('report:submitted', serialized, report.submittedBy)
 			io.emit('dashboard:updated')
@@ -405,10 +418,14 @@ const createReportService = ({
 		}
 		await saveReport(report)
 		const serialized = serializeReport(report)
-		await createNotification({
+		await deliverNotification({
+			io,
+			recipientId: 'supervisor',
 			type: 'success', title: 'Case Resolved',
 			message: `${report.reportNumber} was marked resolved from the mobile app.`,
 			referenceType: 'report', referenceId: report.reportNumber,
+			data: { destination: 'Reports', reportId: report.reportNumber },
+			dedupeKey: `report:${report.reportNumber}:resolved:${serialized.revision}`,
 		})
 		emitToSupervisorAndPersonnel('report:resolved', serialized, report.submittedBy)
 		io.emit('dashboard:updated')

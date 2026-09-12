@@ -37,7 +37,7 @@ const createDeploymentService = ({
 }) => {
 	const { Deployment, Personnel } = models
 	const { emitPersonnelCollection, getPersonnelWithLocations } = personnelService
-	const { createNotification, deliverNotification } = notificationService
+	const { deliverNotification } = notificationService
 	const { emitToSupervisorAndPersonnel } = publish
 
 	const loadDeployments = async (personnelId) => {
@@ -530,12 +530,6 @@ const createDeploymentService = ({
 			listDeployments({ view: 'manageable', limit: 100 }),
 			getPersonnelWithLocations(),
 		])
-		await createNotification({
-			title: 'Deployment Updated',
-			message: `${manageablePayload.data.length} current or scheduled personnel assignment${manageablePayload.data.length === 1 ? '' : 's'} synced.`,
-			referenceType: 'deployment',
-			referenceId: normalizedAssignments[0]?.groupId || 'active',
-		})
 		for (const assignment of normalizedAssignments) {
 			const previous = previousById.get(assignment.id)
 			const signature = deploymentNoticeSignature(assignment)

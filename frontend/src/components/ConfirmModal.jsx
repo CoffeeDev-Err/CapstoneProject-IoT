@@ -11,6 +11,7 @@ function ConfirmModal({
   onConfirm,
   onCancel,
   variant = 'danger',
+  layerClassName = '',
 }) {
   const cancelButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(open, onCancel, cancelButtonRef)
@@ -21,7 +22,7 @@ function ConfirmModal({
 
   return createPortal(
     <div
-      className="modal-backdrop"
+      className={`modal-backdrop${layerClassName ? ` ${layerClassName}` : ''}`}
       role="presentation"
       onClick={onCancel}
     >

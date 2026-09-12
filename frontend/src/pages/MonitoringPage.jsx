@@ -14,19 +14,24 @@
  *   PersonnelContext → hook → this page → props down to child components
  *   User clicks marker/name → setSelectedPersonnel → modal opens
  */
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { MonitoringContentSkeleton } from '../components/LoadingSkeleton'
+import ConfirmModal from '../components/ConfirmModal'
 import ProfileModal from '../components/ProfileModal'
 import SidePanel from '../components/SidePanel'
 import { usePersonnelContext } from '../context/usePersonnelContext'
+import { useFeedback } from '../context/useFeedback'
 import { useDevelopmentMapPersonnel } from '../hooks/useDevelopmentMapPersonnel'
+import { completeTask, getTask } from '../services/operations'
+import { requestErrorMessage } from '../utils/requestFeedback'
 
 const PersonnelMap = lazy(() => import('../components/PersonnelMap'))
 
 function MonitoringPage() {
   const location = useLocation()
+  const { showFeedback } = useFeedback()
   // Pull live officer data and status from the shared context
   const {
     personnel,
@@ -78,6 +83,9 @@ function MonitoringPage() {
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false)
+  const [taskActionBusy, setTaskActionBusy] = useState(false)
   const [followedPersonnelId, setFollowedPersonnelId] = useState(
     () => location.state?.locatePersonnelId || null,
   )
@@ -91,7 +99,61 @@ function MonitoringPage() {
     (member) => member.id === followedPersonnelId,
   ) ? followedPersonnelId : null
 
+  useEffect(() => {
+    const requestedPersonnelId = location.state?.locatePersonnelId
+    const requestedTaskId = location.state?.taskId
+    if (!requestedPersonnelId && !requestedTaskId) return undefined
+
+    let isCurrent = true
+    const openPersonnel = (personnelId) => {
+      if (!personnelId || !isCurrent) return
+      setFollowedPersonnelId(personnelId)
+      setSelectedPersonnelId(personnelId)
+    }
+
+    if (!requestedTaskId) {
+      queueMicrotask(() => {
+        if (!isCurrent) return
+        setSelectedTask(null)
+        openPersonnel(requestedPersonnelId)
+      })
+      return () => { isCurrent = false }
+    }
+
+    const activeTask = tasks.find((task) => task.id === requestedTaskId)
+    if (activeTask) {
+      queueMicrotask(() => {
+        if (!isCurrent) return
+        setSelectedTask(activeTask)
+        openPersonnel(activeTask.requested_by || requestedPersonnelId)
+      })
+      return () => { isCurrent = false }
+    }
+
+    getTask(requestedTaskId).then((task) => {
+      if (!isCurrent) return
+      setSelectedTask(task)
+      openPersonnel(task.requested_by || requestedPersonnelId)
+    }).catch((error) => {
+      if (!isCurrent) return
+      setSelectedTask(null)
+      openPersonnel(requestedPersonnelId)
+      showFeedback(requestErrorMessage(error, { action: 'open the backup request' }), {
+        type: 'error',
+        title: 'Backup request could not be opened',
+      })
+    })
+    return () => { isCurrent = false }
+  }, [location.state?.notificationRequestId, location.state?.locatePersonnelId,
+    location.state?.taskId, showFeedback, tasks])
+
+  const currentSelectedTask = useMemo(() => {
+    if (!selectedTask) return null
+    return tasks.find((task) => task.id === selectedTask.id) || selectedTask
+  }, [selectedTask, tasks])
+
   const handleSelectPersonnel = (member) => {
+    setSelectedTask(null)
     setSelectedPersonnelId(member?.id || null)
   }
 
@@ -117,6 +179,24 @@ function MonitoringPage() {
 
     // Close the modal so the supervisor can immediately see the map focus result.
     setSelectedPersonnelId(null)
+  }
+
+  const handleCompleteTask = async () => {
+    if (!currentSelectedTask || taskActionBusy) return
+    setTaskActionBusy(true)
+    try {
+      const updatedTask = await completeTask(currentSelectedTask.id)
+      setSelectedTask(updatedTask)
+      setCompletionConfirmOpen(false)
+      showFeedback(`${updatedTask.id} was marked completed.`, { type: 'success' })
+    } catch (error) {
+      showFeedback(requestErrorMessage(error, { action: 'complete the backup request', write: true }), {
+        type: 'error',
+        title: 'Backup request needs attention',
+      })
+    } finally {
+      setTaskActionBusy(false)
+    }
   }
 
   if (isInitialDataLoading) {
@@ -173,9 +253,26 @@ function MonitoringPage() {
       </main>
 
       <ProfileModal
-        selectedPersonnel={selectedPersonnel}
-        onClose={() => setSelectedPersonnelId(null)}
+        selectedPersonnel={completionConfirmOpen ? null : selectedPersonnel}
+        selectedTask={currentSelectedTask}
+        taskActionBusy={taskActionBusy}
+        onClose={() => {
+          setSelectedPersonnelId(null)
+          setSelectedTask(null)
+        }}
         onLocate={() => handleLocatePersonnel(selectedPersonnel)}
+        onCompleteTask={() => setCompletionConfirmOpen(true)}
+      />
+      <ConfirmModal
+        open={completionConfirmOpen}
+        title="Complete backup request?"
+        message="Mark this request completed after the response has been handled. Officers will see the updated status."
+        confirmLabel={taskActionBusy ? 'Completing...' : 'Mark completed'}
+        cancelLabel="Keep open"
+        variant="primary"
+        layerClassName="modal-backdrop--above-profile"
+        onCancel={() => !taskActionBusy && setCompletionConfirmOpen(false)}
+        onConfirm={handleCompleteTask}
       />
     </div>
   )

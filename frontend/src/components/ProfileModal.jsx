@@ -4,6 +4,7 @@ import {
   Gauge,
   LocateFixed,
   MapPin,
+  RadioTower,
   X,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -28,7 +29,16 @@ const formatGpsDateTime = (value) => {
   }).format(date)
 }
 
-function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
+const formatTaskStatus = (value) => String(value || 'open').replaceAll('_', ' ')
+
+function ProfileModal({
+  selectedPersonnel,
+  selectedTask,
+  taskActionBusy = false,
+  onClose,
+  onLocate,
+  onCompleteTask,
+}) {
   const closeButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(Boolean(selectedPersonnel), onClose, closeButtonRef)
 
@@ -85,7 +95,7 @@ function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
         <div className="profile-map-card__location">
           <MapPin size={17} aria-hidden="true" />
           <div>
-            <span>Last confirmed location</span>
+            <span>{selectedTask ? 'Current officer location' : 'Last confirmed location'}</span>
             <strong>{selectedPersonnel.locationName || 'Location unavailable'}</strong>
             {selectedPersonnel.isLocationStale && selectedPersonnel.lastKnownLocationName && (
               <small>Last known: {selectedPersonnel.lastKnownLocationName}</small>
@@ -103,6 +113,51 @@ function ProfileModal({ selectedPersonnel, onClose, onLocate }) {
             <span>Locate</span>
           </button>
         </div>
+
+        {selectedTask && (
+          <section className="profile-map-card__request" aria-label="Backup request details">
+            <div className="profile-map-card__request-heading">
+              <span className="profile-map-card__request-icon" aria-hidden="true">
+                <RadioTower size={16} />
+              </span>
+              <div>
+                <small>{selectedTask.type === 'backup' ? 'Backup request' : 'Urgent task'}</small>
+                <strong>{selectedTask.title}</strong>
+              </div>
+              <span className={`profile-map-card__request-status is-${selectedTask.status || 'open'}`}>
+                {formatTaskStatus(selectedTask.status)}
+              </span>
+            </div>
+            <dl className="profile-map-card__request-grid">
+              <div>
+                <dt>Requested at</dt>
+                <dd>{formatGpsDateTime(selectedTask.created_at)}</dd>
+              </div>
+              <div>
+                <dt>Request location</dt>
+                <dd>{selectedTask.location || 'Location unavailable'}</dd>
+              </div>
+              <div>
+                <dt>Responders</dt>
+                <dd>{selectedTask.accepted_by?.length || 0} of {selectedTask.required_responders || 1}</dd>
+              </div>
+              <div>
+                <dt>Request ID</dt>
+                <dd>{selectedTask.id}</dd>
+              </div>
+            </dl>
+            {['open', 'full'].includes(selectedTask.status) && onCompleteTask && (
+              <button
+                type="button"
+                className="profile-map-card__request-action"
+                onClick={onCompleteTask}
+                disabled={taskActionBusy}
+              >
+                {taskActionBusy ? 'Completing...' : 'Mark completed'}
+              </button>
+            )}
+          </section>
+        )}
 
         <div className="profile-map-card__telemetry">
           <div className="profile-map-card__metric">

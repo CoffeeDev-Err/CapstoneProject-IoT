@@ -3,6 +3,7 @@ const { Notification, PushDevice } = require('../models')
 const { findCursorPage } = require('./operations/pagination')
 
 const PERSONNEL_ROOM_PREFIX = 'personnel:'
+const SUPERVISOR_ROOM = 'role:supervisor'
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
 const toNotificationPayload = (notification) => ({
@@ -116,7 +117,9 @@ const deliverNotification = async ({ io, ...payload }) => {
 	const result = await createNotificationRecord(payload)
 	if (!result.created) return result.notification
 
-	if (payload.recipientId && payload.recipientId !== 'supervisor') {
+	if (!payload.recipientId || payload.recipientId === 'supervisor') {
+		io?.to(SUPERVISOR_ROOM).emit('notification:created', result.notification)
+	} else {
 		io?.to(`${PERSONNEL_ROOM_PREFIX}${payload.recipientId}`)
 			.emit('notification:created', result.notification)
 		void sendExpoPush(payload.recipientId, result.notification).catch((error) => {

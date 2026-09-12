@@ -29,7 +29,6 @@ const {
 } = require('../utils/accountValidation')
 const { fetchRegisteredDevices } = require('./flespiService')
 const { toMediaAccessPath } = require('./mediaStorageService')
-const { createNotification } = require('./notificationService')
 
 const normalizeStatus = (status) => (
 	String(status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active'
@@ -255,25 +254,17 @@ const createAccountService = ({ io, personnelService }) => {
 				forcePasswordReset: true,
 			})
 
-			await Promise.all([
-				AuditLog.create({
-					action: 'account.created',
-					entityType: 'user',
-					entityId: String(user._id),
-					changes: {
-						personnelId,
-						badgeNumber: profile.badgeNumber,
-						imei: assignment.imei,
-					},
-					ipAddress,
-				}),
-				createNotification({
-					title: 'Officer Account Created',
-					message: `${profile.fullName} was provisioned for mobile access.`,
-					referenceType: 'user',
-					referenceId: String(user._id),
-				}),
-			])
+			await AuditLog.create({
+				action: 'account.created',
+				entityType: 'user',
+				entityId: String(user._id),
+				changes: {
+					personnelId,
+					badgeNumber: profile.badgeNumber,
+					imei: assignment.imei,
+				},
+				ipAddress,
+			})
 
 			await broadcastAccountData()
 			return serializeAccount(user, profile, assignment)

@@ -395,6 +395,30 @@
   background: #f0f4f8;
 }
 
+:root:not([data-theme="dark"]) .profile-map-card__request {
+  border-color: var(--border-color-light);
+  background: #f8fafc;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__request-grid {
+  border-color: var(--border-color-light);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__request-heading small,
+:root:not([data-theme="dark"]) .profile-map-card__request-grid dt {
+  color: var(--text-tertiary);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__request-heading strong,
+:root:not([data-theme="dark"]) .profile-map-card__request-grid dd {
+  color: var(--text-primary);
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__request-action {
+  color: var(--color-primary-dark);
+  background: #eff6ff;
+}
+
 :root:not([data-theme="dark"]) .deployment-form-card,
 :root:not([data-theme="dark"]) .deployment-list-card {
   --deployment-navy: var(--text-primary);
