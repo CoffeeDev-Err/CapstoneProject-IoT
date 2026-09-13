@@ -53,7 +53,7 @@ const createOperationalService = ({ io }) => {
 	} = taskService
 	const reportService = createReportService({
 		io,
-		models: { CurrentLocation, Deployment, Report },
+		models: { CurrentLocation, Deployment, Report, Task },
 		loadPersonnelMap,
 		personnelService: { getPersonnelMember },
 		notificationService: { createNotification, deliverNotification },

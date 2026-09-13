@@ -26,8 +26,9 @@ const {
 	activeShiftConditions,
 	createNotFoundResult,
 	serializeReport,
+	serializeTask,
 } = require('./domain')
-const { getOfficerPersonnelId } = require('./access')
+const { getOfficerPersonnelId, taskParticipantIds } = require('./access')
 const { appendFilterCondition, findCursorPage } = require('./pagination')
 const { editValues, assertRevision, saveReport } = require('./reportEdits')
 
@@ -45,7 +46,7 @@ const createReportService = ({
 	clock = () => new Date(),
 	idGenerator = randomUUID,
 }) => {
-	const { CurrentLocation, Deployment, Report } = models
+	const { CurrentLocation, Deployment, Report, Task } = models
 	const { getPersonnelMember } = personnelService
 	const { deliverNotification } = notificationService
 	const emitToSupervisorAndPersonnel = publish.emitToSupervisorAndPersonnel
@@ -188,6 +189,14 @@ const createReportService = ({
 		if (!personnelId) return { status: 403, body: { success: false, message: 'Only the submitting officer can correct a report.' } }
 		const report = await Report.findOne({ reportNumber: reportId, submittedBy: personnelId })
 		if (!report) return createNotFoundResult('Report')
+		if (report.backupResponse?.taskId
+			&& payload.report_type !== undefined
+			&& String(payload.report_type).trim().toLowerCase() !== 'incident') {
+			throw createValidationError(
+				'A report linked to a backup response must remain an incident report.',
+				'report_type', 'BACKUP_REPORT_MUST_BE_INCIDENT',
+			)
+		}
 		const { values, changes, reason } = editValues(report, payload, clock())
 		const oldCoordinates = report.location?.coordinates
 		const newCoordinates = values.location?.coordinates
@@ -243,6 +252,35 @@ const createReportService = ({
 		}
 		const reportType = validateReportType(payload.report_type)
 		const isIncident = reportType === 'incident'
+		const backupTaskId = String(payload.backup_task_id || '').trim()
+		let backupTask = null
+		let backupPersonnelById = new Map()
+		if (backupTaskId) {
+			backupTask = await Task.findOne({ taskId: backupTaskId })
+			if (!backupTask || backupTask.type !== 'backup') {
+				throw createValidationError('The linked backup request could not be found.', 'backup_task_id', 'BACKUP_REQUEST_NOT_FOUND')
+			}
+			if (backupTask.requestedBy !== officer.id) {
+				const error = createValidationError('Only the officer who requested backup can submit its incident report.', 'backup_task_id', 'BACKUP_REPORT_NOT_ALLOWED')
+				error.status = 403
+				throw error
+			}
+			if (backupTask.status !== 'completed' || !backupTask.completedAt) {
+				throw createValidationError('Complete the backup response before creating its incident report.', 'backup_task_id', 'BACKUP_RESPONSE_ACTIVE')
+			}
+			if (!isIncident) {
+				throw createValidationError('A backup response must be submitted as an incident report.', 'report_type', 'BACKUP_REPORT_MUST_BE_INCIDENT')
+			}
+			const existingBackupReport = await Report.findOne({ 'backupResponse.taskId': backupTaskId }).lean()
+			if (existingBackupReport) {
+				const error = createValidationError(`Backup request ${backupTaskId} is already linked to ${existingBackupReport.reportNumber}.`, 'backup_task_id', 'BACKUP_REPORT_EXISTS')
+				error.status = 409
+				throw error
+			}
+			backupPersonnelById = await loadPersonnelMap(
+				(backupTask.responders || []).map((responder) => responder.personnelId),
+			)
+		}
 		const selectedBarangay = findCabaganBarangay(payload.barangay)
 		if (!selectedBarangay) {
 			const error = new Error('Select one of the 26 official Cabagan barangays before submitting.')
@@ -258,13 +296,21 @@ const createReportService = ({
 			field: 'description', label: 'Report description',
 			maxLength: OPERATIONAL_LIMITS.reportDescription, required: true,
 		})
-		const locationName = validateText(payload.location, {
+		const locationName = validateText(
+			String(payload.location_source || '').trim().toLowerCase() === 'backup_request' && backupTask
+				? backupTask.locationName
+				: payload.location,
+			{
 			field: 'location', label: 'Exact incident location',
 			maxLength: OPERATIONAL_LIMITS.reportLocation, required: true, allowNewlines: false,
-		})
+			},
+		)
 		const locationSource = String(payload.location_source || '').trim().toLowerCase()
-		if (!['gps', 'manual'].includes(locationSource)) {
-			throw createValidationError('Location source must be gps or manual.', 'location_source')
+		if (!['gps', 'manual', 'backup_request'].includes(locationSource)) {
+			throw createValidationError('Location source must be gps, manual, or backup_request.', 'location_source')
+		}
+		if (locationSource === 'backup_request' && !backupTask) {
+			throw createValidationError('A linked backup request is required for this location source.', 'location_source', 'BACKUP_REQUEST_REQUIRED')
 		}
 		const occurredAt = validateDate(payload.occurred_at || now, {
 			field: 'occurred_at', label: 'Incident date and time',
@@ -297,10 +343,14 @@ const createReportService = ({
 			&& currentAgeMs >= -5 * 60 * 1000
 			&& currentAgeMs <= getLocationStaleThresholdMs()
 
-		const hasLatitude = payload.latitude !== null && payload.latitude !== undefined && payload.latitude !== ''
-		const hasLongitude = payload.longitude !== null && payload.longitude !== undefined && payload.longitude !== ''
-		const suppliedLatitude = hasLatitude ? Number(payload.latitude) : undefined
-		const suppliedLongitude = hasLongitude ? Number(payload.longitude) : undefined
+		const backupCoordinates = backupTask?.location?.coordinates
+		const usesBackupLocation = locationSource === 'backup_request'
+		const sourceLatitude = usesBackupLocation ? backupCoordinates?.[1] : payload.latitude
+		const sourceLongitude = usesBackupLocation ? backupCoordinates?.[0] : payload.longitude
+		const hasLatitude = sourceLatitude !== null && sourceLatitude !== undefined && sourceLatitude !== ''
+		const hasLongitude = sourceLongitude !== null && sourceLongitude !== undefined && sourceLongitude !== ''
+		const suppliedLatitude = hasLatitude ? Number(sourceLatitude) : undefined
+		const suppliedLongitude = hasLongitude ? Number(sourceLongitude) : undefined
 		const hasValidSuppliedCoordinates = hasLatitude && hasLongitude
 			&& isValidCoordinates(suppliedLatitude, suppliedLongitude)
 		if ((hasLatitude || hasLongitude) && !hasValidSuppliedCoordinates) {
@@ -319,6 +369,12 @@ const createReportService = ({
 			throw createValidationError(
 				'Include the current device coordinates when using the GPS location source.',
 				'location', 'REPORT_GPS_COORDINATES_REQUIRED',
+			)
+		}
+		if (locationSource === 'backup_request' && !hasValidSuppliedCoordinates) {
+			throw createValidationError(
+				'The linked backup request does not contain valid GPS coordinates. Select the incident point manually.',
+				'location', 'BACKUP_LOCATION_UNAVAILABLE',
 			)
 		}
 		if (locationSource === 'gps'
@@ -348,31 +404,72 @@ const createReportService = ({
 				}),
 			}
 		}
-		const report = await Report.create({
-			reportNumber: `RPT-${now.getFullYear()}-${idGenerator().slice(0, 8).toUpperCase()}`,
-			...(clientSubmissionId && { clientSubmissionId }),
-			submittedBy: officer.id,
-			officerName: officer.name,
-			submittedAt: now,
-			incidentAt: occurredAt,
-			assignedArea: activeDeployment?.patrolArea || 'Unassigned area',
-			barangayCode: selectedBarangay.code,
-			reportType,
-			isIncident,
-			severity,
-			validationStatus: 'pending',
-			caseStatus: isIncident ? 'open' : 'not_applicable',
-			title,
-			description,
-			locationName,
-			locationSource,
-			...(hasReportCoordinates && { location: point(longitude, latitude) }),
-			...(hasFreshCurrentLocation && {
-				submittedFrom: point(currentCoordinates[0], currentCoordinates[1]),
+		const backupResponse = backupTask ? {
+			taskId: backupTask.taskId,
+			requestedAt: backupTask.createdAt,
+			completedAt: backupTask.completedAt,
+			requestLocation: backupTask.locationName,
+			responders: (backupTask.responders || []).map((responder) => {
+				const profile = backupPersonnelById.get(responder.personnelId)
+				return {
+					personnelId: responder.personnelId,
+					name: profile?.fullName || responder.personnelId,
+					rank: profile?.rank || '',
+					badgeNumber: profile?.badgeNumber || '',
+					acceptedAt: responder.acceptedAt,
+				}
 			}),
-			...(evidencePhoto && { evidencePhoto }),
-		})
+		} : undefined
+		let report
 		try {
+			report = await Report.create({
+				reportNumber: `RPT-${now.getFullYear()}-${idGenerator().slice(0, 8).toUpperCase()}`,
+				...(clientSubmissionId && { clientSubmissionId }),
+				submittedBy: officer.id,
+				officerName: officer.name,
+				submittedAt: now,
+				incidentAt: occurredAt,
+				assignedArea: backupTask?.assignedArea || activeDeployment?.patrolArea || 'Unassigned area',
+				barangayCode: selectedBarangay.code,
+				reportType,
+				isIncident,
+				severity,
+				validationStatus: 'pending',
+				caseStatus: isIncident ? 'open' : 'not_applicable',
+				title,
+				description,
+				locationName,
+				locationSource,
+				...(hasReportCoordinates && { location: point(longitude, latitude) }),
+				...(hasFreshCurrentLocation && {
+					submittedFrom: point(currentCoordinates[0], currentCoordinates[1]),
+				}),
+				...(evidencePhoto && { evidencePhoto }),
+				...(backupResponse && { backupResponse }),
+			})
+		} catch (error) {
+			if (backupTaskId && error?.code === 11000
+				&& (error.keyPattern?.['backupResponse.taskId'] || error.keyValue?.['backupResponse.taskId'])) {
+				const existingBackupReport = await Report.findOne({ 'backupResponse.taskId': backupTaskId }).lean()
+				const conflict = createValidationError(
+					`Backup request ${backupTaskId} is already linked to ${existingBackupReport?.reportNumber || 'another report'}.`,
+					'backup_task_id', 'BACKUP_REPORT_EXISTS',
+				)
+				conflict.status = 409
+				throw conflict
+			}
+			throw error
+		}
+		try {
+			if (backupTask) {
+				backupTask.reportNumber = report.reportNumber
+				await backupTask.save()
+				const serializedTask = serializeTask(backupTask, backupPersonnelById)
+				io.to('role:supervisor').emit('task:updated', serializedTask)
+				taskParticipantIds(backupTask).forEach((personnelId) => {
+					io.to(`personnel:${personnelId}`).emit('task:updated', serializedTask)
+				})
+			}
 			await reportRouteService.captureSnapshot(report)
 			const personnelById = await loadPersonnelMap([report.submittedBy])
 			const serialized = serializeReport(report, personnelById)
@@ -391,6 +488,10 @@ const createReportService = ({
 			io.emit('dashboard:updated')
 			return serialized
 		} catch (error) {
+			if (backupTask?.reportNumber === report.reportNumber) {
+				backupTask.reportNumber = undefined
+				await backupTask.save().catch(() => {})
+			}
 			await Report.deleteOne({ _id: report._id }).catch(() => {})
 			throw error
 		}

@@ -38,7 +38,7 @@ import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import { resolveApiAssetUrl } from '../services/operationsApi';
 import { discardTemporaryEvidence } from '../services/offlineReportQueue';
-import type { PoliceReport } from '../types/operations';
+import type { OperationalTask, PoliceReport } from '../types/operations';
 import {
   REPORT_FILTERS,
   REPORT_TYPES,
@@ -129,9 +129,12 @@ export default function ReportsScreen() {
       reportId?: string;
       notificationRequestId?: number;
       draftRequestId?: number;
+      backupTask?: OperationalTask;
+      backupReportRequestId?: number;
     };
   }, 'Reports'>>();
   const handledDraftRequestRef = useRef<number | null>(null);
+  const handledBackupReportRequestRef = useRef<number | null>(null);
   const { reportId, openReport, selectedReport, loading: detailLoading, error: detailError, refresh: refreshDetail } = useReportDetails(token, reports);
   useEffect(() => {
     if (route.params?.reportId) { openReport(route.params.reportId); refreshDetail(); }
@@ -142,6 +145,13 @@ export default function ReportsScreen() {
     handledDraftRequestRef.current = requestId;
     openSubmitForm().catch(() => undefined);
   }, [openSubmitForm, route.params?.draftRequestId]);
+  useEffect(() => {
+    const requestId = route.params?.backupReportRequestId;
+    const backupTask = route.params?.backupTask;
+    if (!requestId || !backupTask || handledBackupReportRequestRef.current === requestId) return;
+    handledBackupReportRequestRef.current = requestId;
+    openSubmitForm(backupTask).catch(() => undefined);
+  }, [openSubmitForm, route.params?.backupReportRequestId, route.params?.backupTask]);
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
   const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
@@ -188,7 +198,7 @@ export default function ReportsScreen() {
           <Text style={[styles.title, isDark && themeStyles.text]}>Reports</Text>
           <Text style={[styles.subtitle, isDark && themeStyles.muted]}>Your submitted report history</Text>
         </View>
-         <TouchableOpacity style={styles.submitButton} onPress={openSubmitForm}>
+         <TouchableOpacity style={styles.submitButton} onPress={() => { void openSubmitForm(); }}>
           <Icon name="add" size={19} color="#ffffff" />
         </TouchableOpacity>
       </View>
@@ -348,12 +358,51 @@ export default function ReportsScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {form.backup_context ? (
+              <View style={[
+                styles.backupContextCard,
+                { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+              ]}>
+                <View style={styles.backupContextHeader}>
+                  <View style={styles.backupContextIcon}>
+                    <Icon name="campaign" size={18} color="#ffffff" />
+                  </View>
+                  <View style={styles.backupContextTitleWrap}>
+                    <Text style={[styles.backupContextTitle, { color: colors.text }]}>Backup Response</Text>
+                    <Text style={[styles.backupContextId, { color: colors.textMuted }]}>{form.backup_context.task_id}</Text>
+                  </View>
+                  <View style={styles.automaticBadge}>
+                    <Text style={styles.automaticBadgeText}>AUTOMATIC</Text>
+                  </View>
+                </View>
+                <View style={[styles.backupContextMeta, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.backupContextLabel, { color: colors.textMuted }]}>REQUEST LOCATION</Text>
+                  <Text style={[styles.backupContextValue, { color: colors.text }]}>{form.backup_context.request_location}</Text>
+                  <Text style={[styles.backupContextLabel, styles.backupContextLabelSpaced, { color: colors.textMuted }]}>RESPONSE TEAM</Text>
+                  {form.backup_context.responders.length > 0 ? form.backup_context.responders.map((responder, index) => (
+                    <View key={`${responder.personnel_id}-${responder.accepted_at}`} style={styles.responderRow}>
+                      <Text style={[styles.responderNumber, { color: mobileTheme.blue }]}>{index + 1}</Text>
+                      <View style={styles.responderCopy}>
+                        <Text style={[styles.responderName, { color: colors.text }]}>{[responder.rank, responder.name].filter(Boolean).join(' ')}</Text>
+                        <Text style={[styles.responderMeta, { color: colors.textMuted }]}>
+                          {responder.badge_number ? `Badge ${responder.badge_number} · ` : ''}Accepted {formatReportDate(responder.accepted_at)}
+                        </Text>
+                      </View>
+                    </View>
+                  )) : (
+                    <Text style={[styles.responderMeta, { color: colors.textMuted }]}>No responder accepted before completion.</Text>
+                  )}
+                </View>
+              </View>
+            ) : null}
+
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REPORT TYPE</Text>
             <View style={styles.typeOptions}>
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[styles.typeOption, isDark && themeStyles.surfaceMuted, form.report_type === type && styles.typeOptionActive]}
+                  disabled={Boolean(form.backup_task_id)}
                   onPress={() => updateForm('report_type', type)}
                 >
                   <Text style={[styles.typeOptionText, form.report_type === type && styles.typeOptionTextActive]}>
@@ -557,11 +606,27 @@ export default function ReportsScreen() {
               label="Location selected using"
               value={selectedReport.location_source === 'gps'
                 ? "Officer's current GPS"
+                : selectedReport.location_source === 'backup_request'
+                  ? 'GPS recorded with backup request'
                 : selectedReport.latitude != null && selectedReport.longitude != null
                   ? 'Manually selected map pin'
                   : 'Manually entered place'}
             />
             <Detail label="Description" value={selectedReport.description} />
+            {selectedReport.backup_response ? <>
+              <Detail label="Backup request" value={selectedReport.backup_response.task_id} />
+              <Detail label="Backup requested" value={formatReportDate(selectedReport.backup_response.requested_at)} />
+              <Detail label="Backup response completed" value={formatReportDate(selectedReport.backup_response.completed_at)} />
+              <Detail label="Backup request location" value={selectedReport.backup_response.request_location} />
+              <Detail
+                label="Backup response team"
+                value={selectedReport.backup_response.responders.length
+                  ? selectedReport.backup_response.responders.map((responder, index) => (
+                    `${index + 1}. ${[responder.rank, responder.name].filter(Boolean).join(' ')}${responder.badge_number ? ` · Badge ${responder.badge_number}` : ''}`
+                  )).join('\n')
+                  : 'No responder accepted before completion'}
+              />
+            </> : null}
             {selectedReport.evidence_photo?.url && (
               <View style={[styles.detailEvidence, isDark && themeStyles.border]}>
                 <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE</Text>
@@ -693,6 +758,23 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   submitButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  backupContextCard: { marginBottom: 4, padding: 12, borderWidth: 1, borderRadius: 12 },
+  backupContextHeader: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  backupContextIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: mobileTheme.blue },
+  backupContextTitleWrap: { flex: 1 },
+  backupContextTitle: { fontSize: 13, fontWeight: '800' },
+  backupContextId: { marginTop: 2, fontSize: 9, fontWeight: '700' },
+  automaticBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, backgroundColor: mobileTheme.blueSoft },
+  automaticBadgeText: { color: mobileTheme.blue, fontSize: 8, fontWeight: '900' },
+  backupContextMeta: { marginTop: 10, paddingTop: 10, borderTopWidth: 1 },
+  backupContextLabel: { fontSize: 8, fontWeight: '900' },
+  backupContextLabelSpaced: { marginTop: 10, marginBottom: 5 },
+  backupContextValue: { marginTop: 3, fontSize: 11, fontWeight: '700' },
+  responderRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  responderNumber: { width: 20, height: 20, textAlign: 'center', textAlignVertical: 'center', borderRadius: 10, backgroundColor: mobileTheme.blueSoft, fontSize: 9, fontWeight: '900' },
+  responderCopy: { flex: 1 },
+  responderName: { fontSize: 11, fontWeight: '800' },
+  responderMeta: { marginTop: 2, fontSize: 9, lineHeight: 13 },
   filters: {
     marginHorizontal: 22,
     marginBottom: 16,

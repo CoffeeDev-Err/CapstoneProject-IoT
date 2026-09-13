@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { Alert, AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useReportFormController } from './useReportFormController';
-import type { LivePersonnel, PoliceReport } from '../../types/operations';
+import type { LivePersonnel, OperationalTask, PoliceReport } from '../../types/operations';
 import {
   clearReportDraft,
   loadReportDraft,
@@ -243,6 +243,65 @@ it('restores the officer report draft after the form is reopened', async () => {
     location: 'ISU Cabagan gate',
     barangay: 'Catabayungan',
   });
+});
+
+const completedBackupTask: OperationalTask = {
+  id: 'TSK-2026-BACKUP1',
+  type: 'backup',
+  title: 'Immediate assistance needed',
+  description: 'Backup requested during patrol.',
+  location: 'Catabayungan Public Market',
+  latitude: 17.4305,
+  longitude: 121.765,
+  requested_by: 'one',
+  requester_name: 'Officer One',
+  assigned_area: 'Catabayungan',
+  required_responders: 3,
+  accepted_by: ['two'],
+  responders: [{
+    personnel_id: 'two', name: 'Responder Two', rank: 'Police Corporal',
+    badge_number: '12002', accepted_at: '2026-09-11T08:02:00.000Z',
+  }],
+  status: 'completed',
+  created_at: '2026-09-11T08:00:00.000Z',
+  completed_at: '2026-09-11T08:10:00.000Z',
+};
+
+it('prefills a completed backup report from its immutable task context', async () => {
+  const { result } = await renderHook(() => useReportFormController(options));
+
+  await act(async () => { await result.current.openSubmitForm(completedBackupTask); });
+
+  expect(result.current.form).toMatchObject({
+    backup_task_id: completedBackupTask.id,
+    report_type: 'incident',
+    barangay: 'Catabayungan',
+    location: 'Catabayungan Public Market',
+    location_source: 'backup_request',
+    latitude: 17.4305,
+    longitude: 121.765,
+  });
+  expect(result.current.form.backup_context?.responders[0].name).toBe('Responder Two');
+});
+
+it('does not attach an unrelated saved draft to the selected backup task', async () => {
+  jest.mocked(loadReportDraft).mockResolvedValueOnce({
+    form: {
+      report_type: 'patrol', title: 'Existing patrol draft', description: 'Unfinished patrol.',
+      location: 'ISU gate', barangay: 'Catabayungan', severity: 2,
+      occurred_at: '2026-09-11T07:00:00.000Z', assigned_area: 'Catabayungan', location_source: 'manual',
+    },
+    evidencePhoto: null,
+    updatedAt: '2026-09-11T07:05:00.000Z',
+  });
+  const { result } = await renderHook(() => useReportFormController(options));
+
+  await act(async () => { await result.current.openSubmitForm(completedBackupTask); });
+
+  expect(result.current.form.title).toBe('Existing patrol draft');
+  expect(result.current.form.backup_task_id).toBeUndefined();
+  expect(result.current.form.backup_context).toBeUndefined();
+  expect(Alert.alert).toHaveBeenCalledWith('Unfinished report opened', expect.stringContaining('Task History'));
 });
 
 it('saves the latest unfinished fields immediately when the report sheet closes', async () => {

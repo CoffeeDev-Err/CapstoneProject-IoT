@@ -7,6 +7,7 @@ import { isInsideCabagan } from '../../constants/cabaganGeofence';
 import type {
   DeploymentAssignment,
   LivePersonnel,
+  OperationalTask,
   PoliceReport,
   ReportEvidenceInput,
   SubmitReportInput,
@@ -50,6 +51,7 @@ const hasReportDraftContent = (form: ReportForm, evidencePhoto: ReportEvidenceIn
     || evidencePhoto
     || form.latitude !== undefined
     || form.longitude !== undefined
+    || form.backup_task_id
   )
   || form.report_type !== 'incident'
   || form.severity !== 2
@@ -133,27 +135,67 @@ export function useReportFormController({
     }
   }, [cancelScheduledDraftSave, currentPersonnelId]);
 
-  const openSubmitForm = async () => {
+  const openSubmitForm = async (backupTask?: OperationalTask) => {
     cancelScheduledDraftSave();
     draftHydratedRef.current = false;
     setEditTarget(null);
     setEditReason('');
     const assignedArea = selectPersonnelDeployment(deployments, currentPersonnelId)?.patrolArea || '';
-    const emptyForm = {
+    const backupLatitude = Number(backupTask?.latitude);
+    const backupLongitude = Number(backupTask?.longitude);
+    const hasUsableBackupLocation = Boolean(
+      backupTask
+      && Number.isFinite(backupLatitude)
+      && Number.isFinite(backupLongitude)
+      && isInsideCabagan(backupLatitude, backupLongitude),
+    );
+    const backupContext = backupTask ? {
+      task_id: backupTask.id,
+      requested_at: backupTask.created_at,
+      completed_at: backupTask.completed_at || new Date().toISOString(),
+      request_location: backupTask.location,
+      assigned_area: backupTask.assigned_area || assignedArea,
+      latitude: hasUsableBackupLocation ? backupLatitude : undefined,
+      longitude: hasUsableBackupLocation ? backupLongitude : undefined,
+      responders: backupTask.responders || [],
+    } : undefined;
+    const emptyForm: ReportForm = {
       ...createEmptyReportForm(),
-      occurred_at: new Date().toISOString(),
-      assigned_area: assignedArea,
-      barangay: getBarangayFromArea(assignedArea),
+      occurred_at: backupTask?.created_at || new Date().toISOString(),
+      assigned_area: backupTask?.assigned_area || assignedArea,
+      barangay: getBarangayFromArea(backupTask?.assigned_area || backupTask?.location || assignedArea),
+      ...(backupTask && {
+        report_type: 'incident',
+        backup_task_id: backupTask.id,
+        backup_context: backupContext,
+        location: backupTask.location,
+        location_source: hasUsableBackupLocation ? 'backup_request' : 'manual',
+        latitude: hasUsableBackupLocation ? backupLatitude : undefined,
+        longitude: hasUsableBackupLocation ? backupLongitude : undefined,
+      }),
     };
     try {
       const draft = await loadReportDraft(currentPersonnelId);
       if (draft) {
-        setForm({
-          ...emptyForm,
+        const draftBelongsToRequestedBackup = Boolean(
+          backupTask && draft.form.backup_task_id === backupTask.id,
+        );
+        setForm((backupTask && !draftBelongsToRequestedBackup ? {
           ...draft.form,
           assigned_area: draft.form.assigned_area || assignedArea,
-        } as ReportForm);
+        } : {
+          ...emptyForm,
+          ...draft.form,
+          ...(draftBelongsToRequestedBackup && { backup_context: backupContext }),
+          assigned_area: draft.form.assigned_area || assignedArea,
+        }) as ReportForm);
         setEvidencePhoto(draft.evidencePhoto);
+        if (backupTask && !draftBelongsToRequestedBackup) {
+          Alert.alert(
+            'Unfinished report opened',
+            `Finish or discard this saved report first. Backup request ${backupTask.id} remains available in Task History.`,
+          );
+        }
       } else {
         setForm(emptyForm);
         setEvidencePhoto(null);
@@ -177,11 +219,22 @@ export function useReportFormController({
     setEditTarget(report);
     setEditReason('');
     setEvidencePhoto(null);
+    const backupContext = report.backup_response ? {
+      task_id: report.backup_response.task_id,
+      requested_at: report.backup_response.requested_at,
+      completed_at: report.backup_response.completed_at,
+      request_location: report.backup_response.request_location,
+      assigned_area: report.assigned_area,
+      latitude: report.latitude ?? undefined,
+      longitude: report.longitude ?? undefined,
+      responders: report.backup_response.responders,
+    } : undefined;
     setForm({ report_type: report.report_type, title: report.title, description: report.description,
       location: report.location, barangay: report.barangay, severity: report.severity,
       occurred_at: report.occurred_at, assigned_area: report.assigned_area,
       location_source: report.location_source || 'manual',
-      latitude: report.latitude ?? undefined, longitude: report.longitude ?? undefined });
+      latitude: report.latitude ?? undefined, longitude: report.longitude ?? undefined,
+      ...(backupContext && { backup_task_id: backupContext.task_id, backup_context: backupContext }) });
     setFormVisible(true);
   };
 
@@ -477,7 +530,13 @@ export function useReportFormController({
     try {
       if (editTarget) {
         if (!editReport) throw new Error('Report corrections are unavailable. Reopen the app and try again.');
-        const { assigned_area: _area, evidence_photo: _evidence, ...content } = form;
+        const {
+          assigned_area: _area,
+          evidence_photo: _evidence,
+          backup_task_id: _backupTaskId,
+          backup_context: _backupContext,
+          ...content
+        } = form;
         await editReport(editTarget.id, { ...content,
           latitude: form.latitude ?? null, longitude: form.longitude ?? null,
           reason: editReason.trim(), revision: editTarget.revision || 0 });

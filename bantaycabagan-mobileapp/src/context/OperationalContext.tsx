@@ -12,6 +12,7 @@ import {
   acceptOperationalTask,
   acknowledgeDeploymentAssignment,
   cancelOperationalTask,
+  completeOperationalTask,
   fetchOperations,
   fetchLivePersonnel,
   requestBackup,
@@ -54,6 +55,7 @@ type OperationalContextValue = {
   currentPersonnelId: string;
   acceptTask: (taskId: string) => Promise<void>;
   cancelBackupRequest: (taskId: string) => Promise<void>;
+  completeBackupRequest: (taskId: string) => Promise<OperationalTask>;
   createBackupRequest: () => Promise<void>;
   submitReport: (input: SubmitReportInput) => Promise<'submitted' | 'queued'>;
   resolveReport: (reportId: string, resolutionNotes: string) => Promise<void>;
@@ -206,6 +208,12 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setTasks((items) => upsertById(items, response.task));
   }, [token]);
 
+  const completeBackupRequest = useCallback(async (taskId: string) => {
+    const response = await completeOperationalTask(taskId, token);
+    setTasks((items) => upsertById(items, response.task));
+    return response.task;
+  }, [token]);
+
   const createBackupRequest = useCallback(async () => {
     const response = await requestBackup(actor, deployments[0], token);
     setTasks((items) => upsertById(items, response.task));
@@ -248,6 +256,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     currentPersonnelId,
     acceptTask,
     cancelBackupRequest,
+    completeBackupRequest,
     createBackupRequest,
     submitReport,
     resolveReport,
@@ -260,6 +269,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   }), [
     acceptTask,
     cancelBackupRequest,
+    completeBackupRequest,
     createBackupRequest,
     currentOfficer,
     currentPersonnelId,

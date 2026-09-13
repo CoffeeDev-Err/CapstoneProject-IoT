@@ -20,6 +20,8 @@ export function ReportLocationFields({
   const inputSurface = isDark ? { backgroundColor: colors.surfaceMuted, borderColor: colors.border } : null;
   const locationSource = form.location_source === 'gps'
     ? "Officer's current GPS"
+    : form.location_source === 'backup_request'
+      ? 'GPS location recorded with backup request'
     : typeof form.latitude === 'number' && typeof form.longitude === 'number'
       ? 'Incident point pinned on map'
       : 'Manually entered incident place';
@@ -40,7 +42,7 @@ export function ReportLocationFields({
         placeholder="Example: Anao Public Market entrance" placeholderTextColor={colors.textMuted} />
       <View style={styles.assistRow}>
         <View style={styles.source}>
-          <Icon name={form.location_source === 'gps' ? 'gps-fixed' : 'edit-location-alt'}
+          <Icon name={form.location_source === 'gps' || form.location_source === 'backup_request' ? 'gps-fixed' : 'edit-location-alt'}
             size={15} color={colors.textMuted} />
           <Text style={[styles.sourceText, { color: colors.textMuted }]}>
             {locationSource}

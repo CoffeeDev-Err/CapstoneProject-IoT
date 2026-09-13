@@ -147,6 +147,15 @@ export const cancelOperationalTask = (
   token,
 );
 
+export const completeOperationalTask = (
+  taskId: string,
+  token?: string | null,
+) => request<{ task: OperationalTask }>(
+  `/api/tasks/${taskId}/complete`,
+  { method: 'PATCH' },
+  token,
+);
+
 export const acknowledgeDeploymentAssignment = (
   assignmentId: string,
   token?: string | null,
@@ -185,8 +194,9 @@ export const submitPoliceReport = (
   deployment?: DeploymentAssignment,
   token?: string | null,
 ) => {
+  const { backup_context: _backupContext, ...submissionInput } = input;
   const payload = {
-    ...input,
+    ...submissionInput,
     personnel_id: actor.id,
     officer: actor.name,
     assigned_area: input.assigned_area || deployment?.patrolArea || actor.station,

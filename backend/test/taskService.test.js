@@ -100,6 +100,45 @@ describe('task authorization', () => {
 		assert.equal(result.status, 403)
 		assert.match(result.body.message, /requested backup/)
 	})
+
+	it('allows the requesting officer to complete their backup response', async () => {
+		const task = {
+			taskId: 'TSK-1',
+			requestedBy: 'PNP-REQUESTER',
+			requesterName: 'Requester',
+			type: 'backup',
+			title: 'Backup request',
+			locationName: 'Catabayungan',
+			location: { type: 'Point', coordinates: [121.765, 17.4305] },
+			requiredResponders: 3,
+			responders: [],
+			status: 'open',
+			activeRequestKey: 'backup:PNP-REQUESTER',
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			save: async () => {},
+		}
+		const result = await createService({ task }).completeTask('TSK-1', {
+			role: 'officer',
+			personnelId: 'PNP-REQUESTER',
+		})
+		assert.equal(result.status, 200)
+		assert.equal(task.status, 'completed')
+		assert.equal(task.completedBy, 'PNP-REQUESTER')
+		assert.equal(task.activeRequestKey, undefined)
+	})
+
+	it('rejects completion by a different officer', async () => {
+		const task = {
+			taskId: 'TSK-1', requestedBy: 'PNP-REQUESTER', type: 'backup', status: 'open', responders: [],
+		}
+		const result = await createService({ task }).completeTask('TSK-1', {
+			role: 'officer',
+			personnelId: 'PNP-DIFFERENT',
+		})
+		assert.equal(result.status, 403)
+		assert.match(result.body.message, /requesting officer or the COP/)
+	})
 })
 
 describe('backup request concurrency', () => {
@@ -170,7 +209,11 @@ describe('backup request concurrency', () => {
 				save: async () => {},
 			}
 			const service = createService({ task })
-			await service[action](task.taskId, 'PNP-REQUESTER')
+			if (action === 'completeTask') {
+				await service[action](task.taskId, { role: 'officer', personnelId: 'PNP-REQUESTER' })
+			} else {
+				await service[action](task.taskId, 'PNP-REQUESTER')
+			}
 			assert.equal(task.activeRequestKey, undefined)
 		}
 	})

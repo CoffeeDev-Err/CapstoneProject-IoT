@@ -33,8 +33,10 @@ const task: OperationalTask = {
   longitude: 121.77,
   requested_by: 'officer-2',
   requester_name: 'Officer Two',
+  assigned_area: 'Centro',
   required_responders: 2,
   accepted_by: [],
+  responders: [],
   status: 'open',
   created_at: '2026-08-28T08:00:00.000Z',
 };
@@ -47,11 +49,15 @@ describe('TaskCard', () => {
       <TaskCard
         accepting={false}
         cancelling={false}
+        completing={false}
         currentPersonnelId="officer-1"
         expanded
         filterTranslateX={{ value: 0 } as never}
         onAccept={onAccept}
         onCancel={jest.fn()}
+        onComplete={jest.fn()}
+        onCreateReport={jest.fn()}
+        onOpenReport={jest.fn()}
         onToggle={onToggle}
         task={task}
       />,
@@ -62,5 +68,93 @@ describe('TaskCard', () => {
 
     expect(onToggle).toHaveBeenCalledWith('task-1');
     expect(onAccept).toHaveBeenCalledWith(task);
+  });
+
+  it('lets the requester close an active backup response', async () => {
+    const onCancel = jest.fn();
+    const onComplete = jest.fn();
+    const ownTask = { ...task, requested_by: 'officer-1' };
+    const view = await render(
+      <TaskCard
+        accepting={false}
+        cancelling={false}
+        completing={false}
+        currentPersonnelId="officer-1"
+        expanded
+        filterTranslateX={{ value: 0 } as never}
+        onAccept={jest.fn()}
+        onCancel={onCancel}
+        onComplete={onComplete}
+        onCreateReport={jest.fn()}
+        onOpenReport={jest.fn()}
+        onToggle={jest.fn()}
+        task={ownTask}
+      />,
+    );
+
+    await fireEvent.press(view.getByText('Complete Response'));
+    expect(onComplete).toHaveBeenCalledWith(ownTask);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('offers one report action after the requester completes the backup', async () => {
+    const onCreateReport = jest.fn();
+    const completedTask = {
+      ...task,
+      requested_by: 'officer-1',
+      status: 'completed' as const,
+      completed_at: '2026-08-28T08:15:00.000Z',
+    };
+    const view = await render(
+      <TaskCard
+        accepting={false}
+        cancelling={false}
+        completing={false}
+        currentPersonnelId="officer-1"
+        expanded
+        filterTranslateX={{ value: 0 } as never}
+        onAccept={jest.fn()}
+        onCancel={jest.fn()}
+        onComplete={jest.fn()}
+        onCreateReport={onCreateReport}
+        onOpenReport={jest.fn()}
+        onToggle={jest.fn()}
+        task={completedTask}
+      />,
+    );
+
+    await fireEvent.press(view.getByText('Create Incident Report'));
+    expect(onCreateReport).toHaveBeenCalledWith(completedTask);
+  });
+
+  it('opens the linked incident report instead of creating another one', async () => {
+    const onOpenReport = jest.fn();
+    const completedTask = {
+      ...task,
+      requested_by: 'officer-1',
+      status: 'completed' as const,
+      completed_at: '2026-08-28T08:15:00.000Z',
+      report_id: 'RPT-2026-LINKED01',
+    };
+    const view = await render(
+      <TaskCard
+        accepting={false}
+        cancelling={false}
+        completing={false}
+        currentPersonnelId="officer-1"
+        expanded
+        filterTranslateX={{ value: 0 } as never}
+        onAccept={jest.fn()}
+        onCancel={jest.fn()}
+        onComplete={jest.fn()}
+        onCreateReport={jest.fn()}
+        onOpenReport={onOpenReport}
+        onToggle={jest.fn()}
+        task={completedTask}
+      />,
+    );
+
+    await fireEvent.press(view.getByText('View Incident Report'));
+    expect(onOpenReport).toHaveBeenCalledWith('RPT-2026-LINKED01');
   });
 });

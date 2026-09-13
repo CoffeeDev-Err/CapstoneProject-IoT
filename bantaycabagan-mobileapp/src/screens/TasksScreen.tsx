@@ -44,10 +44,14 @@ const TASK_CONTROLS_ROW: TaskListRow = {
 };
 
 type TasksScreenProps = {
+  onCreateReportFromBackup?: (task: OperationalTask) => void;
+  onOpenReport?: (reportId: string) => void;
   presentation?: 'screen' | 'modal';
 };
 
 export default function TasksScreen({
+  onCreateReportFromBackup,
+  onOpenReport,
   presentation = 'screen',
 }: TasksScreenProps) {
   const { colors, isDark } = useMobileTheme();
@@ -56,6 +60,7 @@ export default function TasksScreen({
     upcomingDeployment,
     acceptTask,
     cancelBackupRequest,
+    completeBackupRequest,
     currentPersonnelId,
     isLoading,
     isTaskHistoryLoading,
@@ -70,6 +75,7 @@ export default function TasksScreen({
   const pendingFilterDirection = useRef(0);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(() => new Set());
   const filterAnimatedStyle = useAnimatedStyle(() => ({
@@ -165,20 +171,66 @@ export default function TasksScreen({
     );
   }, [cancelBackupRequest]);
 
+  const handleComplete = useCallback((task: OperationalTask) => {
+    Alert.alert(
+      'Complete backup response?',
+      'Confirm that the emergency assistance has ended. This will close the SOS alert for all officers.',
+      [
+        { text: 'Keep Active', style: 'cancel' },
+        {
+          text: 'Complete Response',
+          onPress: async () => {
+            setCompletingId(task.id);
+            try {
+              const completedTask = await completeBackupRequest(task.id);
+              Alert.alert(
+                'Backup response completed',
+                'The SOS alert is closed. Create the incident report while the details are still fresh.',
+                [
+                  { text: 'Later', style: 'cancel' },
+                  {
+                    text: 'Create Report',
+                    onPress: () => onCreateReportFromBackup?.(completedTask),
+                  },
+                ],
+              );
+            } catch (error) {
+              Alert.alert('Unable to complete backup', requestErrorMessage(error, { action: 'complete the backup response', write: true }));
+            } finally {
+              setCompletingId(null);
+            }
+          },
+        },
+      ],
+    );
+  }, [completeBackupRequest, onCreateReportFromBackup]);
+
+  const handleCreateReport = useCallback((task: OperationalTask) => {
+    onCreateReportFromBackup?.(task);
+  }, [onCreateReportFromBackup]);
+
+  const handleOpenReport = useCallback((reportId: string) => {
+    onOpenReport?.(reportId);
+  }, [onOpenReport]);
+
   const renderTask = useCallback(({ item }: { item: OperationalTask }) => (
     <TaskCard
       accepting={acceptingId === item.id}
       cancelling={cancellingId === item.id}
+      completing={completingId === item.id}
       currentPersonnelId={currentPersonnelId}
       expanded={expandedTaskIds.has(item.id)}
       filterTranslateX={filterTranslateX}
       onAccept={handleAccept}
       onCancel={handleCancel}
+      onComplete={handleComplete}
+      onCreateReport={handleCreateReport}
+      onOpenReport={handleOpenReport}
       onToggle={toggleTask}
       task={item}
     />
-  ), [acceptingId, cancellingId, currentPersonnelId, expandedTaskIds,
-    filterTranslateX, handleAccept, handleCancel, toggleTask]);
+  ), [acceptingId, cancellingId, completingId, currentPersonnelId, expandedTaskIds,
+    filterTranslateX, handleAccept, handleCancel, handleComplete, handleCreateReport, handleOpenReport, toggleTask]);
 
   return (
     <SafeAreaView

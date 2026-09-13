@@ -44,6 +44,8 @@ import {
   type MapMode,
 } from '../features/maps/MapControls';
 import { OfficerDetailSheet } from '../features/maps/OfficerDetailSheet';
+
+const BACKUP_EMERGENCY_OVERLAY_MS = 2 * 60 * 1000;
 import { GpsReadingAge } from '../features/maps/GpsReadingAge';
 import { useMapSelectionController } from '../features/maps/useMapSelectionController';
 import { useDevelopmentMapPersonnel } from '../features/maps/useDevelopmentMapPersonnel';
@@ -93,6 +95,7 @@ export default function OfficerMapScreen({
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [backupActionPending, setBackupActionPending] = useState(false);
+  const [showOwnEmergencyOverlay, setShowOwnEmergencyOverlay] = useState(false);
   const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(false);
@@ -173,6 +176,19 @@ export default function OfficerMapScreen({
     () => selectActiveBackupRequest(tasks, currentPersonnelId),
     [currentPersonnelId, tasks],
   );
+  useEffect(() => {
+    if (!activeOwnBackupRequest) {
+      setShowOwnEmergencyOverlay(false);
+      return undefined;
+    }
+    const parsedCreatedAt = new Date(activeOwnBackupRequest.created_at).getTime();
+    const createdAt = Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now();
+    const remainingMs = Math.max(0, createdAt + BACKUP_EMERGENCY_OVERLAY_MS - Date.now());
+    setShowOwnEmergencyOverlay(remainingMs > 0);
+    if (remainingMs <= 0) return undefined;
+    const timer = setTimeout(() => setShowOwnEmergencyOverlay(false), remainingMs);
+    return () => clearTimeout(timer);
+  }, [activeOwnBackupRequest]);
 
   const mapPersonnel = useMemo<OfficerMapPerson[]>(() => (
     [...createMapPersonnel(visiblePersonnel, emergencyPersonnelIds, operationPersonnelIds), ...preview.personnel]
@@ -379,7 +395,7 @@ export default function OfficerMapScreen({
         )}
       </View>
 
-      {currentOfficerHasActiveBackup && (
+      {currentOfficerHasActiveBackup && showOwnEmergencyOverlay && (
         <Animated.View
           nativeID="emergency-overlay"
           testID="emergency-overlay"

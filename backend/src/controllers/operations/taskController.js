@@ -31,7 +31,7 @@ const createTaskController = (operationalService) => ({
 		res.status(result.status).json(result.body)
 	},
 	completeTask: async (req, res) => {
-		const result = await operationalService.completeTask(req.params.taskId)
+		const result = await operationalService.completeTask(req.params.taskId, req.auth.user)
 		res.status(result.status).json(result.body)
 	},
 })

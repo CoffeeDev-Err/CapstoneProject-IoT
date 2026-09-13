@@ -85,6 +85,15 @@ it('rejects another officer and supervisor edits', async () => {
   assert.equal((await f.service.editReport('RPT-ONE', {}, { role: 'supervisor' })).status, 403)
   assert.equal(f.saves(), 0)
 })
+it('keeps a backup-linked report classified as an incident during corrections', async () => {
+  const f = fixture()
+  f.document.backupResponse = { taskId: 'TSK-2026-BACKUP1' }
+  await assert.rejects(
+    f.service.editReport('RPT-ONE', { report_type: 'patrol', revision: 0, reason: 'Change type' }, officer),
+    { status: 400, code: 'BACKUP_REPORT_MUST_BE_INCIDENT' },
+  )
+  assert.equal(f.saves(), 0)
+})
 it('rejects stale revisions, forbidden metadata, missing reasons, invalid dates and coordinates', () => {
   const { document } = fixture()
   const base = { title: 'Updated', revision: 0, reason: 'Fix' }

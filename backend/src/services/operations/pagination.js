@@ -57,7 +57,7 @@ const createPersonnelLoader = (Personnel) => async (personnelIds = []) => {
 	const uniqueIds = [...new Set(personnelIds.filter(Boolean))]
 	if (uniqueIds.length === 0) return new Map()
 	const profiles = await Personnel.find({ personnelId: { $in: uniqueIds } })
-		.select('personnelId fullName rank')
+		.select('personnelId fullName rank badgeNumber')
 		.lean()
 	return new Map(profiles.map((profile) => [profile.personnelId, profile]))
 }

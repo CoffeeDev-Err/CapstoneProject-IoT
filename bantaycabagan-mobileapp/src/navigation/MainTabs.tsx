@@ -12,6 +12,7 @@ import {
   createBottomTabNavigator,
   type BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mobileTheme } from '../constants/mobileTheme';
@@ -27,6 +28,7 @@ import type { NotificationNavigationRequest } from '../types/notifications';
 import { SwipeDismissSheet } from '../components/SwipeDismissSheet';
 import { PolicePageHeader } from '../components/PolicePageHeader';
 import { useReportDraftReminder } from '../features/reports/useReportDraftReminder';
+import type { OperationalTask } from '../types/operations';
 
 const Tab = createBottomTabNavigator();
 const TASK_MODAL_TOP_OFFSET = 1;
@@ -201,6 +203,7 @@ function FloatingTabBar({
 }
 
 export default function MainTabs() {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const {
     currentPersonnelId,
@@ -325,7 +328,19 @@ export default function MainTabs() {
         onClose={() => setTasksVisible(false)}
         sheetStyle={[styles.taskSheet, isDark && styles.taskSheetDark]}
       >
-        <TasksScreen presentation="modal" />
+        {({ close }) => <TasksScreen
+          presentation="modal"
+          onCreateReportFromBackup={(task: OperationalTask) => close(() => navigation.navigate('Reports', {
+            backupTask: task,
+            backupReportRequestId: Date.now(),
+            reportId: undefined,
+            notificationRequestId: undefined,
+          }))}
+          onOpenReport={(reportId: string) => close(() => navigation.navigate('Reports', {
+            reportId,
+            notificationRequestId: Date.now(),
+          }))}
+        />}
       </SwipeDismissSheet>
 
       <SwipeDismissSheet

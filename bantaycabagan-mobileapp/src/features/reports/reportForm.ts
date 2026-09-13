@@ -7,7 +7,7 @@ export const REPORT_FILTERS = ['all', 'incident', 'routine'] as const;
 export type ReportForm = SubmitReportInput & {
   occurred_at: string;
   assigned_area: string;
-  location_source: 'gps' | 'manual';
+  location_source: 'gps' | 'manual' | 'backup_request';
 };
 
 export const createEmptyReportForm = (): ReportForm => ({

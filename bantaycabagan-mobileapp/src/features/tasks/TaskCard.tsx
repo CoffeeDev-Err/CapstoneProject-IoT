@@ -10,11 +10,15 @@ import { SmoothCollapsible } from './SmoothCollapsible';
 type TaskCardProps = {
   accepting: boolean;
   cancelling: boolean;
+  completing: boolean;
   currentPersonnelId: string;
   expanded: boolean;
   filterTranslateX: SharedValue<number>;
   onAccept: (task: OperationalTask) => void;
   onCancel: (task: OperationalTask) => void;
+  onComplete: (task: OperationalTask) => void;
+  onCreateReport: (task: OperationalTask) => void;
+  onOpenReport: (reportId: string) => void;
   onToggle: (taskId: string) => void;
   task: OperationalTask;
 };
@@ -22,11 +26,15 @@ type TaskCardProps = {
 export function TaskCard({
   accepting,
   cancelling,
+  completing,
   currentPersonnelId,
   expanded,
   filterTranslateX,
   onAccept,
   onCancel,
+  onComplete,
+  onCreateReport,
+  onOpenReport,
   onToggle,
   task,
 }: TaskCardProps) {
@@ -106,13 +114,31 @@ export function TaskCard({
             </View>
 
             {ownRequest && active ? (
+              <View style={styles.ownRequestActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.splitActionButton, styles.cancelButton, cancelling && styles.actionPending]}
+                  onPress={() => onCancel(task)}
+                  disabled={cancelling || completing}
+                >
+                  <Icon name="close" size={17} color="#ffffff" />
+                  <Text style={styles.actionButtonText}>{cancelling ? 'Cancelling...' : 'Cancel'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.splitActionButton, styles.completeButton, completing && styles.actionPending]}
+                  onPress={() => onComplete(task)}
+                  disabled={cancelling || completing}
+                >
+                  <Icon name="check-circle" size={17} color="#ffffff" />
+                  <Text style={styles.actionButtonText}>{completing ? 'Completing...' : 'Complete Response'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : ownRequest && completed ? (
               <TouchableOpacity
-                style={[styles.actionButton, styles.cancelButton, cancelling && styles.actionPending]}
-                onPress={() => onCancel(task)}
-                disabled={cancelling}
+                style={[styles.actionButton, styles.completeButton]}
+                onPress={() => task.report_id ? onOpenReport(task.report_id) : onCreateReport(task)}
               >
-                <Icon name="close" size={18} color="#ffffff" />
-                <Text style={styles.actionButtonText}>{cancelling ? 'Cancelling...' : 'Cancel Request'}</Text>
+                <Icon name={task.report_id ? 'description' : 'post-add'} size={18} color="#ffffff" />
+                <Text style={styles.actionButtonText}>{task.report_id ? 'View Incident Report' : 'Create Incident Report'}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -163,6 +189,9 @@ const styles = StyleSheet.create({
   statusCancelled: { backgroundColor: '#e2e2ea' },
   statusText: { color: mobileTheme.text, fontSize: 10, fontWeight: '800' },
   actionButton: { minHeight: 42, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: mobileTheme.purple },
+  ownRequestActions: { marginTop: 12, flexDirection: 'row', gap: 8 },
+  splitActionButton: { flex: 1, marginTop: 0, paddingHorizontal: 8 },
+  completeButton: { backgroundColor: mobileTheme.blue },
   actionButtonDisabled: { backgroundColor: '#e2e2ea' },
   cancelButton: { backgroundColor: mobileTheme.danger },
   actionPending: { opacity: 0.6 },

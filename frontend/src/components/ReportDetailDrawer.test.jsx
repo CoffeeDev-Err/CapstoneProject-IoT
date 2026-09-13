@@ -17,7 +17,31 @@ it('shows the current report fields without exposing internal report history', a
   expect(screen.getByText('2026-09-08T10:00:00Z')).toBeTruthy()
   expect(screen.getByText('Catabayungan assignment')).toBeTruthy()
   expect(screen.getByText('17.430500, 121.765000')).toBeTruthy()
-  expect(screen.getByText('GPS suggestion')).toBeTruthy()
+  expect(screen.getByText('Officer current GPS')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Validate report' })).not.toBeDisabled()
+  await screen.findByText('Report map')
+})
+
+it('shows the linked backup request and the actual response team', async () => {
+  render(<ReportDetailDrawer report={{
+    id: 'RPT-BACKUP', title: 'Backup response report', description: 'Assistance completed.',
+    officer: 'Officer One', report_type: 'incident', is_incident: true, severity: 4, validation_status: 'pending',
+    case_status: 'open', date_time: '2026-09-09T10:00:00Z', occurred_at: '2026-09-09T09:30:00Z',
+    assigned_area: 'Catabayungan', barangay: 'Catabayungan', location: 'Public Market', latitude: 17.4305, longitude: 121.765,
+    location_source: 'backup_request',
+    backup_response: {
+      task_id: 'TSK-2026-BACKUP1', requested_at: '2026-09-09T09:25:00Z', completed_at: '2026-09-09T09:40:00Z',
+      request_location: 'Catabayungan Public Market',
+      responders: [{
+        personnel_id: 'PNP-002', name: 'Responder Two', rank: 'Police Corporal', badge_number: '12002',
+        accepted_at: '2026-09-09T09:27:00Z',
+      }],
+    },
+  }} formatDateTime={(value) => value} onClose={vi.fn()} onValidationChange={vi.fn()} onDownload={vi.fn()} />)
+
+  expect(screen.getByText('GPS recorded with backup request')).toBeTruthy()
+  expect(screen.getByText('TSK-2026-BACKUP1')).toBeTruthy()
+  expect(screen.getByText(/Police Corporal Responder Two/)).toBeTruthy()
+  expect(screen.getByText(/Badge 12002/)).toBeTruthy()
   await screen.findByText('Report map')
 })

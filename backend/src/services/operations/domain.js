@@ -57,13 +57,26 @@ const serializeTask = (task, personnelById = new Map()) => ({
 	...readCoordinates(task.location),
 	requested_by: task.requestedBy,
 	requester_name: personnelById.get(task.requestedBy)?.fullName || task.requesterName,
+	assigned_area: task.assignedArea || task.locationName,
 	required_responders: task.requiredResponders,
 	accepted_by: (task.responders || []).map((responder) => responder.personnelId),
+	responders: (task.responders || []).map((responder) => {
+		const profile = personnelById.get(responder.personnelId)
+		return {
+			personnel_id: responder.personnelId,
+			name: profile?.fullName || responder.personnelId,
+			rank: profile?.rank || '',
+			badge_number: profile?.badgeNumber || '',
+			accepted_at: responder.acceptedAt?.toISOString(),
+		}
+	}),
 	status: task.status,
 	created_at: task.createdAt?.toISOString(),
 	updated_at: task.updatedAt?.toISOString(),
 	completed_at: task.completedAt?.toISOString(),
+	completed_by: task.completedBy,
 	cancelled_at: task.cancelledAt?.toISOString(),
+	report_id: task.reportNumber,
 })
 
 const serializeReport = (report, personnelById = new Map()) => ({
@@ -109,6 +122,21 @@ const serializeReport = (report, personnelById = new Map()) => ({
 		resolved_at: report.resolution.resolvedAt.toISOString(),
 		resolved_by: report.resolution.resolvedBy,
 		resolution_notes: report.resolution.notes,
+	}),
+	...(report.backupResponse?.taskId && {
+		backup_response: {
+			task_id: report.backupResponse.taskId,
+			requested_at: report.backupResponse.requestedAt?.toISOString(),
+			completed_at: report.backupResponse.completedAt?.toISOString(),
+			request_location: report.backupResponse.requestLocation,
+			responders: (report.backupResponse.responders || []).map((responder) => ({
+				personnel_id: responder.personnelId,
+				name: responder.name,
+				rank: responder.rank,
+				badge_number: responder.badgeNumber,
+				accepted_at: responder.acceptedAt?.toISOString(),
+			})),
+		},
 	}),
 	route_point_count: report.routeSnapshot?.length || 0,
 	route_captured_at: report.routeSnapshotCapturedAt?.toISOString(),

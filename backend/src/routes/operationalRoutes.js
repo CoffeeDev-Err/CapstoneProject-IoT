@@ -56,7 +56,7 @@ const createOperationalRoutes = ({ authService, controller }) => {
 		...authenticatedOfficerOnly,
 		asyncHandler(controller.cancelTask),
 	)
-	router.patch('/tasks/:taskId/complete', ...authenticatedSupervisorOnly, asyncHandler(controller.completeTask))
+	router.patch('/tasks/:taskId/complete', ...authenticatedOperationalRead, asyncHandler(controller.completeTask))
 	router.get('/reports', ...authenticatedOperationalRead, asyncHandler(controller.getReports))
 	router.post(
 		'/reports',

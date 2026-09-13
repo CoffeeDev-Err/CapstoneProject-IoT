@@ -38,6 +38,9 @@ const createTaskService = ({
 	const { Deployment, Task } = models
 	const { getPersonnelMember } = personnelService
 	const { deliverNotification } = notificationService
+	const loadTaskPersonnelMap = (tasks = []) => loadPersonnelMap(
+		tasks.flatMap((task) => taskParticipantIds(task)),
+	)
 	const createActiveBackupError = () => {
 		const error = new Error('You already have an active backup request. Open Tasks to view or cancel it.')
 		error.status = 409
@@ -72,7 +75,7 @@ const createTaskService = ({
 
 	const loadTasks = async () => {
 		const tasks = await Task.find().sort({ createdAt: -1 }).lean()
-		const personnelById = await loadPersonnelMap(tasks.map((task) => task.requestedBy))
+		const personnelById = await loadTaskPersonnelMap(tasks)
 		return tasks.map((task) => serializeTask(task, personnelById))
 	}
 
@@ -113,7 +116,7 @@ const createTaskService = ({
 				limit: Math.min(pagination.limit, 50),
 				cursor: query.cursor,
 			})
-			const personnelById = await loadPersonnelMap(cursorPage.data.map((task) => task.requestedBy))
+			const personnelById = await loadTaskPersonnelMap(cursorPage.data)
 			return {
 				data: cursorPage.data.map((task) => serializeTask(task, personnelById)),
 				pagination: cursorPage.pagination,
@@ -125,7 +128,7 @@ const createTaskService = ({
 				.skip(pagination.skip).limit(pagination.limit).lean(),
 			Task.countDocuments(filter),
 		])
-		const personnelById = await loadPersonnelMap(documents.map((task) => task.requestedBy))
+		const personnelById = await loadTaskPersonnelMap(documents)
 		return {
 			data: documents.map((task) => serializeTask(task, personnelById)),
 			pagination: createPaginationMeta({ ...pagination, total }),
@@ -140,38 +143,53 @@ const createTaskService = ({
 			const officerIsOnDuty = await isOfficerOnDuty(officerPersonnelId)
 			if (!canOfficerReadTask(task, officerPersonnelId, officerIsOnDuty)) return null
 		}
-		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const personnelById = await loadTaskPersonnelMap([task])
 		return serializeTask(task, personnelById)
 	}
 
-	const completeTask = async (taskId) => {
+	const completeTask = async (taskId, actor) => {
 		const task = await Task.findOne({ taskId })
 		if (!task) return createNotFoundResult('Task')
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		if (!isSupervisorActor(actor) && (
+			task.type !== 'backup' || task.requestedBy !== officerPersonnelId
+		)) {
+			return {
+				status: 403,
+				body: { success: false, message: 'Only the requesting officer or the COP can complete this backup response.' },
+			}
+		}
 		if (task.status === 'cancelled') {
 			return { status: 409, body: { success: false, message: 'A cancelled task cannot be completed.' } }
+		}
+		if (task.status === 'completed') {
+			const personnelById = await loadTaskPersonnelMap([task])
+			return { status: 200, body: { success: true, task: serializeTask(task, personnelById) } }
 		}
 		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
 		task.status = 'completed'
 		task.completedAt = clock()
+		task.completedBy = officerPersonnelId || 'supervisor'
 		task.activeRequestKey = undefined
 		await task.save()
-		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const personnelById = await loadTaskPersonnelMap([task])
 		const serialized = serializeTask(task, personnelById)
-		const recipients = [...new Set([
-			task.requestedBy,
-			...(task.responders || []).map((responder) => responder.personnelId),
-		])].filter((personnelId) => personnelId && personnelId !== 'supervisor')
-		await Promise.all(recipients.map((recipientId) => deliverNotification({
+		const recipients = new Set(taskParticipantIds(task))
+		if (officerPersonnelId) {
+			recipients.delete(officerPersonnelId)
+			recipients.add('supervisor')
+		}
+		await Promise.all([...recipients].map((recipientId) => deliverNotification({
 			io,
 			recipientId,
 			type: 'success',
-			title: 'Task Completed',
-			message: `${task.title} has been marked completed.`,
+			title: 'Backup Response Completed',
+			message: `${task.title} was completed ${officerPersonnelId ? 'by the requesting officer' : 'by the COP'}.`,
 			referenceType: 'task',
 			referenceId: task.taskId,
 			priority: 'normal',
 			data: { destination: 'Tasks', taskId: task.taskId },
-			dedupeKey: `task:${task.taskId}:completed`,
+			dedupeKey: `task:${task.taskId}:completed:${task.completedBy}`,
 		})))
 		emitTaskRemoval({ io, taskId: task.taskId, personnelIds: previouslyEligiblePersonnelIds })
 		await emitToAuthorizedOfficers('task:updated', serialized, task)
@@ -200,7 +218,7 @@ const createTaskService = ({
 			task.activeRequestKey = undefined
 			await task.save()
 		}
-		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const personnelById = await loadTaskPersonnelMap([task])
 		const serialized = serializeTask(task, personnelById)
 		await Promise.all((task.responders || []).map((responder) => deliverNotification({
 			io,
@@ -312,6 +330,7 @@ const createTaskService = ({
 				description,
 				requestedBy: payload.requested_by || 'supervisor',
 				requesterName: requester?.name || 'Duty Supervisor',
+				assignedArea: activeDeployment?.patrolArea || locationName,
 				requiredResponders,
 				locationName,
 				location: point(coordinates.longitude, coordinates.latitude),
@@ -394,10 +413,10 @@ const createTaskService = ({
 				return { status: 409, body: { success: false, message: 'The requester cannot accept their own backup request.' } }
 			}
 			if (task.responders.some((item) => item.personnelId === personnelId)) {
-				const personnelById = await loadPersonnelMap([task.requestedBy])
+				const personnelById = await loadTaskPersonnelMap([task])
 				return { status: 200, body: { success: true, task: serializeTask(task, personnelById) } }
 			}
-			const personnelById = await loadPersonnelMap([task.requestedBy])
+			const personnelById = await loadTaskPersonnelMap([task])
 			return {
 				status: 409,
 				body: {
@@ -411,7 +430,7 @@ const createTaskService = ({
 			task.status = 'full'
 			await task.save()
 		}
-		const personnelById = await loadPersonnelMap([task.requestedBy])
+		const personnelById = await loadTaskPersonnelMap([task])
 		const serialized = serializeTask(task, personnelById)
 		if (task.requestedBy !== 'supervisor') {
 			await deliverNotification({

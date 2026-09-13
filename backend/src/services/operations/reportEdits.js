@@ -36,7 +36,7 @@ const editValues = (report, payload, now) => {
 		location: report.location,
 	}
 	if (!Number.isInteger(values.severity)) throw createValidationError('Severity must be a whole number from 1 to 5.', 'severity')
-	if (!['manual', 'gps'].includes(values.locationSource)) throw createValidationError('Location source must be gps or manual.', 'location_source')
+	if (!['manual', 'gps', 'backup_request'].includes(values.locationSource)) throw createValidationError('Location source must be gps, manual, or backup_request.', 'location_source')
 	if ('latitude' in payload || 'longitude' in payload) {
 		const empty = payload.latitude == null && payload.longitude == null
 		if (!empty && !isValidCoordinates(payload.latitude, payload.longitude)) throw createValidationError('Provide a valid latitude and longitude.', 'location')

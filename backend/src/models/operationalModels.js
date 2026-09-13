@@ -57,6 +57,22 @@ const reportRoutePointSchema = new mongoose.Schema({
 	recordedAt: { type: Date, required: true },
 }, { _id: false })
 
+const reportBackupResponderSchema = new mongoose.Schema({
+	personnelId: { type: String, required: true },
+	name: { type: String, required: true, maxlength: 100 },
+	rank: { type: String, default: '', maxlength: 80 },
+	badgeNumber: { type: String, default: '', maxlength: 30 },
+	acceptedAt: { type: Date, required: true },
+}, { _id: false })
+
+const reportBackupResponseSchema = new mongoose.Schema({
+	taskId: { type: String, required: true },
+	requestedAt: { type: Date, required: true },
+	completedAt: { type: Date, required: true },
+	requestLocation: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.taskLocation },
+	responders: { type: [reportBackupResponderSchema], default: [] },
+}, { _id: false })
+
 const reportSchema = new mongoose.Schema({
 	reportNumber: { type: String, required: true },
 	clientSubmissionId: { type: String, trim: true, maxlength: 100 },
@@ -82,7 +98,7 @@ const reportSchema = new mongoose.Schema({
 	location: pointSchema,
 	locationSource: {
 		type: String,
-		enum: ['gps', 'manual'],
+		enum: ['gps', 'manual', 'backup_request'],
 		default: 'manual',
 	},
 	submittedFrom: pointSchema,
@@ -91,6 +107,7 @@ const reportSchema = new mongoose.Schema({
 	evidencePhoto: reportEvidenceSchema,
 	routeSnapshot: { type: [reportRoutePointSchema], default: [] },
 	routeSnapshotCapturedAt: Date,
+	backupResponse: reportBackupResponseSchema,
 	resolution: resolutionSchema,
 }, {
 	collection: 'reports',
@@ -114,6 +131,10 @@ reportSchema.index({ caseStatus: 1, submittedAt: -1, _id: -1 })
 reportSchema.index({ validationStatus: 1, submittedAt: -1, _id: -1 })
 reportSchema.index({ severity: -1, submittedAt: -1, _id: -1 })
 reportSchema.index({ location: '2dsphere' })
+reportSchema.index(
+	{ 'backupResponse.taskId': 1 },
+	{ unique: true, partialFilterExpression: { 'backupResponse.taskId': { $type: 'string' } } },
+)
 
 const responderSchema = new mongoose.Schema({
 	personnelId: { type: String, required: true },
@@ -128,6 +149,7 @@ const taskSchema = new mongoose.Schema({
 	description: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.taskDescription },
 	requestedBy: { type: String, required: true },
 	requesterName: { type: String, required: true },
+	assignedArea: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.deploymentArea },
 	requiredResponders: { type: Number, min: 1, max: 5, default: 3 },
 	responders: { type: [responderSchema], default: [] },
 	barangayCode: { type: String, trim: true, uppercase: true },
@@ -135,7 +157,9 @@ const taskSchema = new mongoose.Schema({
 	location: { type: pointSchema, required: true },
 	status: { type: String, enum: ['open', 'full', 'completed', 'cancelled'], default: 'open' },
 	completedAt: Date,
+	completedBy: String,
 	cancelledAt: Date,
+	reportNumber: String,
 }, {
 	collection: 'tasks',
 	timestamps: true,

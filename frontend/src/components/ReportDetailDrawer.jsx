@@ -203,11 +203,39 @@ function ReportDetailDrawer({
                 <dt>GPS coordinates</dt>
                 <dd>{formatCoordinates(report.latitude, report.longitude)}</dd>
               </div>
-              <div><dt>Location source</dt><dd>{report.location_source === 'gps' ? 'GPS suggestion' : 'Manually entered / map pin'}</dd></div>
+              <div><dt>Location source</dt><dd>{report.location_source === 'gps'
+                ? 'Officer current GPS'
+                : report.location_source === 'backup_request'
+                  ? 'GPS recorded with backup request'
+                  : 'Manually entered / map pin'}</dd></div>
               {report.submitted_from && <div><dt>Officer GPS at submission</dt><dd>{formatCoordinates(report.submitted_from.latitude, report.submitted_from.longitude)}</dd></div>}
               {report.reviewed_at && <div><dt>Reviewed</dt><dd>{formatDateTime(report.reviewed_at)} · {report.reviewed_by}</dd></div>}
             </dl>
           </section>
+
+          {report.backup_response && (
+            <section className="report-detail-section">
+              <h4>Backup response</h4>
+              <dl className="report-detail-list">
+                <div><dt>Backup request</dt><dd>{report.backup_response.task_id}</dd></div>
+                <div><dt>Requested at</dt><dd>{formatDateTime(report.backup_response.requested_at)}</dd></div>
+                <div><dt>Completed at</dt><dd>{formatDateTime(report.backup_response.completed_at)}</dd></div>
+                <div><dt>Request location</dt><dd>{report.backup_response.request_location}</dd></div>
+                {(report.backup_response.responders || []).length > 0
+                  ? report.backup_response.responders.map((responder, index) => (
+                    <div key={`${responder.personnel_id}-${responder.accepted_at}`}>
+                      <dt>Responder {index + 1}</dt>
+                      <dd>
+                        {[responder.rank, responder.name].filter(Boolean).join(' ')}
+                        {responder.badge_number ? ` · Badge ${responder.badge_number}` : ''}
+                        {responder.accepted_at ? ` · Accepted ${formatDateTime(responder.accepted_at)}` : ''}
+                      </dd>
+                    </div>
+                  ))
+                  : <div><dt>Response team</dt><dd>No responder accepted before completion</dd></div>}
+              </dl>
+            </section>
+          )}
 
           <section className="report-detail-section report-review-panel">
             <div className="report-review-panel__heading">
