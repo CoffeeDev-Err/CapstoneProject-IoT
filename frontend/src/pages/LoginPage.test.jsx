@@ -168,4 +168,18 @@ describe('automatic login verification', () => {
     expect(resetPassword).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Reset Password' })).toBeInTheDocument()
   })
+
+  it('shows a nonexistent recovery account error beside the identifier field', async () => {
+    requestPasswordReset.mockRejectedValueOnce(Object.assign(
+      new Error('No account was found for that Login ID or official email.'),
+      { code: 'ACCOUNT_NOT_FOUND' },
+    ))
+    renderLogin()
+    fireEvent.click(screen.getByText('Forgot password?'))
+    fireEvent.change(screen.getByLabelText('Login ID or Official Email'), { target: { value: '99-9999' } })
+    fireEvent.click(screen.getByText('Send Reset Code'))
+    expect(await screen.findByText('No account was found for that Login ID or official email.')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('e.g., 01-2002 or example@gmail.com'))
+      .toHaveAttribute('aria-invalid', 'true')
+  })
 })

@@ -171,6 +171,11 @@ function LoginPage() {
         setMessage(nextChallenge.message)
       }
     } catch (requestError) {
+      if (['ACCOUNT_NOT_FOUND', 'INVALID_LOGIN_ID_FORMAT', 'INVALID_RESET_INPUT']
+        .includes(requestError?.code)) {
+        setFieldErrors({ identifier: requestError.message })
+        return
+      }
       showRequestError(requestError, true)
     } finally {
       setPending(false)

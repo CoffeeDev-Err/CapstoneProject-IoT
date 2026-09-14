@@ -380,6 +380,13 @@ const resetPassword = async (
 	if (!user || user.status !== 'active') {
 		throw createAuthError('Account is inactive or unavailable.')
 	}
+	if (await verifyPassword(newPassword, user.passwordHash)) {
+		throw createAuthError(
+			'Your new password must be different from your current password.',
+			400,
+			'PASSWORD_REUSED',
+		)
+	}
 	user.passwordHash = await hashPassword(newPassword)
 	user.forcePasswordReset = false
 	if (!user.emailVerifiedAt) user.emailVerifiedAt = new Date()

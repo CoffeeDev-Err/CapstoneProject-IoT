@@ -7,6 +7,7 @@ const otpRequestLimit = require('../src/services/otpRequestLimit')
 mock.method(emailService, 'sendVerificationCode', async () => {})
 const auth = require('../src/services/authService')
 const { hashCode } = require('../src/utils/verification')
+const { hashPassword } = require('../src/utils/password')
 const errorHandler = require('../src/middleware/errorHandler')
 const createRateLimit = require('../src/middleware/rateLimit')
 
@@ -38,6 +39,23 @@ describe('verification feedback and server deadlines', () => {
       { code: 'INVALID_ACCOUNT_EMAIL' },
     )
     assert.equal(EmailVerification.create.mock.callCount(), 0)
+  })
+
+  it('rejects reusing the current password during password recovery', async (t) => {
+    const challenge = {
+      userId: 'user', purpose: 'reset_password', expiresAt: new Date('2099-01-01'),
+      attempts: 0, maxAttempts: 5, otpHash: hashCode('123456'), save: async () => {},
+    }
+    const user = {
+      _id: 'user', status: 'active', passwordHash: await hashPassword('StrongPass1!'),
+      save: async () => {},
+    }
+    t.mock.method(EmailVerification, 'findById', () => ({ select: async () => challenge }))
+    t.mock.method(User, 'findById', () => ({ select: async () => user }))
+    await assert.rejects(
+      auth.resetPassword({ challenge_id: 'challenge', code: '123456', new_password: 'StrongPass1!' }),
+      { code: 'PASSWORD_REUSED' },
+    )
   })
 
   it('returns the remaining account window after the third code', async (t) => {
