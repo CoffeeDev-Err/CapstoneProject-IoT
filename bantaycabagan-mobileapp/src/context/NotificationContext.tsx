@@ -18,6 +18,7 @@ import {
   fetchMyNotifications,
   markAllMyNotificationsRead,
   markMyNotificationRead,
+	markMyTaskInboxRead,
   registerNotificationDevice,
   unregisterNotificationDevice,
 } from '../services/notificationsApi';
@@ -38,6 +39,7 @@ Notifications.setNotificationHandler({
 type NotificationContextValue = {
   notifications: OfficerNotification[];
   unreadCount: number;
+	unreadTaskCount: number;
   isLoading: boolean;
   isLoadingMore: boolean;
   notificationsHasMore: boolean;
@@ -45,6 +47,7 @@ type NotificationContextValue = {
   navigationRequest: NotificationNavigationRequest | null;
   clearNavigationRequest: () => void;
   markAllRead: () => Promise<void>;
+	markTaskInboxRead: () => Promise<void>;
   openNotification: (notification: OfficerNotification) => void;
   refreshNotifications: () => Promise<void>;
   loadMoreNotifications: () => Promise<void>;
@@ -92,6 +95,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [notificationsError, setNotificationsError] = useState('');
   const [notificationCursor, setNotificationCursor] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+	const [unreadTaskCount, setUnreadTaskCount] = useState(0);
   const [navigationRequest, setNavigationRequest] = useState<NotificationNavigationRequest | null>(null);
   const requestIdRef = useRef(0);
   const actionBusy = useRef(false);
@@ -108,6 +112,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNotificationCursor(null);
       setNotificationsHasMore(false);
       setUnreadCount(0);
+		setUnreadTaskCount(0);
       return;
     }
     const requestId = ++requestIdRef.current;
@@ -120,6 +125,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNotificationCursor(payload.pagination.nextCursor);
       setNotificationsHasMore(payload.pagination.hasNextPage);
       setUnreadCount(payload.unreadCount);
+		setUnreadTaskCount(payload.unreadTaskCount ?? 0);
     } catch (error) {
       if (requestId === requestIdRef.current) {
         setNotificationsError(requestErrorMessage(error, { action: 'load notifications' }));
@@ -160,6 +166,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNotificationCursor(payload.pagination.nextCursor);
       setNotificationsHasMore(payload.pagination.hasNextPage);
       setUnreadCount(payload.unreadCount);
+		setUnreadTaskCount(payload.unreadTaskCount ?? 0);
     } catch (error) {
       setNotificationsError(requestErrorMessage(error, { action: 'load previous notifications' }));
       throw error;
@@ -177,6 +184,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNotifications((items) => {
         const isNew = !items.some((item) => item.id === notification.id);
         if (isNew && !notification.isRead) setUnreadCount((count) => count + 1);
+			if (isNew && !notification.isRead && notification.data?.taskInbox === true) {
+				setUnreadTaskCount((count) => count + 1);
+			}
         return mergeNotification(items, notification);
       });
     };
@@ -286,9 +296,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const markAllRead = useCallback(() => updateReadState(), [updateReadState]);
 
+	const markTaskInboxRead = useCallback(async () => {
+		if (!token || unreadTaskCount === 0) return;
+		const generation = sessionGeneration.current;
+		setNotificationsError('');
+		try {
+			await markMyTaskInboxRead(token);
+			if (generation === sessionGeneration.current) await refreshNotifications();
+		} catch (error) {
+			if (generation !== sessionGeneration.current) return;
+			const message = requestErrorMessage(error, { action: 'update task read status', write: true });
+			setNotificationsError(message);
+			Alert.alert('Task badge could not be updated', message);
+		}
+	}, [refreshNotifications, token, unreadTaskCount]);
+
   const value = useMemo(() => ({
     notifications,
     unreadCount,
+		unreadTaskCount,
     isLoading,
     isLoadingMore,
     notificationsHasMore,
@@ -296,6 +322,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     navigationRequest,
     clearNavigationRequest: () => setNavigationRequest(null),
     markAllRead,
+		markTaskInboxRead,
     openNotification,
     refreshNotifications,
     loadMoreNotifications,
@@ -304,6 +331,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     isLoadingMore,
     loadMoreNotifications,
     markAllRead,
+		markTaskInboxRead,
     navigationRequest,
     notifications,
     notificationsError,
@@ -311,6 +339,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     openNotification,
     refreshNotifications,
     unreadCount,
+		unreadTaskCount,
   ]);
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;

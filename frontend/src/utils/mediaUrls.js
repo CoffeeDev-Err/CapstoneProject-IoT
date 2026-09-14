@@ -12,7 +12,9 @@ export const getMediaDownloadUrl = (assetUrl) => {
   return `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}download=1`
 }
 
-export const getEvidenceViewerPath = (reportId) => (
-  `/reports/${encodeURIComponent(reportId)}/evidence`
-
-)
+export const getEvidenceViewerPath = (reportId, correctionIndex) => {
+	const path = `/reports/${encodeURIComponent(reportId)}/evidence`
+	return Number.isInteger(correctionIndex) && correctionIndex >= 0
+		? `${path}?correction=${correctionIndex}`
+		: path
+}

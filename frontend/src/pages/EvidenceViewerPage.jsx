@@ -3,7 +3,7 @@ import SystemStatusBanner from '../components/SystemStatusBanner'
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Download, ImageOff, Moon, RefreshCw, ShieldCheck, Sun } from 'lucide-react'
 import { EvidenceLoadingSkeleton, SkeletonBlock } from '../components/LoadingSkeleton'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import geosentriIcon from '../assets/geosentri-icon.png'
 import { getReport } from '../services/operations'
 import { getMediaDownloadUrl, resolveMediaUrl } from '../utils/mediaUrls'
@@ -20,6 +20,7 @@ const formatDateTime = (value) => {
 
 function EvidenceViewerPage() {
   const { reportId = '' } = useParams()
+	const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark')
   const [loadVersion, setLoadVersion] = useState(0)
@@ -76,7 +77,16 @@ function EvidenceViewerPage() {
     ? state
     : { reportId, status: 'loading', report: null, error: '' }
   const report = activeState.report
-  const evidence = report?.evidence_photo
+	const correctionIndexValue = searchParams.get('correction')
+	const correctionIndex = correctionIndexValue !== null && /^\d+$/.test(correctionIndexValue)
+		? Number(correctionIndexValue)
+		: null
+	const evidence = correctionIndex === null
+		? report?.evidence_photo
+		: report?.evidence_corrections?.[correctionIndex]
+	const evidenceLabel = correctionIndex === null
+		? 'Original evidence'
+		: `Corrected evidence ${correctionIndex + 1}`
   const evidenceUrl = resolveMediaUrl(evidence?.url)
   const downloadUrl = getMediaDownloadUrl(evidence?.url)
   const imageFailed = Boolean(evidenceUrl && failedImageUrl === evidenceUrl)
@@ -138,7 +148,7 @@ function EvidenceViewerPage() {
           <article className="evidence-viewer__panel">
             <header className="evidence-viewer__heading">
               <div>
-                <span className="evidence-viewer__eyebrow">Report {report.id}</span>
+				<span className="evidence-viewer__eyebrow">Report {report.id} · {evidenceLabel}</span>
                 <h1>{report.title}</h1>
                 <p>{report.report_type} report submitted by {report.officer}</p>
               </div>
@@ -189,6 +199,12 @@ function EvidenceViewerPage() {
                 <dt>Validation</dt>
                 <dd>{report.validation_status || 'Pending'}</dd>
               </div>
+			  {evidence?.reason && (
+				<div>
+				  <dt>Correction reason</dt>
+				  <dd>{evidence.reason}</dd>
+				</div>
+			  )}
             </dl>
 
             <footer className="evidence-viewer__security-note">

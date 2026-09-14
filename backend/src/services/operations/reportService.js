@@ -197,7 +197,44 @@ const createReportService = ({
 				'report_type', 'BACKUP_REPORT_MUST_BE_INCIDENT',
 			)
 		}
-		const { values, changes, reason } = editValues(report, payload, clock())
+		const { evidence_correction: evidenceCorrection, ...contentPayload } = payload
+		const editTime = clock()
+		const { values, changes, reason } = editValues(
+			report,
+			contentPayload,
+			editTime,
+			{ allowUnchanged: Boolean(evidenceCorrection) },
+		)
+		let correctionEntry
+		if (evidenceCorrection) {
+			const evidencePath = String(evidenceCorrection.path || '').trim()
+			if (!evidencePath) throw createValidationError('The corrected evidence upload is unavailable.', 'evidence_photo')
+			if (!['image/jpeg', 'image/png', 'image/webp'].includes(evidenceCorrection.mimeType)) {
+				throw createValidationError('Corrected photo evidence must be a JPEG, PNG, or WebP image.', 'evidence_photo')
+			}
+			const evidenceSize = Number(evidenceCorrection.size)
+			if (!Number.isFinite(evidenceSize) || evidenceSize < 1 || evidenceSize > 5 * 1024 * 1024) {
+				throw createValidationError('Corrected photo evidence must be 5 MB or smaller.', 'evidence_photo')
+			}
+			const capturedAt = validateDate(evidenceCorrection.capturedAt || editTime, {
+				field: 'evidence_captured_at', label: 'Evidence capture time',
+				min: new Date(editTime.getTime() - 365 * 86400000),
+				max: new Date(editTime.getTime() + 300000),
+			})
+			correctionEntry = {
+				evidence: {
+					...evidenceCorrection,
+					path: evidencePath,
+					cameraFacing: evidenceCorrection.cameraFacing === 'front' ? 'front' : 'back',
+					capturedAt,
+				},
+				addedAt: editTime,
+				addedBy: personnelId,
+				addedByName: actor.fullName || report.officerName,
+				reason,
+				revision: (report.__v || 0) + 1,
+			}
+		}
 		const oldCoordinates = report.location?.coordinates
 		const newCoordinates = values.location?.coordinates
 		if (values.locationSource === 'gps' && (report.locationSource !== 'gps' || JSON.stringify(oldCoordinates) !== JSON.stringify(newCoordinates))) {
@@ -211,10 +248,27 @@ const createReportService = ({
 		const previousStatus = report.validationStatus
 		const isValidatedCorrection = previousStatus === 'validated'
 		report.history ||= []
-		report.history.push({ at: clock(), by: personnelId, name: actor.fullName || report.officerName,
+		report.history.push({ at: editTime, by: personnelId, name: actor.fullName || report.officerName,
 			kind: previousStatus === 'validated' ? 'correction' : 'edit', reason,
-			changes: [...changes, { field: 'validationStatus', before: previousStatus, after: 'pending' }] })
+			changes: [
+				...changes,
+				...(correctionEntry ? [{
+					field: 'evidenceCorrection',
+					before: null,
+					after: {
+						capturedAt: correctionEntry.evidence.capturedAt,
+						cameraFacing: correctionEntry.evidence.cameraFacing,
+						size: correctionEntry.evidence.size,
+					},
+				}] : []),
+				{ field: 'validationStatus', before: previousStatus, after: 'pending' },
+			],
+		})
 		Object.assign(report, values, { validationStatus: 'pending', reviewedAt: undefined, reviewedBy: undefined })
+		if (correctionEntry) {
+			report.evidenceCorrections ||= []
+			report.evidenceCorrections.push(correctionEntry)
+		}
 		// The original route/evidence and submission metadata remain part of the record.
 		await saveReport(report)
 		const serialized = serializeReport(report, await loadPersonnelMap([personnelId]))

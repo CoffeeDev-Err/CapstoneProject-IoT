@@ -39,6 +39,46 @@ const formatCoordinates = (latitude, longitude) => {
   return `${parsedLatitude.toFixed(6)}, ${parsedLongitude.toFixed(6)}`
 }
 
+const EvidenceFigure = ({ evidence, label, report, formatDateTime, correctionIndex }) => {
+  const viewerPath = correctionIndex === undefined
+	? getEvidenceViewerPath(report.id)
+	: getEvidenceViewerPath(report.id, correctionIndex)
+  return <figure className="report-evidence">
+	<div className="report-evidence__label">{label}</div>
+	<a
+	  className="report-evidence__preview-link"
+	  href={viewerPath}
+	  target="_blank"
+	  rel="noopener noreferrer"
+	  aria-label={`Open ${label.toLowerCase()} viewer for ${report.id}`}
+	>
+	  <img
+		src={resolveMediaUrl(evidence.url)}
+		alt={`${label} attached to ${report.id}`}
+		loading="lazy"
+		decoding="async"
+	  />
+	</a>
+	<figcaption>
+	  <div>
+		<span>{evidence.camera_facing === 'front' ? 'Front camera' : 'Back camera'}</span>
+		{evidence.captured_at && <span>Captured {formatDateTime(evidence.captured_at)}</span>}
+		{evidence.added_at && <span>Added {formatDateTime(evidence.added_at)} by {evidence.added_by_name}</span>}
+		{evidence.reason && <span>Reason: {evidence.reason}</span>}
+	  </div>
+	  <a
+		className="report-evidence__viewer-link"
+		href={viewerPath}
+		target="_blank"
+		rel="noopener noreferrer"
+	  >
+		<Maximize2 aria-hidden="true" />
+		Open evidence viewer
+	  </a>
+	</figcaption>
+  </figure>
+}
+
 function ReportDetailDrawer({
   report,
   formatDateTime,
@@ -340,48 +380,27 @@ function ReportDetailDrawer({
             <p>{report.description}</p>
           </section>
 
-          {report.evidence_photo?.url && (
-            <section className="report-detail-section">
-              <h4>Photo evidence</h4>
-              <figure className="report-evidence">
-                <a
-                  className="report-evidence__preview-link"
-                  href={getEvidenceViewerPath(report.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Open evidence viewer for ${report.id}`}
-                >
-                  <img
-                    src={resolveMediaUrl(report.evidence_photo.url)}
-                    alt={`Evidence attached to ${report.id}`}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </a>
-                <figcaption>
-                  <div>
-                    <span>
-                      {report.evidence_photo.camera_facing === 'front'
-                        ? 'Front camera'
-                        : 'Back camera'}
-                    </span>
-                    {report.evidence_photo.captured_at && (
-                      <span>{formatDateTime(report.evidence_photo.captured_at)}</span>
-                    )}
-                  </div>
-                  <a
-                    className="report-evidence__viewer-link"
-                    href={getEvidenceViewerPath(report.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Maximize2 aria-hidden="true" />
-                    Open evidence viewer
-                  </a>
-                </figcaption>
-              </figure>
-            </section>
-          )}
+		  {(report.evidence_photo?.url || report.evidence_corrections?.length > 0) && (
+			<section className="report-detail-section">
+			  <h4>Photo evidence</h4>
+			  <div className="report-evidence-list">
+				{report.evidence_photo?.url && <EvidenceFigure
+				  evidence={report.evidence_photo}
+				  label="Original evidence"
+				  report={report}
+				  formatDateTime={formatDateTime}
+				/>}
+				{(report.evidence_corrections || []).map((evidence, index) => <EvidenceFigure
+				  key={`${evidence.revision}-${evidence.added_at}`}
+				  evidence={evidence}
+				  label={`Corrected evidence ${index + 1}`}
+				  report={report}
+				  formatDateTime={formatDateTime}
+				  correctionIndex={index}
+				/>)}
+			  </div>
+			</section>
+		  )}
 
           {report.resolution_notes && (
             <section className="report-detail-section">

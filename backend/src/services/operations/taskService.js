@@ -503,7 +503,7 @@ const createTaskService = ({
 			referenceType: 'task',
 			referenceId: task.taskId,
 			priority: 'critical',
-			data: { destination: 'Tasks', taskId: task.taskId },
+			data: { destination: 'Tasks', taskId: task.taskId, taskInbox: true },
 			dedupeKey: `task:${task.taskId}:created`,
 		})))
 		await emitToAuthorizedOfficers('task:created', serialized, task, eligiblePersonnelIds)

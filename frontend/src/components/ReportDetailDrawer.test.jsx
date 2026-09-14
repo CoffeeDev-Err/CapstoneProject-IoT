@@ -45,3 +45,24 @@ it('shows the linked backup request and the actual response team', async () => {
   expect(screen.getByText(/Badge 12002/)).toBeTruthy()
   await screen.findByText('Report map')
 })
+
+it('shows original and append-only corrected evidence separately', async () => {
+  render(<ReportDetailDrawer report={{
+    id: 'RPT-EVIDENCE', title: 'Evidence correction', description: 'Corrected evidence attached.',
+    officer: 'Officer One', report_type: 'incident', is_incident: true, severity: 3, validation_status: 'pending',
+    case_status: 'open', date_time: '2026-09-14T10:00:00Z', occurred_at: '2026-09-14T09:30:00Z',
+    assigned_area: 'Catabayungan', barangay: 'Catabayungan', location: 'Public Market', latitude: 17.4305, longitude: 121.765,
+    location_source: 'manual',
+    evidence_photo: { url: '/original.jpg', camera_facing: 'back', captured_at: '2026-09-14T09:35:00Z' },
+    evidence_corrections: [{
+      url: '/corrected.jpg', camera_facing: 'front', captured_at: '2026-09-14T10:05:00Z',
+      added_at: '2026-09-14T10:06:00Z', added_by_name: 'Officer One', reason: 'Wrong entrance shown', revision: 2,
+    }],
+  }} formatDateTime={(value) => value} onClose={vi.fn()} onValidationChange={vi.fn()} onDownload={vi.fn()} />)
+
+  expect(screen.getByText('Original evidence')).toBeTruthy()
+  expect(screen.getByText('Corrected evidence 1')).toBeTruthy()
+  expect(screen.getByText('Reason: Wrong entrance shown')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'Open corrected evidence 1 viewer for RPT-EVIDENCE' }))
+    .toHaveAttribute('href', '/reports/RPT-EVIDENCE/evidence?correction=0')
+})

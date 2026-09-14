@@ -2,10 +2,10 @@ import { act, renderHook } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NotificationProvider, useNotifications } from './NotificationContext';
-import { fetchMyNotifications, markAllMyNotificationsRead, markMyNotificationRead } from '../services/notificationsApi';
+import { fetchMyNotifications, markAllMyNotificationsRead, markMyNotificationRead, markMyTaskInboxRead } from '../services/notificationsApi';
 jest.mock('./AuthContext', () => ({ useAuth: () => ({ token: 'test' }) }));
 jest.mock('../services/operationsApi', () => ({ operationsSocket: { on: jest.fn(), off: jest.fn() } }));
-jest.mock('../services/notificationsApi', () => ({ fetchMyNotifications: jest.fn(), markAllMyNotificationsRead: jest.fn(), markMyNotificationRead: jest.fn() }));
+jest.mock('../services/notificationsApi', () => ({ fetchMyNotifications: jest.fn(), markAllMyNotificationsRead: jest.fn(), markMyNotificationRead: jest.fn(), markMyTaskInboxRead: jest.fn() }));
 jest.mock('expo-device', () => ({ isDevice: false }));
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(), setBadgeCountAsync: jest.fn(async () => {}),
@@ -14,7 +14,7 @@ jest.mock('expo-notifications', () => ({
   getLastNotificationResponseAsync: jest.fn(async () => null),
 }));
 const notification = { id: 'one', type: 'backup', title: 'Backup', message: 'Help', timestamp: '2026-09-01', isRead: false, priority: 'normal' as const };
-const payload = { notifications: [notification], unreadCount: 1, pagination: { limit: 10, hasNextPage: false, nextCursor: null } };
+const payload = { notifications: [notification], unreadCount: 1, unreadTaskCount: 0, pagination: { limit: 10, hasNextPage: false, nextCursor: null } };
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(fetchMyNotifications).mockResolvedValue(payload);
@@ -52,4 +52,15 @@ it('opens a push report reference when the payload uses reportId', async () => {
   // Only the routing payload is consumed here; native display fields are omitted.
   await act(() => listener({ actionIdentifier: 'default', notification: { request: { content: { data: { destination: 'Reports', reportId: 'RPT-OLDER' } } } } } as unknown as Notifications.NotificationResponse));
   expect(result.current.navigationRequest).toMatchObject({ destination: 'Reports', referenceId: 'RPT-OLDER' });
+});
+
+it('clears the task badge through the persistent task inbox endpoint', async () => {
+  jest.mocked(fetchMyNotifications)
+    .mockResolvedValueOnce({ ...payload, unreadTaskCount: 2 })
+    .mockResolvedValueOnce({ ...payload, unreadTaskCount: 0 });
+  jest.mocked(markMyTaskInboxRead).mockResolvedValueOnce({ updated: 2 });
+  const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });
+  await act(async () => { await result.current.markTaskInboxRead(); });
+  expect(markMyTaskInboxRead).toHaveBeenCalledWith('test');
+  expect(result.current.unreadTaskCount).toBe(0);
 });

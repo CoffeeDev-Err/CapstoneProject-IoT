@@ -82,11 +82,18 @@ completion requires at least one verified responder arrival.
 - `GET /reports`
 - `POST /reports`
 - `GET /reports/:reportId`
+- `PATCH /reports/:reportId`
 - `PATCH /reports/:reportId/resolve`
 - `PATCH /reports/:reportId/validation`
 
 Filters: `personnel_id`, `report_type`, `barangay`, `case_status`,
 `validation_status`, `from`, `to`, `search`, `page`, and `limit`.
+
+Officer report edits accept JSON. When a correction adds a photo, the same
+endpoint accepts `multipart/form-data` with `evidence_photo`,
+`evidence_camera_facing`, and `evidence_captured_at`. The original evidence is
+never overwritten; corrected photos are appended to `evidence_corrections`
+with the correction reason, officer, timestamp, and report revision.
 
 ## Deployments and Barangays
 
@@ -107,7 +114,14 @@ Deployment filters: `personnel_id`, `barangay`, `status`, `page`, and `limit`.
 - `PATCH /notifications/read-all`
 - `PATCH /notifications/:notificationId/read`
 - `DELETE /notifications`
+- `GET /notifications/me`
+- `PATCH /notifications/me/tasks/read-all`
 - `GET /audit-logs`
+
+The officer notification page returns both `unreadCount` and
+`unreadTaskCount`. The task count includes only unread new-task notices and is
+cleared when the officer opens the task inbox; later task status updates remain
+available in notification history.
 
 Operational analytics combines report volume, validated incidents, severity,
 repeat locations, time-of-day patterns, and active deployment coverage. Report

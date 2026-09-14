@@ -48,6 +48,15 @@ const reportEvidenceSchema = new mongoose.Schema({
 	capturedAt: { type: Date, required: true },
 }, { _id: false })
 
+const reportEvidenceCorrectionSchema = new mongoose.Schema({
+	evidence: { type: reportEvidenceSchema, required: true },
+	addedAt: { type: Date, required: true },
+	addedBy: { type: String, required: true },
+	addedByName: { type: String, required: true },
+	reason: { type: String, required: true, maxlength: 500 },
+	revision: { type: Number, required: true, min: 1 },
+}, { _id: false })
+
 const reportRoutePointSchema = new mongoose.Schema({
 	location: { type: pointSchema, required: true },
 	accuracy: { type: Number, min: 0.1, max: 5000 },
@@ -108,6 +117,7 @@ const reportSchema = new mongoose.Schema({
 	incidentAt: { type: Date, required: true },
 	submittedAt: { type: Date, required: true, default: Date.now },
 	evidencePhoto: reportEvidenceSchema,
+	evidenceCorrections: { type: [reportEvidenceCorrectionSchema], default: [] },
 	routeSnapshot: { type: [reportRoutePointSchema], default: [] },
 	routeSnapshotCapturedAt: Date,
 	backupResponse: reportBackupResponseSchema,

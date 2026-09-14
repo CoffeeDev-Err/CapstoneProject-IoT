@@ -231,10 +231,34 @@ export const submitPoliceReport = (
 export const fetchPoliceReport = (reportId: string, token?: string | null) =>
   request<{ report: PoliceReport }>(`/api/reports/${encodeURIComponent(reportId)}`, undefined, token);
 
-export const editPoliceReport = (reportId: string, input: Omit<SubmitReportInput, 'assigned_area' | 'evidence_photo' | 'latitude' | 'longitude' | 'client_submission_id'> & { latitude: number | null; longitude: number | null; revision: number; reason: string }, token?: string | null) =>
-  request<{ report: PoliceReport }>(`/api/reports/${encodeURIComponent(reportId)}`, {
-    method: 'PATCH', body: JSON.stringify(input),
-  }, token);
+type EditPoliceReportInput = Omit<SubmitReportInput, 'assigned_area' | 'latitude' | 'longitude' | 'client_submission_id'> & {
+	latitude: number | null;
+	longitude: number | null;
+	revision: number;
+	reason: string;
+};
+
+export const editPoliceReport = (reportId: string, input: EditPoliceReportInput, token?: string | null) => {
+	if (!input.evidence_photo) {
+		return request<{ report: PoliceReport }>(`/api/reports/${encodeURIComponent(reportId)}`, {
+			method: 'PATCH', body: JSON.stringify(input),
+		}, token);
+	}
+
+	const formData = new FormData();
+	Object.entries(input).forEach(([key, value]) => {
+		if (key === 'evidence_photo' || value === undefined) return;
+		formData.append(key, value === null ? '' : String(value));
+	});
+	formData.append('evidence_camera_facing', input.evidence_photo.camera_facing);
+	formData.append('evidence_captured_at', input.evidence_photo.captured_at);
+	const evidenceFile = new File(input.evidence_photo.uri);
+	formData.append('evidence_photo', evidenceFile, input.evidence_photo.name);
+
+	return request<{ report: PoliceReport }>(`/api/reports/${encodeURIComponent(reportId)}`, {
+		method: 'PATCH', body: formData,
+	}, token);
+};
 
 export const resolveIncidentReport = (
   reportId: string,

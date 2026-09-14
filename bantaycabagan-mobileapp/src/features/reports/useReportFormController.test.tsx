@@ -5,6 +5,7 @@ import { useReportFormController } from './useReportFormController';
 import type { LivePersonnel, OperationalTask, PoliceReport } from '../../types/operations';
 import {
   clearReportDraft,
+	discardTemporaryEvidence,
   loadReportDraft,
   saveReportDraft,
 } from '../../services/offlineReportQueue';
@@ -177,6 +178,22 @@ it('submits corrections to the edit endpoint with original revision, without a n
   expect(editReport).toHaveBeenCalledWith('RPT-ONE', expect.objectContaining({ revision: 4, description: 'Corrected', reason: 'Typo' }));
   expect(editReport.mock.calls[0][1]).not.toHaveProperty('assigned_area');
   expect(options.submitReport).not.toHaveBeenCalled();
+});
+it('uploads a new correction photo and cleans its temporary file after success', async () => {
+  const editReport = jest.fn(async (_id: string, _input: Record<string, unknown>) => ({} as PoliceReport));
+  const report = { id: 'RPT-PHOTO', title: 'Title', description: 'Description', location: 'ISU', barangay: 'Catabayungan', severity: 2,
+    report_type: 'incident', occurred_at: new Date().toISOString(), assigned_area: 'Original area', revision: 2, validation_status: 'validated',
+    evidence_photo: { url: '/original.jpg', mime_type: 'image/jpeg', size: 100, camera_facing: 'back', captured_at: new Date().toISOString() } } as PoliceReport;
+  const correctionPhoto = { uri: 'file:///cache/corrected.jpg', name: 'corrected.jpg', type: 'image/jpeg', camera_facing: 'back' as const, captured_at: new Date().toISOString() };
+  const { result } = await renderHook(() => useReportFormController({ ...options, editReport }));
+  await act(() => { result.current.openEditForm(report); });
+  await act(() => { result.current.setEvidencePhoto(correctionPhoto); result.current.setEditReason('The original photo showed the wrong entrance'); });
+  await act(async () => { await result.current.handleSubmit(jest.fn()); });
+  expect(editReport).toHaveBeenCalledWith('RPT-PHOTO', expect.objectContaining({
+    revision: 2,
+    evidence_photo: correctionPhoto,
+  }));
+  expect(discardTemporaryEvidence).toHaveBeenCalledWith(correctionPhoto.uri);
 });
 it('keeps an incomplete report open and explains which required fields are missing', async () => {
   const submitReport = jest.fn();

@@ -378,8 +378,12 @@ export function useReportFormController({
 
   const chooseEvidenceCamera = () => {
     Alert.alert(
-      evidencePhoto ? 'Retake photo evidence' : 'Capture photo evidence',
-      'Choose which camera to use.',
+		evidencePhoto
+			? 'Retake photo evidence'
+			: editTargetRef.current ? 'Capture corrected evidence' : 'Capture photo evidence',
+		editTargetRef.current
+			? 'The original photo will remain in the report. Choose a camera for the corrected evidence.'
+			: 'Choose which camera to use.',
       [
         { text: 'Back camera', onPress: () => captureEvidencePhoto('back') },
         { text: 'Front camera', onPress: () => captureEvidencePhoto('front') },
@@ -547,16 +551,21 @@ export function useReportFormController({
     try {
       if (editTarget) {
         if (!editReport) throw new Error('Report corrections are unavailable. Reopen the app and try again.');
-        const {
-          assigned_area: _area,
-          evidence_photo: _evidence,
+		const {
+			assigned_area: _area,
+			evidence_photo: _evidence,
           backup_task_id: _backupTaskId,
           backup_context: _backupContext,
           ...content
         } = form;
-        await editReport(editTarget.id, { ...content,
-          latitude: form.latitude ?? null, longitude: form.longitude ?? null,
-          reason: editReason.trim(), revision: editTarget.revision || 0 });
+		await editReport(editTarget.id, { ...content,
+			latitude: form.latitude ?? null, longitude: form.longitude ?? null,
+			reason: editReason.trim(), revision: editTarget.revision || 0,
+			...(evidencePhoto && { evidence_photo: evidencePhoto }),
+		});
+		await discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
+		evidencePhotoRef.current = null;
+		setEvidencePhoto(null);
         const isValidatedCorrection = editTarget.validation_status === 'validated';
         close(() => Alert.alert(
           isValidatedCorrection ? 'Correction submitted' : 'Report updated',

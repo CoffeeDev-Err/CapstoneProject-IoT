@@ -21,6 +21,7 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ notificationId: 1 }, { unique: true })
 notificationSchema.index({ recipientId: 1, createdAt: -1 })
 notificationSchema.index({ recipientId: 1, isRead: 1, createdAt: -1 })
+notificationSchema.index({ recipientId: 1, referenceType: 1, 'data.taskInbox': 1, isRead: 1 })
 notificationSchema.index(
 	{ recipientId: 1, dedupeKey: 1 },
 	{ unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } },

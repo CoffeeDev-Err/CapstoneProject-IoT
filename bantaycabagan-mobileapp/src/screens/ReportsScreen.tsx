@@ -449,20 +449,30 @@ export default function ReportsScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE (OPTIONAL)</Text>
-            {editTarget ? (
-              <View>
-                {editTarget.evidence_photo?.url ? <CachedImage source={{ uri: resolveApiAssetUrl(editTarget.evidence_photo.url) }} cachePolicy="memory" style={styles.detailEvidenceImage} contentFit="contain" /> : null}
-                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>{editTarget.evidence_photo ? 'Original photo evidence is retained with this report.' : 'No photo evidence was submitted with this report.'}</Text>
-              </View>
-            ) : <ReportEvidenceField
+			{editTarget ? <>
+			  <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>EXISTING PHOTO EVIDENCE</Text>
+			  <RetainedEvidenceSummary report={editTarget} />
+			  <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>ADD CORRECTED PHOTO (OPTIONAL)</Text>
+			  <Text style={[styles.evidenceCorrectionHint, { color: colors.textMuted }]}>The existing photos stay in the report. A new photo is added as corrected evidence with your reason below.</Text>
+			  <ReportEvidenceField
+				evidence={evidencePhoto}
+				onCapture={chooseEvidenceCamera}
+				onRemove={() => {
+				  discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
+				  setEvidencePhoto(null);
+				}}
+			  />
+			</> : <>
+			  <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE (OPTIONAL)</Text>
+			  <ReportEvidenceField
               evidence={evidencePhoto}
               onCapture={chooseEvidenceCamera}
               onRemove={() => {
                 discardTemporaryEvidence(evidencePhoto?.uri).catch(() => undefined);
                 setEvidencePhoto(null);
               }}
-            />}
+			  />
+			</>}
 
             {form.report_type === 'incident' && (
               <>
@@ -631,21 +641,17 @@ export default function ReportsScreen() {
                   : 'No responder accepted before completion'}
               />
             </> : null}
-            {selectedReport.evidence_photo?.url && (
-              <View style={[styles.detailEvidence, isDark && themeStyles.border]}>
-                <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>PHOTO EVIDENCE</Text>
-                <CachedImage
-                  source={{ uri: resolveApiAssetUrl(selectedReport.evidence_photo.url) }}
-                  cachePolicy="memory"
-                  style={styles.detailEvidenceImage}
-                  contentFit="contain"
-                />
-                <Text style={[styles.detailEvidenceMeta, isDark && themeStyles.muted]}>
-                  Captured with {selectedReport.evidence_photo.camera_facing === 'front' ? 'front' : 'back'} camera
-                  {' · '}{formatReportDate(selectedReport.evidence_photo.captured_at)}
-                </Text>
-              </View>
-            )}
+			{selectedReport.evidence_photo?.url ? (
+			  <DetailEvidenceCard evidence={selectedReport.evidence_photo} label="ORIGINAL PHOTO EVIDENCE" />
+			) : null}
+			{(selectedReport.evidence_corrections || []).map((evidence, index) => (
+			  <DetailEvidenceCard
+				key={`${evidence.revision}-${evidence.added_at}`}
+				evidence={evidence}
+				label={`CORRECTED PHOTO EVIDENCE ${index + 1}`}
+				note={`Added by ${evidence.added_by_name} · ${formatReportDate(evidence.added_at)}\nReason: ${evidence.reason}`}
+			  />
+			))}
             {selectedReport.resolution_notes && (
               <Detail label="Resolution notes" value={selectedReport.resolution_notes} />
             )}
@@ -690,6 +696,56 @@ function Detail({ label, value }: { label: string; value: string }) {
       <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>{label}</Text>
       <Text style={[styles.detailValue, isDark && themeStyles.text]}>{value}</Text>
     </View>
+  );
+}
+
+function RetainedEvidenceSummary({ report }: { report: PoliceReport }) {
+  const { colors, isDark } = useMobileTheme();
+  const corrections = report.evidence_corrections || [];
+  const latest = corrections.at(-1) || report.evidence_photo;
+  const count = (report.evidence_photo ? 1 : 0) + corrections.length;
+  return (
+	<View style={[styles.retainedEvidence, isDark && themeStyles.surfaceMuted]}>
+	  {latest?.url ? <CachedImage
+		source={{ uri: resolveApiAssetUrl(latest.url) }}
+		cachePolicy="memory"
+		style={styles.retainedEvidenceImage}
+		contentFit="cover"
+	  /> : <View style={[styles.retainedEvidencePlaceholder, { borderColor: colors.border }]}>
+		<Icon name="no-photography" size={22} color={colors.textMuted} />
+	  </View>}
+	  <View style={styles.retainedEvidenceCopy}>
+		<Text style={[styles.retainedEvidenceTitle, { color: colors.text }]}>Existing evidence retained</Text>
+		<Text style={[styles.retainedEvidenceMeta, { color: colors.textMuted }]}>
+		  {count === 0 ? 'No existing photo' : `${count} photo${count === 1 ? '' : 's'} already recorded`}
+		</Text>
+		<Text style={[styles.retainedEvidenceMeta, { color: colors.textMuted }]}>Existing evidence cannot be removed or overwritten.</Text>
+	  </View>
+	</View>
+  );
+}
+
+function DetailEvidenceCard({ evidence, label, note }: {
+  evidence: NonNullable<PoliceReport['evidence_photo']>;
+  label: string;
+  note?: string;
+}) {
+  const { isDark } = useMobileTheme();
+  return (
+	<View style={[styles.detailEvidence, isDark && themeStyles.border]}>
+	  <Text style={[styles.detailLabel, isDark && themeStyles.muted]}>{label}</Text>
+	  <CachedImage
+		source={{ uri: resolveApiAssetUrl(evidence.url) }}
+		cachePolicy="memory"
+		style={styles.detailEvidenceImage}
+		contentFit="contain"
+	  />
+	  <Text style={[styles.detailEvidenceMeta, isDark && themeStyles.muted]}>
+		Captured with {evidence.camera_facing === 'front' ? 'front' : 'back'} camera
+		{' · '}{formatReportDate(evidence.captured_at)}
+		{note ? `\n${note}` : ''}
+	  </Text>
+	</View>
   );
 }
 
@@ -924,6 +980,13 @@ const styles = StyleSheet.create({
   evidencePreviewTitle: { color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
   evidencePreviewMeta: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 10 },
   evidenceIconButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8 },
+	evidenceCorrectionHint: { marginTop: -4, marginBottom: 8, fontSize: 10, lineHeight: 15 },
+	retainedEvidence: { minHeight: 76, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+	retainedEvidenceImage: { width: 64, height: 58, borderRadius: 8, backgroundColor: mobileTheme.background },
+	retainedEvidencePlaceholder: { width: 64, height: 58, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 8 },
+	retainedEvidenceCopy: { flex: 1 },
+	retainedEvidenceTitle: { fontSize: 12, fontWeight: '800' },
+	retainedEvidenceMeta: { marginTop: 3, fontSize: 9, lineHeight: 13 },
   retakeButton: { minHeight: 42, marginHorizontal: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 8 },
   retakeButtonText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
   severityOptions: { flexDirection: 'row', gap: 8 },

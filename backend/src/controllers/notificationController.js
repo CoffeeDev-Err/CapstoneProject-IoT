@@ -30,6 +30,13 @@ const createNotificationController = (notificationService) => ({
 		res.json({ success: true, updated })
 	},
 
+	markMyTaskInboxRead: async (req, res) => {
+		const updated = await notificationService.markTaskInboxNotificationsRead(
+			req.auth.user.personnelId,
+		)
+		res.json({ success: true, updated })
+	},
+
 	registerPushDevice: async (req, res) => {
 		await notificationService.registerPushDevice({
 			userId: req.auth.user._id,

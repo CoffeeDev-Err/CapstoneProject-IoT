@@ -16,7 +16,7 @@ const saveReport = async (report) => {
 		throw error
 	}
 }
-const editValues = (report, payload, now) => {
+const editValues = (report, payload, now, { allowUnchanged = false } = {}) => {
 	if (Object.keys(payload).some((key) => !fields.includes(key))) throw createValidationError('Only report content and the correction reason can be edited.', 'report')
 	assertRevision(report, payload.revision)
 	const reason = validateText(payload.reason, { field: 'reason', label: 'Reason for correction', required: true, maxLength: 500 })
@@ -48,7 +48,7 @@ const editValues = (report, payload, now) => {
 	const jsonValue = (value) => value == null ? null : JSON.parse(JSON.stringify(value))
 	const changes = Object.entries(values).filter(([key, value]) => JSON.stringify(jsonValue(report[key])) !== JSON.stringify(jsonValue(value)))
 		.map(([field, value]) => ({ field, before: jsonValue(report[field]), after: jsonValue(value) }))
-	if (!changes.length) throw createValidationError('Change at least one report field before saving.', 'report')
+	if (!changes.length && !allowUnchanged) throw createValidationError('Change at least one report field before saving.', 'report')
 	return { values, changes, reason }
 }
 module.exports = { editValues, assertRevision, saveReport }

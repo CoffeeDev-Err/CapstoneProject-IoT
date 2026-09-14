@@ -23,6 +23,11 @@ const createNotificationRoutes = ({ authService, controller }) => {
 		asyncHandler(controller.markAllMyNotificationsRead),
 	)
 	router.patch(
+		'/me/tasks/read-all',
+		...authenticatedOfficerOnly,
+		asyncHandler(controller.markMyTaskInboxRead),
+	)
+	router.patch(
 		'/me/:notificationId/read',
 		...authenticatedOfficerOnly,
 		asyncHandler(controller.markMyNotificationRead),

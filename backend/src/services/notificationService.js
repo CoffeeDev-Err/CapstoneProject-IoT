@@ -17,6 +17,15 @@ const notificationVisibilityFilter = (recipientId) => (
 		: {}
 )
 
+const taskInboxFilter = {
+	referenceType: 'task',
+	$or: [
+		{ 'data.taskInbox': true },
+		// Keep task alerts created before taskInbox was introduced compatible.
+		{ title: { $in: ['Officer Requests Backup', 'Urgent Task'] } },
+	],
+}
+
 const toNotificationPayload = (notification) => ({
 	id: notification.notificationId,
 	type: notification.type,
@@ -161,6 +170,11 @@ const getNotificationPage = async (recipientId, query = {}) => {
 		...visibilityFilter,
 		isRead: false,
 	})
+	const unreadTaskCountPromise = Notification.countDocuments({
+		...recipientFilter,
+		...taskInboxFilter,
+		isRead: false,
+	})
 	const page = await findCursorPage({
 		model: Notification,
 		filter: { ...recipientFilter, ...visibilityFilter },
@@ -172,6 +186,7 @@ const getNotificationPage = async (recipientId, query = {}) => {
 		notifications: page.data.map(toNotificationPayload),
 		pagination: page.pagination,
 		unreadCount: await unreadCountPromise,
+		unreadTaskCount: await unreadTaskCountPromise,
 	}
 }
 
@@ -190,6 +205,18 @@ const markNotificationRead = async (notificationId, recipientId) => {
 const markAllNotificationsRead = async (recipientId = 'supervisor') => {
 	const result = await Notification.updateMany(
 		{ recipientId: { $in: [recipientId, 'all'] }, isRead: false },
+		{ $set: { isRead: true, readAt: new Date() } },
+	)
+	return result.modifiedCount
+}
+
+const markTaskInboxNotificationsRead = async (recipientId) => {
+	const result = await Notification.updateMany(
+		{
+			recipientId,
+			...taskInboxFilter,
+			isRead: false,
+		},
 		{ $set: { isRead: true, readAt: new Date() } },
 	)
 	return result.modifiedCount
@@ -237,6 +264,7 @@ module.exports = {
 	getNotificationPage,
 	getNotifications,
 	markAllNotificationsRead,
+	markTaskInboxNotificationsRead,
 	markNotificationRead,
 	registerPushDevice,
 	toNotificationPayload,

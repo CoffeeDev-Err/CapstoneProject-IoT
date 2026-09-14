@@ -167,7 +167,9 @@ function FloatingTabBar({
           <TouchableOpacity
             key={route.key}
             accessibilityRole="tab"
-            accessibilityLabel={label}
+			accessibilityLabel={isTasks && openTaskCount > 0
+			  ? `${label}, ${openTaskCount} unread task${openTaskCount === 1 ? '' : 's'}`
+			  : label}
             accessibilityState={{ selected: focused }}
             activeOpacity={0.75}
             style={styles.tabItem}
@@ -207,7 +209,6 @@ export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const {
     currentPersonnelId,
-    tasks,
     initialDataError,
     isLoading,
     refreshOperations,
@@ -215,13 +216,19 @@ export default function MainTabs() {
   const {
     navigationRequest,
     clearNavigationRequest,
+    unreadTaskCount,
+    markTaskInboxRead,
   } = useNotifications();
   const { isDark } = useMobileTheme();
   const [tasksVisible, setTasksVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [mapInteracting, setMapInteracting] = useState(false);
   const headerVisibility = useRef(new Animated.Value(1)).current;
-  const openTaskCount = tasks.filter((task) => task.status === 'open').length;
+	const openTaskCount = unreadTaskCount;
+	const openTaskModal = useCallback(() => {
+		setTasksVisible(true);
+		void markTaskInboxRead();
+	}, [markTaskInboxRead]);
   const {
     visible: unfinishedDraftVisible,
     dismiss: dismissUnfinishedDraft,
@@ -305,7 +312,7 @@ export default function MainTabs() {
           <FloatingTabBar
             {...props}
             openTaskCount={openTaskCount}
-            openTaskModal={() => setTasksVisible(true)}
+			openTaskModal={openTaskModal}
             navigationRequest={navigationRequest}
             clearNavigationRequest={clearNavigationRequest}
             unfinishedDraftVisible={unfinishedDraftVisible}

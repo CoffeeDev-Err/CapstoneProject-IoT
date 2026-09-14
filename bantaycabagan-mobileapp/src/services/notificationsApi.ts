@@ -27,6 +27,7 @@ export const fetchMyNotifications = (
   notifications: OfficerNotification[];
   pagination: CursorPagination;
   unreadCount: number;
+	unreadTaskCount: number;
   }>(`/api/notifications/me?${params.toString()}`, token);
 };
 
@@ -36,6 +37,12 @@ export const markMyNotificationRead = (notificationId: string, token: string) =>
 
 export const markAllMyNotificationsRead = (token: string) => request<{ updated: number }>(
   '/api/notifications/me/read-all',
+  token,
+  { method: 'PATCH' },
+);
+
+export const markMyTaskInboxRead = (token: string) => request<{ updated: number }>(
+  '/api/notifications/me/tasks/read-all',
   token,
   { method: 'PATCH' },
 );

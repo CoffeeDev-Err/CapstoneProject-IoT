@@ -605,6 +605,21 @@
   background: var(--bg-secondary);
 }
 
+.report-evidence-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.report-evidence__label {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border-color-light);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
 .report-evidence img {
   display: block;
   width: 100%;

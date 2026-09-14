@@ -84,6 +84,18 @@ export type PoliceReport = {
     camera_facing: 'front' | 'back';
     captured_at: string;
   };
+	evidence_corrections?: Array<{
+		url: string;
+		mime_type: string;
+		size: number;
+		camera_facing: 'front' | 'back';
+		captured_at: string;
+		added_at: string;
+		added_by: string;
+		added_by_name: string;
+		reason: string;
+		revision: number;
+	}>;
   backup_response?: Omit<BackupReportContext, 'assigned_area' | 'latitude' | 'longitude'>;
 };
 

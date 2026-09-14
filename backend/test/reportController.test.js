@@ -85,4 +85,56 @@ describe('report controller', () => {
 		)
 		assert.deepEqual(deleted, ['report-evidence/stored.jpg'])
 	})
+
+	it('stores corrected evidence and passes only the trusted stored reference to the service', async () => {
+		let editPayload
+		const controller = createReportController({
+			editReport: async (_reportId, payload) => {
+				editPayload = payload
+				return { status: 200, body: { success: true, report: { id: 'RPT-ONE' } } }
+			},
+		}, {
+			storeUploadedMedia: async () => 's3://private/report-evidence/corrected.jpg',
+			deleteStoredMedia: async () => {},
+		})
+		const req = {
+			params: { reportId: 'RPT-ONE' },
+			auth: { user: { personnelId: 'PNP-001' } },
+			body: {
+				revision: '2', reason: 'Wrong photo', severity: '3', latitude: '', longitude: '',
+				evidence_photo: { path: 'attacker-controlled.jpg' },
+				evidence_camera_facing: 'front', evidence_captured_at: '2026-09-14T10:00:00Z',
+			},
+			file: { originalname: 'corrected.jpg', mimetype: 'image/jpeg', size: 4096 },
+		}
+
+		await controller.editReport(req, createResponse())
+
+		assert.equal(editPayload.revision, 2)
+		assert.equal(editPayload.severity, 3)
+		assert.equal(editPayload.latitude, null)
+		assert.equal(editPayload.longitude, null)
+		assert.equal(editPayload.evidence_photo, undefined)
+		assert.equal(editPayload.evidence_correction.path, 's3://private/report-evidence/corrected.jpg')
+		assert.equal(editPayload.evidence_correction.cameraFacing, 'front')
+	})
+
+	it('deletes a corrected evidence upload when the report edit is rejected', async () => {
+		const deleted = []
+		const controller = createReportController({
+			editReport: async () => ({ status: 404, body: { success: false } }),
+		}, {
+			storeUploadedMedia: async () => 'report-evidence/orphan.jpg',
+			deleteStoredMedia: async (path) => deleted.push(path),
+		})
+		const req = {
+			params: { reportId: 'RPT-MISSING' }, auth: { user: { personnelId: 'PNP-001' } },
+			body: { revision: '0', reason: 'Wrong photo' },
+			file: { originalname: 'photo.jpg', mimetype: 'image/jpeg', size: 42 },
+		}
+
+		await controller.editReport(req, createResponse())
+
+		assert.deepEqual(deleted, ['report-evidence/orphan.jpg'])
+	})
 })

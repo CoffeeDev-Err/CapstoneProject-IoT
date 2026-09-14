@@ -129,6 +129,20 @@ const serializeReport = (report, personnelById = new Map()) => ({
 			captured_at: report.evidencePhoto.capturedAt?.toISOString(),
 		},
 	}),
+	evidence_corrections: (report.evidenceCorrections || [])
+		.filter((correction) => correction.evidence?.path)
+		.map((correction) => ({
+			url: toMediaAccessPath(correction.evidence.path),
+			mime_type: correction.evidence.mimeType,
+			size: correction.evidence.size,
+			camera_facing: correction.evidence.cameraFacing,
+			captured_at: correction.evidence.capturedAt?.toISOString(),
+			added_at: correction.addedAt?.toISOString(),
+			added_by: correction.addedBy,
+			added_by_name: correction.addedByName,
+			reason: correction.reason,
+			revision: correction.revision,
+		})),
 	...(report.resolution?.resolvedAt && {
 		resolved_at: report.resolution.resolvedAt.toISOString(),
 		resolved_by: report.resolution.resolvedBy,

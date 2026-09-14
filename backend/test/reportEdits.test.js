@@ -9,7 +9,8 @@ function fixture(status = 'pending') {
     title: 'Original', description: 'Original description', reportType: 'incident', isIncident: true,
     caseStatus: 'open', validationStatus: status, barangayCode: 'CATABAYUNGAN', severity: 2,
     locationName: 'Catabayungan', locationSource: 'manual', incidentAt: now, submittedAt: now,
-    assignedArea: 'Original assignment', evidencePhoto: { path: 'evidence.jpg', capturedAt: now },
+	assignedArea: 'Original assignment', evidencePhoto: { path: 'evidence.jpg', capturedAt: now },
+	evidenceCorrections: [],
     routeSnapshot: [], history: [], __v: 0,
     save: async function () { this.__v += 1 },
   }
@@ -50,6 +51,26 @@ it('notifies the supervisor with the exact report after a correction', async () 
   assert.equal(f.notifications[0].referenceType, 'report')
   assert.equal(f.notifications[0].referenceId, 'RPT-ONE')
   assert.equal(f.notifications[0].data.reportId, 'RPT-ONE')
+})
+it('appends corrected evidence without replacing the original photo', async () => {
+	const f = fixture('validated')
+	await f.service.editReport('RPT-ONE', {
+		revision: 0,
+		reason: 'The first photo showed the wrong entrance',
+		evidence_correction: {
+			path: 'report-evidence/corrected.jpg',
+			originalName: 'corrected.jpg',
+			mimeType: 'image/jpeg',
+			size: 2048,
+			cameraFacing: 'back',
+			capturedAt: now,
+		},
+	}, officer)
+	assert.equal(f.document.evidencePhoto.path, 'evidence.jpg')
+	assert.equal(f.document.evidenceCorrections.length, 1)
+	assert.equal(f.document.evidenceCorrections[0].evidence.path, 'report-evidence/corrected.jpg')
+	assert.equal(f.document.evidenceCorrections[0].reason, 'The first photo showed the wrong entrance')
+	assert.equal(f.document.validationStatus, 'pending')
 })
 it('notifies the supervisor with the exact report after a pending report edit', async () => {
   const f = fixture('pending')

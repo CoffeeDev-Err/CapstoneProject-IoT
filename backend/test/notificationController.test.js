@@ -35,4 +35,21 @@ describe('notification controller', () => {
 		assert.deepEqual(calls, [{ recipientId: '12-2004', query: req.query }])
 		assert.deepEqual(res.body, page)
 	})
+
+	it('marks the authenticated officer task inbox as read', async () => {
+		const calls = []
+		const controller = createNotificationController({
+			markTaskInboxNotificationsRead: async (recipientId) => {
+				calls.push(recipientId)
+				return 3
+			},
+		})
+		const req = { auth: { user: { personnelId: '12-2004' } } }
+		const res = createResponse()
+
+		await controller.markMyTaskInboxRead(req, res)
+
+		assert.deepEqual(calls, ['12-2004'])
+		assert.deepEqual(res.body, { success: true, updated: 3 })
+	})
 })
