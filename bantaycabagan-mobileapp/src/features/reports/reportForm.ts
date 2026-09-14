@@ -3,6 +3,13 @@ import type { SubmitReportInput } from '../../types/operations';
 
 export const REPORT_TYPES = ['incident', 'patrol', 'checkpoint', 'others'] as const;
 export const REPORT_FILTERS = ['all', 'incident', 'routine'] as const;
+export const REPORT_FIELD_LIMITS = {
+  title: 150,
+  description: 5000,
+  location: 200,
+  correctionReason: 500,
+  resolutionNotes: 2000,
+} as const;
 
 export type ReportForm = SubmitReportInput & {
   occurred_at: string;

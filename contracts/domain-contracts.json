@@ -54,6 +54,10 @@
     "officialEmail": [
       { "value": "leo.b.gannad@isu.edu.ph", "valid": true },
       { "value": "officer@pnp.gov.ph", "valid": true },
+      { "value": "officer@ggmail.com", "valid": false },
+      { "value": ".officer@gmail.com", "valid": false },
+      { "value": "officer..name@gmail.com", "valid": false },
+      { "value": "officer.@gmail.com", "valid": false },
       { "value": "leo.b.gannad@isu.edu.p", "valid": false },
       { "value": "officer@pnp", "valid": false },
       { "value": "officerpnp.gov.ph", "valid": false }

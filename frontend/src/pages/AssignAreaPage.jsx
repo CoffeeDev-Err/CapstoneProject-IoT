@@ -21,6 +21,7 @@ import DeploymentDialogs from '../features/deployments/DeploymentDialogs'
 const {
   DEPLOYMENT_LIST_VIEWS,
   DEPLOYMENT_MODES,
+  DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH,
   createDeploymentId,
   getDeploymentMode,
   patrolAreas,
@@ -381,6 +382,11 @@ function AssignAreaPage({ view = 'form' }) {
 
     if (new Date(shiftEnd).getTime() - new Date(shiftStart).getTime() > 24 * 60 * 60 * 1000) {
       showFeedback('A deployment shift must not exceed 24 hours.', { type: 'error' })
+      return
+    }
+
+    if (assignmentForm.notes.trim().length > DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH) {
+      showFeedback(`Deployment instructions must not exceed ${DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH} characters.`, { type: 'error' })
       return
     }
 
@@ -792,6 +798,7 @@ function AssignAreaPage({ view = 'form' }) {
                 value={assignmentForm.notes}
                 onChange={handleFormChange('notes')}
                 placeholder="Deployment instructions, route reminders, or priority checkpoints"
+                maxLength={DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH}
                 rows={2}
               />
             </label>

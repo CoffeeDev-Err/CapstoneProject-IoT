@@ -23,6 +23,7 @@ import type { editPoliceReport } from '../../services/operationsApi';
 import {
   createEmptyReportForm,
   getBarangayFromArea,
+  REPORT_FIELD_LIMITS,
   type ReportForm,
 } from './reportForm';
 
@@ -517,12 +518,28 @@ export function useReportFormController({
       Alert.alert('Complete the report', 'Title, description, location, and barangay are required.');
       return;
     }
+    const overlongReportField = [
+      ['Title', form.title.trim(), REPORT_FIELD_LIMITS.title],
+      ['Description', form.description.trim(), REPORT_FIELD_LIMITS.description],
+      ['Exact incident place', form.location.trim(), REPORT_FIELD_LIMITS.location],
+    ].find(([, value, limit]) => String(value).length > Number(limit));
+    if (overlongReportField) {
+      Alert.alert(
+        'Shorten the report entry',
+        `${overlongReportField[0]} must not exceed ${overlongReportField[2]} characters.`,
+      );
+      return;
+    }
     if (!Number.isFinite(new Date(form.occurred_at).getTime()) || new Date(form.occurred_at).getTime() > Date.now() + 300000) {
       Alert.alert('Check the date and time', 'Enter a valid incident/activity date and time that is not in the future.');
       return;
     }
     if (editTarget && !editReason.trim()) {
       Alert.alert('Correction reason required', 'Explain what needs to be corrected.');
+      return;
+    }
+    if (editTarget && editReason.trim().length > REPORT_FIELD_LIMITS.correctionReason) {
+      Alert.alert('Shorten the correction reason', `Correction reason must not exceed ${REPORT_FIELD_LIMITS.correctionReason} characters.`);
       return;
     }
     savingRef.current = true;
@@ -576,6 +593,10 @@ export function useReportFormController({
   const handleResolve = async (close: SheetClose) => {
     if (!resolveTarget || !resolutionNotes.trim()) {
       Alert.alert('Resolution notes required', 'Describe the action taken before resolving the incident.');
+      return;
+    }
+    if (resolutionNotes.trim().length > REPORT_FIELD_LIMITS.resolutionNotes) {
+      Alert.alert('Shorten the resolution notes', `Resolution notes must not exceed ${REPORT_FIELD_LIMITS.resolutionNotes} characters.`);
       return;
     }
     setIsSaving(true);

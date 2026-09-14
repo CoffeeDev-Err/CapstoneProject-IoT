@@ -67,11 +67,18 @@ const getAccountEmail = async (user) => {
 	if (!email && user.role === 'supervisor') {
 		email = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase()
 	}
-	if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+	if (!email) {
 		throw createAuthError(
 			'No official email is configured for this account. Contact the supervisor.',
 			409,
 			'EMAIL_NOT_CONFIGURED',
+		)
+	}
+	if (validateOfficialEmail(email)) {
+		throw createAuthError(
+			'The official email configured for this account is invalid. Ask the supervisor to correct it.',
+			409,
+			'INVALID_ACCOUNT_EMAIL',
 		)
 	}
 	if (!user.email) {

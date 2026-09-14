@@ -2,6 +2,7 @@ import { CABAGAN_BARANGAYS } from '../../constants/cabaganBarangays'
 
 export const DEPLOYMENT_MODES = Object.freeze({ START_NOW: 'start_now', SCHEDULE_LATER: 'schedule_later' })
 export const DEPLOYMENT_LIST_VIEWS = Object.freeze({ ACTIVE_NOW: 'active_now', SCHEDULED_LATER: 'scheduled_later' })
+export const DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH = 1000
 
 export const patrolAreas = [
   ...CABAGAN_BARANGAYS.map((barangay) => `Barangay ${barangay}`),

@@ -40,6 +40,7 @@ const EMAIL_DOMAIN_CORRECTIONS = new Map([
 	['gmail.cm', 'gmail.com'],
 	['gmail.con', 'gmail.com'],
 	['gmail.comm', 'gmail.com'],
+	['ggmail.com', 'gmail.com'],
 	['gmial.com', 'gmail.com'],
 	['gamil.com', 'gmail.com'],
 	['yaho.com', 'yahoo.com'],
@@ -114,6 +115,9 @@ const validateOfficialEmail = (value) => {
 			return `Check the email domain. Did you mean ${localPart}@${correctedDomain}?`
 		}
 		if (localPart.length > 64) return 'The email username must not exceed 64 characters.'
+		if (localPart.startsWith('.') || localPart.endsWith('.') || localPart.includes('..')) {
+			return 'The email username cannot start or end with a period or contain consecutive periods.'
+		}
 		const topLevelDomain = domain.split('.').at(-1)
 		if (!/^[a-z]{2,63}$/i.test(topLevelDomain || '')) {
 			return 'Enter a complete email address with a valid domain, such as name@isu.edu.ph.'

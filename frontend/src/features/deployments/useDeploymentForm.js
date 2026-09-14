@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   DEPLOYMENT_MODES,
+  DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH,
   addHoursToLocalValue,
   addMinutesToLocalValue,
   createEmptyAssignmentForm,
@@ -79,6 +80,7 @@ export function useDeploymentForm({
     && formShiftEnd.getTime() - formShiftStart.getTime() <= 24 * 60 * 60 * 1000
   const hasSelectedPersonnel = selectedPersonnelMembers.length > 0
   const hasPatrolArea = Boolean(assignmentForm.patrolArea.trim())
+  const hasValidNotes = assignmentForm.notes.trim().length <= DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH
   const hasValidPersonnelSelection = hasSelectedPersonnel
     && (!editingAssignmentId || selectedPersonnelMembers.length === 1)
   const isScheduledDeployment = assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
@@ -89,6 +91,7 @@ export function useDeploymentForm({
       && hasValidShiftStart
       && hasValidShiftEnd
       && isWithinMaximumDuration
+      && hasValidNotes
       && !isInitialDataLoading,
     maximumShiftEnd: assignmentForm.shiftStart
       ? addHoursToLocalValue(assignmentForm.shiftStart, 24)
@@ -129,6 +132,7 @@ export function useDeploymentForm({
     editingAssignmentId && hasSelectedPersonnel && selectedPersonnelMembers.length !== 1
       ? 'Select exactly one personnel member when editing an individual deployment.' : '',
     !hasPatrolArea ? 'Select a patrol area.' : '',
+    !hasValidNotes ? `Limit deployment instructions to ${DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH} characters.` : '',
     !assignmentForm.shiftStart ? 'Choose a shift start date and time.'
       : !hasValidShiftStart
         ? isScheduledDeployment ? 'Choose a future start date and time.' : 'Choose a start time that is not in the past.'

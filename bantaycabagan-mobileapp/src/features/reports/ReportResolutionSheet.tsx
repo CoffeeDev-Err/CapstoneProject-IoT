@@ -4,6 +4,7 @@ import { SwipeDismissSheet } from '../../components/SwipeDismissSheet';
 import { mobileTheme } from '../../constants/mobileTheme';
 import { useMobileTheme } from '../../context/ThemeContext';
 import type { PoliceReport } from '../../types/operations';
+import { REPORT_FIELD_LIMITS } from './reportForm';
 
 type SheetClose = (afterClose?: () => void) => void;
 
@@ -33,6 +34,7 @@ export function ReportResolutionSheet({
           <TextInput style={[styles.input, { color: colors.text, borderColor: colors.border,
             backgroundColor: isDark ? colors.surfaceMuted : mobileTheme.surface }]}
             value={notes} onChangeText={onChangeNotes}
+            maxLength={REPORT_FIELD_LIMITS.resolutionNotes}
             placeholder="Describe the action taken and outcome" placeholderTextColor={colors.textMuted}
             multiline textAlignVertical="top" />
           <View style={styles.actions}>

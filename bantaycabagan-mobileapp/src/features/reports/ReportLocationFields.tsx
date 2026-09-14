@@ -3,7 +3,7 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileTheme } from '../../constants/mobileTheme';
 import { useMobileTheme } from '../../context/ThemeContext';
-import type { ReportForm } from './reportForm';
+import { REPORT_FIELD_LIMITS, type ReportForm } from './reportForm';
 
 type ReportLocationFieldsProps = {
   form: ReportForm;
@@ -39,6 +39,7 @@ export function ReportLocationFields({
       <Text style={[styles.label, { color: colors.textMuted }]}>EXACT INCIDENT PLACE / LANDMARK</Text>
       <TextInput style={[styles.input, inputSurface, { color: colors.text }]}
         value={form.location} onChangeText={onEditLocation}
+        maxLength={REPORT_FIELD_LIMITS.location}
         placeholder="Example: Anao Public Market entrance" placeholderTextColor={colors.textMuted} />
       <View style={styles.assistRow}>
         <View style={styles.source}>

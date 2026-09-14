@@ -41,6 +41,7 @@ import { discardTemporaryEvidence } from '../services/offlineReportQueue';
 import type { OperationalTask, PoliceReport } from '../types/operations';
 import {
   REPORT_FILTERS,
+  REPORT_FIELD_LIMITS,
   REPORT_TYPES,
 } from '../features/reports/reportForm';
 import { ReportCard } from '../features/reports/ReportCard';
@@ -413,7 +414,7 @@ export default function ReportsScreen() {
             </View>
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>TITLE</Text>
-            <TextInput style={[styles.input, isDark && themeStyles.input]} value={form.title} onChangeText={(value) => updateForm('title', value)} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[styles.input, isDark && themeStyles.input]} value={form.title} onChangeText={(value) => updateForm('title', value)} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>INCIDENT / ACTIVITY DATE AND TIME</Text>
             <ReportDateTimeField value={form.occurred_at} onChange={(value) => updateForm('occurred_at', value)} />
@@ -439,6 +440,7 @@ export default function ReportsScreen() {
               style={[styles.input, styles.textArea, isDark && themeStyles.input]}
               value={form.description}
               onChangeText={(value) => updateForm('description', value)}
+              maxLength={REPORT_FIELD_LIMITS.description}
               placeholder="What happened and what action was taken?"
               placeholderTextColor={colors.textMuted}
               multiline
@@ -481,7 +483,7 @@ export default function ReportsScreen() {
 
             {editTarget ? <>
               <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REASON FOR CORRECTION</Text>
-              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.input]} value={editReason} onChangeText={setEditReason} maxLength={500} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
+              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.input]} value={editReason} onChangeText={setEditReason} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
             </> : null}
             <View style={styles.formActions}>
               <TouchableOpacity

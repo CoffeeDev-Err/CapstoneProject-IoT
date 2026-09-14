@@ -31,6 +31,15 @@ describe('verification feedback and server deadlines', () => {
     assert.ok(response.serverTime)
   })
 
+  it('does not send verification codes to a stored email with a known mistyped domain', async (t) => {
+    t.mock.method(User, 'findOne', async () => ({ _id: 'user', email: 'officer@ggmail.com' }))
+    await assert.rejects(
+      auth.requestPasswordReset({ identifier: '01-2002' }),
+      { code: 'INVALID_ACCOUNT_EMAIL' },
+    )
+    assert.equal(EmailVerification.create.mock.callCount(), 0)
+  })
+
   it('returns the remaining account window after the third code', async (t) => {
     t.mock.method(otpRequestLimit, 'reserve', async () => ({ id: 'third', resendAvailableAt: new Date(oldest.getTime() + 900_000).toISOString() }))
     const response = await auth.requestPasswordReset({ identifier: '01-2002' })
