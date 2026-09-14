@@ -12,6 +12,8 @@ export function requestErrorMessage(error: unknown, { action = 'complete this re
   if (detail.code === 'OTP_ATTEMPTS_EXCEEDED') return 'Too many incorrect attempts. Request a new code to continue.'
   if (detail.code === 'ACTIVE_BACKUP_REQUEST_EXISTS') return message
     || 'You already have an active backup request. Open Tasks to view or cancel it.'
+  if (detail.code === 'REPORT_ALREADY_RESOLVED') return message
+    || 'This incident has already been resolved. Open the report to view the recorded resolution.'
   if (detail.status === 429) return 'Too many requests. Wait a moment before trying again.'
   const connection = ['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'INVALID_RESPONSE'].includes(detail.code || '')
     || detail.status === 0 || detail.status === 408 || detail.name === 'TypeError'

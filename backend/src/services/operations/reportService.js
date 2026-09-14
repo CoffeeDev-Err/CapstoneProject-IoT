@@ -34,6 +34,14 @@ const { editValues, assertRevision, saveReport } = require('./reportEdits')
 
 const REPORT_GPS_MAX_DISTANCE_METERS = 100
 const CLIENT_SUBMISSION_ID_PATTERN = /^mobile-[a-z0-9-]{10,100}$/i
+const alreadyResolvedResult = () => ({
+	status: 409,
+	body: {
+		success: false,
+		code: 'REPORT_ALREADY_RESOLVED',
+		message: 'This incident has already been resolved. Open the report to view the recorded resolution.',
+	},
+})
 
 const createReportService = ({
 	io,
@@ -566,8 +574,8 @@ const createReportService = ({
 				body: { success: false, message: 'Only the officer who submitted this incident can resolve it.' },
 			}
 		}
-		report.caseStatus = 'resolved'
-		report.resolution = {
+		if (report.caseStatus === 'resolved') return alreadyResolvedResult()
+		const resolution = {
 			resolvedAt: clock(),
 			resolvedBy: payload.resolved_by || report.submittedBy,
 			notes: validateText(payload.resolution_notes, {
@@ -575,18 +583,43 @@ const createReportService = ({
 				maxLength: OPERATIONAL_LIMITS.resolutionNotes,
 			}),
 		}
-		await saveReport(report)
-		const serialized = serializeReport(report)
+		const resolvedReport = await Report.findOneAndUpdate(
+			{
+				reportNumber: reportId,
+				submittedBy: report.submittedBy,
+				isIncident: true,
+				caseStatus: 'open',
+			},
+			{
+				$set: { caseStatus: 'resolved', resolution },
+				$inc: { __v: 1 },
+			},
+			{ new: true, runValidators: true },
+		)
+		if (!resolvedReport) {
+			const latestReport = await Report.findOne({ reportNumber: reportId })
+			if (!latestReport) return { status: 404, body: { success: false, message: 'Report not found.' } }
+			if (latestReport.caseStatus === 'resolved') return alreadyResolvedResult()
+			return {
+				status: 409,
+				body: {
+					success: false,
+					code: 'REPORT_STATE_CHANGED',
+					message: 'This incident changed while it was being resolved. Reopen the report and review its latest status.',
+				},
+			}
+		}
+		const serialized = serializeReport(resolvedReport)
 		await deliverNotification({
 			io,
 			recipientId: 'supervisor',
 			type: 'success', title: 'Case Resolved',
-			message: `${report.reportNumber} was marked resolved from the mobile app.`,
-			referenceType: 'report', referenceId: report.reportNumber,
-			data: { destination: 'Reports', reportId: report.reportNumber },
-			dedupeKey: `report:${report.reportNumber}:resolved:${serialized.revision}`,
+			message: `${resolvedReport.reportNumber} was marked resolved from the mobile app.`,
+			referenceType: 'report', referenceId: resolvedReport.reportNumber,
+			data: { destination: 'Reports', reportId: resolvedReport.reportNumber },
+			dedupeKey: `report:${resolvedReport.reportNumber}:resolved:${serialized.revision}`,
 		})
-		emitToSupervisorAndPersonnel('report:resolved', serialized, report.submittedBy)
+		emitToSupervisorAndPersonnel('report:resolved', serialized, resolvedReport.submittedBy)
 		io.emit('dashboard:updated')
 		return { status: 200, body: { success: true, report: serialized } }
 	}

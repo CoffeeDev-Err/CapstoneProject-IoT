@@ -95,6 +95,10 @@ endpoint accepts `multipart/form-data` with `evidence_photo`,
 never overwritten; corrected photos are appended to `evidence_corrections`
 with the correction reason, officer, timestamp, and report revision.
 
+Incident resolution is an atomic one-time transition from `open` to `resolved`.
+A repeated or concurrent request returns `409 REPORT_ALREADY_RESOLVED` and does
+not replace the recorded resolution or create another notification.
+
 ## Deployments and Barangays
 
 - `GET /deployments`

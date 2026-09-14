@@ -14,6 +14,7 @@ describe('actionable request feedback', () => {
     expect(requestErrorMessage({ status: 409, message: 'The response team is already full.' })).toMatch(/already full.*Refresh/)
     expect(requestErrorMessage({ status: 400, field: 'title', message: 'Report title is required.' })).toBe('Report title is required.')
     expect(requestErrorMessage({ status: 409, code: 'ACTIVE_BACKUP_REQUEST_EXISTS', message: 'You already have an active backup request. Open Tasks to view or cancel it.' })).toBe('You already have an active backup request. Open Tasks to view or cancel it.')
+    expect(requestErrorMessage({ status: 409, code: 'REPORT_ALREADY_RESOLVED', message: 'This incident has already been resolved. Open the report to view the recorded resolution.' }, { action: 'resolve the incident', write: true })).toBe('This incident has already been resolved. Open the report to view the recorded resolution.')
   })
   it('gives recovery steps for session, upload, and rate errors', () => {
     expect(requestErrorMessage({ status: 401 })).toMatch(/Sign in again/)
