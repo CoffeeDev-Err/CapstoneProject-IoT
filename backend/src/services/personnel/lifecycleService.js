@@ -8,6 +8,18 @@ const createPersonnelLifecycleService = ({
 }) => {
 	const { CurrentLocation, Deployment, GpsDeviceAssignment, Personnel } = models
 	const { deliverNotification } = notificationService
+	const maxGeofenceAccuracyMeters = Math.max(
+		10,
+		Number(process.env.GEOFENCE_MAX_ACCURACY_METERS) || 100,
+	)
+	const geofenceConfirmationReadings = Math.max(
+		2,
+		Math.floor(Number(process.env.GEOFENCE_CONFIRMATION_READINGS) || 2),
+	)
+	const geofenceAlertCooldownMs = Math.max(
+		1,
+		Number(process.env.GEOFENCE_ALERT_COOLDOWN_MINUTES) || 2,
+	) * 60_000
 
 const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 	const inactivityMinutes = Math.max(2, Number(process.env.INACTIVITY_ALERT_MINUTES) || 5)
@@ -116,21 +128,97 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 	for (const location of locations) {
 		const assignment = assignmentByPersonnel.get(location.personnelId)
 		if (!assignment || location.deviceAssignmentId !== assignment.assignmentId) continue
+		if (location.source !== 'gps' || location.isSimulated) continue
 		if (getLocationFreshness({
 			recordedAt: location.recordedAt || location.updatedAt,
 			source: location.source,
 			now,
 		}).isLocationStale) continue
+		if (
+			Number.isFinite(location.accuracy)
+			&& location.accuracy > maxGeofenceAccuracyMeters
+		) {
+			if (location.geofenceCandidateStatus || location.geofenceCandidateCount) {
+				await CurrentLocation.updateOne(
+					{ _id: location._id, recordedAt: location.recordedAt },
+					{
+						$unset: {
+							geofenceCandidateStatus: '',
+							geofenceCandidateRecordedAt: '',
+						},
+						$set: { geofenceCandidateCount: 0 },
+					},
+				)
+			}
+			continue
+		}
 
 		const [longitude, latitude] = location.location?.coordinates || []
 		if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue
 		const nextStatus = isInsideCabagan(latitude, longitude) ? 'inside' : 'outside'
 		const previousStatus = location.geofenceStatus
-		if (previousStatus === nextStatus) continue
+		if (!previousStatus && nextStatus === 'inside') {
+			await CurrentLocation.updateOne(
+				{ _id: location._id, recordedAt: location.recordedAt },
+				{
+					$set: {
+						geofenceStatus: 'inside',
+						geofenceBoundaryId: 'cabagan-municipal',
+						geofenceCandidateCount: 0,
+					},
+					$unset: {
+						geofenceCandidateStatus: '',
+						geofenceCandidateRecordedAt: '',
+					},
+				},
+			)
+			continue
+		}
+		if (previousStatus === nextStatus) {
+			if (location.geofenceCandidateStatus || location.geofenceCandidateCount) {
+				await CurrentLocation.updateOne(
+					{ _id: location._id, recordedAt: location.recordedAt },
+					{
+						$unset: {
+							geofenceCandidateStatus: '',
+							geofenceCandidateRecordedAt: '',
+						},
+						$set: { geofenceCandidateCount: 0 },
+					},
+				)
+			}
+			continue
+		}
 
+		const readingAt = location.recordedAt || location.updatedAt
+		const candidateReadingAt = location.geofenceCandidateRecordedAt
+		if (
+			candidateReadingAt
+			&& readingAt
+			&& candidateReadingAt.getTime() === readingAt.getTime()
+		) continue
+		const candidateCount = location.geofenceCandidateStatus === nextStatus
+			? Number(location.geofenceCandidateCount || 0) + 1
+			: 1
+		if (candidateCount < geofenceConfirmationReadings) {
+			await CurrentLocation.updateOne(
+				{ _id: location._id, recordedAt: location.recordedAt },
+				{
+					$set: {
+						geofenceCandidateStatus: nextStatus,
+						geofenceCandidateCount: candidateCount,
+						geofenceCandidateRecordedAt: readingAt,
+					},
+				},
+			)
+			continue
+		}
+
+		const previousTransitionAt = location.geofenceTransitionAt?.getTime?.() || 0
 		const result = await CurrentLocation.updateOne(
 			{
 				_id: location._id,
+				recordedAt: location.recordedAt,
 				...(previousStatus
 					? { geofenceStatus: previousStatus }
 					: { $or: [{ geofenceStatus: { $exists: false } }, { geofenceStatus: null }] }),
@@ -140,6 +228,11 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 					geofenceStatus: nextStatus,
 					geofenceBoundaryId: 'cabagan-municipal',
 					geofenceTransitionAt: now,
+					geofenceCandidateCount: 0,
+				},
+				$unset: {
+					geofenceCandidateStatus: '',
+					geofenceCandidateRecordedAt: '',
 				},
 			},
 		)
@@ -147,26 +240,33 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 
 		if (previousStatus !== 'outside' && nextStatus === 'inside') continue
 		const isOutside = nextStatus === 'outside'
-		const notification = await deliverNotification({
-			io,
-			recipientId: location.personnelId,
-			type: isOutside ? 'geofence' : 'success',
-			title: isOutside ? 'Boundary Warning' : 'Back Inside Boundary',
-			message: isOutside
-				? 'Your assigned GPS device has moved outside the allowed Cabagan boundary.'
-				: 'Your assigned GPS device is back inside the allowed Cabagan boundary.',
-			referenceType: 'geofence',
-			referenceId: assignment.assignmentId,
-			priority: isOutside ? 'critical' : 'low',
-			data: { destination: 'Map', latitude, longitude, boundaryId: 'cabagan-municipal' },
-			dedupeKey: `geofence:${assignment.assignmentId}:${nextStatus}:${now.toISOString()}`,
-		})
+		const alertSuppressed = Boolean(
+			previousTransitionAt
+			&& now.getTime() - previousTransitionAt < geofenceAlertCooldownMs,
+		)
+		const notification = alertSuppressed
+			? null
+			: await deliverNotification({
+				io,
+				recipientId: location.personnelId,
+				type: isOutside ? 'geofence' : 'success',
+				title: isOutside ? 'Boundary Warning' : 'Back Inside Boundary',
+				message: isOutside
+					? 'Your assigned GPS device has moved outside the allowed Cabagan boundary.'
+					: 'Your assigned GPS device is back inside the allowed Cabagan boundary.',
+				referenceType: 'geofence',
+				referenceId: assignment.assignmentId,
+				priority: isOutside ? 'critical' : 'low',
+				data: { destination: 'Map', latitude, longitude, boundaryId: 'cabagan-municipal' },
+				dedupeKey: `geofence:${assignment.assignmentId}:${nextStatus}:${now.toISOString()}`,
+			})
 		const transition = {
-			...notification,
+			...(notification || {}),
 			personnelId: location.personnelId,
 			status: nextStatus,
 			latitude,
 			longitude,
+			alertSuppressed,
 		}
 		transitions.push(transition)
 		io?.emit('geofence:transition', transition)

@@ -1,6 +1,7 @@
 const { randomUUID } = require('crypto')
 const {
 	AuditLog,
+	AuthSession,
 	Deployment,
 	GpsDeviceAssignment,
 	Personnel,
@@ -291,6 +292,22 @@ const createAccountService = ({ io, personnelService }) => {
 			requireDevice: !isSupervisor && !user.isMockAccount,
 			existingLoginId: user.username,
 		})
+		const nextLoginId = normalizeLoginId(payload.loginId)
+		const nextEmail = normalizeEmail(payload.officialEmail)
+		const nextStatus = isSupervisor ? 'active' : normalizeStatus(payload.accountStatus)
+		const shouldRevokeSessions = (
+			user.username !== nextLoginId
+			|| user.email !== nextEmail
+			|| user.status !== nextStatus
+			|| Boolean(payload.temporaryPassword)
+		)
+		const revokeActiveSessions = async () => {
+			if (!shouldRevokeSessions) return
+			await AuthSession.updateMany(
+				{ userId: user._id, revokedAt: null },
+				{ $set: { revokedAt: new Date() } },
+			)
+		}
 
 		if (isSupervisor) {
 			if (String(payload.accountStatus || '').toLowerCase() === 'inactive') {
@@ -298,8 +315,7 @@ const createAccountService = ({ io, personnelService }) => {
 			}
 			user.fullName = normalizeHumanName(payload.fullName)
 			user.rank = String(payload.rank).trim()
-			user.username = normalizeLoginId(payload.loginId)
-			const nextEmail = normalizeEmail(payload.officialEmail)
+			user.username = nextLoginId
 			if (user.email !== nextEmail) {
 				user.email = nextEmail
 				user.emailVerifiedAt = null
@@ -312,6 +328,7 @@ const createAccountService = ({ io, personnelService }) => {
 			}
 
 			await user.save()
+			await revokeActiveSessions()
 			await AuditLog.create({
 				action: 'account.updated',
 				entityType: 'user',
@@ -374,13 +391,12 @@ const createAccountService = ({ io, personnelService }) => {
 		if (payload.photoUrl) profile.photoUrl = payload.photoUrl
 		profile.status = normalizeStatus(payload.accountStatus)
 
-		user.username = normalizeLoginId(payload.loginId)
-		const nextEmail = normalizeEmail(payload.officialEmail)
+		user.username = nextLoginId
 		if (user.email !== nextEmail) {
 			user.email = nextEmail
 			user.emailVerifiedAt = null
 		}
-		user.status = normalizeStatus(payload.accountStatus)
+		user.status = nextStatus
 		if (payload.photoUrl) user.photoUrl = payload.photoUrl
 		if (payload.temporaryPassword) {
 			user.passwordHash = await hashPassword(payload.temporaryPassword)
@@ -408,6 +424,7 @@ const createAccountService = ({ io, personnelService }) => {
 				{ $set: { officerName: profile.fullName } },
 			),
 		])
+		await revokeActiveSessions()
 		await AuditLog.create({
 			action: 'account.updated',
 			entityType: 'user',

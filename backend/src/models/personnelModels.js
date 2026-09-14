@@ -66,6 +66,9 @@ const currentLocationSchema = new mongoose.Schema({
 	geofenceStatus: { type: String, enum: ['inside', 'outside'] },
 	geofenceBoundaryId: String,
 	geofenceTransitionAt: Date,
+	geofenceCandidateStatus: { type: String, enum: ['inside', 'outside'] },
+	geofenceCandidateCount: { type: Number, min: 0, default: 0 },
+	geofenceCandidateRecordedAt: Date,
 }, {
 	collection: 'current_locations',
 	timestamps: true,
