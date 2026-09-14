@@ -1,4 +1,4 @@
-const createPersonnelController = ({ io, personnelService }) => ({
+const createPersonnelController = ({ io, operationalService, personnelService }) => ({
 	getPersonnel: async (req, res) => {
 		res.json(await personnelService.listPersonnel(req.query, req.auth.user))
 	},
@@ -55,6 +55,7 @@ const createPersonnelController = ({ io, personnelService }) => ({
 			source: 'gps',
 		})
 		if (result.accepted) {
+			await operationalService?.reconcileTaskArrivals?.({ personnelIds: [result.personnel.id] })
 			personnelService.emitPersonnelCollection(
 				io,
 				'personnel:update',

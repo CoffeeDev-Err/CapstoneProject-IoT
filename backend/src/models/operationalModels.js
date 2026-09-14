@@ -63,6 +63,9 @@ const reportBackupResponderSchema = new mongoose.Schema({
 	rank: { type: String, default: '', maxlength: 80 },
 	badgeNumber: { type: String, default: '', maxlength: 30 },
 	acceptedAt: { type: Date, required: true },
+	arrivedAt: Date,
+	arrivalDistanceMeters: { type: Number, min: 0 },
+	arrivalLocation: pointSchema,
 }, { _id: false })
 
 const reportBackupResponseSchema = new mongoose.Schema({
@@ -139,6 +142,9 @@ reportSchema.index(
 const responderSchema = new mongoose.Schema({
 	personnelId: { type: String, required: true },
 	acceptedAt: { type: Date, default: Date.now },
+	arrivedAt: Date,
+	arrivalDistanceMeters: { type: Number, min: 0 },
+	arrivalLocation: pointSchema,
 }, { _id: false })
 
 const taskSchema = new mongoose.Schema({

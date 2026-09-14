@@ -229,6 +229,8 @@ function ReportDetailDrawer({
                         {[responder.rank, responder.name].filter(Boolean).join(' ')}
                         {responder.badge_number ? ` · Badge ${responder.badge_number}` : ''}
                         {responder.accepted_at ? ` · Accepted ${formatDateTime(responder.accepted_at)}` : ''}
+                        {responder.arrived_at ? ` · Arrived ${formatDateTime(responder.arrived_at)}` : ' · Responding only'}
+                        {Number.isFinite(responder.arrival_distance_meters) ? ` · ${responder.arrival_distance_meters} m from request point` : ''}
                       </dd>
                     </div>
                   ))

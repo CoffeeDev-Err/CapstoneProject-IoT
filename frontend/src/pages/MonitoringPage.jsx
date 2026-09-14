@@ -266,7 +266,9 @@ function MonitoringPage() {
       <ConfirmModal
         open={completionConfirmOpen}
         title="Complete backup request?"
-        message="Mark this request completed after the response has been handled. Officers will see the updated status."
+        message={currentSelectedTask?.type === 'backup'
+          ? 'GeoSentri detected at least one responder at the request point. Confirm that the emergency assistance has ended; officers will see the updated status.'
+          : 'Confirm that this task has been completed. Officers will see the updated status.'}
         confirmLabel={taskActionBusy ? 'Completing...' : 'Mark completed'}
         cancelLabel="Keep open"
         variant="primary"

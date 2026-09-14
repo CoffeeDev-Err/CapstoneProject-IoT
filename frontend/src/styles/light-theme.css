@@ -419,6 +419,27 @@
   background: #eff6ff;
 }
 
+:root:not([data-theme="dark"]) .profile-map-card__responders {
+  border-color: #d8e1ee;
+  background: #ffffff;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__responders li {
+  color: #1e293b;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__responders .is-responding {
+  color: #2563eb;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__responders .is-arrived {
+  color: #15803d;
+}
+
+:root:not([data-theme="dark"]) .profile-map-card__request-note {
+  color: #64748b;
+}
+
 :root:not([data-theme="dark"]) .deployment-form-card,
 :root:not([data-theme="dark"]) .deployment-list-card {
   --deployment-navy: var(--text-primary);

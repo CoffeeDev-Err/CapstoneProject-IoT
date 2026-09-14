@@ -52,6 +52,11 @@ function ProfileModal({
   const battery = Number.isFinite(selectedPersonnel.batteryLevel)
     ? `${Math.round(selectedPersonnel.batteryLevel)}%`
     : 'Unavailable'
+  const responders = selectedTask?.responders || []
+  const arrivedResponders = responders.filter((responder) => responder.arrived_at)
+  const hasVerifiedArrival = arrivedResponders.length > 0
+  const requiresVerifiedArrival = selectedTask?.type === 'backup'
+  const canCompleteTask = !requiresVerifiedArrival || hasVerifiedArrival
 
   return createPortal(
     <div className="profile-modal-layer" role="presentation" onClick={onClose}>
@@ -139,22 +144,44 @@ function ProfileModal({
               </div>
               <div>
                 <dt>Responders</dt>
-                <dd>{selectedTask.accepted_by?.length || 0} of {selectedTask.required_responders || 1}</dd>
+                <dd>{selectedTask.accepted_by?.length || 0} accepted · {arrivedResponders.length} arrived</dd>
               </div>
               <div>
                 <dt>Request ID</dt>
                 <dd>{selectedTask.id}</dd>
               </div>
             </dl>
+            {responders.length > 0 && (
+              <ul className="profile-map-card__responders" aria-label="Responder status">
+                {responders.map((responder) => (
+                  <li key={responder.personnel_id}>
+                    <span>{responder.name || responder.personnel_id}</span>
+                    <strong className={responder.arrived_at ? 'is-arrived' : 'is-responding'}>
+                      {responder.arrived_at
+                        ? `Arrived ${formatGpsDateTime(responder.arrived_at)}${Number.isFinite(responder.arrival_distance_meters) ? ` · ${responder.arrival_distance_meters} m` : ''}`
+                        : 'Responding'}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+            )}
             {['open', 'full'].includes(selectedTask.status) && onCompleteTask && (
-              <button
-                type="button"
-                className="profile-map-card__request-action"
-                onClick={onCompleteTask}
-                disabled={taskActionBusy}
-              >
-                {taskActionBusy ? 'Completing...' : 'Mark completed'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="profile-map-card__request-action"
+                  onClick={onCompleteTask}
+                  disabled={taskActionBusy || !canCompleteTask}
+                  title={canCompleteTask ? 'Complete task' : 'Waiting for GeoSentri to detect a responder at the request point'}
+                >
+                  {taskActionBusy ? 'Completing...' : canCompleteTask ? 'Mark completed' : 'Waiting for arrival'}
+                </button>
+                {requiresVerifiedArrival && !hasVerifiedArrival && (
+                  <p className="profile-map-card__request-note">
+                    Completion becomes available after GeoSentri detects a responder at the request point.
+                  </p>
+                )}
+              </>
             )}
           </section>
         )}

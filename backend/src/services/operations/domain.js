@@ -60,6 +60,9 @@ const serializeTask = (task, personnelById = new Map()) => ({
 	assigned_area: task.assignedArea || task.locationName,
 	required_responders: task.requiredResponders,
 	accepted_by: (task.responders || []).map((responder) => responder.personnelId),
+	arrived_by: (task.responders || [])
+		.filter((responder) => responder.arrivedAt)
+		.map((responder) => responder.personnelId),
 	responders: (task.responders || []).map((responder) => {
 		const profile = personnelById.get(responder.personnelId)
 		return {
@@ -68,6 +71,14 @@ const serializeTask = (task, personnelById = new Map()) => ({
 			rank: profile?.rank || '',
 			badge_number: profile?.badgeNumber || '',
 			accepted_at: responder.acceptedAt?.toISOString(),
+			arrived_at: responder.arrivedAt?.toISOString(),
+			arrival_distance_meters: Number.isFinite(responder.arrivalDistanceMeters)
+				? Math.round(responder.arrivalDistanceMeters)
+				: undefined,
+			...(responder.arrivalLocation?.coordinates && {
+				arrival_latitude: responder.arrivalLocation.coordinates[1],
+				arrival_longitude: responder.arrivalLocation.coordinates[0],
+			}),
 		}
 	}),
 	status: task.status,
@@ -135,6 +146,10 @@ const serializeReport = (report, personnelById = new Map()) => ({
 				rank: responder.rank,
 				badge_number: responder.badgeNumber,
 				accepted_at: responder.acceptedAt?.toISOString(),
+				arrived_at: responder.arrivedAt?.toISOString(),
+				arrival_distance_meters: Number.isFinite(responder.arrivalDistanceMeters)
+					? Math.round(responder.arrivalDistanceMeters)
+					: undefined,
 			})),
 		},
 	}),

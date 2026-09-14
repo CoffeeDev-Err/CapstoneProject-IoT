@@ -43,6 +43,11 @@ export function TaskCard({
     transform: [{ translateX: filterTranslateX.value }],
   }));
   const accepted = task.accepted_by.includes(currentPersonnelId);
+  const currentResponder = task.responders?.find((responder) => responder.personnel_id === currentPersonnelId);
+  const arrived = Boolean(currentResponder?.arrived_at);
+  const arrivedCount = task.responders?.filter((responder) => responder.arrived_at).length
+    ?? task.arrived_by?.length
+    ?? 0;
   const full = task.accepted_by.length >= task.required_responders || task.status === 'full';
   const ownRequest = task.type === 'backup' && task.requested_by === currentPersonnelId;
   const active = task.status === 'open' || task.status === 'full';
@@ -99,7 +104,7 @@ export function TaskCard({
               <View>
                 <Text style={[styles.responseLabel, isDark && darkStyles.muted]}>RESPONSE TEAM</Text>
                 <Text style={[styles.responseCount, isDark && darkStyles.text]}>
-                  {task.accepted_by.length}/{task.required_responders} accepted
+                  {task.accepted_by.length}/{task.required_responders} accepted · {arrivedCount} arrived
                   {!full && ` - ${remaining} slot${remaining === 1 ? '' : 's'} left`}
                 </Text>
               </View>
@@ -113,25 +118,67 @@ export function TaskCard({
               </View>
             </View>
 
-            {ownRequest && active ? (
-              <View style={styles.ownRequestActions}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.splitActionButton, styles.cancelButton, cancelling && styles.actionPending]}
-                  onPress={() => onCancel(task)}
-                  disabled={cancelling || completing}
-                >
-                  <Icon name="close" size={17} color="#ffffff" />
-                  <Text style={styles.actionButtonText}>{cancelling ? 'Cancelling...' : 'Cancel'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.splitActionButton, styles.completeButton, completing && styles.actionPending]}
-                  onPress={() => onComplete(task)}
-                  disabled={cancelling || completing}
-                >
-                  <Icon name="check-circle" size={17} color="#ffffff" />
-                  <Text style={styles.actionButtonText}>{completing ? 'Completing...' : 'Complete Response'}</Text>
-                </TouchableOpacity>
+            {task.responders?.length ? (
+              <View style={[styles.responderList, isDark && darkStyles.responderList]}>
+                {task.responders.map((responder) => (
+                  <View key={responder.personnel_id} style={styles.responderRow}>
+                    <View style={styles.responderIdentity}>
+                      <Icon
+                        name={responder.arrived_at ? 'verified' : 'directions-run'}
+                        size={15}
+                        color={responder.arrived_at ? mobileTheme.success : mobileTheme.blue}
+                      />
+                      <Text style={[styles.responderName, isDark && darkStyles.text]} numberOfLines={1}>
+                        {responder.name || responder.personnel_id}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.responderState,
+                      responder.arrived_at ? styles.responderArrived : styles.responderResponding,
+                    ]}>
+                      {responder.arrived_at
+                        ? `Arrived ${new Date(responder.arrived_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                        : 'Responding'}
+                    </Text>
+                  </View>
+                ))}
               </View>
+            ) : null}
+
+            {ownRequest && active ? (
+              <>
+                <View style={styles.ownRequestActions}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.splitActionButton, styles.cancelButton, cancelling && styles.actionPending]}
+                    onPress={() => onCancel(task)}
+                    disabled={cancelling || completing}
+                  >
+                    <Icon name="close" size={17} color="#ffffff" />
+                    <Text style={styles.actionButtonText}>{cancelling ? 'Cancelling...' : 'Cancel'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.splitActionButton,
+                      styles.completeButton,
+                      arrivedCount === 0 && styles.actionButtonDisabled,
+                      completing && styles.actionPending,
+                    ]}
+                    onPress={() => onComplete(task)}
+                    disabled={cancelling || completing || arrivedCount === 0}
+                  >
+                    <Icon name={arrivedCount ? 'check-circle' : 'hourglass-empty'} size={17} color={arrivedCount ? '#ffffff' : colors.textMuted} />
+                    <Text style={[styles.actionButtonText, arrivedCount === 0 && styles.actionButtonTextDisabled]}>
+                      {completing ? 'Completing...' : arrivedCount ? 'Complete Response' : 'Waiting for Arrival'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {arrivedCount === 0 && (
+                  <Text style={[styles.arrivalHint, isDark && darkStyles.muted]}>
+                    Completion becomes available after GeoSentri detects a responder at the request point.
+                  </Text>
+                )}
+              </>
             ) : ownRequest && completed ? (
               <TouchableOpacity
                 style={[styles.actionButton, styles.completeButton]}
@@ -140,18 +187,34 @@ export function TaskCard({
                 <Icon name={task.report_id ? 'description' : 'post-add'} size={18} color="#ffffff" />
                 <Text style={styles.actionButtonText}>{task.report_id ? 'View Incident Report' : 'Create Incident Report'}</Text>
               </TouchableOpacity>
+            ) : accepted && active ? (
+              <View
+                style={[
+                  styles.arrivalStatus,
+                  arrived ? styles.arrivedStatus : styles.arrivalWaitingStatus,
+                ]}
+              >
+                <Icon name={arrived ? 'verified' : 'my-location'} size={18} color={arrived ? '#ffffff' : mobileTheme.blue} />
+                <Text style={[styles.arrivalStatusText, !arrived && styles.arrivalWaitingText]}>
+                  {arrived ? 'Arrival Confirmed' : 'Waiting for GPS Arrival'}
+                </Text>
+                {!arrived && (
+                  <Text style={[styles.arrivalAutomaticText, isDark && darkStyles.muted]}>
+                    Updates automatically near the request point
+                  </Text>
+                )}
+              </View>
             ) : (
               <TouchableOpacity
-                style={[styles.actionButton, (!active || accepted || full) && styles.actionButtonDisabled]}
+                style={[styles.actionButton, (!active || full) && styles.actionButtonDisabled]}
                 onPress={() => onAccept(task)}
-                disabled={!active || accepted || full || accepting}
+                disabled={!active || full || accepting}
               >
-                <Icon name={accepted ? 'check' : 'person-add'} size={18} color={!active || accepted || full ? colors.textMuted : '#ffffff'} />
-                <Text style={[styles.actionButtonText, (!active || accepted || full) && styles.actionButtonTextDisabled]}>
+                <Icon name="person-add" size={18} color={!active || full ? colors.textMuted : '#ffffff'} />
+                <Text style={[styles.actionButtonText, (!active || full) && styles.actionButtonTextDisabled]}>
                   {cancelled ? 'Request Cancelled'
                     : completed ? 'Task Completed'
-                      : accepted ? 'Accepted'
-                        : full ? 'Team Full'
+                      : full ? 'Team Full'
                           : accepting ? 'Accepting...' : 'Accept Task'}
                 </Text>
               </TouchableOpacity>
@@ -182,6 +245,13 @@ const styles = StyleSheet.create({
   responseRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   responseLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
   responseCount: { marginTop: 3, color: mobileTheme.text, fontSize: 11, fontWeight: '700' },
+  responderList: { marginTop: 10, padding: 9, gap: 7, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8, backgroundColor: '#f8fafc' },
+  responderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  responderIdentity: { minWidth: 0, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  responderName: { flex: 1, color: mobileTheme.text, fontSize: 11, fontWeight: '700' },
+  responderState: { fontSize: 10, fontWeight: '800' },
+  responderResponding: { color: mobileTheme.blue },
+  responderArrived: { color: mobileTheme.success },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
   statusOpen: { backgroundColor: mobileTheme.successSoft },
   statusFull: { backgroundColor: mobileTheme.blueSoft },
@@ -192,11 +262,18 @@ const styles = StyleSheet.create({
   ownRequestActions: { marginTop: 12, flexDirection: 'row', gap: 8 },
   splitActionButton: { flex: 1, marginTop: 0, paddingHorizontal: 8 },
   completeButton: { backgroundColor: mobileTheme.blue },
+  arrivalStatus: { minHeight: 42, marginTop: 12, paddingHorizontal: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8 },
+  arrivedStatus: { borderColor: mobileTheme.success, backgroundColor: mobileTheme.success },
+  arrivalWaitingStatus: { borderColor: mobileTheme.blue, backgroundColor: mobileTheme.blueSoft },
+  arrivalStatusText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  arrivalWaitingText: { color: mobileTheme.blue },
+  arrivalAutomaticText: { flexBasis: '100%', color: mobileTheme.textMuted, fontSize: 9, textAlign: 'center' },
   actionButtonDisabled: { backgroundColor: '#e2e2ea' },
   cancelButton: { backgroundColor: mobileTheme.danger },
   actionPending: { opacity: 0.6 },
   actionButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   actionButtonTextDisabled: { color: mobileTheme.textMuted },
+  arrivalHint: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 10, lineHeight: 15, textAlign: 'center' },
 });
 
 const darkStyles = StyleSheet.create({
@@ -205,4 +282,5 @@ const darkStyles = StyleSheet.create({
   text: { color: '#f8fafc' },
   muted: { color: '#9eabc0' },
   border: { borderColor: '#22314a' },
+  responderList: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
 });

@@ -4,6 +4,10 @@ export type TaskResponder = {
   rank: string;
   badge_number: string;
   accepted_at: string;
+  arrived_at?: string;
+  arrival_distance_meters?: number;
+  arrival_latitude?: number;
+  arrival_longitude?: number;
 };
 
 export type BackupReportContext = {
@@ -30,6 +34,7 @@ export type OperationalTask = {
   assigned_area: string;
   required_responders: number;
   accepted_by: string[];
+  arrived_by?: string[];
   responders: TaskResponder[];
   status: 'open' | 'full' | 'completed' | 'cancelled';
   created_at: string;

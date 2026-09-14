@@ -67,9 +67,15 @@ history is sampled every 30 seconds and expires after 24 hours.
 - `POST /tasks`
 - `GET /tasks/:taskId`
 - `POST /tasks/:taskId/accept`
+- `PATCH /tasks/:taskId/cancel`
 - `PATCH /tasks/:taskId/complete`
 
 Filters: `status`, `type`, `personnel_id`, `search`, `page`, and `limit`.
+
+The server automatically marks an accepted backup responder as arrived when
+their current tracker reading is fresh, genuine, and within the configured
+arrival radius of the saved request point (150 meters by default). Backup
+completion requires at least one verified responder arrival.
 
 ## Reports
 

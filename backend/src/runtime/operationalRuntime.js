@@ -56,6 +56,7 @@ const createOperationalRuntime = ({
 					deviceIds: selectedDeviceIds,
 				})
 				if (result.accepted > 0) {
+					await operationalService.reconcileTaskArrivals()
 					emitPersonnelCollection(io, 'personnel:update', await getPersonnelWithLocations())
 				}
 			}
@@ -75,6 +76,7 @@ const createOperationalRuntime = ({
 		lifecycleCheckRunning = true
 		try {
 			await operationalService.reconcileDeploymentShifts()
+			await operationalService.reconcileTaskArrivals()
 			await evaluatePersonnelInactivity({ io })
 			await evaluatePersonnelGeofences({ io })
 			await operationalService.finalizeReportRouteSnapshots()

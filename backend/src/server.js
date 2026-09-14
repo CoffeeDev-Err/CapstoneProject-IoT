@@ -86,7 +86,7 @@ const authController = createAuthController(authService)
 const barangayController = createBarangayController(barangayService)
 const gpsDeviceController = createGpsDeviceController(gpsDeviceService)
 const notificationController = createNotificationController(notificationService)
-const personnelController = createPersonnelController({ io, personnelService })
+const personnelController = createPersonnelController({ io, operationalService, personnelService })
 const systemController = createSystemController(flespiService, {
 	checkDatabase: async () => {
 		if (mongoose.connection.readyState !== 1) return false

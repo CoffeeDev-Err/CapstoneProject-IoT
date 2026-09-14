@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto')
-const { isValidCoordinates, point } = require('../../utils/geo')
+const { distanceInMeters, isValidCoordinates, point } = require('../../utils/geo')
+const { getLocationFreshness } = require('../../utils/locationFreshness')
 const {
 	buildPrefixSearchConditions,
 	createPaginationMeta,
@@ -35,9 +36,13 @@ const createTaskService = ({
 	clock = () => new Date(),
 	idGenerator = randomUUID,
 }) => {
-	const { Deployment, Task } = models
+	const { CurrentLocation, Deployment, Task } = models
 	const { getPersonnelMember } = personnelService
 	const { deliverNotification } = notificationService
+	const backupArrivalRadiusMeters = Math.max(
+		25,
+		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 150,
+	)
 	const loadTaskPersonnelMap = (tasks = []) => loadPersonnelMap(
 		tasks.flatMap((task) => taskParticipantIds(task)),
 	)
@@ -147,6 +152,118 @@ const createTaskService = ({
 		return serializeTask(task, personnelById)
 	}
 
+	const reconcileTaskArrivals = async ({ personnelIds = [] } = {}) => {
+		if (!CurrentLocation) return { checked: 0, arrived: 0 }
+		const scopedPersonnelIds = [...new Set(personnelIds.map(String).filter(Boolean))]
+		const scopedPersonnelIdSet = new Set(scopedPersonnelIds)
+		const taskFilter = {
+			type: 'backup',
+			status: { $in: ['open', 'full'] },
+			responders: {
+				$elemMatch: {
+					$or: [{ arrivedAt: { $exists: false } }, { arrivedAt: null }],
+				},
+			},
+			...(scopedPersonnelIds.length > 0 && {
+				'responders.personnelId': { $in: scopedPersonnelIds },
+			}),
+		}
+		const tasks = await Task.find(taskFilter).lean()
+		const pendingResponderIds = [...new Set(tasks.flatMap((task) => (
+			(task.responders || [])
+				.filter((responder) => (
+					!responder.arrivedAt
+					&& (scopedPersonnelIdSet.size === 0 || scopedPersonnelIdSet.has(responder.personnelId))
+				))
+				.map((responder) => responder.personnelId)
+		)))]
+		if (pendingResponderIds.length === 0) return { checked: 0, arrived: 0 }
+
+		const locations = await CurrentLocation.find({
+			personnelId: { $in: pendingResponderIds },
+			source: 'gps',
+			isSimulated: { $ne: true },
+		}).lean()
+		const locationsByPersonnelId = new Map(locations.map((location) => [location.personnelId, location]))
+		let checked = 0
+		let arrived = 0
+
+		for (const task of tasks) {
+			const taskCoordinates = task.location?.coordinates || []
+			if (!isValidCoordinates(taskCoordinates[1], taskCoordinates[0])) continue
+			for (const responder of task.responders || []) {
+				if (
+					responder.arrivedAt
+					|| (scopedPersonnelIdSet.size > 0 && !scopedPersonnelIdSet.has(responder.personnelId))
+				) continue
+				const location = locationsByPersonnelId.get(responder.personnelId)
+				if (!location) continue
+				const freshness = getLocationFreshness({
+					recordedAt: location.recordedAt || location.updatedAt,
+					source: location.source,
+					now: clock(),
+				})
+				if (freshness.isLocationStale) continue
+				const responderCoordinates = location.location?.coordinates || []
+				if (!isValidCoordinates(responderCoordinates[1], responderCoordinates[0])) continue
+				checked += 1
+				const distanceMeters = distanceInMeters(taskCoordinates, responderCoordinates)
+				if (!Number.isFinite(distanceMeters) || distanceMeters > backupArrivalRadiusMeters) continue
+
+				const updatedTask = await Task.findOneAndUpdate(
+					{
+						taskId: task.taskId,
+						status: { $in: ['open', 'full'] },
+						responders: {
+							$elemMatch: {
+								personnelId: responder.personnelId,
+								$or: [{ arrivedAt: { $exists: false } }, { arrivedAt: null }],
+							},
+						},
+					},
+					{
+						$set: {
+							'responders.$.arrivedAt': clock(),
+							'responders.$.arrivalDistanceMeters': distanceMeters,
+							'responders.$.arrivalLocation': point(responderCoordinates[0], responderCoordinates[1]),
+						},
+					},
+					{ returnDocument: 'after' },
+				)
+				if (!updatedTask) continue
+				arrived += 1
+				const personnelById = await loadTaskPersonnelMap([updatedTask])
+				const serialized = serializeTask(updatedTask, personnelById)
+				const responderName = personnelById.get(responder.personnelId)?.fullName
+					|| responder.personnelId
+				const recipients = new Set([updatedTask.requestedBy, 'supervisor'])
+				await Promise.all([...recipients].map((recipientId) => deliverNotification({
+					io,
+					recipientId,
+					type: 'success',
+					title: 'Responder Arrived',
+					message: `${responderName} was automatically marked arrived within ${Math.round(backupArrivalRadiusMeters)} meters of the backup request point.`,
+					referenceType: 'task',
+					referenceId: updatedTask.taskId,
+					priority: 'high',
+					data: recipientId === 'supervisor'
+						? {
+							destination: 'Map',
+							taskId: updatedTask.taskId,
+							personnelId: responder.personnelId,
+							latitude: serialized.latitude,
+							longitude: serialized.longitude,
+						}
+						: { destination: 'Tasks', taskId: updatedTask.taskId },
+					dedupeKey: `task:${updatedTask.taskId}:arrived:${responder.personnelId}`,
+				})))
+				await emitToAuthorizedOfficers('task:updated', serialized, updatedTask)
+			}
+		}
+		if (arrived > 0) io.emit('dashboard:updated')
+		return { checked, arrived }
+	}
+
 	const completeTask = async (taskId, actor) => {
 		const task = await Task.findOne({ taskId })
 		if (!task) return createNotFoundResult('Task')
@@ -165,6 +282,16 @@ const createTaskService = ({
 		if (task.status === 'completed') {
 			const personnelById = await loadTaskPersonnelMap([task])
 			return { status: 200, body: { success: true, task: serializeTask(task, personnelById) } }
+		}
+		if (task.type === 'backup' && !task.responders.some((responder) => responder.arrivedAt)) {
+			return {
+				status: 409,
+				body: {
+					success: false,
+					code: 'BACKUP_ARRIVAL_REQUIRED',
+					message: 'Wait for GeoSentri to detect at least one responder within the backup request area. Cancel the request if assistance is no longer needed before anyone arrives.',
+				},
+			}
 		}
 		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
 		task.status = 'completed'
@@ -448,6 +575,15 @@ const createTaskService = ({
 		}
 		await emitToAuthorizedOfficers('task:updated', serialized, task)
 		io.emit('dashboard:updated')
+		const arrivalResult = await reconcileTaskArrivals({ personnelIds: [personnelId] })
+		if (arrivalResult.arrived > 0) {
+			const arrivedTask = await Task.findOne({ taskId })
+			const arrivedPersonnelById = await loadTaskPersonnelMap([arrivedTask])
+			return {
+				status: 200,
+				body: { success: true, task: serializeTask(arrivedTask, arrivedPersonnelById) },
+			}
+		}
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
@@ -459,6 +595,7 @@ const createTaskService = ({
 		getTask,
 		listTasks,
 		loadTasks,
+		reconcileTaskArrivals,
 	}
 }
 

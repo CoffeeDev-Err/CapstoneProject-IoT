@@ -37,7 +37,7 @@ const createOperationalService = ({ io }) => {
 	const getReportRoute = reportRouteService.getRoute
 	const taskService = createTaskService({
 		io,
-		models: { Deployment, Task },
+		models: { CurrentLocation, Deployment, Task },
 		loadPersonnelMap,
 		personnelService: { getPersonnelMember },
 		notificationService: { createNotification, deliverNotification },
@@ -50,6 +50,7 @@ const createOperationalService = ({ io }) => {
 		getTask,
 		listTasks,
 		loadTasks,
+		reconcileTaskArrivals,
 	} = taskService
 	const reportService = createReportService({
 		io,
@@ -117,6 +118,7 @@ const createOperationalService = ({ io }) => {
 		loadDeployments,
 		loadReports,
 		loadTasks,
+		reconcileTaskArrivals,
 		registerSocket,
 		reconcileDeploymentShifts,
 		replaceDeployments,

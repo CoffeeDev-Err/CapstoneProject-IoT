@@ -2,7 +2,12 @@ const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 const createTaskService = require('../src/services/operations/taskService')
 
-const createService = ({ deploymentExists = false, task = null } = {}) => createTaskService({
+const createService = ({
+	deploymentExists = false,
+	task = null,
+	member = null,
+	findOneAndUpdate = async () => null,
+} = {}) => createTaskService({
 	io: {
 		emit: () => {},
 		to: () => ({ emit: () => {} }),
@@ -14,11 +19,11 @@ const createService = ({ deploymentExists = false, task = null } = {}) => create
 		},
 		Task: {
 			findOne: async () => task,
-			findOneAndUpdate: async () => null,
+			findOneAndUpdate,
 		},
 	},
 	loadPersonnelMap: async () => new Map(),
-	personnelService: { getPersonnelMember: async () => null },
+	personnelService: { getPersonnelMember: async () => member },
 	notificationService: {
 		createNotification: async () => {},
 		deliverNotification: async () => {},
@@ -86,6 +91,44 @@ const createBackupFixture = ({ existingRequest = false } = {}) => {
 	return { deliveries, service, tasks }
 }
 
+const createArrivalFixture = ({ task, location }) => {
+	const now = new Date('2026-09-14T08:00:00Z')
+	const deliveries = []
+	let updates = 0
+	const service = createTaskService({
+		io: { emit: () => {}, to: () => ({ emit: () => {} }) },
+		models: {
+			CurrentLocation: {
+				find: () => ({ lean: async () => location ? [location] : [] }),
+			},
+			Deployment: { distinct: async () => [] },
+			Task: {
+				find: () => ({ lean: async () => [task] }),
+				findOneAndUpdate: async (_filter, update) => {
+					const responder = task.responders[0]
+					if (responder.arrivedAt) return null
+					responder.arrivedAt = update.$set['responders.$.arrivedAt']
+					responder.arrivalDistanceMeters = update.$set['responders.$.arrivalDistanceMeters']
+					responder.arrivalLocation = update.$set['responders.$.arrivalLocation']
+					updates += 1
+					return task
+				},
+			},
+		},
+		loadPersonnelMap: async () => new Map([[
+			'PNP-RESPONDER',
+			{ fullName: 'Responder One', rank: 'PO1', badgeNumber: '1001' },
+		]]),
+		personnelService: { getPersonnelMember: async () => null },
+		notificationService: {
+			createNotification: async () => {},
+			deliverNotification: async (notification) => deliveries.push(notification),
+		},
+		clock: () => now,
+	})
+	return { deliveries, getUpdates: () => updates, service }
+}
+
 describe('task authorization', () => {
 	it('rejects task acceptance when the officer is off duty', async () => {
 		const result = await createService().acceptTask('TSK-1', 'PNP-OFF-DUTY')
@@ -111,7 +154,11 @@ describe('task authorization', () => {
 			locationName: 'Catabayungan',
 			location: { type: 'Point', coordinates: [121.765, 17.4305] },
 			requiredResponders: 3,
-			responders: [],
+			responders: [{
+				personnelId: 'PNP-RESPONDER',
+				acceptedAt: new Date(),
+				arrivedAt: new Date(),
+			}],
 			status: 'open',
 			activeRequestKey: 'backup:PNP-REQUESTER',
 			createdAt: new Date(),
@@ -126,6 +173,92 @@ describe('task authorization', () => {
 		assert.equal(task.status, 'completed')
 		assert.equal(task.completedBy, 'PNP-REQUESTER')
 		assert.equal(task.activeRequestKey, undefined)
+	})
+
+	it('rejects completion until a responder has a verified arrival', async () => {
+		const task = {
+			taskId: 'TSK-1',
+			requestedBy: 'PNP-REQUESTER',
+			type: 'backup',
+			responders: [{ personnelId: 'PNP-RESPONDER', acceptedAt: new Date() }],
+			status: 'open',
+		}
+		const result = await createService({ task }).completeTask('TSK-1', {
+			role: 'officer',
+			personnelId: 'PNP-REQUESTER',
+		})
+
+		assert.equal(result.status, 409)
+		assert.equal(result.body.code, 'BACKUP_ARRIVAL_REQUIRED')
+		assert.match(result.body.message, /GeoSentri to detect/)
+	})
+
+	it('automatically records arrival from a fresh tracker reading near the request point', async () => {
+		const task = {
+			taskId: 'TSK-1',
+			requestedBy: 'PNP-REQUESTER',
+			requesterName: 'Requester',
+			type: 'backup',
+			title: 'Backup request',
+			description: '',
+			locationName: 'Catabayungan',
+			location: { type: 'Point', coordinates: [121.765, 17.4305] },
+			requiredResponders: 3,
+			responders: [{ personnelId: 'PNP-RESPONDER', acceptedAt: new Date() }],
+			status: 'open',
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}
+		const location = {
+			personnelId: 'PNP-RESPONDER',
+			source: 'gps',
+			isSimulated: false,
+			recordedAt: new Date('2026-09-14T07:59:55Z'),
+			location: { type: 'Point', coordinates: [121.76505, 17.43055] },
+		}
+		const fixture = createArrivalFixture({ task, location })
+
+		const result = await fixture.service.reconcileTaskArrivals({ personnelIds: ['PNP-RESPONDER'] })
+
+		assert.equal(result.arrived, 1)
+		assert.equal(fixture.getUpdates(), 1)
+		assert.ok(task.responders[0].arrivalDistanceMeters < 150)
+		assert.equal(fixture.deliveries.length, 2)
+		assert.deepEqual(new Set(fixture.deliveries.map((item) => item.recipientId)), new Set(['PNP-REQUESTER', 'supervisor']))
+		assert.equal(fixture.deliveries.find((item) => item.recipientId === 'supervisor').data.destination, 'Map')
+		assert.equal(fixture.deliveries.find((item) => item.recipientId === 'PNP-REQUESTER').data.destination, 'Tasks')
+	})
+
+	it('does not record automatic arrival from a stale or distant tracker reading', async () => {
+		const baseTask = () => ({
+			taskId: 'TSK-1', requestedBy: 'PNP-REQUESTER', type: 'backup', status: 'open',
+			location: { type: 'Point', coordinates: [121.765, 17.4305] },
+			responders: [{ personnelId: 'PNP-RESPONDER', acceptedAt: new Date() }],
+		})
+		const staleFixture = createArrivalFixture({
+			task: baseTask(),
+			location: {
+				personnelId: 'PNP-RESPONDER', source: 'gps', isSimulated: false,
+				recordedAt: new Date('2026-09-14T07:50:00Z'),
+				location: { type: 'Point', coordinates: [121.765, 17.4305] },
+			},
+		})
+		const staleResult = await staleFixture.service.reconcileTaskArrivals()
+		assert.equal(staleResult.arrived, 0)
+		assert.equal(staleFixture.getUpdates(), 0)
+
+		const farFixture = createArrivalFixture({
+			task: baseTask(),
+			location: {
+				personnelId: 'PNP-RESPONDER', source: 'gps', isSimulated: false,
+				recordedAt: new Date('2026-09-14T07:59:55Z'),
+				location: { type: 'Point', coordinates: [121.78, 17.45] },
+			},
+		})
+		const farResult = await farFixture.service.reconcileTaskArrivals()
+		assert.equal(farResult.arrived, 0)
+		assert.equal(farResult.checked, 1)
+		assert.equal(farFixture.getUpdates(), 0)
 	})
 
 	it('rejects completion by a different officer', async () => {
@@ -201,7 +334,9 @@ describe('backup request concurrency', () => {
 				locationName: 'Catabayungan',
 				location: { type: 'Point', coordinates: [121.765, 17.4305] },
 				requiredResponders: 3,
-				responders: [],
+				responders: action === 'completeTask'
+					? [{ personnelId: 'PNP-RESPONDER', acceptedAt: new Date(), arrivedAt: new Date() }]
+					: [],
 				status: 'open',
 				activeRequestKey: 'backup:PNP-REQUESTER',
 				createdAt: new Date(),

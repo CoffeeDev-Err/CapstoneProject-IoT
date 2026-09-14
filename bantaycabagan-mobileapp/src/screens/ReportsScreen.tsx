@@ -387,6 +387,8 @@ export default function ReportsScreen() {
                         <Text style={[styles.responderName, { color: colors.text }]}>{[responder.rank, responder.name].filter(Boolean).join(' ')}</Text>
                         <Text style={[styles.responderMeta, { color: colors.textMuted }]}>
                           {responder.badge_number ? `Badge ${responder.badge_number} · ` : ''}Accepted {formatReportDate(responder.accepted_at)}
+                          {responder.arrived_at ? ` · Arrived ${formatReportDate(responder.arrived_at)}` : ' · Responding only'}
+                          {typeof responder.arrival_distance_meters === 'number' ? ` · ${responder.arrival_distance_meters} m from request point` : ''}
                         </Text>
                       </View>
                     </View>
@@ -624,7 +626,7 @@ export default function ReportsScreen() {
                 label="Backup response team"
                 value={selectedReport.backup_response.responders.length
                   ? selectedReport.backup_response.responders.map((responder, index) => (
-                    `${index + 1}. ${[responder.rank, responder.name].filter(Boolean).join(' ')}${responder.badge_number ? ` · Badge ${responder.badge_number}` : ''}`
+                    `${index + 1}. ${[responder.rank, responder.name].filter(Boolean).join(' ')}${responder.badge_number ? ` · Badge ${responder.badge_number}` : ''}${responder.arrived_at ? ` · Arrived ${formatReportDate(responder.arrived_at)}` : ' · Responding only'}${typeof responder.arrival_distance_meters === 'number' ? ` · ${responder.arrival_distance_meters} m from request point` : ''}`
                   )).join('\n')
                   : 'No responder accepted before completion'}
               />

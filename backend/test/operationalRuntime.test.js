@@ -11,6 +11,7 @@ describe('operational runtime', () => {
 			isDatabaseReady: () => ready,
 			operationalService: {
 				reconcileDeploymentShifts: async () => calls.push('deployments'),
+				reconcileTaskArrivals: async () => calls.push('arrivals'),
 				finalizeReportRouteSnapshots: async () => calls.push('reports'),
 			},
 			personnelService: {
@@ -30,7 +31,7 @@ describe('operational runtime', () => {
 		assert.deepEqual(calls, [])
 		ready = true
 		await runtime.runOperationalLifecycleCheck()
-		assert.deepEqual(calls, ['deployments', 'inactivity', 'geofences', 'reports'])
+		assert.deepEqual(calls, ['deployments', 'arrivals', 'inactivity', 'geofences', 'reports'])
 		runtime.stop()
 	})
 })

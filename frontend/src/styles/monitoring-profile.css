@@ -535,5 +535,55 @@
 
 .profile-map-card__request-action:disabled {
   opacity: 0.65;
-  cursor: wait;
+  cursor: not-allowed;
+}
+
+.profile-map-card__responders {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.6rem 0 0;
+  padding: 0.55rem;
+  border: 1px solid #25344b;
+  border-radius: 8px;
+  list-style: none;
+  background: #111c31;
+}
+
+.profile-map-card__responders li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: #dce6f3;
+  font-size: var(--font-size-xs);
+}
+
+.profile-map-card__responders li > span {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-map-card__responders strong {
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+}
+
+.profile-map-card__responders .is-responding {
+  color: #93c5fd;
+}
+
+.profile-map-card__responders .is-arrived {
+  color: #86efac;
+}
+
+.profile-map-card__request-note {
+  margin: 0.4rem 0 0;
+  color: #8f9db2;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  text-align: center;
 }

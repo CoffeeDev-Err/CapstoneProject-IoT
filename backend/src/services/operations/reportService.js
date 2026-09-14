@@ -417,6 +417,9 @@ const createReportService = ({
 					rank: profile?.rank || '',
 					badgeNumber: profile?.badgeNumber || '',
 					acceptedAt: responder.acceptedAt,
+					arrivedAt: responder.arrivedAt,
+					arrivalDistanceMeters: responder.arrivalDistanceMeters,
+					arrivalLocation: responder.arrivalLocation,
 				}
 			}),
 		} : undefined
