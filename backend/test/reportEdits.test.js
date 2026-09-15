@@ -19,15 +19,17 @@ function fixture(status = 'pending') {
   document.save = async () => { saves += 1; await save.call(document) }
   const Report = { findOne: async (filter) => filter.submittedBy && filter.submittedBy !== document.submittedBy ? null : document }
   const notifications = []
+	const audits = []
   const service = createReportService({ io: { emit: () => {} }, models: { Report }, clock: () => now,
     loadPersonnelMap: async () => new Map(), personnelService: {}, reportRouteService: {},
     notificationService: {
       createNotification: async (notification) => notifications.push(notification),
       deliverNotification: async (notification) => notifications.push(notification),
     },
+	auditService: { recordAudit: async (entry) => audits.push(entry) },
     publish: { emitToSupervisorAndPersonnel: () => {} },
   })
-  return { document, service, saves: () => saves, notifications }
+  return { audits, document, service, saves: () => saves, notifications }
 }
 it('records before/after values and preserves submission metadata and evidence', async () => {
   const f = fixture()
@@ -39,6 +41,7 @@ it('records before/after values and preserves submission metadata and evidence',
   assert.equal(f.document.evidencePhoto.path, 'evidence.jpg')
   assert.deepEqual(f.document.history[0].changes[0], { field: 'description', before: 'Original description', after: 'Corrected description' })
   assert.equal(result.body.report.revision, 1)
+	assert.equal(f.audits[0].action, 'report.updated')
 })
 it('notifies the supervisor with the exact report after a correction', async () => {
   const f = fixture('validated')
@@ -51,6 +54,7 @@ it('notifies the supervisor with the exact report after a correction', async () 
   assert.equal(f.notifications[0].referenceType, 'report')
   assert.equal(f.notifications[0].referenceId, 'RPT-ONE')
   assert.equal(f.notifications[0].data.reportId, 'RPT-ONE')
+	assert.equal(f.audits[0].action, 'report.correction_submitted')
 })
 it('appends corrected evidence without replacing the original photo', async () => {
 	const f = fixture('validated')
@@ -82,6 +86,7 @@ it('notifies the supervisor with the exact report after a pending report edit', 
   assert.equal(f.notifications[0].title, 'Report updated')
   assert.equal(f.notifications[0].referenceType, 'report')
   assert.equal(f.notifications[0].data.reportId, 'RPT-ONE')
+	assert.equal(f.audits[0].action, 'report.updated')
 })
 it('notifies only the submitting officer after a COP review action', async () => {
   const f = fixture('pending')
@@ -92,6 +97,7 @@ it('notifies only the submitting officer after a COP review action', async () =>
   assert.equal(f.notifications[0].recipientId, 'officer-1')
   assert.equal(f.notifications[0].title, 'Report Review Updated')
   assert.equal(f.notifications.some((notification) => notification.recipientId === 'supervisor'), false)
+	assert.equal(f.audits[0].action, 'report.reviewed')
 })
 for (const status of ['validated', 'rejected']) it(`returns ${status} reports to pending review after correction`, async () => {
   const f = fixture(status)

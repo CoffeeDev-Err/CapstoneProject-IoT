@@ -2,7 +2,9 @@ const mongoose = require('mongoose')
 const model = require('./modelFactory')
 
 const auditLogSchema = new mongoose.Schema({
-	actorUserId: { type: String, default: 'supervisor' },
+	actorUserId: { type: String, default: 'system', maxlength: 100 },
+	actorRole: { type: String, enum: ['supervisor', 'officer', 'system'], default: 'system' },
+	actorPersonnelId: { type: String, maxlength: 100 },
 	action: { type: String, required: true },
 	entityType: { type: String, required: true },
 	entityId: { type: String, required: true },
@@ -14,6 +16,7 @@ const auditLogSchema = new mongoose.Schema({
 })
 auditLogSchema.index({ actorUserId: 1, createdAt: -1 })
 auditLogSchema.index({ entityType: 1, entityId: 1, createdAt: -1 })
+auditLogSchema.index({ action: 1, createdAt: -1 })
 
 module.exports = {
 	AuditLog: model('AuditLog', auditLogSchema),

@@ -30,7 +30,7 @@ const createTaskService = require('./operations/taskService')
 
 const loadPersonnelMap = createPersonnelLoader(Personnel)
 
-const createOperationalService = ({ io }) => {
+const createOperationalService = ({ io, auditService }) => {
 	const operationalPublisher = createOperationalPublisher(io)
 	const reportRouteService = createReportRouteService({ Report, LocationHistory })
 	const finalizeReportRouteSnapshots = reportRouteService.finalizeSnapshots
@@ -41,6 +41,7 @@ const createOperationalService = ({ io }) => {
 		loadPersonnelMap,
 		personnelService: { getPersonnelMember },
 		notificationService: { createNotification, deliverNotification },
+		auditService,
 	})
 	const {
 		acceptTask,
@@ -58,6 +59,7 @@ const createOperationalService = ({ io }) => {
 		loadPersonnelMap,
 		personnelService: { getPersonnelMember },
 		notificationService: { createNotification, deliverNotification },
+		auditService,
 		reportRouteService,
 		publish: operationalPublisher,
 	})
@@ -77,6 +79,7 @@ const createOperationalService = ({ io }) => {
 		loadPersonnelMap,
 		personnelService: { emitPersonnelCollection, getPersonnelWithLocations },
 		notificationService: { createNotification, deliverNotification },
+		auditService,
 		publish: operationalPublisher,
 	})
 	const {

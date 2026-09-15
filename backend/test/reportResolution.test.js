@@ -42,6 +42,7 @@ const createFixture = () => {
 	}
 	const notifications = []
 	const realtimeEvents = []
+	const audits = []
 	let dashboardUpdates = 0
 	const service = createReportService({
 		io: { emit: (event) => { if (event === 'dashboard:updated') dashboardUpdates += 1 } },
@@ -51,6 +52,7 @@ const createFixture = () => {
 		notificationService: {
 			deliverNotification: async (notification) => notifications.push(notification),
 		},
+		auditService: { recordAudit: async (entry) => audits.push(entry) },
 		reportRouteService: {},
 		publish: {
 			emitToSupervisorAndPersonnel: (event, report) => realtimeEvents.push({ event, report }),
@@ -58,6 +60,7 @@ const createFixture = () => {
 		clock: () => resolvedAt,
 	})
 	return {
+		audits,
 		dashboardUpdates: () => dashboardUpdates,
 		notifications,
 		realtimeEvents,
@@ -84,6 +87,8 @@ it('atomically resolves an incident once when two requests arrive together', asy
 	assert.equal(fixture.notifications.length, 1)
 	assert.equal(fixture.realtimeEvents.length, 1)
 	assert.equal(fixture.dashboardUpdates(), 1)
+	assert.equal(fixture.audits.length, 1)
+	assert.equal(fixture.audits[0].action, 'report.resolved')
 })
 
 it('keeps the original resolution and side effects unchanged on later attempts', async () => {
@@ -105,4 +110,5 @@ it('keeps the original resolution and side effects unchanged on later attempts',
 	assert.equal(fixture.notifications.length, 1)
 	assert.equal(fixture.realtimeEvents.length, 1)
 	assert.equal(fixture.dashboardUpdates(), 1)
+	assert.equal(fixture.audits.length, 1)
 })

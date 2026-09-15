@@ -18,6 +18,7 @@ const {
 } = require('../utils/verification')
 const { sendVerificationCode } = require('./emailService')
 const otpRequestLimit = require('./otpRequestLimit')
+const { recordAudit } = require('./auditService')
 const { toMediaAccessPath } = require('./mediaStorageService')
 const {
 	LOGIN_ID_PATTERN,
@@ -282,7 +283,20 @@ const verifyLogin = async (
 	if (challenge.purpose === 'verify_email' && !user.emailVerifiedAt) {
 		user.emailVerifiedAt = new Date()
 	}
-	return createSession(user, deviceName || challenge.deviceName)
+	const session = await createSession(user, deviceName || challenge.deviceName)
+	await recordAudit({
+		actor: user,
+		action: 'auth.login_succeeded',
+		entityType: 'user',
+		entityId: String(user._id),
+		ipAddress: challenge.requestIp,
+		changes: {
+			application: user.role === 'supervisor' ? 'web' : 'mobile',
+			deviceName: deviceName || challenge.deviceName || 'Unknown device',
+			emailVerified: Boolean(user.emailVerifiedAt),
+		},
+	})
+	return session
 }
 
 const resendVerification = async (
@@ -397,6 +411,14 @@ const resetPassword = async (
 			{ $set: { revokedAt: new Date() } },
 		),
 	])
+	await recordAudit({
+		actor: user,
+		action: 'auth.password_reset',
+		entityType: 'user',
+		entityId: String(user._id),
+		ipAddress: challenge.requestIp,
+		changes: { sessionsRevoked: true },
+	})
 	return { success: true }
 }
 
@@ -430,9 +452,17 @@ const getCurrentUser = async (user) => {
 	return serializeUser(user, profile)
 }
 
-const logout = async (session) => {
+const logout = async (session, actor, { requestIp } = {}) => {
 	session.revokedAt = new Date()
 	await session.save()
+	await recordAudit({
+		actor,
+		action: 'auth.logged_out',
+		entityType: 'user',
+		entityId: String(actor?._id || actor?.id || session.userId),
+		ipAddress: requestIp,
+		changes: { deviceName: session.deviceName || 'Unknown device' },
+	})
 }
 
 const requestPasswordChange = async (
@@ -458,7 +488,7 @@ const requestPasswordChange = async (
 	})
 }
 
-const changePassword = async (user, payload = {}) => {
+const changePassword = async (user, payload = {}, { requestIp } = {}) => {
 	const newPassword = String(payload.new_password || '')
 	if (!isStrongPassword(newPassword)) {
 		throw createAuthError(
@@ -489,6 +519,14 @@ const changePassword = async (user, payload = {}) => {
 			{ $set: { revokedAt: new Date() } },
 		),
 	])
+	await recordAudit({
+		actor: securedUser,
+		action: 'auth.password_changed',
+		entityType: 'user',
+		entityId: String(securedUser._id),
+		ipAddress: requestIp,
+		changes: { sessionsRevoked: true },
+	})
 	return getCurrentUser(securedUser)
 }
 

@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 const { beforeEach, describe, it, mock } = require('node:test')
-const { EmailVerification, User } = require('../src/models')
+const { AuditLog, AuthSession, EmailVerification, User } = require('../src/models')
 const emailService = require('../src/services/emailService')
 const otpRequestLimit = require('../src/services/otpRequestLimit')
 // Never send email or connect to MongoDB in these tests.
@@ -56,6 +56,32 @@ describe('verification feedback and server deadlines', () => {
       auth.resetPassword({ challenge_id: 'challenge', code: '123456', new_password: 'StrongPass1!' }),
       { code: 'PASSWORD_REUSED' },
     )
+  })
+
+  it('records a successful password reset without storing the password or OTP', async (t) => {
+	const audits = []
+	const challenge = {
+		userId: 'user', purpose: 'reset_password', expiresAt: new Date('2099-01-01'),
+		attempts: 0, maxAttempts: 5, otpHash: hashCode('123456'), requestIp: '127.0.0.1',
+		save: async () => {},
+	}
+	const user = {
+		_id: 'user', role: 'officer', personnelId: 'PNP-001', status: 'active',
+		passwordHash: await hashPassword('OldStrong1!'), save: async () => {},
+	}
+	t.mock.method(EmailVerification, 'findById', () => ({ select: async () => challenge }))
+	t.mock.method(User, 'findById', () => ({ select: async () => user }))
+	t.mock.method(AuthSession, 'updateMany', async () => ({ modifiedCount: 1 }))
+	t.mock.method(AuditLog, 'create', async (entry) => { audits.push(entry); return entry })
+
+	await auth.resetPassword({
+		challenge_id: 'challenge', code: '123456', new_password: 'NewStrong2!',
+	})
+
+	assert.equal(audits.length, 1)
+	assert.equal(audits[0].action, 'auth.password_reset')
+	assert.equal(audits[0].actorPersonnelId, 'PNP-001')
+	assert.deepEqual(audits[0].changes, { sessionsRevoked: true })
   })
 
   it('returns the remaining account window after the third code', async (t) => {

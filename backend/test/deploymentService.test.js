@@ -2,7 +2,7 @@ const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 const createDeploymentService = require('../src/services/operations/deploymentService')
 
-const createService = ({ Deployment, Personnel, published = [] }) => createDeploymentService({
+const createService = ({ Deployment, Personnel, published = [], audits = [] }) => createDeploymentService({
 	io: { emit: () => {}, to: () => ({ emit: () => {} }) },
 	models: { Deployment, Personnel },
 	loadPersonnelMap: async () => new Map([
@@ -16,6 +16,7 @@ const createService = ({ Deployment, Personnel, published = [] }) => createDeplo
 		createNotification: async () => {},
 		deliverNotification: async () => {},
 	},
+	auditService: { recordAudit: async (entry) => audits.push(entry) },
 	publish: {
 		emitToSupervisorAndPersonnel: (...args) => published.push(args),
 	},
@@ -42,10 +43,12 @@ describe('deployment acknowledgement', () => {
 			save: async () => { saved = true },
 		}
 		const published = []
+		const audits = []
 		const service = createService({
 			Deployment: { findOne: async () => deployment },
 			Personnel: {},
 			published,
+			audits,
 		})
 
 		const result = await service.acknowledgeDeployment('DEP-001', 'PNP-001')
@@ -57,6 +60,7 @@ describe('deployment acknowledgement', () => {
 		assert.equal(published.length, 1)
 		assert.deepEqual(published[0].slice(0, 1), ['deployment:acknowledged'])
 		assert.equal(published[0][2], 'PNP-001')
+		assert.equal(audits[0].action, 'deployment.acknowledged')
 	})
 
 	it('prevents an officer from acknowledging another officer assignment', async () => {

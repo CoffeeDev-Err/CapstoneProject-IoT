@@ -32,12 +32,14 @@ const createDeploymentService = ({
 	loadPersonnelMap,
 	personnelService,
 	notificationService,
+	auditService = { recordAudit: async () => null },
 	publish,
 	clock = () => new Date(),
 }) => {
 	const { Deployment, Personnel } = models
 	const { emitPersonnelCollection, getPersonnelWithLocations } = personnelService
 	const { deliverNotification } = notificationService
+	const { recordAudit } = auditService
 	const { emitToSupervisorAndPersonnel } = publish
 
 	const loadDeployments = async (personnelId) => {
@@ -122,6 +124,24 @@ const createDeploymentService = ({
 			|| activated.modifiedCount > 0
 			|| onDutyUpdate.modifiedCount > 0
 			|| offDutyUpdate.modifiedCount > 0
+		if (completed.modifiedCount > 0) {
+			await Promise.all(completingDeployments.map((deployment) => recordAudit({
+				actor: { role: 'system' },
+				action: 'deployment.completed',
+				entityType: 'deployment',
+				entityId: deployment.assignmentId,
+				changes: { personnelId: deployment.personnelId, status: { from: deployment.status, to: 'completed' } },
+			})))
+		}
+		if (activated.modifiedCount > 0) {
+			await Promise.all(activatingDeployments.map((deployment) => recordAudit({
+				actor: { role: 'system' },
+				action: 'deployment.activated',
+				entityType: 'deployment',
+				entityId: deployment.assignmentId,
+				changes: { personnelId: deployment.personnelId, status: { from: 'scheduled', to: 'active' } },
+			})))
+		}
 
 		if (broadcast && changed) {
 			const [deployments, personnel] = await Promise.all([
@@ -187,7 +207,11 @@ const createDeploymentService = ({
 		return { affectedPersonnelIds, changed, onDutyPersonnelIds }
 	}
 
-	const acknowledgeDeployment = async (assignmentId, personnelId) => {
+	const acknowledgeDeployment = async (
+		assignmentId,
+		personnelId,
+		actor = { role: 'officer', personnelId },
+	) => {
 		const deployment = await Deployment.findOne({ assignmentId, status: 'active' })
 		if (!deployment) return createNotFoundResult('Active deployment')
 		if (deployment.personnelId !== personnelId) {
@@ -206,6 +230,13 @@ const createDeploymentService = ({
 		deployment.acknowledgedSignature = deploymentSignature(deployment)
 		deployment.acknowledgedAt = clock()
 		await deployment.save()
+		await recordAudit({
+			actor,
+			action: 'deployment.acknowledged',
+			entityType: 'deployment',
+			entityId: deployment.assignmentId,
+			changes: { personnelId: deployment.personnelId, status: deployment.status },
+		})
 		const personnelById = await loadPersonnelMap([personnelId])
 		const serialized = serializeDeployment(deployment, personnelById)
 		emitToSupervisorAndPersonnel(
@@ -273,7 +304,11 @@ const createDeploymentService = ({
 		return serializeDeployment(deployment, personnelById)
 	}
 
-	const updateDeploymentStatus = async (assignmentId, status) => {
+	const updateDeploymentStatus = async (
+		assignmentId,
+		status,
+		actor = { role: 'supervisor', id: 'supervisor' },
+	) => {
 		if (!DEPLOYMENT_STATUSES.includes(status)) {
 			return {
 				status: 400,
@@ -286,6 +321,13 @@ const createDeploymentService = ({
 			{ returnDocument: 'after' },
 		)
 		if (!deployment) return createNotFoundResult('Deployment')
+		await recordAudit({
+			actor,
+			action: 'deployment.status_updated',
+			entityType: 'deployment',
+			entityId: deployment.assignmentId,
+			changes: { personnelId: deployment.personnelId, status },
+		})
 		const reconciliation = await reconcileDeploymentShifts({ broadcast: false })
 		const [activeDeployments, personnel] = await Promise.all([
 			loadDeployments(),
@@ -326,7 +368,10 @@ const createDeploymentService = ({
 		}
 	}
 
-	const replaceDeployments = async (payload = []) => {
+	const replaceDeployments = async (
+		payload = [],
+		actor = { role: 'supervisor', id: 'supervisor' },
+	) => {
 		const now = clock()
 		if (!Array.isArray(payload)) {
 			throw createValidationError('assignments must be an array.', 'assignments')
@@ -559,6 +604,24 @@ const createDeploymentService = ({
 			MANAGEABLE_DEPLOYMENT_STATUSES.includes(deployment.status)
 			&& !assignmentIds.includes(deployment.assignmentId)
 		))
+		const changedAssignments = normalizedAssignments.filter((assignment) => {
+			const previous = previousById.get(assignment.id)
+			return !previous || deploymentNoticeSignature(previous) !== deploymentNoticeSignature(assignment)
+		})
+		await recordAudit({
+			actor,
+			action: 'deployments.synchronized',
+			entityType: 'deployment_batch',
+			entityId: now.toISOString(),
+			changes: {
+				submittedCount: normalizedAssignments.length,
+				createdCount: changedAssignments.filter((assignment) => !previousById.has(assignment.id)).length,
+				updatedCount: changedAssignments.filter((assignment) => previousById.has(assignment.id)).length,
+				cancelledCount: cancelledDeployments.length,
+				assignmentIds,
+				cancelledAssignmentIds: cancelledDeployments.map((deployment) => deployment.assignmentId),
+			},
+		})
 		await Promise.all(cancelledDeployments.map((deployment) => deliverNotification({
 			io,
 			recipientId: deployment.personnelId,

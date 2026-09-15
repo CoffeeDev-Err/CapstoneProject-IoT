@@ -11,7 +11,7 @@ const createDeploymentController = (operationalService) => ({
 	},
 	acknowledgeDeployment: async (req, res) => {
 		const result = await operationalService.acknowledgeDeployment(
-			req.params.assignmentId, req.auth.user.personnelId,
+			req.params.assignmentId, req.auth.user.personnelId, req.auth.user,
 		)
 		res.status(result.status).json(result.body)
 	},
@@ -22,12 +22,12 @@ const createDeploymentController = (operationalService) => ({
 			error.code = 'INVALID_DEPLOYMENT_PAYLOAD'
 			throw error
 		}
-		const deployments = await operationalService.replaceDeployments(req.body.assignments)
+		const deployments = await operationalService.replaceDeployments(req.body.assignments, req.auth.user)
 		res.json({ success: true, deployments })
 	},
 	updateDeploymentStatus: async (req, res) => {
 		const result = await operationalService.updateDeploymentStatus(
-			req.params.assignmentId, String(req.body?.status || '').toLowerCase(),
+			req.params.assignmentId, String(req.body?.status || '').toLowerCase(), req.auth.user,
 		)
 		res.status(result.status).json(result.body)
 	},

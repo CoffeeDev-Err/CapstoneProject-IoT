@@ -1,6 +1,5 @@
 const { randomUUID } = require('crypto')
 const {
-	AuditLog,
 	AuthSession,
 	Deployment,
 	GpsDeviceAssignment,
@@ -28,6 +27,7 @@ const {
 	validateOfficialEmail,
 	validateRank,
 } = require('../utils/accountValidation')
+const defaultAuditService = require('./auditService')
 const { fetchRegisteredDevices } = require('./flespiService')
 const { toMediaAccessPath } = require('./mediaStorageService')
 
@@ -160,7 +160,8 @@ const validateRegisteredDevice = async ({ imei, flespiDeviceId }) => {
 	return device
 }
 
-const createAccountService = ({ io, personnelService }) => {
+const createAccountService = ({ io, personnelService, auditService = defaultAuditService }) => {
+	const { recordAudit } = auditService
 	const broadcastAccountData = async (identity) => {
 		io.emit('accounts:updated')
 		if (identity?.personnelId) {
@@ -213,7 +214,7 @@ const createAccountService = ({ io, personnelService }) => {
 		return profile?.photoUrl || user.photoUrl || ''
 	}
 
-	const createAccount = async (payload, { ipAddress } = {}) => {
+	const createAccount = async (payload, { ipAddress, actor } = {}) => {
 		validateAccountPayload(payload)
 		const device = await validateRegisteredDevice(payload)
 		const personnelId = `officer-${String(payload.badgeNumber)
@@ -255,14 +256,16 @@ const createAccountService = ({ io, personnelService }) => {
 				forcePasswordReset: true,
 			})
 
-			await AuditLog.create({
+			await recordAudit({
+				actor,
 				action: 'account.created',
 				entityType: 'user',
 				entityId: String(user._id),
 				changes: {
 					personnelId,
 					badgeNumber: profile.badgeNumber,
-					imei: assignment.imei,
+					role: user.role,
+					gpsAssigned: Boolean(assignment),
 				},
 				ipAddress,
 			})
@@ -281,7 +284,7 @@ const createAccountService = ({ io, personnelService }) => {
 		}
 	}
 
-	const updateAccount = async (accountId, payload, { ipAddress } = {}) => {
+	const updateAccount = async (accountId, payload, { ipAddress, actor } = {}) => {
 		const user = await User.findById(accountId)
 		if (!user) throw createHttpError('Account not found.', 404)
 		const isSupervisor = user.role === 'supervisor'
@@ -329,11 +332,17 @@ const createAccountService = ({ io, personnelService }) => {
 
 			await user.save()
 			await revokeActiveSessions()
-			await AuditLog.create({
+			await recordAudit({
+				actor,
 				action: 'account.updated',
 				entityType: 'user',
 				entityId: String(user._id),
-				changes: { role: user.role },
+				changes: {
+					role: user.role,
+					updatedFields: Object.keys(payload).filter((field) => field !== 'temporaryPassword'),
+					credentialsChanged: Boolean(payload.temporaryPassword),
+					sessionsRevoked: shouldRevokeSessions,
+				},
 				ipAddress,
 			})
 
@@ -425,13 +434,17 @@ const createAccountService = ({ io, personnelService }) => {
 			),
 		])
 		await revokeActiveSessions()
-		await AuditLog.create({
+		await recordAudit({
+			actor,
 			action: 'account.updated',
 			entityType: 'user',
 			entityId: String(user._id),
 			changes: {
 				personnelId: user.personnelId,
 				deviceChanged,
+				updatedFields: Object.keys(payload).filter((field) => field !== 'temporaryPassword'),
+				credentialsChanged: Boolean(payload.temporaryPassword),
+				sessionsRevoked: shouldRevokeSessions,
 			},
 			ipAddress,
 		})
@@ -451,7 +464,7 @@ const createAccountService = ({ io, personnelService }) => {
 		return serializeAccount(user, profile, assignment)
 	}
 
-	const deactivateAccount = async (accountId, { ipAddress } = {}) => {
+	const deactivateAccount = async (accountId, { ipAddress, actor } = {}) => {
 		const user = await User.findById(accountId)
 		if (!user) throw createHttpError('Account not found.', 404)
 		assertAccountCanBeDeactivated(user)
@@ -469,7 +482,8 @@ const createAccountService = ({ io, personnelService }) => {
 				{ $set: { status: 'released', unassignedAt: now } },
 			),
 		])
-		await AuditLog.create({
+		await recordAudit({
+			actor,
 			action: 'account.deactivated',
 			entityType: 'user',
 			entityId: String(user._id),

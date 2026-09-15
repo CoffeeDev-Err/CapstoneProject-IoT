@@ -33,12 +33,14 @@ const createTaskService = ({
 	loadPersonnelMap,
 	personnelService,
 	notificationService,
+	auditService = { recordAudit: async () => null },
 	clock = () => new Date(),
 	idGenerator = randomUUID,
 }) => {
 	const { CurrentLocation, Deployment, Task } = models
 	const { getPersonnelMember } = personnelService
 	const { deliverNotification } = notificationService
+	const { recordAudit } = auditService
 	const backupArrivalRadiusMeters = Math.max(
 		25,
 		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 150,
@@ -236,6 +238,17 @@ const createTaskService = ({
 				const serialized = serializeTask(updatedTask, personnelById)
 				const responderName = personnelById.get(responder.personnelId)?.fullName
 					|| responder.personnelId
+				await recordAudit({
+					actor: { role: 'system' },
+					action: 'task.responder_arrived',
+					entityType: 'task',
+					entityId: updatedTask.taskId,
+					changes: {
+						personnelId: responder.personnelId,
+						arrivalDistanceMeters: Math.round(distanceMeters),
+						status: updatedTask.status,
+					},
+				})
 				const recipients = new Set([updatedTask.requestedBy, 'supervisor'])
 				await Promise.all([...recipients].map((recipientId) => deliverNotification({
 					io,
@@ -294,11 +307,23 @@ const createTaskService = ({
 			}
 		}
 		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
+		const previousStatus = task.status
 		task.status = 'completed'
 		task.completedAt = clock()
 		task.completedBy = officerPersonnelId || 'supervisor'
 		task.activeRequestKey = undefined
 		await task.save()
+		await recordAudit({
+			actor,
+			action: 'task.completed',
+			entityType: 'task',
+			entityId: task.taskId,
+			changes: {
+				type: task.type,
+				status: { from: previousStatus, to: 'completed' },
+				responderCount: task.responders?.length || 0,
+			},
+		})
 		const personnelById = await loadTaskPersonnelMap([task])
 		const serialized = serializeTask(task, personnelById)
 		const recipients = new Set(taskParticipantIds(task))
@@ -323,7 +348,7 @@ const createTaskService = ({
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
-	const cancelTask = async (taskId, personnelId) => {
+	const cancelTask = async (taskId, personnelId, actor = { role: 'officer', personnelId }) => {
 		if (!personnelId) {
 			return { status: 400, body: { success: false, message: 'Personnel ID is required.' } }
 		}
@@ -339,11 +364,19 @@ const createTaskService = ({
 			return { status: 409, body: { success: false, message: 'A completed backup request cannot be cancelled.' } }
 		}
 		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
-		if (task.status !== 'cancelled') {
+		const previousStatus = task.status
+		if (previousStatus !== 'cancelled') {
 			task.status = 'cancelled'
 			task.cancelledAt = clock()
 			task.activeRequestKey = undefined
 			await task.save()
+			await recordAudit({
+				actor,
+				action: 'task.cancelled',
+				entityType: 'task',
+				entityId: task.taskId,
+				changes: { type: task.type, status: { from: previousStatus, to: 'cancelled' } },
+			})
 		}
 		const personnelById = await loadTaskPersonnelMap([task])
 		const serialized = serializeTask(task, personnelById)
@@ -365,7 +398,7 @@ const createTaskService = ({
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
-	const createTask = async (payload = {}) => {
+	const createTask = async (payload = {}, actor = {}) => {
 		const taskType = String(payload.type || '').trim().toLowerCase()
 		if (!['backup', 'urgent'].includes(taskType)) {
 			throw createValidationError('Task type must be backup or urgent.', 'type')
@@ -470,6 +503,19 @@ const createTaskService = ({
 			}
 			throw error
 		}
+		await recordAudit({
+			actor: Object.keys(actor).length > 0 ? actor : task.requestedBy === 'supervisor'
+				? { role: 'supervisor', id: 'supervisor' }
+				: { role: 'officer', personnelId: task.requestedBy },
+			action: task.type === 'backup' ? 'task.backup_requested' : 'task.created',
+			entityType: 'task',
+			entityId: task.taskId,
+			changes: {
+				type: task.type,
+				status: task.status,
+				requiredResponders: task.requiredResponders,
+			},
+		})
 		const serialized = serializeTask(task)
 		await deliverNotification({
 			io,
@@ -511,7 +557,7 @@ const createTaskService = ({
 		return serialized
 	}
 
-	const acceptTask = async (taskId, personnelId) => {
+	const acceptTask = async (taskId, personnelId, actor = { role: 'officer', personnelId }) => {
 		if (!personnelId) {
 			return { status: 400, body: { success: false, message: 'Personnel ID is required.' } }
 		}
@@ -559,6 +605,17 @@ const createTaskService = ({
 		}
 		const personnelById = await loadTaskPersonnelMap([task])
 		const serialized = serializeTask(task, personnelById)
+		await recordAudit({
+			actor,
+			action: 'task.accepted',
+			entityType: 'task',
+			entityId: task.taskId,
+			changes: {
+				personnelId,
+				status: task.status,
+				responderCount: task.responders.length,
+			},
+		})
 		if (task.requestedBy !== 'supervisor') {
 			await deliverNotification({
 				io,

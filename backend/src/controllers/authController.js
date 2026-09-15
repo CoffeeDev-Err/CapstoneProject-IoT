@@ -46,13 +46,13 @@ const createAuthController = (authService) => ({
 	},
 
 	logout: async (req, res) => {
-		await authService.logout(req.auth.session)
+		await authService.logout(req.auth.session, req.auth.user, { requestIp: req.ip })
 		res.clearCookie(AUTH_COOKIE_NAME, clearCookieOptions())
 		res.json({ success: true })
 	},
 
 	changePassword: async (req, res) => {
-		const user = await authService.changePassword(req.auth.user, req.body)
+		const user = await authService.changePassword(req.auth.user, req.body, { requestIp: req.ip })
 		// changePassword revokes every session, so drop the now-dead web cookie.
 		res.clearCookie(AUTH_COOKIE_NAME, clearCookieOptions())
 		res.json({ success: true, user })

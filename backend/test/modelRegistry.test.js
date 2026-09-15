@@ -17,7 +17,7 @@ const EXPECTED_MODEL_CONTRACTS = {
 	Task: ['tasks', 5],
 	Notification: ['notifications', 5],
 	PushDevice: ['push_devices', 2],
-	AuditLog: ['audit_logs', 2],
+	AuditLog: ['audit_logs', 3],
 }
 
 describe('model registry compatibility surface', () => {

@@ -122,6 +122,13 @@ Deployment filters: `personnel_id`, `barangay`, `status`, `page`, and `limit`.
 - `PATCH /notifications/me/tasks/read-all`
 - `GET /audit-logs`
 
+Audit collection is backend-only and does not add an application page or user
+workflow. Successful authentication, account, deployment, report, and task
+lifecycle actions append compact audit entries. Each entry identifies the actor,
+action, affected record, time, and non-sensitive status metadata. Passwords,
+OTP values, session tokens, report narratives, evidence contents, and GPS trails
+are never copied into audit details.
+
 The officer notification page returns both `unreadCount` and
 `unreadTaskCount`. The task count includes only unread new-task notices and is
 cleared when the officer opens the task inbox; later task status updates remain

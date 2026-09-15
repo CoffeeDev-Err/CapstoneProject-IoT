@@ -19,15 +19,19 @@ const createTaskController = (operationalService) => ({
 	createTask: async (req, res) => {
 		const task = await operationalService.createTask({
 			...req.body, type: 'backup', requested_by: req.auth.user.personnelId,
-		})
+		}, req.auth.user)
 		res.status(201).json({ success: true, task })
 	},
 	acceptTask: async (req, res) => {
-		const result = await operationalService.acceptTask(req.params.taskId, req.auth.user.personnelId)
+		const result = await operationalService.acceptTask(
+			req.params.taskId, req.auth.user.personnelId, req.auth.user,
+		)
 		res.status(result.status).json(result.body)
 	},
 	cancelTask: async (req, res) => {
-		const result = await operationalService.cancelTask(req.params.taskId, req.auth.user.personnelId)
+		const result = await operationalService.cancelTask(
+			req.params.taskId, req.auth.user.personnelId, req.auth.user,
+		)
 		res.status(result.status).json(result.body)
 	},
 	completeTask: async (req, res) => {

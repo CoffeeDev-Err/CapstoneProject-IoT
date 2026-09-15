@@ -46,7 +46,7 @@ const createReportController = (operationalService, mediaStorage = {
 						capturedAt: req.body.evidence_captured_at || new Date(),
 					},
 				}),
-			})
+			}, req.auth.user)
 			return res.status(201).json({ success: true, report })
 		} catch (error) {
 			if (storedEvidence) await mediaStorage.deleteStoredMedia(storedEvidence).catch(() => {})
@@ -64,7 +64,7 @@ const createReportController = (operationalService, mediaStorage = {
 	resolveReport: async (req, res) => {
 		const result = await operationalService.resolveReport(req.params.reportId, {
 			...req.body, resolved_by: req.auth.user.personnelId,
-		})
+		}, req.auth.user)
 		res.status(result.status).json(result.body)
 	},
 	updateReportValidation: async (req, res) => {

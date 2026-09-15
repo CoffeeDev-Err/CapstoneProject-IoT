@@ -72,8 +72,8 @@ const io = new Server(server, {
 	cors: corsOptions,
 })
 
-const operationalService = createOperationalService({ io })
-const accountService = createAccountService({ io, personnelService })
+const operationalService = createOperationalService({ io, auditService })
+const accountService = createAccountService({ io, personnelService, auditService })
 const flespiSyncService = createFlespiSyncService({
 	flespiService,
 	personnelService,

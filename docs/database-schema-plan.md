@@ -242,9 +242,12 @@ Indexes:
 
 ### `audit_logs`
 
-Supervisor and security-sensitive actions.
+Append-only backend records for completed authentication, account, deployment,
+report, and task lifecycle actions. No separate application page is required.
 
 - `actorUserId`
+- `actorRole`
+- `actorPersonnelId`
 - `action`
 - `entityType`
 - `entityId`
@@ -256,6 +259,7 @@ Indexes:
 
 - `{ actorUserId: 1, createdAt: -1 }`
 - `{ entityType: 1, entityId: 1, createdAt: -1 }`
+- `{ action: 1, createdAt: -1 }`
 
 ## Intentionally Not Separate Collections
 

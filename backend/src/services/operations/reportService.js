@@ -49,6 +49,7 @@ const createReportService = ({
 	loadPersonnelMap,
 	personnelService,
 	notificationService,
+	auditService = { recordAudit: async () => null },
 	reportRouteService,
 	publish,
 	clock = () => new Date(),
@@ -57,6 +58,7 @@ const createReportService = ({
 	const { CurrentLocation, Deployment, Report, Task } = models
 	const { getPersonnelMember } = personnelService
 	const { deliverNotification } = notificationService
+	const { recordAudit } = auditService
 	const emitToSupervisorAndPersonnel = publish.emitToSupervisorAndPersonnel
 
 	const loadReports = async (personnelId) => {
@@ -167,6 +169,16 @@ const createReportService = ({
 		report.history.push({ at: clock(), by: String(actor.id || actor._id || 'supervisor'), name: report.reviewedBy,
 			kind: 'review', reason: 'Supervisor review', changes: [{ field: 'validationStatus', before: previousStatus, after: validationStatus }] })
 		await saveReport(report)
+		await recordAudit({
+			actor,
+			action: 'report.reviewed',
+			entityType: 'report',
+			entityId: report.reportNumber,
+			changes: {
+				validationStatus: { from: previousStatus, to: validationStatus },
+				revision: report.__v || 0,
+			},
+		})
 		const personnelById = await loadPersonnelMap([report.submittedBy])
 		const serialized = serializeReport(report, personnelById)
 		const notificationType = validationStatus === 'validated'
@@ -279,6 +291,16 @@ const createReportService = ({
 		}
 		// The original route/evidence and submission metadata remain part of the record.
 		await saveReport(report)
+		await recordAudit({
+			actor,
+			action: isValidatedCorrection ? 'report.correction_submitted' : 'report.updated',
+			entityType: 'report',
+			entityId: report.reportNumber,
+			changes: {
+				changedFields: report.history.at(-1).changes.map((change) => change.field),
+				revision: report.__v || 0,
+			},
+		})
 		const serialized = serializeReport(report, await loadPersonnelMap([personnelId]))
 		emitToSupervisorAndPersonnel('report:updated', serialized, personnelId)
 		io.emit('dashboard:updated')
@@ -298,7 +320,7 @@ const createReportService = ({
 		return { status: 200, body: { success: true, report: serialized } }
 	}
 
-	const submitReport = async (payload = {}) => {
+	const submitReport = async (payload = {}, actor = {}) => {
 		const officer = payload.personnel_id ? await getPersonnelMember(payload.personnel_id) : null
 		if (!officer) {
 			const error = new Error('An active, GPS-linked personnel account is required to submit a report.')
@@ -551,6 +573,21 @@ const createReportService = ({
 			})
 			emitToSupervisorAndPersonnel('report:submitted', serialized, report.submittedBy)
 			io.emit('dashboard:updated')
+			await recordAudit({
+				actor: Object.keys(actor).length > 0
+					? actor
+					: { role: 'officer', personnelId: report.submittedBy },
+				action: 'report.submitted',
+				entityType: 'report',
+				entityId: report.reportNumber,
+				changes: {
+					reportType: report.reportType,
+					severity: report.severity,
+					barangayCode: report.barangayCode,
+					isIncident: report.isIncident,
+					...(report.backupResponse?.taskId && { backupTaskId: report.backupResponse.taskId }),
+				},
+			})
 			return serialized
 		} catch (error) {
 			if (backupTask?.reportNumber === report.reportNumber) {
@@ -562,7 +599,7 @@ const createReportService = ({
 		}
 	}
 
-	const resolveReport = async (reportId, payload = {}) => {
+	const resolveReport = async (reportId, payload = {}, actor = {}) => {
 		const report = await Report.findOne({ reportNumber: reportId })
 		if (!report) return { status: 404, body: { success: false, message: 'Report not found.' } }
 		if (!report.isIncident) {
@@ -610,6 +647,18 @@ const createReportService = ({
 			}
 		}
 		const serialized = serializeReport(resolvedReport)
+		await recordAudit({
+			actor: Object.keys(actor).length > 0
+				? actor
+				: { role: 'officer', personnelId: resolvedReport.submittedBy },
+			action: 'report.resolved',
+			entityType: 'report',
+			entityId: resolvedReport.reportNumber,
+			changes: {
+				caseStatus: { from: 'open', to: 'resolved' },
+				revision: serialized.revision,
+			},
+		})
 		await deliverNotification({
 			io,
 			recipientId: 'supervisor',

@@ -34,6 +34,7 @@ const createBackupFixture = ({ existingRequest = false } = {}) => {
 	const now = new Date('2026-09-11T08:00:00Z')
 	const tasks = []
 	const deliveries = []
+	const audits = []
 	let sequence = 0
 	const Task = {
 		exists: async (filter) => existingRequest || tasks.some((task) => (
@@ -85,15 +86,17 @@ const createBackupFixture = ({ existingRequest = false } = {}) => {
 			createNotification: async () => {},
 			deliverNotification: async (notification) => deliveries.push(notification),
 		},
+		auditService: { recordAudit: async (entry) => audits.push(entry) },
 		clock: () => now,
 		idGenerator: () => `${(++sequence).toString(16).padStart(8, '0')}-fixed-id`,
 	})
-	return { deliveries, service, tasks }
+	return { audits, deliveries, service, tasks }
 }
 
 const createArrivalFixture = ({ task, location }) => {
 	const now = new Date('2026-09-14T08:00:00Z')
 	const deliveries = []
+	const audits = []
 	let updates = 0
 	const service = createTaskService({
 		io: { emit: () => {}, to: () => ({ emit: () => {} }) },
@@ -124,9 +127,10 @@ const createArrivalFixture = ({ task, location }) => {
 			createNotification: async () => {},
 			deliverNotification: async (notification) => deliveries.push(notification),
 		},
+		auditService: { recordAudit: async (entry) => audits.push(entry) },
 		clock: () => now,
 	})
-	return { deliveries, getUpdates: () => updates, service }
+	return { audits, deliveries, getUpdates: () => updates, service }
 }
 
 describe('task authorization', () => {
@@ -227,6 +231,7 @@ describe('task authorization', () => {
 		assert.deepEqual(new Set(fixture.deliveries.map((item) => item.recipientId)), new Set(['PNP-REQUESTER', 'supervisor']))
 		assert.equal(fixture.deliveries.find((item) => item.recipientId === 'supervisor').data.destination, 'Map')
 		assert.equal(fixture.deliveries.find((item) => item.recipientId === 'PNP-REQUESTER').data.destination, 'Tasks')
+		assert.equal(fixture.audits[0].action, 'task.responder_arrived')
 	})
 
 	it('does not record automatic arrival from a stale or distant tracker reading', async () => {
@@ -295,6 +300,7 @@ describe('backup request concurrency', () => {
 		assert.equal(fixture.deliveries[0].referenceId, task.id)
 		assert.equal(fixture.deliveries[0].data.taskId, task.id)
 		assert.equal(fixture.deliveries[0].data.personnelId, 'PNP-001')
+		assert.equal(fixture.audits[0].action, 'task.backup_requested')
 	})
 
 	it('allows only one active request when the same account submits from two devices', async () => {

@@ -21,6 +21,7 @@ const createAccountController = (accountService) => ({
 				...(storedPhoto ? { photoUrl: storedPhoto } : {}),
 			}, {
 				ipAddress: req.ip,
+				actor: req.auth.user,
 			})
 			return res.status(201).json({ success: true, account })
 		} catch (error) {
@@ -46,7 +47,7 @@ const createAccountController = (accountService) => ({
 					...accountInput,
 					...(storedPhoto ? { photoUrl: storedPhoto } : {}),
 				},
-				{ ipAddress: req.ip },
+				{ ipAddress: req.ip, actor: req.auth.user },
 			)
 			if (storedPhoto && previousPhoto && previousPhoto !== storedPhoto) {
 				await deleteStoredMedia(previousPhoto).catch((error) => {
@@ -63,7 +64,7 @@ const createAccountController = (accountService) => ({
 	deactivateAccount: async (req, res) => {
 		const result = await accountService.deactivateAccount(
 			req.params.accountId,
-			{ ipAddress: req.ip },
+			{ ipAddress: req.ip, actor: req.auth.user },
 		)
 		res.json({ success: true, message: result.message })
 	},
