@@ -4,12 +4,12 @@ This guide is for the VS Code **Git Bash** terminal. `C:\cbm` is a short-path bu
 
 ## Important locations
 
-| Purpose | Location |
-|---|---|
-| Original mobile source | `C:\desktop\GeoSentri-PNP_System\bantaycabagan-mobileapp` |
-| Short-path build workspace | `C:\cbm` |
-| Verified APK output | `C:\cbm\dist-apk` |
-| Shared domain contract used by type-checking | `C:\contracts\domain-contracts.json` |
+| Purpose                                      | Location                                                    |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Original mobile source                       | `C:\desktop\GeoSentri-PNP_System\bantaycabagan-mobileapp` |
+| Short-path build workspace                   | `C:\cbm`                                                  |
+| Verified APK output                          | `C:\cbm\dist-apk`                                         |
+| Shared domain contract used by type-checking | `C:\contracts\domain-contracts.json`                      |
 
 Do not make permanent code changes directly inside `C:\cbm`. A later sync or fresh preparation can replace them.
 
@@ -146,14 +146,14 @@ Then repeat the preflight, build, and installation steps above.
 
 ## Common errors
 
-| Error | Meaning and action |
-|---|---|
-| `INSTALL_FAILED_VERSION_DOWNGRADE` | The APK version code is lower than the installed app. Increase it in both version files, sync CBM again, and rebuild. |
+| Error                                  | Meaning and action                                                                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INSTALL_FAILED_VERSION_DOWNGRADE`   | The APK version code is lower than the installed app. Increase it in both version files, sync CBM again, and rebuild.                              |
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | The installed app and APK use different signing keys. Do not uninstall immediately if local data must be preserved. Verify which APK is installed. |
-| `unauthorized` from `adb devices` | Unlock the phone and accept its USB debugging authorization prompt. |
-| No device is listed | Enable Developer options and USB debugging, reconnect the cable, and select a USB mode that permits data transfer. |
-| `package appears to be invalid` | Install through ADB to obtain the specific `INSTALL_FAILED_...` reason instead of relying on the generic phone message. |
-| The command stops after `-File` | Paste the complete command on one line, including the quoted `.ps1` path. |
+| `unauthorized` from `adb devices`  | Unlock the phone and accept its USB debugging authorization prompt.                                                                                |
+| No device is listed                    | Enable Developer options and USB debugging, reconnect the cable, and select a USB mode that permits data transfer.                                 |
+| `package appears to be invalid`      | Install through ADB to obtain the specific `INSTALL_FAILED_...` reason instead of relying on the generic phone message.                          |
+| The command stops after `-File`      | Paste the complete command on one line, including the quoted `.ps1` path.                                                                        |
 
 ## Before distributing an APK
 
