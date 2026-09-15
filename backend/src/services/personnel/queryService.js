@@ -88,12 +88,24 @@ const withoutPrivatePersonnelDetails = (member) => {
 	return safeMember
 }
 
+const visiblePersonnelIdsForOfficer = (onDutyPersonnelIds = [], officerPersonnelId) => {
+	const onDutySet = new Set(onDutyPersonnelIds.map(String))
+	if (!officerPersonnelId) return []
+	return onDutySet.has(officerPersonnelId)
+		? [...new Set([...onDutySet, officerPersonnelId])]
+		: [officerPersonnelId]
+}
+
 const scopePersonnelForActor = (personnel = [], actor) => {
 	if (!actor || actor.role === 'supervisor') return personnel
 	const officerPersonnelId = getOfficerPersonnelId(actor)
 	if (!officerPersonnelId) return []
+	const visiblePersonnelIds = new Set(visiblePersonnelIdsForOfficer(
+		personnel.filter((member) => member.isOnDuty).map((member) => member.id),
+		officerPersonnelId,
+	))
 	return personnel
-		.filter((member) => member.id === officerPersonnelId || member.isOnDuty)
+		.filter((member) => visiblePersonnelIds.has(member.id))
 		.map(withoutPrivatePersonnelDetails)
 }
 
@@ -155,7 +167,7 @@ const listPersonnel = async (query = {}, actor) => {
 		: { status: 'active' }
 	if (officerPersonnelId) {
 		filter.personnelId = {
-			$in: [...new Set([...visibleOnDutyPersonnelIds, officerPersonnelId])],
+			$in: visiblePersonnelIdsForOfficer(visibleOnDutyPersonnelIds, officerPersonnelId),
 		}
 	}
 	if (query.duty_status) filter.dutyStatus = String(query.duty_status)

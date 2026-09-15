@@ -62,8 +62,14 @@ const personnel = [
 const officerRoster = scopePersonnelForActor(personnel, {
 	role: 'officer', personnelId: 'officer-001',
 })
-assert.deepEqual(officerRoster.map((member) => member.id), ['officer-001', 'officer-002'])
+assert.deepEqual(officerRoster.map((member) => member.id), ['officer-001'])
 assert.equal('mobileNumber' in officerRoster[0], false)
+assert.deepEqual(
+	scopePersonnelForActor(personnel, {
+		role: 'officer', personnelId: 'officer-002',
+	}).map((member) => member.id),
+	['officer-002'],
+)
 assert.equal(scopePersonnelForActor(personnel, { role: 'supervisor' }).length, 3)
 
 const previousMediaSigningSecret = process.env.MEDIA_URL_SIGNING_SECRET

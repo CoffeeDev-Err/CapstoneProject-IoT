@@ -9,8 +9,16 @@ describe('officer map selectors', () => {
     const visible = selectVisiblePersonnel([
       { id: 'current', latitude: 17.4, longitude: 121.7 } as never,
       { id: 'stale', latitude: 17.4, longitude: 121.7, isLocationStale: true } as never,
-    ], 'current', {} as never);
+    ], 'current', { isOnDuty: true } as never);
     expect(visible.map(({ id }) => id)).toEqual(['current']);
+  });
+
+  it('does not render personnel locations for an off-duty officer', () => {
+    const visible = selectVisiblePersonnel([
+      { id: 'current', latitude: 17.4, longitude: 121.7, isOnDuty: false } as never,
+      { id: 'on-duty', latitude: 17.41, longitude: 121.71, isOnDuty: true } as never,
+    ], 'current', { id: 'current', isOnDuty: false } as never);
+    expect(visible).toEqual([]);
   });
 
   it('derives active backup ownership from tasks', () => {

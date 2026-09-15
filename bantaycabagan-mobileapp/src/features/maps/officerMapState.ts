@@ -7,6 +7,10 @@ export const selectVisiblePersonnel = (
   currentPersonnelId: string,
   currentOfficer: LivePersonnel,
 ) => {
+  // Location sharing is available only while the viewing officer has an
+  // active deployment. Keep this client-side guard even though the API and
+  // socket payloads are also scoped by the backend.
+  if (currentOfficer.isOnDuty !== true) return [];
   if (personnel.length) {
     return personnel.filter((member) => (
       member.isVisibleOnMap !== false
