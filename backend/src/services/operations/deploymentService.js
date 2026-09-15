@@ -26,6 +26,21 @@ const { getOfficerPersonnelId } = require('./access')
 const { appendFilterCondition } = require('./pagination')
 const { emitDeploymentCollection } = require('./events')
 
+const formatDeploymentInstructionsText = (assignment) => {
+	const instructions = String(assignment.instructions || assignment.notes || '').trim()
+	const instructionsText = instructions
+		? ` Instructions: ${instructions}${/[.!?]$/.test(instructions) ? '' : '.'}`
+		: ''
+	return instructionsText
+}
+
+const formatDeploymentNotificationMessage = ({ assignment, scheduled, scheduleText }) => {
+	const instructionsText = formatDeploymentInstructionsText(assignment)
+	return scheduled
+		? `You are scheduled at ${assignment.patrolArea} on ${scheduleText}.${instructionsText}`
+		: `You are assigned to ${assignment.patrolArea}.${instructionsText} Open Map to confirm your deployment.`
+}
+
 const createDeploymentService = ({
 	io,
 	models,
@@ -164,7 +179,7 @@ const createDeploymentService = ({
 				recipientId: deployment.personnelId,
 				type: 'deployment',
 				title: 'Your Shift Is Now Active',
-				message: `Your deployment at ${deployment.patrolArea} is now active. Open Map to confirm your assignment.`,
+				message: `Your deployment at ${deployment.patrolArea} is now active.${formatDeploymentInstructionsText(deployment)} Open Map to confirm your assignment.`,
 				referenceType: 'deployment',
 				referenceId: deployment.assignmentId,
 				priority: 'high',
@@ -194,7 +209,7 @@ const createDeploymentService = ({
 					recipientId: deployment.personnelId,
 					type: 'deployment',
 					title: 'Upcoming Shift',
-					message: `Your shift at ${deployment.patrolArea} starts in ${reminderMinutes} minutes or less.`,
+					message: `Your shift at ${deployment.patrolArea} starts in ${reminderMinutes} minutes or less.${formatDeploymentInstructionsText(deployment)}`,
 					referenceType: 'deployment',
 					referenceId: deployment.assignmentId,
 					priority: 'high',
@@ -590,9 +605,7 @@ const createDeploymentService = ({
 				recipientId: assignment.personnelId,
 				type: 'deployment',
 				title: previous ? 'Deployment Updated' : (scheduled ? 'New Scheduled Shift' : 'New Deployment'),
-				message: scheduled
-					? `You are scheduled at ${assignment.patrolArea} on ${scheduleText}.`
-					: `You are assigned to ${assignment.patrolArea}. Open Map to confirm your deployment.`,
+				message: formatDeploymentNotificationMessage({ assignment, scheduled, scheduleText }),
 				referenceType: 'deployment',
 				referenceId: assignment.id,
 				priority: 'high',
@@ -662,3 +675,4 @@ const createDeploymentService = ({
 }
 
 module.exports = createDeploymentService
+module.exports.formatDeploymentNotificationMessage = formatDeploymentNotificationMessage

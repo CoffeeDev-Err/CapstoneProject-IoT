@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2380" viewBox="0 0 3200 2380">
+<defs><marker id="openArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M 1 1 L 10 6 L 1 11" fill="none" stroke="#246BFD" stroke-width="2"/></marker></defs>
+<rect width="3200" height="2380" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="54" font-weight="700" fill="#0F172A"><tspan x="1600.0" y="82.0">GeoSentri: Detailed Proposed Use-Case Diagram</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="27" font-weight="400" fill="#475569"><tspan x="1600.0" y="132.0">Aligned with the Approved Objectives and Implemented Web/Mobile Workflows</tspan></text>
+<rect x="330" y="160" width="2540" height="2085" rx="18" fill="none" stroke="#0F172A" stroke-width="4"/>
+<rect x="365" y="178" width="560" height="52" fill="#FFFFFF"/><text x="380" y="220" font-family="Segoe UI,Arial,sans-serif" font-size="31" font-weight="700" fill="#0F172A">GEOSENTRI SYSTEM</text>
+<polyline points="220,1235 495.0,690" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,860" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,1030" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,1200" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,1370" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,1540" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,1710" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 495.0,1880" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,690" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,860" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,1030" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,1200" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,1370" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,1540" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,1710" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2705.0,1880" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 365,1235 395,430 760.0,430 760.0,380" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2835,1235 2805,466 1120.0,466 1120.0,380" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 365,1235 395,448 1380.0,448 1380.0,380" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2835,1235 2805,448 1820.0,448 1820.0,380" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="220,1235 365,1235 395,466 2080.0,466 2080.0,380" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2980,1235 2835,1235 2805,430 2440.0,430 2440.0,380" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="940,393 940,451" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="972" y="406" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1040" y="430.0">&lt;&lt;include&gt;&gt;</tspan></text>
+<polyline points="790,1142 790,1088" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="832" y="1099" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="900" y="1123.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="790,1822 790,1768" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="832" y="1778" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="900" y="1802.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="1855,795 2115,850" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1922" y="778" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1990" y="802.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="2115,1200 1855,1125" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1927" y="1119" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1995" y="1143.0">&lt;&lt;include&gt;&gt;</tspan></text>
+<polyline points="1855,1275 2115,1200" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1922" y="1228" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1990" y="1252.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="1855,1425 2115,1540" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1917" y="1448" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1985" y="1472.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="1345,1575 1085,1540" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1147" y="1513" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1215" y="1537.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="2115,1710 1855,1725" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1917" y="1658" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1985" y="1682.0">&lt;&lt;include&gt;&gt;</tspan></text>
+<polyline points="1855,1875 2115,1710" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1922" y="1793" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1990" y="1817.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<polyline points="1855,2050 2115,1880" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10" marker-end="url(#openArrow)"/>
+<rect x="1922" y="1943" width="136" height="34" rx="5" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#246BFD"><tspan x="1990" y="1967.0">&lt;&lt;extend&gt;&gt;</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#246BFD"><tspan x="870" y="593.0">SUPERVISOR / ADMINISTRATOR FUNCTIONS</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#246BFD"><tspan x="2410" y="593.0">POLICE PERSONNEL FUNCTIONS</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#246BFD"><tspan x="1600" y="254.0">SHARED</tspan></text>
+<rect x="1260" y="920" width="680" height="90" rx="13" fill="#F8FAFC" stroke="#246BFD" stroke-width="3"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="400" fill="#0F172A"><tspan x="1600" y="943.0">GPS locations update automatically from</tspan><tspan x="1600" y="975.0">assigned IoT devices through the backend.</tspan></text>
+<polyline points="1260,965 1085,1030" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="15 10"/>
+<ellipse cx="790" cy="690" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="682.0">Manage Personnel Accounts</tspan><tspan x="790" y="714.0">&amp; GPS Device Assignments</tspan></text>
+<ellipse cx="790" cy="860" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="868.0">Manage Deployments</tspan></text>
+<ellipse cx="790" cy="1030" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="1022.0">Monitor Real-Time</tspan><tspan x="790" y="1054.0">Personnel Locations</tspan></text>
+<ellipse cx="790" cy="1200" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="1192.0">View Boundary &amp;</tspan><tspan x="790" y="1224.0">Inactivity Alerts</tspan></text>
+<ellipse cx="790" cy="1370" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="1378.0">Monitor Backup Requests</tspan></text>
+<ellipse cx="790" cy="1540" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="1548.0">Review Operational Reports</tspan></text>
+<ellipse cx="790" cy="1710" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="1702.0">View Dashboard &amp;</tspan><tspan x="790" y="1734.0">Operational Analytics</tspan></text>
+<ellipse cx="790" cy="1880" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="790" y="1872.0">Generate or Download</tspan><tspan x="790" y="1904.0">Analytics Report</tspan></text>
+<ellipse cx="2410" cy="690" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="682.0">View Updated GPS Location</tspan><tspan x="2410" y="714.0">&amp; Duty Status</tspan></text>
+<ellipse cx="2410" cy="860" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="868.0">View Deployment</tspan></text>
+<ellipse cx="2410" cy="1030" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="1038.0">View Assigned Tasks</tspan></text>
+<ellipse cx="2410" cy="1200" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="1208.0">Request Backup</tspan></text>
+<ellipse cx="2410" cy="1370" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="1378.0">Respond to Backup Request</tspan></text>
+<ellipse cx="2410" cy="1540" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="1548.0">Complete Backup Response</tspan></text>
+<ellipse cx="2410" cy="1710" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="1718.0">Submit Operational Report</tspan></text>
+<ellipse cx="2410" cy="1880" rx="295.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2410" y="1888.0">View Report Status</tspan></text>
+<ellipse cx="940" cy="335" rx="180.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="940" y="343.0">Login</tspan></text>
+<ellipse cx="1600" cy="335" rx="220.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="1600" y="343.0">View Notifications</tspan></text>
+<ellipse cx="2260" cy="335" rx="180.0" ry="58.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="600" fill="#0F172A"><tspan x="2260" y="343.0">Logout</tspan></text>
+<ellipse cx="940" cy="505" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="940" y="513.0">Verify Login Code</tspan></text>
+<ellipse cx="1600" cy="795" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="803.0">Acknowledge Deployment</tspan></text>
+<ellipse cx="1600" cy="1125" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="1133.0">Send Backup Notifications</tspan></text>
+<ellipse cx="1600" cy="1275" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="1283.0">Cancel Active Backup Request</tspan></text>
+<ellipse cx="1600" cy="1425" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="1433.0">Create Linked Incident Report</tspan></text>
+<ellipse cx="1600" cy="1575" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="1583.0">Validate or Reject Report</tspan></text>
+<ellipse cx="1600" cy="1725" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="1733.0">Specify Incident Location</tspan></text>
+<ellipse cx="1600" cy="1875" rx="255.0" ry="54.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="1883.0">Attach Photo Evidence</tspan></text>
+<ellipse cx="1600" cy="2050" rx="255.0" ry="63.0" fill="#FFFFFF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" fill="#0F172A"><tspan x="1600" y="2042.0">Edit Pending Report or</tspan><tspan x="1600" y="2074.0">Submit Report Correction</tspan></text>
+<circle cx="145" cy="1145" r="40" fill="none" stroke="#0F172A" stroke-width="6"/>
+<line x1="145" y1="1185" x2="145" y2="1315" stroke="#0F172A" stroke-width="6"/>
+<line x1="70" y1="1235" x2="220" y2="1235" stroke="#0F172A" stroke-width="6"/>
+<line x1="145" y1="1315" x2="75" y2="1405" stroke="#0F172A" stroke-width="6"/>
+<line x1="145" y1="1315" x2="215" y2="1405" stroke="#0F172A" stroke-width="6"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" fill="#0F172A"><tspan x="145" y="1439.0">Supervisor /</tspan><tspan x="145" y="1471.0">Administrator (COP)</tspan></text>
+<circle cx="3055" cy="1145" r="40" fill="none" stroke="#0F172A" stroke-width="6"/>
+<line x1="3055" y1="1185" x2="3055" y2="1315" stroke="#0F172A" stroke-width="6"/>
+<line x1="2980" y1="1235" x2="3130" y2="1235" stroke="#0F172A" stroke-width="6"/>
+<line x1="3055" y1="1315" x2="2985" y2="1405" stroke="#0F172A" stroke-width="6"/>
+<line x1="3055" y1="1315" x2="3125" y2="1405" stroke="#0F172A" stroke-width="6"/>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" fill="#0F172A"><tspan x="3055" y="1439.0">Police</tspan><tspan x="3055" y="1471.0">Personnel</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="400" fill="#475569"><tspan x="1600.0" y="2318.0">Legend:  &lt;&lt;include&gt;&gt; required sub-process     |     &lt;&lt;extend&gt;&gt; optional or condition-based behavior</tspan></text>
+</svg>

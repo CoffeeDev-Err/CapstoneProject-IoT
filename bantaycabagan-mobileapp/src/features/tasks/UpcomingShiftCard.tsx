@@ -88,6 +88,15 @@ export function UpcomingShiftCard({
                   </Text>
                 </View>
               </View>
+              <View style={styles.shiftDetailRow}>
+                <Icon name="description" size={18} color={colors.textMuted} />
+                <View style={styles.shiftDetailText}>
+                  <Text style={[styles.shiftDetailLabel, isDark && darkStyles.muted]}>INSTRUCTIONS</Text>
+                  <Text style={[styles.shiftDetailValue, isDark && darkStyles.text]}>
+                    {upcomingDeployment.notes?.trim() || 'No additional instructions.'}
+                  </Text>
+                </View>
+              </View>
             </View>
           </SmoothCollapsible>
         </View>

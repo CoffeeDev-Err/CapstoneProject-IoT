@@ -133,6 +133,110 @@
   vertical-align: middle;
 }
 
+.assignment-instructions-cell {
+  width: 1%;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.assignment-instructions-btn {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.assignment-instructions-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.assignment-instructions-btn:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--bg-primary));
+  color: var(--color-primary-dark);
+}
+
+.assignment-instructions-btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.deployment-instructions-modal__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.deployment-instructions-modal__heading small {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.deployment-instructions-modal__icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 13%, var(--bg-primary));
+  color: var(--color-primary);
+}
+
+.deployment-instructions-modal__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.deployment-instructions-modal__context {
+  margin: 0.8rem 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.deployment-instructions-modal__content {
+  max-height: min(42vh, 18rem);
+  margin: 0.85rem 0 0;
+  padding: 0.9rem 1rem;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.deployment-instructions-modal__close {
+  border: 1px solid var(--color-danger);
+  background: transparent;
+  color: var(--color-danger);
+  box-shadow: none;
+}
+
+.deployment-instructions-modal__close:hover {
+  border-color: var(--color-danger-dark);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-danger-dark);
+  transform: none;
+  box-shadow: none;
+}
+
 .assignment-group-row td {
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-primary);

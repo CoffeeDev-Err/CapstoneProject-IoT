@@ -22,6 +22,7 @@ describe('verification feedback and server deadlines', () => {
     t.mock.method(EmailVerification, 'countDocuments', async () => 0)
     t.mock.method(EmailVerification, 'findOne', () => ({ sort: async () => ({ createdAt: oldest }) }))
     t.mock.method(EmailVerification, 'updateMany', async () => ({}))
+    t.mock.method(EmailVerification, 'updateOne', async () => ({ modifiedCount: 1 }))
     t.mock.method(EmailVerification, 'create', async (payload) => ({ ...payload, _id: 'new-code' }))
   })
 
@@ -56,6 +57,9 @@ describe('verification feedback and server deadlines', () => {
       auth.resetPassword({ challenge_id: 'challenge', code: '123456', new_password: 'StrongPass1!' }),
       { code: 'PASSWORD_REUSED' },
     )
+    assert.equal(challenge.consumedAt, undefined)
+    assert.equal(challenge.attempts, 0)
+    assert.equal(EmailVerification.updateOne.mock.callCount(), 0)
   })
 
   it('records a successful password reset without storing the password or OTP', async (t) => {

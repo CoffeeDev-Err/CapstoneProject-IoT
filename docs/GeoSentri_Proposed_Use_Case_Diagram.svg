@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2800" height="2000" viewBox="0 0 2800 2000">
+<rect width="2800" height="2000" fill="#FFFFFF"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" fill="#0F172A"><tspan x="1400.0" y="76.0">GeoSentri: Proposed Use-Case Diagram</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="400" fill="#475569"><tspan x="1400.0" y="128.0">Web- and Mobile-Based Real-Time GPS Monitoring System for Police Personnel</tspan></text>
+<rect x="330" y="160" width="2140" height="1720" rx="18" fill="none" stroke="#0F172A" stroke-width="4"/>
+<rect x="365" y="177" width="555" height="50" fill="#FFFFFF"/>
+<text x="380" y="215" font-family="Segoe UI, Arial, sans-serif" font-size="31" font-weight="700" fill="#0F172A">GEOSENTRI SYSTEM</text>
+<polyline points="225,965 515.0,550" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,710" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,870" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,1030" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,1190" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,1350" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,1510" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 515.0,1670" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,550" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,710" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,870" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,1030" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,1190" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,1350" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,1510" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2285.0,1670" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 370,965 400,410 735.0,410 735.0,376.0" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2430,965 2400,446 1065.0,446 1065.0,376.0" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 370,965 400,428 1190.0,428 1190.0,376.0" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2430,965 2400,428 1610.0,428 1610.0,376.0" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="225,965 370,965 400,446 1735.0,446 1735.0,376.0" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="2575,965 2430,965 2400,410 2065.0,410 2065.0,376.0" fill="none" stroke="#64748B" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1120,1780 1025,905" fill="none" stroke="#246BFD" stroke-width="3" stroke-linejoin="round" stroke-dasharray="12 10"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#246BFD"><tspan x="845" y="468.0">SUPERVISOR / ADMINISTRATOR FUNCTIONS</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#246BFD"><tspan x="2040" y="468.0">POLICE PERSONNEL FUNCTIONS</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#246BFD"><tspan x="1400" y="256.0">SHARED</tspan></text>
+<ellipse cx="780" cy="550" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="534.0">Manage Personnel Accounts</tspan><tspan x="780" y="566.0">&amp; GPS Device Assignments</tspan></text>
+<ellipse cx="780" cy="710" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="710.0">Manage Deployments</tspan></text>
+<ellipse cx="780" cy="870" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="854.0">Monitor Real-Time</tspan><tspan x="780" y="886.0">Personnel Locations</tspan></text>
+<ellipse cx="780" cy="1030" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="1014.0">View Boundary &amp;</tspan><tspan x="780" y="1046.0">Inactivity Alerts</tspan></text>
+<ellipse cx="780" cy="1190" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="1190.0">Monitor Backup Requests</tspan></text>
+<ellipse cx="780" cy="1350" rx="265.0" ry="75.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="1316.0">Review, Validate, or Reject</tspan><tspan x="780" y="1348.0">Operational Reports</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#475569"><tspan x="780" y="1398.0">Details, evidence, and location</tspan></text>
+<ellipse cx="780" cy="1510" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="1494.0">View Dashboard &amp;</tspan><tspan x="780" y="1526.0">Operational Analytics</tspan></text>
+<ellipse cx="780" cy="1670" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="780" y="1654.0">Generate or Download</tspan><tspan x="780" y="1686.0">Analytics Report</tspan></text>
+<ellipse cx="2020" cy="550" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="534.0">View Updated GPS Location</tspan><tspan x="2020" y="566.0">&amp; Duty Status</tspan></text>
+<ellipse cx="2020" cy="710" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="694.0">View &amp; Acknowledge</tspan><tspan x="2020" y="726.0">Deployment</tspan></text>
+<ellipse cx="2020" cy="870" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="870.0">View Assigned Tasks</tspan></text>
+<ellipse cx="2020" cy="1030" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="1030.0">Request Backup</tspan></text>
+<ellipse cx="2020" cy="1190" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="1190.0">Respond to Backup Request</tspan></text>
+<ellipse cx="2020" cy="1350" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="1334.0">Complete or Cancel</tspan><tspan x="2020" y="1366.0">Backup Response</tspan></text>
+<ellipse cx="2020" cy="1510" rx="265.0" ry="75.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="1476.0">Submit, Edit, or Correct</tspan><tspan x="2020" y="1508.0">Operational Reports</tspan></text>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#475569"><tspan x="2020" y="1558.0">With evidence and incident location</tspan></text>
+<ellipse cx="2020" cy="1670" rx="265.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="2020" y="1670.0">View Report Status</tspan></text>
+<ellipse cx="900" cy="330" rx="165.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="900" y="330.0">Login</tspan></text>
+<ellipse cx="1400" cy="330" rx="210.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="1400" y="330.0">View Notifications</tspan></text>
+<ellipse cx="1900" cy="330" rx="165.0" ry="56.0" fill="#EFF6FF" stroke="#246BFD" stroke-width="4"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#0F172A"><tspan x="1900" y="330.0">Logout</tspan></text>
+<rect x="780" y="1772" width="1240" height="90" rx="14" fill="#F8FAFC" stroke="#246BFD" stroke-width="3"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="23" font-weight="400" fill="#0F172A"><tspan x="1400" y="1811.0">Personnel locations update automatically from assigned IoT GPS devices</tspan><tspan x="1400" y="1839.0">through the GeoSentri backend.</tspan></text>
+<circle cx="150" cy="875" r="40" fill="none" stroke="#0F172A" stroke-width="6"/>
+<line x1="150" y1="915" x2="150" y2="1045" stroke="#0F172A" stroke-width="6"/>
+<line x1="75" y1="965" x2="225" y2="965" stroke="#0F172A" stroke-width="6"/>
+<line x1="150" y1="1045" x2="80" y2="1135" stroke="#0F172A" stroke-width="6"/>
+<line x1="150" y1="1045" x2="220" y2="1135" stroke="#0F172A" stroke-width="6"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#0F172A"><tspan x="150" y="1169.5">Supervisor /</tspan><tspan x="150" y="1200.5">Administrator (COP)</tspan></text>
+<circle cx="2650" cy="875" r="40" fill="none" stroke="#0F172A" stroke-width="6"/>
+<line x1="2650" y1="915" x2="2650" y2="1045" stroke="#0F172A" stroke-width="6"/>
+<line x1="2575" y1="965" x2="2725" y2="965" stroke="#0F172A" stroke-width="6"/>
+<line x1="2650" y1="1045" x2="2580" y2="1135" stroke="#0F172A" stroke-width="6"/>
+<line x1="2650" y1="1045" x2="2720" y2="1135" stroke="#0F172A" stroke-width="6"/>
+<text text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#0F172A"><tspan x="2650" y="1169.5">Police</tspan><tspan x="2650" y="1200.5">Personnel</tspan></text>
+</svg>

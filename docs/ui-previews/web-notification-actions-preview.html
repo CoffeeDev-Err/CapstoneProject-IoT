@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GeoSentri actionable notifications preview</title>
+  <style>
+    :root {
+      --page:#f4f7fb; --shell:#fff; --surface:#fff; --muted-surface:#f8fafc;
+      --selected:#eff6ff; --border:#dfe7f0; --text:#0f172a; --text-2:#475569;
+      --text-3:#64748b; --blue:#2563eb; --blue-2:#1d4ed8; --blue-soft:#eff6ff;
+      --red:#dc2626; --red-soft:#fef2f2; --amber:#b45309; --amber-soft:#fffbeb;
+      --green:#15803d; --green-soft:#f0fdf4; --purple:#7c3aed; --purple-soft:#ede9fe;
+      --shadow:0 20px 48px rgba(15,23,42,.16); --map:#dce7e3; --road:#fff;
+    }
+    :root[data-theme="dark"] {
+      --page:#0f172a; --shell:#020817; --surface:#1e293b; --muted-surface:#111d33;
+      --selected:rgba(37,99,235,.16); --border:#334155; --text:#f1f5f9; --text-2:#cbd5e1;
+      --text-3:#94a3b8; --blue:#3b82f6; --blue-2:#60a5fa; --blue-soft:rgba(37,99,235,.16);
+      --red:#f87171; --red-soft:rgba(220,38,38,.17); --amber:#fbbf24; --amber-soft:rgba(245,158,11,.16);
+      --green:#4ade80; --green-soft:rgba(22,163,74,.16); --purple:#a78bfa; --purple-soft:rgba(124,58,237,.2);
+      --shadow:0 24px 56px rgba(0,0,0,.42); --map:#14241f; --road:#60736e;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#09101f; color:var(--text); font-family:Manrope,"Segoe UI",Arial,sans-serif; }
+    button { font:inherit; }
+    .board { width:1600px; min-height:1050px; padding:32px 40px 44px; background:#09101f; }
+    .preview-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; color:#f8fafc; }
+    .preview-head h1 { margin:0; font-size:25px; letter-spacing:-.02em; }
+    .preview-head p { margin:6px 0 0; color:#94a3b8; font-size:13px; }
+    .preview-controls { display:flex; gap:8px; }
+    .preview-controls button { border:1px solid #334155; border-radius:8px; padding:9px 13px; background:#111827; color:#cbd5e1; font-size:12px; font-weight:700; cursor:pointer; }
+    .preview-controls button.active { border-color:#3b82f6; background:#1d4ed8; color:#fff; }
+    .window { height:920px; overflow:hidden; border:1px solid #243148; border-radius:16px; background:var(--page); box-shadow:var(--shadow); }
+    .topbar { height:68px; margin-left:248px; display:flex; align-items:center; justify-content:space-between; padding:0 25px; border-bottom:1px solid var(--border); background:var(--shell); }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand img { width:41px; height:46px; object-fit:contain; }
+    .brand h2 { margin:0; color:var(--text); font-size:16px; }
+    .brand p { margin:3px 0 0; color:var(--text-3); font-size:11px; }
+    .top-actions { display:flex; align-items:center; gap:10px; }
+    .live { display:flex; align-items:center; gap:7px; padding:7px 11px; border:1px solid var(--border); border-radius:999px; color:var(--text-2); font-size:11px; font-weight:700; }
+    .live i { width:7px; height:7px; border-radius:50%; background:var(--green); }
+    .round { position:relative; width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text-2); font-size:18px; }
+    .round .dot { position:absolute; top:7px; right:7px; width:7px; height:7px; border:2px solid var(--surface); border-radius:50%; background:var(--blue); }
+    .avatar { width:34px; height:34px; display:grid; place-items:center; border:2px solid var(--blue); border-radius:50%; background:#bfdbfe; color:#1e3a8a; font-size:11px; font-weight:800; }
+    .sidebar { position:absolute; width:248px; height:920px; padding:21px 16px; border-right:1px solid #1e293b; background:#0f172a; color:#94a3b8; }
+    .side-brand { padding:4px 11px 22px; color:#e2e8f0; font-size:22px; font-weight:800; }
+    .side-brand span { color:#60a5fa; }
+    .side-label { margin:15px 11px 7px; color:#64748b; font-size:10px; font-weight:800; letter-spacing:.1em; }
+    .nav { height:43px; margin:4px 0; padding:0 12px; display:flex; align-items:center; gap:12px; border-radius:8px; font-size:13px; font-weight:700; }
+    .nav.active { background:#1e3a5f; color:#bfdbfe; }
+    .nav .ico { width:20px; text-align:center; font-size:16px; }
+    .content { position:relative; height:852px; margin-left:248px; padding:24px; overflow:hidden; }
+    .title-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+    .title-row h2 { margin:0; font-size:25px; letter-spacing:-.02em; }
+    .title-row p { margin:5px 0 0; color:var(--text-3); font-size:12px; }
+    .btn { height:40px; padding:0 15px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-2); font-size:12px; font-weight:800; }
+    .btn.primary { border-color:var(--blue); background:var(--blue); color:white; }
+    .btn.danger { border-color:var(--red); background:transparent; color:var(--red); }
+    .card { border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 5px 18px rgba(15,23,42,.05); }
+    .toolbar { height:62px; display:flex; align-items:center; gap:10px; padding:10px 14px; }
+    .search { flex:1; height:40px; display:flex; align-items:center; gap:10px; padding:0 13px; border:1px solid var(--border); border-radius:8px; background:var(--muted-surface); color:var(--text-3); font-size:12px; }
+    .pill { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .pill.blue { background:var(--blue-soft); color:var(--blue-2); }
+    .pill.red { background:var(--red-soft); color:var(--red); }
+    .pill.amber { background:var(--amber-soft); color:var(--amber); }
+    .pill.green { background:var(--green-soft); color:var(--green); }
+    .pill.purple { background:var(--purple-soft); color:var(--purple); }
+    .table-head,.table-row { display:grid; grid-template-columns:1.4fr .8fr .75fr .8fr .85fr 90px; align-items:center; gap:12px; padding:0 18px; }
+    .table-head { height:43px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:var(--muted-surface); color:var(--text-3); font-size:10px; font-weight:800; text-transform:uppercase; }
+    .table-row { min-height:67px; border-bottom:1px solid var(--border); color:var(--text-2); font-size:12px; }
+    .person { display:flex; align-items:center; gap:10px; }
+    .person .face { width:34px; height:34px; display:grid; place-items:center; border-radius:50%; background:var(--blue-soft); color:var(--blue-2); font-size:11px; font-weight:800; }
+    .person strong { display:block; color:var(--text); font-size:12px; }
+    .person small { color:var(--text-3); }
+    .highlight-row { position:relative; background:var(--selected); box-shadow:inset 3px 0 0 var(--blue),inset 0 1px rgba(59,130,246,.35),inset 0 -1px rgba(59,130,246,.35); }
+    .open { color:var(--blue-2); font-size:11px; font-weight:800; }
+    .notice { margin-bottom:13px; padding:10px 13px; display:flex; align-items:center; gap:9px; border:1px solid rgba(59,130,246,.35); border-radius:9px; background:var(--blue-soft); color:var(--blue-2); font-size:11px; font-weight:700; }
+
+    /* notifications */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .stat { height:116px; padding:18px; }
+    .stat span { color:var(--text-3); font-size:11px; font-weight:700; }
+    .stat strong { display:block; margin-top:13px; font-size:26px; }
+    .chart { height:370px; margin-top:15px; padding:18px; overflow:hidden; }
+    .chart h3 { margin:0; font-size:14px; }
+    .bars { height:255px; display:flex; align-items:flex-end; gap:23px; padding:35px 20px 0; border-bottom:1px solid var(--border); }
+    .bars i { width:47px; border-radius:6px 6px 0 0; background:linear-gradient(#60a5fa,#2563eb); }
+    .notif-menu { position:absolute; z-index:20; top:-12px; right:14px; width:430px; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:var(--shadow); }
+    .notif-head { display:flex; justify-content:space-between; padding:16px 17px 12px; border-bottom:1px solid var(--border); }
+    .notif-head strong { font-size:15px; }
+    .notif-head small { display:block; margin-top:2px; color:var(--text-3); font-size:10px; }
+    .links { display:flex; gap:10px; color:var(--blue-2); font-size:10px; font-weight:800; }
+    .notif-search { padding:10px 13px; border-bottom:1px solid var(--border); }
+    .notif-search .search { height:36px; }
+    .history { padding:10px 13px; display:flex; gap:8px; border-bottom:1px solid var(--border); }
+    .history span { padding:5px 9px; border:1px solid var(--border); border-radius:999px; color:var(--text-3); font-size:9px; font-weight:800; }
+    .history span.active { border-color:var(--blue); background:var(--blue-soft); color:var(--blue-2); }
+    .notif-list { max-height:584px; overflow:hidden; }
+    .notif { position:relative; width:100%; padding:13px 16px; border:0; border-bottom:1px solid var(--border); background:var(--surface); color:inherit; text-align:left; }
+    .notif.unread { background:var(--selected); }
+    .notif.unread::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--blue); }
+    .notif-meta { display:flex; align-items:center; justify-content:space-between; }
+    .notif-meta time { color:var(--text-3); font-size:9px; }
+    .notif h4 { margin:8px 0 4px; font-size:12px; }
+    .notif p { margin:0; color:var(--text-2); font-size:10px; line-height:1.5; }
+    .notif .arrow { position:absolute; right:16px; bottom:13px; color:var(--blue-2); font-size:14px; }
+
+    /* drawers */
+    .scrim { position:absolute; inset:0; z-index:9; background:rgba(2,6,23,.5); }
+    .drawer { position:absolute; z-index:10; top:0; right:0; width:520px; height:100%; display:flex; flex-direction:column; border-left:1px solid var(--border); background:var(--surface); box-shadow:-16px 0 35px rgba(2,6,23,.22); }
+    .drawer-head { padding:19px 21px; display:flex; justify-content:space-between; border-bottom:1px solid var(--border); }
+    .drawer-head .eyebrow { color:var(--blue-2); font-size:9px; font-weight:800; text-transform:uppercase; }
+    .drawer-head h3 { margin:4px 0 0; font-size:19px; }
+    .x { width:34px; height:34px; display:grid; place-items:center; border:1px solid var(--border); border-radius:8px; color:var(--text-2); }
+    .drawer-body { flex:1; overflow:hidden; padding:18px 21px; }
+    .summary { padding:13px; display:flex; justify-content:space-between; border:1px solid var(--border); border-radius:10px; background:var(--muted-surface); }
+    .summary small,.detail dt { color:var(--text-3); font-size:9px; font-weight:800; text-transform:uppercase; }
+    .summary strong { display:block; margin-top:4px; font-size:12px; }
+    .detail { display:grid; grid-template-columns:1fr 1fr; margin:17px 0 0; border-top:1px solid var(--border); border-left:1px solid var(--border); }
+    .detail div { min-height:70px; padding:12px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .detail dd { margin:6px 0 0; color:var(--text); font-size:11px; font-weight:650; }
+    .description { margin-top:16px; }
+    .description h4 { margin:0 0 7px; font-size:11px; text-transform:uppercase; }
+    .description p { margin:0; color:var(--text-2); font-size:11px; line-height:1.6; }
+    .evidence { height:96px; margin-top:15px; display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--muted-surface); }
+    .thumb { width:90px; height:70px; display:grid; place-items:center; border-radius:8px; background:linear-gradient(135deg,#213b39,#5b695d); color:#fff; font-size:23px; }
+    .evidence strong { display:block; font-size:11px; }
+    .evidence span { color:var(--text-3); font-size:9px; }
+    .drawer-foot { padding:13px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+
+    /* map and profile */
+    .map-layout { height:100%; display:grid; grid-template-columns:300px 1fr; gap:14px; }
+    .officers { padding:14px; }
+    .officers h3 { margin:0 0 12px; font-size:14px; }
+    .officer-item { padding:10px; display:flex; align-items:center; gap:9px; border-bottom:1px solid var(--border); }
+    .officer-item.selected { border:1px solid var(--blue); border-radius:8px; background:var(--selected); }
+    .map-stage { position:relative; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:var(--map); }
+    .map-stage::before,.map-stage::after { content:""; position:absolute; width:120%; height:16px; left:-10%; top:45%; border:2px solid rgba(100,116,139,.35); background:var(--road); transform:rotate(-13deg); }
+    .map-stage::after { top:22%; transform:rotate(35deg); }
+    .map-label { position:absolute; color:var(--text-3); font-size:9px; font-weight:800; transform:rotate(-13deg); }
+    .marker { position:absolute; width:46px; height:46px; display:grid; place-items:center; border:5px solid var(--blue); border-radius:50% 50% 50% 0; background:#dbeafe; color:#1e3a8a; font-size:10px; font-weight:900; transform:rotate(-45deg); box-shadow:0 0 0 4px rgba(37,99,235,.2); }
+    .marker span { transform:rotate(45deg); }
+    .marker.backup { border-color:var(--red); box-shadow:0 0 0 6px rgba(220,38,38,.18); }
+    .profile-scrim { position:absolute; inset:0; z-index:4; background:rgba(2,6,23,.46); backdrop-filter:blur(3px); }
+    .profile { position:absolute; z-index:5; top:50%; left:50%; width:380px; overflow:hidden; border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:var(--shadow); transform:translate(-50%,-50%); }
+    .profile-head { padding:16px; display:flex; gap:12px; align-items:center; border-bottom:1px solid var(--border); }
+    .profile-photo { width:52px; height:52px; display:grid; place-items:center; border:3px solid var(--blue); border-radius:50%; background:#dbeafe; color:#1e3a8a; font-size:14px; font-weight:900; }
+    .profile-head h3 { margin:0; font-size:16px; }
+    .profile-head p { margin:3px 0; color:var(--text-3); font-size:10px; }
+    .status { color:var(--green); font-size:9px; font-weight:800; text-transform:uppercase; }
+    .location { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
+    .location span { display:block; color:var(--text-3); font-size:9px; text-transform:uppercase; font-weight:800; }
+    .location strong { display:block; margin-top:4px; font-size:11px; }
+    .request { margin:13px; padding:13px; border:1px solid var(--border); border-radius:10px; background:var(--muted-surface); }
+    .request-title { display:flex; align-items:center; justify-content:space-between; }
+    .request-title small { display:block; color:var(--text-3); font-size:9px; font-weight:800; text-transform:uppercase; }
+    .request-title strong { display:block; margin-top:3px; font-size:12px; }
+    .request-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+    .request-grid span { display:block; color:var(--text-3); font-size:8px; text-transform:uppercase; font-weight:800; }
+    .request-grid strong { display:block; margin-top:3px; color:var(--text); font-size:10px; }
+    .request-action { width:100%; height:36px; margin-top:12px; border:0; border-radius:7px; background:var(--blue); color:white; font-size:11px; font-weight:800; }
+    .metrics { display:grid; grid-template-columns:repeat(2,1fr); padding:11px 13px; gap:9px 14px; border-top:1px solid var(--border); }
+    .metric { padding:0; text-align:left; }
+    .metric span { display:block; color:var(--text-3); font-size:8px; text-transform:uppercase; }
+    .metric strong { display:block; margin-top:5px; font-size:10px; }
+    .focus-label { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); padding:9px 12px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text-2); font-size:10px; font-weight:800; box-shadow:var(--shadow); }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="preview-head">
+      <div><h1>GeoSentri · Actionable notification design</h1><p>Interactive preview using the current web theme and component proportions</p></div>
+      <div class="preview-controls">
+        <button data-view="notifications">Notifications</button>
+        <button data-view="report">Report</button>
+        <button data-view="outside">Outside / inactive</button>
+        <button data-view="backup">Backup</button>
+        <button data-view="deployment">Deployment</button>
+        <button data-view="personnel">Personnel</button>
+        <button id="theme">Light theme</button>
+      </div>
+    </header>
+    <section class="window">
+      <aside class="sidebar">
+        <div class="side-brand">Geo<span>Sentri</span></div>
+        <div class="side-label">OVERVIEW</div>
+        <div class="nav" data-nav="map"><span class="ico">⌖</span>Live Map</div>
+        <div class="nav" data-nav="dashboard"><span class="ico">⌂</span>Dashboard</div>
+        <div class="side-label">OPERATIONS</div>
+        <div class="nav" data-nav="personnel"><span class="ico">♙</span>Personnel</div>
+        <div class="nav" data-nav="deployment-management"><span class="ico">⌁</span>Deployment Management</div>
+        <div class="nav" data-nav="deployments"><span class="ico">▣</span>Assigned Deployments</div>
+        <div class="side-label">ANALYTICS</div>
+        <div class="nav"><span class="ico">◫</span>Analytics</div>
+        <div class="nav" data-nav="reports"><span class="ico">▤</span>Reports</div>
+        <div class="side-label">ADMIN</div>
+        <div class="nav"><span class="ico">⚙</span>Account Management</div>
+      </aside>
+      <header class="topbar">
+        <div class="brand"><img src="../../frontend/src/assets/pnp-logo.png" alt=""><div><h2>Philippine National Police</h2><p>Cabagan Police Station Operations Portal</p></div></div>
+        <div class="top-actions"><span class="live"><i></i>Live</span><button class="round">☾</button><button class="round">♢<span class="dot"></span></button><span class="avatar">COP</span></div>
+      </header>
+      <div class="content" id="content"></div>
+    </section>
+  </main>
+  <script>
+    const content = document.getElementById('content');
+    const qs = new URLSearchParams(location.search);
+    let view = qs.get('view') || 'notifications';
+    let theme = qs.get('theme') || 'dark';
+    const rows = `
+      <div class="table-row"><div class="person"><span class="face">MD</span><div><strong>PSMS Marco Dela Cruz</strong><small>Badge 10547</small></div></div><span>Checkpoint</span><span class="pill amber">Pending</span><span>San Bernardo</span><span>Sep 13 · 8:42 AM</span><span class="open">View</span></div>
+      <div class="table-row"><div class="person"><span class="face">AR</span><div><strong>PCpl Andrea Ramos</strong><small>Badge 11802</small></div></div><span>Patrol</span><span class="pill green">Validated</span><span>Catabayungan</span><span>Sep 13 · 7:18 AM</span><span class="open">View</span></div>
+      <div class="table-row"><div class="person"><span class="face">JS</span><div><strong>PSSg Joel Santos</strong><small>Badge 10386</small></div></div><span>Incident</span><span class="pill green">Validated</span><span>Cansan</span><span>Sep 12 · 10:31 PM</span><span class="open">View</span></div>`;
+    const shellTitle = (title, subtitle, action='') => `<div class="title-row"><div><h2>${title}</h2><p>${subtitle}</p></div>${action}</div>`;
+    const reportsTable = () => `<div class="card"><div class="toolbar"><div class="search">⌕&nbsp; Search report ID, officer, or location</div><button class="btn">All statuses⌄</button></div><div class="table-head"><span>Officer</span><span>Type</span><span>Status</span><span>Area</span><span>Submitted</span><span>Actions</span></div>${rows}</div>`;
+    const notifications = () => `${shellTitle('Operations Dashboard','Live personnel activity and station overview')}<div class="stats"><div class="card stat"><span>Active personnel</span><strong>24</strong></div><div class="card stat"><span>On deployment</span><strong>16</strong></div><div class="card stat"><span>Open backup requests</span><strong>1</strong></div><div class="card stat"><span>Reports today</span><strong>8</strong></div></div><div class="card chart"><h3>Personnel activity</h3><div class="bars"><i style="height:55%"></i><i style="height:72%"></i><i style="height:46%"></i><i style="height:84%"></i><i style="height:63%"></i><i style="height:78%"></i><i style="height:91%"></i><i style="height:68%"></i><i style="height:76%"></i></div></div><section class="notif-menu"><div class="notif-head"><div><strong>Notifications</strong><small>5 of 5 shown</small></div><div class="links"><span>Mark all read</span><span>Clear</span></div></div><div class="notif-search"><div class="search">⌕&nbsp; Search notifications</div></div><div class="history"><span class="active">All</span><span>Today</span><span>This week</span></div><div class="notif-list"><button class="notif unread"><div class="notif-meta"><span class="pill blue">Report</span><time>2 min ago</time></div><h4>New report submitted</h4><p>PSMS Marco Dela Cruz submitted RPT-2026-09A42.</p><span class="arrow">›</span></button><button class="notif unread"><div class="notif-meta"><span class="pill red">Backup</span><time>5 min ago</time></div><h4>Backup requested</h4><p>PCpl Andrea Ramos requested backup at Catabayungan.</p><span class="arrow">›</span></button><button class="notif unread"><div class="notif-meta"><span class="pill amber">Geofence</span><time>12 min ago</time></div><h4>Personnel outside Cabagan</h4><p>PSSg Joel Santos crossed the municipal boundary.</p><span class="arrow">›</span></button><button class="notif"><div class="notif-meta"><span class="pill purple">Deployment</span><time>28 min ago</time></div><h4>Deployment acknowledged</h4><p>Checkpoint Alpha assignment was acknowledged.</p><span class="arrow">›</span></button><button class="notif"><div class="notif-meta"><span class="pill green">Personnel</span><time>1 hr ago</time></div><h4>Account activated</h4><p>Officer account is now available in Personnel.</p><span class="arrow">›</span></button></div></section>`;
+    const report = () => `${shellTitle('Reports','Review submitted field reports','<button class="btn primary">Generate report</button>')}<div class="notice">●&nbsp; Opened RPT-2026-09A42 from a notification.</div>${reportsTable()}<div class="scrim"></div><aside class="drawer"><div class="drawer-head"><div><div class="eyebrow">Report · RPT-2026-09A42</div><h3>Checkpoint traffic inspection</h3></div><span class="x">×</span></div><div class="drawer-body"><div class="summary"><div><small>Submitted by</small><strong>PSMS Marco Dela Cruz</strong></div><span class="pill amber">Pending review</span></div><dl class="detail"><div><dt>Report type</dt><dd>Checkpoint</dd></div><div><dt>Severity</dt><dd>2 · Low</dd></div><div><dt>Incident / activity time</dt><dd>Sep 13, 2026 · 8:35 AM</dd></div><div><dt>Submitted at</dt><dd>Sep 13, 2026 · 8:42 AM</dd></div><div><dt>Barangay</dt><dd>San Bernardo</dd></div><div><dt>Exact place</dt><dd>Cabagan–Sta. Maria Road</dd></div><div><dt>Location source</dt><dd>Officer's current GPS</dd></div><div><dt>Assigned area</dt><dd>Checkpoint Alpha</dd></div></dl><div class="description"><h4>Description</h4><p>Conducted checkpoint traffic inspection and verified passing vehicles. No incident was recorded during the activity.</p></div><div class="evidence"><div class="thumb">▧</div><div><strong>Photo evidence</strong><span>checkpoint-0913.jpg · Captured 8:37 AM</span></div></div></div><div class="drawer-foot"><button class="btn danger">Reject</button><button class="btn primary">Validate report</button></div></aside>`;
+    const officerList = `<div class="card officers"><h3>Personnel on map</h3><div class="search">⌕&nbsp; Search officer</div><div class="officer-item selected"><span class="face">JS</span><div class="person"><div><strong>PSSg Joel Santos</strong><small>Outside boundary</small></div></div></div><div class="officer-item"><span class="face">AR</span><div class="person"><div><strong>PCpl Andrea Ramos</strong><small>On duty</small></div></div></div><div class="officer-item"><span class="face">MD</span><div class="person"><div><strong>PSMS Marco Dela Cruz</strong><small>On deployment</small></div></div></div></div>`;
+    const mapBase = (type) => `<div class="map-layout">${officerList}<div class="map-stage"><span class="map-label" style="left:32%;top:40%">Cabagan–Sta. Maria Road</span><div class="marker ${type==='backup'?'backup':''}" style="left:43%;top:42%"><span>${type==='backup'?'AR':'JS'}</span></div><div class="marker" style="left:23%;top:66%"><span>MD</span></div><span class="focus-label">Map centered on the officer from the notification</span><div class="profile-scrim"></div>${type==='backup'?backupProfile():outsideProfile()}</div></div>`;
+    const outsideProfile = () => `<article class="profile"><div class="profile-head"><span class="profile-photo">JS</span><div><h3>PSSg Joel Santos</h3><p>Police Staff Sergeant · Badge 10386</p><span class="status" style="color:var(--amber)">● Outside Cabagan</span></div><span class="x" style="margin-left:auto">×</span></div><div class="location"><div><span>Last confirmed location</span><strong>National Highway, Tumauini boundary</strong></div><button class="btn primary">Locate</button></div><div class="metrics"><div class="metric"><span>Speed</span><strong>32.4 km/h</strong></div><div class="metric"><span>Battery</span><strong>74%</strong></div><div class="metric"><span>GPS time</span><strong>9:18 AM</strong></div><div class="metric"><span>Reading age</span><strong>6s ago</strong></div></div></article>`;
+    const backupProfile = () => `<article class="profile"><div class="profile-head"><span class="profile-photo">AR</span><div><h3>PCpl Andrea Ramos</h3><p>Police Corporal · Badge 11802</p><span class="status">● On duty</span></div><span class="x" style="margin-left:auto">×</span></div><div class="location"><div><span>Current officer location</span><strong>Catabayungan Public Market</strong></div><button class="btn primary">Locate</button></div><section class="request"><div class="request-title"><div><small>Backup request</small><strong>Immediate assistance needed</strong></div><span class="pill blue">Open</span></div><div class="request-grid"><div><span>Requested at</span><strong>Sep 13 · 9:25 AM</strong></div><div><span>Request location</span><strong>Market south entrance</strong></div><div><span>Responders</span><strong>1 of 2</strong></div><div><span>Request ID</span><strong>TSK-BK-1842</strong></div></div><button class="request-action">Mark completed</button></section><div class="metrics"><div class="metric"><span>Speed</span><strong>0.0 km/h</strong></div><div class="metric"><span>Battery</span><strong>81%</strong></div><div class="metric"><span>GPS time</span><strong>9:25 AM</strong></div><div class="metric"><span>Reading age</span><strong>4s ago</strong></div></div></article>`;
+    const monitoring = (type) => `${mapBase(type)}`;
+    const deployment = () => `${shellTitle('Assigned Deployments','Search and manage active or scheduled personnel assignments','<button class="btn primary">Create Deployment</button>')}<div class="card" style="padding:20px 20px 0"><div class="title-row" style="margin-bottom:18px"><h2 style="font-size:17px">Assigned Deployment List</h2><div class="search" style="max-width:355px">ASG-MIYNFXY9-FBDB9EBB</div></div><div class="history" style="width:420px;padding:4px;margin-bottom:16px;border:1px solid var(--border);border-radius:12px;background:var(--muted-surface)"><span class="active" style="width:50%;text-align:center;border:0;border-radius:9px">ACTIVE NOW&nbsp;&nbsp; 1</span><span style="width:50%;text-align:center;border:0">SCHEDULED LATER&nbsp;&nbsp; 0</span></div><div style="overflow:hidden"><div class="table-head" style="grid-template-columns:1.05fr .9fr 1fr .85fr .85fr .55fr .95fr 1.4fr"><span>Assignment ID</span><span>Personnel</span><span>Patrol Area</span><span>Shift Start</span><span>Shift End</span><span>Status</span><span>Assigned At</span><span style="text-align:center">Action</span></div><div class="table-row" style="grid-template-columns:1fr 130px;height:62px;background:var(--muted-surface)"><div><strong style="display:block;color:var(--text)">Barangay Anangcasillan</strong><span style="color:var(--blue-2);font-weight:700">1 personnel assigned in this deployment group</span></div><button class="btn" style="justify-self:end">GROUP ACTIONS</button></div><div class="table-row highlight-row" style="grid-template-columns:1.05fr .9fr 1fr .85fr .85fr .55fr .95fr 1.4fr;min-height:110px"><strong>ASG-MIYNFXY9-<br>FBDB9EBB</strong><span><strong style="display:block;color:var(--text)">Leo B Gannad</strong><small>Police Corporal</small></span><span>Barangay<br>Anangcasillan</span><span>Sep 13, 2026,<br>1:18 AM</span><span>Sep 14, 2026,<br>1:18 AM</span><span class="pill blue">Active</span><span>Sep 13, 2026, 1:18 AM</span><span style="display:flex;gap:8px"><button class="btn primary">REASSIGN</button><button class="btn" style="border-color:var(--red);background:var(--red);color:#fff">DELETE</button></span></div></div></div>`;
+    const personnel = () => `${shellTitle('Personnel','Manage police personnel accounts','<button class="btn primary">Add personnel</button>')}<div class="notice">●&nbsp; Opened the Personnel page for the referenced account.</div><div class="card"><div class="toolbar"><div class="search">⌕&nbsp; Search by name, badge number, or rank</div><button class="btn">All statuses⌄</button></div><div class="table-head" style="grid-template-columns:1.4fr .8fr .8fr .8fr .8fr 90px"><span>Personnel</span><span>Rank</span><span>Account</span><span>Duty status</span><span>Last activity</span><span>Actions</span></div><div class="table-row highlight-row" style="grid-template-columns:1.4fr .8fr .8fr .8fr .8fr 90px"><div class="person"><span class="face">JL</span><div><strong>Pat. Joseph Lim</strong><small>Badge 12194</small></div></div><span>Patrolman</span><span class="pill green">Active</span><span>Off duty</span><span>Sep 13 · 9:03 AM</span><span class="open">View</span></div><div class="table-row" style="grid-template-columns:1.4fr .8fr .8fr .8fr .8fr 90px"><div class="person"><span class="face">AR</span><div><strong>PCpl Andrea Ramos</strong><small>Badge 11802</small></div></div><span>Police Corporal</span><span class="pill green">Active</span><span>On duty</span><span>Sep 13 · 9:25 AM</span><span class="open">View</span></div></div>`;
+    function render(){
+      document.documentElement.dataset.theme=theme;
+      document.getElementById('theme').textContent=theme==='dark'?'Light theme':'Dark theme';
+      document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+      document.querySelectorAll('[data-nav]').forEach(n=>n.classList.remove('active'));
+      const nav={notifications:'dashboard',report:'reports',outside:'map',backup:'map',deployment:'deployments',personnel:'personnel'}[view];
+      document.querySelector(`[data-nav="${nav}"]`)?.classList.add('active');
+      content.innerHTML=view==='notifications'?notifications():view==='report'?report():view==='outside'?monitoring('outside'):view==='backup'?monitoring('backup'):view==='deployment'?deployment():personnel();
+    }
+    document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;render()});
+    document.getElementById('theme').onclick=()=>{theme=theme==='dark'?'light':'dark';render()};
+    render();
+  </script>
+</body>
+</html>

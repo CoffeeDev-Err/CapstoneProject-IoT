@@ -49,11 +49,13 @@ const createFlespiMqttService = require('./services/flespiMqttService')
 const createFlespiSyncService = require('./services/flespiSyncService')
 const gpsDeviceService = require('./services/gpsDeviceService')
 const notificationService = require('./services/notificationService')
+const { createPushDeliveryService } = require('./services/pushDeliveryService')
 const createOperationalService = require('./services/operationalService')
 const personnelService = require('./services/personnelService')
 const seedDatabase = require('./services/seedService')
 const registerSocketGateway = require('./runtime/socketGateway')
 const createOperationalRuntime = require('./runtime/operationalRuntime')
+const createPushDeliveryRuntime = require('./runtime/pushDeliveryRuntime')
 
 const PORT = process.env.PORT || 4000
 const GPS_UPDATE_INTERVAL_MS = 2500
@@ -167,6 +169,12 @@ const operationalRuntime = createOperationalRuntime({
 	},
 })
 
+const pushDeliveryRuntime = createPushDeliveryRuntime({
+	service: createPushDeliveryService(),
+	isDatabaseReady: () => mongoose.connection.readyState === 1,
+})
+server.on('close', () => pushDeliveryRuntime.stop())
+
 const start = async () => {
 	try {
 		await connectDB()
@@ -178,6 +186,7 @@ const start = async () => {
 			console.log(`GeoSentri backend server running on port ${PORT}`)
 		})
 		operationalRuntime.start()
+		pushDeliveryRuntime.start()
 	} catch (error) {
 		console.error('Backend startup failed:', error)
 		process.exitCode = 1

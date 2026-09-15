@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GeoSentri report actions preview</title>
+  <style>
+    :root {
+      --page: #e8eef6;
+      --background: #f4f7fb;
+      --surface: #ffffff;
+      --surface-muted: #f8fafc;
+      --border: #d7e0eb;
+      --border-soft: #e5ebf2;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --overlay: rgba(2, 6, 23, .58);
+      --shadow: rgba(15, 23, 42, .22);
+    }
+    body.dark {
+      --page: #020617;
+      --background: #050b18;
+      --surface: #0b1528;
+      --surface-muted: #0e1a30;
+      --border: #2a3a56;
+      --border-soft: #22314a;
+      --text: #f8fafc;
+      --muted: #9eabc0;
+      --blue-soft: #132442;
+      --danger: #f87171;
+      --danger-soft: #3a151d;
+      --overlay: rgba(2, 6, 23, .72);
+      --shadow: rgba(0, 0, 0, .55);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      width: 1120px;
+      min-height: 1040px;
+      overflow: hidden;
+      background: var(--page);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page-header {
+      height: 116px;
+      padding: 34px 56px 20px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+    .page-title { margin: 0; font-size: 27px; line-height: 1.15; font-weight: 800; }
+    .page-subtitle { margin-top: 7px; color: var(--muted); font-size: 14px; }
+    .theme-badge {
+      padding: 9px 13px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .previews { display: flex; justify-content: center; gap: 52px; padding: 0 56px 44px; }
+    .preview-column { width: 470px; }
+    .preview-label { margin: 0 0 10px 7px; color: var(--muted); font-size: 13px; font-weight: 800; }
+    .phone {
+      position: relative;
+      width: 470px;
+      height: 855px;
+      overflow: hidden;
+      border: 8px solid #111827;
+      border-radius: 42px;
+      background: var(--background);
+      box-shadow: 0 22px 48px var(--shadow);
+    }
+    body.dark .phone { border-color: #172033; }
+    .status {
+      height: 35px;
+      padding: 10px 22px 0;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .app-header {
+      height: 77px;
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+      background: var(--surface);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .crest {
+      width: 36px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      clip-path: polygon(20% 0,80% 0,100% 32%,82% 100%,18% 100%,0 32%);
+      background: #b91c1c;
+      color: #facc15;
+      font-size: 15px;
+      font-weight: 900;
+    }
+    .brand-title { color: var(--text); font-size: 14px; font-weight: 800; }
+    .brand-subtitle { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .bell { color: var(--muted); font-size: 23px; }
+    .reports-page { padding: 18px 22px; }
+    .reports-title-row { display: flex; justify-content: space-between; align-items: center; }
+    .reports-title { font-size: 28px; font-weight: 800; }
+    .reports-subtitle { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .add { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--blue); color: white; font-size: 25px; }
+    .ghost-card { margin-top: 20px; height: 112px; border: 1px solid var(--border); border-left: 3px solid var(--blue); border-radius: 8px; background: var(--surface); }
+    .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 44px 20px; background: var(--overlay); }
+    .dialog {
+      width: 100%;
+      max-height: 78%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: 0 18px 34px rgba(0,0,0,.28);
+    }
+    .dialog-header { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .dialog-header h2 { margin: 0; font-size: 19px; font-weight: 800; }
+    .detail-body { padding: 18px; overflow: hidden; flex: 1; }
+    .eyebrow { color: var(--muted); font-size: 10px; font-weight: 800; }
+    .detail-title { margin: 5px 0 12px; font-size: 18px; font-weight: 800; }
+    .row { padding: 10px 0; border-top: 1px solid var(--border); }
+    .row-label { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+    .row-value { margin-top: 4px; font-size: 13px; line-height: 19px; }
+    .dialog-footer { padding: 12px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); }
+    .button { height: 42px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: 21px; font-size: 12px; font-weight: 800; }
+    .button span { position: relative; z-index: 1; display: block; white-space: nowrap; }
+    .dialog-footer .button { flex: 1; min-width: 0; }
+    .button.close { border-color: var(--danger); background: var(--surface); color: var(--danger); }
+    .button.primary { border-color: var(--blue); background: var(--blue); color: #fff; }
+    .sheet { position: absolute; inset: 36px 0 0; overflow: hidden; border-radius: 18px 18px 0 0; background: var(--background); }
+    .handle { width: 54px; height: 5px; margin: 10px auto 4px; border-radius: 999px; background: var(--border); }
+    .sheet-header { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .sheet-header h2 { margin: 0; font-size: 19px; font-weight: 800; }
+    .sheet-header p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+    .form { padding: 18px 18px 36px; }
+    .label { margin: 14px 0 6px; color: var(--muted); font-size: 10px; font-weight: 800; }
+    .input { min-height: 46px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 13px; }
+    .assist { margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .source { flex: 1; color: var(--muted); font-size: 10px; }
+    .gps { min-height: 36px; padding: 0 10px; display: grid; place-items: center; border: 1px solid var(--blue); border-radius: 18px; background: var(--surface); color: var(--blue); font-size: 10px; font-weight: 800; }
+    .map { min-height: 70px; margin-top: 10px; padding: 11px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+    .map-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; background: var(--blue-soft); color: var(--blue); font-size: 20px; }
+    .map-copy { flex: 1; }
+    .map-title { font-size: 12px; font-weight: 800; }
+    .map-meta { margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 14px; }
+    .helper { margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 15px; }
+    .textarea { min-height: 84px; }
+    .photo { min-height: 70px; display: flex; align-items: center; gap: 10px; }
+    .camera { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; background: var(--blue-soft); color: var(--blue); font-size: 19px; }
+    .photo-title { font-size: 13px; font-weight: 800; }
+    .photo-meta { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .severity { display: flex; gap: 8px; }
+    .severity-level { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 800; }
+    .severity-level.active { border-color: var(--blue); background: var(--blue); color: #ffffff; }
+    .form-actions { margin-top: 22px; display: flex; align-items: center; gap: 10px; }
+    .form-actions .button { height: 48px; border-radius: 24px; }
+    .cancel { flex: 1; border-color: var(--danger); background: var(--surface); color: var(--danger); font-size: 13px; }
+    .submit { flex: 1.45; height: 48px !important; border-radius: 24px !important; font-size: 13px; }
+    .bottom-nav { position: absolute; left: 52px; right: 52px; bottom: 15px; height: 54px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); }
+    .caption { margin: 12px 8px 0; color: var(--muted); font-size: 12px; line-height: 17px; }
+    .caption strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">GeoSentri mobile report actions</h1>
+      <div class="page-subtitle">Rendered from the current implemented spacing, colors, labels, and button ratios</div>
+    </div>
+    <div class="theme-badge" id="themeLabel">LIGHT THEME</div>
+  </header>
+
+  <main class="previews">
+    <section class="preview-column">
+      <h2 class="preview-label">REPORT DETAILS</h2>
+      <div class="phone">
+        <div class="status"><span>9:56</span><span>● Wi-Fi&nbsp;&nbsp;100%</span></div>
+        <div class="app-header">
+          <div class="brand"><div class="crest">★</div><div><div class="brand-title">Philippine National Police</div><div class="brand-subtitle">Cabagan Police Station</div></div></div>
+          <div class="bell">♢</div>
+        </div>
+        <div class="reports-page">
+          <div class="reports-title-row"><div><div class="reports-title">Reports</div><div class="reports-subtitle">Your submitted report history</div></div><div class="add">+</div></div>
+          <div class="ghost-card"></div><div class="ghost-card"></div>
+        </div>
+        <div class="bottom-nav"></div>
+        <div class="overlay">
+          <article class="dialog">
+            <div class="dialog-header"><h2>Report Details</h2></div>
+            <div class="detail-body">
+              <div class="eyebrow">RPT-2026-9E6AA56B</div>
+              <div class="detail-title">Checkpoint inspection</div>
+              <div class="row"><div class="row-label">Report type</div><div class="row-value">Checkpoint</div></div>
+              <div class="row"><div class="row-label">Review status</div><div class="row-value">VALIDATED</div></div>
+              <div class="row"><div class="row-label">Barangay</div><div class="row-value">Catabayungan</div></div>
+              <div class="row"><div class="row-label">Location</div><div class="row-value">Cabagan North Bypass Road checkpoint</div></div>
+              <div class="row"><div class="row-label">Location selected using</div><div class="row-value">Officer's current GPS</div></div>
+            </div>
+            <footer class="dialog-footer"><div class="button close"><span>Close</span></div><div class="button primary"><span>Submit correction</span></div></footer>
+          </article>
+        </div>
+      </div>
+      <p class="caption"><strong>Close</strong> uses the red outline and text. Pending reports show <strong>Edit report</strong> in the same blue position.</p>
+    </section>
+
+    <section class="preview-column">
+      <h2 class="preview-label">INCIDENT REPORT · SCROLLED TO ACTIONS</h2>
+      <div class="phone">
+        <div class="status"><span>9:56</span><span>● Wi-Fi&nbsp;&nbsp;100%</span></div>
+        <section class="sheet">
+          <div class="handle"></div>
+          <header class="sheet-header"><h2>Submit Report</h2><p>Record an incident or completed activity</p></header>
+          <div class="form">
+            <div class="label">EXACT INCIDENT PLACE / LANDMARK</div>
+            <div class="input">Cabagan Public Market entrance</div>
+            <div class="assist"><div class="source">⌾&nbsp; Officer's current GPS</div><div class="gps">⌾&nbsp; Use current GPS</div></div>
+            <div class="map"><div class="map-icon">⌖</div><div class="map-copy"><div class="map-title">Pick the incident point on map</div><div class="map-meta">17.430500, 121.765000</div></div><div>›</div></div>
+            <div class="helper">Verify the actual incident place. Your current position may be different if you submit later.</div>
+            <div class="label">DESCRIPTION</div>
+            <div class="input textarea">Routine checkpoint inspection was completed. No incident was recorded.</div>
+            <div class="label">PHOTO EVIDENCE (OPTIONAL)</div>
+            <div class="input photo"><div class="camera">▣</div><div><div class="photo-title">Capture photo evidence</div><div class="photo-meta">Use the front or back camera</div></div></div>
+            <div class="label">SEVERITY</div>
+            <div class="severity"><div class="severity-level">1</div><div class="severity-level active">2</div><div class="severity-level">3</div><div class="severity-level">4</div><div class="severity-level">5</div></div>
+            <div class="form-actions"><div class="button cancel"><span>Cancel</span></div><div class="button primary submit"><span>Submit Report</span></div></div>
+          </div>
+        </section>
+      </div>
+      <p class="caption"><strong>Cancel</strong> uses the danger color and asks for confirmation. The blue submit action remains visually primary.</p>
+    </section>
+  </main>
+  <script>
+    const dark = new URLSearchParams(location.search).get('theme') === 'dark';
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('themeLabel').textContent = dark ? 'DARK THEME' : 'LIGHT THEME';
+  </script>
+</body>
+</html>

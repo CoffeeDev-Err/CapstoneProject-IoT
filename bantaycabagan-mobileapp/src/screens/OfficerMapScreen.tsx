@@ -50,6 +50,7 @@ import { GpsReadingAge } from '../features/maps/GpsReadingAge';
 import { useMapSelectionController } from '../features/maps/useMapSelectionController';
 import { useDevelopmentMapPersonnel } from '../features/maps/useDevelopmentMapPersonnel';
 import { MapPreviewToggle } from '../features/maps/MapPreviewToggle';
+import { GpsTrackingReminder } from '../features/maps/GpsTrackingReminder';
 
 const webSearchInputReset = Platform.OS === 'web'
   ? ({
@@ -90,6 +91,7 @@ export default function OfficerMapScreen({
     currentOfficer,
     currentPersonnelId,
     isConnected,
+    refreshOperations,
   } = useOperationalContext();
   const emergencyPulse = useRef(new Animated.Value(0)).current;
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
@@ -446,6 +448,12 @@ export default function OfficerMapScreen({
 
         <View style={styles.topUtilityRow} pointerEvents="box-none">
           <View style={styles.mapStatusStack} pointerEvents="box-none">
+            <GpsTrackingReminder
+              assignment={assignment}
+              isConnected={isConnected}
+              officer={currentOfficer}
+              onRefresh={refreshOperations}
+            />
             {followedOfficer && !selectedOfficer && (
               <View style={styles.followBanner}>
                 <Icon name="near-me" size={17} color="#93c5fd" />

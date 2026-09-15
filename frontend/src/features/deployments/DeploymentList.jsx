@@ -1,5 +1,7 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
+import { FileText } from 'lucide-react'
 import { TableSkeletonRows } from '../../components/LoadingSkeleton'
+import DeploymentInstructionsModal from './DeploymentInstructionsModal'
 import {
   DEPLOYMENT_LIST_VIEWS,
   formatDateTime,
@@ -24,7 +26,10 @@ function DeploymentList({
   openGroupMenuId,
   visibleAssignments,
 }) {
+  const [instructionsAssignment, setInstructionsAssignment] = useState(null)
+
   return (
+    <>
       <div className="widget-card deployment-list-card slide-up overflow-auto no-scrollbar">
         <div className="assignment-list-header mb-3">
           <h3 className="widget-title mb-0">Assigned Deployment List</h3>
@@ -75,6 +80,7 @@ function DeploymentList({
                   <th>Assignment ID</th>
                   <th>Personnel</th>
                   <th>Patrol Area</th>
+                  <th>Instructions</th>
                   <th>Shift Start</th>
                   <th>Shift End</th>
                   <th>Status</th>
@@ -83,7 +89,7 @@ function DeploymentList({
                 </tr>
               </thead>
               <tbody>
-                <TableSkeletonRows columns={8} rows={5} label="Loading deployments" />
+                <TableSkeletonRows columns={9} rows={5} label="Loading deployments" />
               </tbody>
             </table>
           ) : assignments.length === 0 ? (
@@ -105,6 +111,7 @@ function DeploymentList({
                 <th>Assignment ID</th>
                 <th>Personnel</th>
                 <th>Patrol Area</th>
+                <th>Instructions</th>
                 <th>Shift Start</th>
                 <th>Shift End</th>
                 <th>Status</th>
@@ -116,7 +123,7 @@ function DeploymentList({
               {filteredGroupedAssignments.map((group) => (
                 <Fragment key={group.groupId}>
                   <tr className="assignment-group-row">
-                    <td colSpan={7} className="assignment-group-cell">
+                    <td colSpan={8} className="assignment-group-cell">
                       <div className="assignment-group-content">
                         <strong className="assignment-group-label">{group.patrolArea}</strong>
                         <small className="assignment-group-meta">
@@ -170,6 +177,17 @@ function DeploymentList({
                         <small className="assignment-personnel-rank">{assignment.rank}</small>
                       </td>
                       <td data-label="Patrol Area">{assignment.patrolArea}</td>
+                      <td data-label="Instructions" className="assignment-instructions-cell">
+                        <button
+                          type="button"
+                          className="assignment-instructions-btn"
+                          onClick={() => setInstructionsAssignment(assignment)}
+                          aria-label={`View instructions for ${assignment.personnelName}`}
+                          title="View deployment instructions"
+                        >
+                          <FileText aria-hidden="true" />
+                        </button>
+                      </td>
                       <td data-label="Shift Start">{assignment.shiftStart ? formatDateTime(assignment.shiftStart) : '-'}</td>
                       <td data-label="Shift End">{assignment.shiftEnd ? formatDateTime(assignment.shiftEnd) : '-'}</td>
                       <td data-label="Status">
@@ -205,6 +223,11 @@ function DeploymentList({
           )}
         </div>
       </div>
+      <DeploymentInstructionsModal
+        assignment={instructionsAssignment}
+        onClose={() => setInstructionsAssignment(null)}
+      />
+    </>
   )
 }
 

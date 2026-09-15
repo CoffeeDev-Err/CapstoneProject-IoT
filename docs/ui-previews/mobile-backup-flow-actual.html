@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GeoSentri mobile backup flow</title>
+  <style>
+    :root {
+      --background:#f4f7fb; --surface:#fff; --surface-muted:#f8fafc;
+      --border:#d7e0eb; --text:#0f172a; --muted:#64748b;
+      --blue:#2563eb; --blue-soft:#dbeafe; --purple-soft:#eff6ff;
+      --danger:#dc2626; --danger-soft:#fef2f2; --warning:#f59e0b;
+    }
+    body.dark {
+      --background:#050b18; --surface:#0b1528; --surface-muted:#0e1a30;
+      --border:#2a3a56; --text:#f8fafc; --muted:#9eabc0;
+      --blue-soft:#132442; --purple-soft:#132442; --danger:#f87171; --danger-soft:#3a151d;
+    }
+    * { box-sizing:border-box }
+    html,body { margin:0; width:430px; min-height:100%; overflow-x:hidden; background:var(--background); color:var(--text); font-family:"Segoe UI",Arial,sans-serif; -webkit-font-smoothing:antialiased }
+    body { padding-bottom:30px }
+    .status { height:34px; padding:9px 21px 0; display:flex; justify-content:space-between; color:var(--text); font-size:12px; font-weight:800 }
+    .app-header { min-height:68px; padding:10px 20px 12px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); background:var(--surface) }
+    .crest { width:38px; height:45px; display:grid; place-items:center; color:#fff; background:linear-gradient(155deg,#ef4444 0 52%,#1d4ed8 52%); clip-path:polygon(18% 0,82% 0,100% 20%,83% 100%,17% 100%,0 20%); font-size:12px; font-weight:900 }
+    .station { flex:1 }
+    .station strong { display:block; font-size:15px }
+    .station span { display:block; margin-top:2px; color:var(--muted); font-size:10px }
+    .bell { position:relative; width:34px; height:34px; display:grid; place-items:center; color:var(--muted); font-size:20px }
+    .bell i { position:absolute; right:-1px; top:-4px; width:18px; height:18px; display:grid; place-items:center; border:2px solid var(--surface); border-radius:50%; background:#b91c1c; color:#fff; font-size:8px; font-style:normal }
+    .screen { padding:18px 22px 96px }
+    h1 { margin:0; font-size:29px; line-height:1.1; font-weight:800 }
+    .subtitle { margin:5px 0 0; color:var(--muted); font-size:11px; line-height:16px }
+    .section-row { margin-top:24px; display:flex; align-items:center; justify-content:space-between }
+    .section-title { font-size:15px; font-weight:800 }
+    .section-subtitle { margin-top:2px; color:var(--muted); font-size:10px }
+    .calendar { color:var(--blue); font-size:21px }
+    .shift { margin-top:10px; padding:13px 14px; border:1px solid var(--border); border-radius:8px; background:var(--surface); display:flex; align-items:center; justify-content:space-between }
+    .shift strong { display:block; font-size:12px }
+    .shift span { display:block; margin-top:3px; color:var(--muted); font-size:9px }
+    .regular { margin-top:22px }
+    .filters { margin-top:12px; display:flex; gap:10px }
+    .filter { flex:1; min-height:44px; display:grid; place-items:center; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--muted); font-size:12px; font-weight:700 }
+    .filter.active { border-color:var(--blue); background:var(--purple-soft); color:var(--blue) }
+    .task-card { margin-top:14px; padding:16px; border:1px solid var(--border); border-left:3px solid var(--blue); border-radius:8px; background:var(--surface); box-shadow:0 2px 8px rgba(15,23,42,.09) }
+    .task-top,.response-row { display:flex; align-items:center; justify-content:space-between }
+    .task-type { display:flex; gap:6px; align-items:center; color:var(--danger); font-size:18px; font-weight:800; text-transform:capitalize }
+    .task-time { color:var(--muted); font-size:10px }
+    .task-card h2 { margin:13px 0 0; font-size:16px }
+    .task-card .desc { margin-top:5px; color:var(--muted); font-size:11px }
+    .location { margin-top:12px; color:var(--text); font-size:11px; font-weight:600 }
+    .expanded { margin-top:10px; padding-top:10px; border-top:1px solid var(--border) }
+    .expanded-copy { color:var(--muted); font-size:11px; line-height:17px }
+    .response-row { margin-top:12px }
+    .eyebrow { color:var(--muted); font-size:8px; font-weight:900; letter-spacing:.05em }
+    .response-count { margin-top:4px; font-size:10px; font-weight:700 }
+    .status-open { padding:5px 10px; border-radius:12px; background:#dcfce7; color:#166534; font-size:9px; font-weight:900 }
+    body.dark .status-open { background:#123a2c; color:#86efac }
+    .actions { margin-top:13px; display:flex; gap:8px }
+    .btn { min-height:42px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px; color:#fff; font-size:12px; font-weight:800 }
+    .actions .btn { flex:1 }
+    .cancel { background:var(--danger) }
+    .complete { background:var(--blue) }
+    .bottom-tabs { position:fixed; left:28px; right:28px; bottom:18px; height:62px; display:flex; align-items:center; justify-content:space-around; border:1px solid var(--border); border-radius:22px; background:var(--surface); box-shadow:0 8px 24px rgba(0,0,0,.22) }
+    .tab { min-width:65px; text-align:center; color:var(--muted); font-size:9px; font-weight:700 }
+    .tab b { display:block; margin-bottom:4px; font-size:19px }
+    .tab.active { padding:8px 13px; border-radius:17px; background:var(--blue); color:#fff }
+
+    .form-screen { padding-bottom:28px }
+    .sheet-handle { width:56px; height:5px; margin:12px auto 6px; border-radius:4px; background:var(--border) }
+    .modal-header { padding:14px 18px; border-bottom:1px solid var(--border) }
+    .modal-header h1 { font-size:19px }
+    .modal-header p { margin:3px 0 0; color:var(--muted); font-size:10px }
+    .form { padding:18px }
+    .backup { padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface-muted) }
+    .backup-head { display:flex; align-items:center; gap:9px }
+    .backup-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:9px; background:var(--blue); color:#fff; font-size:17px }
+    .backup-title { flex:1 }
+    .backup-title strong { display:block; font-size:13px }
+    .backup-title span { display:block; margin-top:2px; color:var(--muted); font-size:8px; font-weight:700 }
+    .auto { padding:4px 7px; border-radius:9px; background:var(--blue-soft); color:var(--blue); font-size:7px; font-weight:900 }
+    .backup-body { margin-top:10px; padding-top:10px; border-top:1px solid var(--border) }
+    .value { margin-top:3px; font-size:11px; font-weight:700 }
+    .team-label { margin-top:11px; margin-bottom:4px }
+    .responder { min-height:38px; display:flex; align-items:center; gap:8px }
+    .number { width:20px; height:20px; display:grid; place-items:center; border-radius:50%; background:var(--blue-soft); color:var(--blue); font-size:9px; font-weight:900 }
+    .responder strong { display:block; font-size:10px }
+    .responder span { display:block; margin-top:2px; color:var(--muted); font-size:8px }
+    .label { margin-top:14px; margin-bottom:6px; color:var(--muted); font-size:9px; font-weight:900 }
+    .pills { display:flex; flex-wrap:wrap; gap:7px }
+    .pill { min-height:38px; padding:0 12px; display:grid; place-items:center; border:1px solid var(--border); border-radius:19px; background:var(--surface); color:var(--muted); font-size:10px; font-weight:700; text-transform:capitalize }
+    .pill.active { border-color:var(--blue); background:var(--purple-soft); color:var(--blue) }
+    .field { min-height:46px; padding:0 12px; display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); font-size:12px }
+    .field .field-icon { color:var(--blue); font-size:16px }
+    .field .chev { margin-left:auto; color:var(--muted) }
+    .helper { margin-top:7px; color:var(--muted); font-size:9px; line-height:14px }
+    .location-help { margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px }
+    .location-source { flex:1; color:var(--muted); font-size:9px }
+    .gps { min-height:36px; padding:0 10px; display:flex; align-items:center; border:1px solid var(--blue); border-radius:18px; color:var(--blue); font-size:9px; font-weight:800; background:var(--surface) }
+    .map-pick { min-height:70px; margin-top:10px; padding:11px; display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:12px; background:var(--surface) }
+    .map-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:10px; background:var(--purple-soft); color:var(--blue); font-size:20px }
+    .map-copy { flex:1 }
+    .map-copy strong { display:block; font-size:11px }
+    .map-copy span { display:block; margin-top:3px; color:var(--muted); font-size:8px; line-height:13px }
+    .textarea { min-height:88px; padding:12px; align-items:flex-start; color:var(--muted) }
+    .capture { min-height:82px; padding:12px; display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:12px; background:var(--surface) }
+    .capture-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:10px; background:var(--purple-soft); color:var(--blue); font-size:20px }
+    .capture strong { display:block; font-size:12px }
+    .capture span { display:block; margin-top:3px; color:var(--muted); font-size:9px }
+    .severity { display:flex; gap:8px }
+    .severity i { width:42px; height:42px; display:grid; place-items:center; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--muted); font-style:normal; font-weight:800 }
+    .severity i.selected { border-color:var(--blue); background:var(--blue); color:#fff }
+    .form-actions { margin-top:22px; display:flex; gap:10px }
+    .form-actions .btn { min-height:48px; border-radius:24px }
+    .discard { flex:1; border:1px solid var(--danger); background:var(--surface); color:var(--danger) }
+    .submit { flex:1.45; background:var(--blue); color:#fff }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const view = q.get('view') || 'task';
+    const dark = q.get('theme') !== 'light';
+    document.body.classList.toggle('dark', dark);
+    const chrome = `<div class="status"><span>9:41</span><span>▮▮▮ WiFi&nbsp; 86%</span></div><div class="app-header"><div class="crest">PNP</div><div class="station"><strong>Philippine National Police</strong><span>Cabagan Police Station</span></div><div class="bell">♢<i>2</i></div></div>`;
+    const tabs = `<div class="bottom-tabs"><div class="tab"><b>⌖</b>Map</div><div class="tab active"><b>▣</b>Tasks</div><div class="tab"><b>▤</b>Reports</div><div class="tab"><b>●</b>Account</div></div>`;
+    const task = `${chrome}<main class="screen"><h1>My Task</h1><p class="subtitle">Duty schedule and operational response requests</p><div class="section-row"><div><div class="section-title">Upcoming Shift</div><div class="section-subtitle">Your nearest scheduled deployment</div></div><div class="calendar">▣</div></div><div class="shift"><div><strong>Barangay Catabayungan</strong><span>Today · 8:00 AM–4:00 PM</span></div><span>⌄</span></div><div class="regular"><div class="section-title">Regular Assigned Tasks</div><div class="section-subtitle">Backup and urgent response requests</div><div class="filters"><div class="filter active">Active</div><div class="filter">History</div></div></div><article class="task-card"><div class="task-top"><div class="task-type">◉ backup</div><div class="task-time">9:25 AM&nbsp;⌃</div></div><h2>Immediate assistance needed</h2><div class="desc">Backup requested during patrol.</div><div class="location">● Catabayungan Public Market</div><div class="expanded"><div class="expanded-copy">Assist the requesting officer and remain with the response team until the emergency is closed.</div><div class="response-row"><div><div class="eyebrow">RESPONSE TEAM</div><div class="response-count">2/3 accepted - 1 slot left</div></div><div class="status-open">Open</div></div><div class="actions"><div class="btn cancel">×&nbsp; Cancel</div><div class="btn complete">✓&nbsp; Complete Response</div></div></div></article></main>${tabs}`;
+    const report = `${chrome}<main class="form-screen"><div class="sheet-handle"></div><div class="modal-header"><h1>Submit Report</h1><p>Record an incident or completed activity</p></div><div class="form"><section class="backup"><div class="backup-head"><div class="backup-icon">◉</div><div class="backup-title"><strong>Backup Response</strong><span>TSK-2026-BACKUP1</span></div><div class="auto">AUTOMATIC</div></div><div class="backup-body"><div class="eyebrow">REQUEST LOCATION</div><div class="value">Catabayungan Public Market</div><div class="eyebrow team-label">RESPONSE TEAM</div><div class="responder"><div class="number">1</div><div><strong>Police Corporal Andrea Ramos</strong><span>Badge 11802 · Accepted Sep 13, 9:27 AM</span></div></div><div class="responder"><div class="number">2</div><div><strong>Police Staff Sergeant Marco Dela Cruz</strong><span>Badge 10386 · Accepted Sep 13, 9:28 AM</span></div></div></div></section><div class="label">REPORT TYPE</div><div class="pills"><div class="pill active">Incident</div><div class="pill">Patrol</div><div class="pill">Checkpoint</div><div class="pill">Others</div></div><div class="label">TITLE</div><div class="field">Short report title</div><div class="label">INCIDENT / ACTIVITY DATE AND TIME</div><div class="field"><span class="field-icon">◷</span>2026-09-13 09:25</div><div class="label">ASSIGNED AREA</div><div class="field"><span class="field-icon">▣</span>Catabayungan</div><div class="label">BARANGAY</div><div class="field"><span class="field-icon">▰</span>Catabayungan<span class="chev">⌄</span></div><div class="label">EXACT INCIDENT PLACE / LANDMARK</div><div class="field">Catabayungan Public Market</div><div class="location-help"><div class="location-source">◉ GPS location recorded with backup request</div><div class="gps">◎&nbsp; Use current GPS</div></div><div class="map-pick"><div class="map-icon">⌖</div><div class="map-copy"><strong>Pick the incident point on map</strong><span>Use this when the incident happened somewhere other than your current position.</span></div><span>›</span></div><div class="label">DESCRIPTION</div><div class="field textarea">What happened and what action was taken?</div><div class="label">PHOTO EVIDENCE (OPTIONAL)</div><div class="capture"><div class="capture-icon">▣</div><div><strong>Capture evidence</strong><span>Use the front or back camera</span></div></div><div class="label">SEVERITY</div><div class="severity"><i>1</i><i class="selected">2</i><i>3</i><i>4</i><i>5</i></div><div class="form-actions"><div class="btn discard">Cancel</div><div class="btn submit">Submit Report</div></div></div></main>`;
+    document.getElementById('root').innerHTML = view === 'task' ? task : report;
+  </script>
+</body>
+</html>

@@ -408,7 +408,6 @@ const styles = StyleSheet.create({
   draftContinueText: { color: '#ffffff', fontSize: 10, fontWeight: '800' },
   draftLaterButton: {
     minHeight: 34,
-    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },

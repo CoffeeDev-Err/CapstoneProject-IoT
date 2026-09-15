@@ -104,6 +104,10 @@ Passing unit/static checks is supporting evidence, not a reliability percentage.
 
 ## Backup verification and isolated restore
 
+The executable manifest/verifier, proposed RPO/RTO targets and isolated drill steps
+are now in [RESTORE_DRILL_RUNBOOK.md](../docs/RESTORE_DRILL_RUNBOOK.md). Production
+restore remains unverified until an actual backup is restored and checked there.
+
 Status: cloud backup configuration and restoration have NOT been verified or
 changed by these code updates. The older defense guide left snapshots off.
 Review cost, retention, access and target resources before enabling anything.

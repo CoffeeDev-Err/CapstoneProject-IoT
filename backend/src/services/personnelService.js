@@ -38,6 +38,7 @@ const { ingestLocation } = createLocationIngestionService({
 })
 const {
 	evaluatePersonnelGeofences,
+	evaluatePersonnelGpsAvailability,
 	evaluatePersonnelInactivity,
 } = createPersonnelLifecycleService({
 	models: { CurrentLocation, Deployment, GpsDeviceAssignment, Personnel },
@@ -52,6 +53,7 @@ const { updateMockLocations } = createMockMovementService({
 module.exports = {
 	emitPersonnelCollection,
 	evaluatePersonnelGeofences,
+	evaluatePersonnelGpsAvailability,
 	evaluatePersonnelInactivity,
 	getPersonnelMember,
 	getPersonnelWithLocations,

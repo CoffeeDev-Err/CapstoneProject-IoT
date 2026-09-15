@@ -9,6 +9,9 @@ node_modules/
 dist/
 coverage/
 tmp/
+recovery-private/
+bantaycabagan-mobileapp/security-reports/
+docs/ui-previews/.chrome*/
 
 # Local tooling
 .DS_Store

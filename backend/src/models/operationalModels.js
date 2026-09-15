@@ -21,6 +21,7 @@ const deploymentSchema = new mongoose.Schema({
 	acknowledgedAt: Date,
 	acknowledgedSignature: String,
 	upcomingReminderSentFor: String,
+	gpsUnavailableAlertedAt: Date,
 }, {
 	collection: 'deployments',
 	timestamps: true,

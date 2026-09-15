@@ -30,6 +30,8 @@
     "plugins": [
       "@maplibre/maplibre-react-native",
       "expo-font",
+      "expo-image",
+      "expo-sqlite",
       "expo-secure-store",
       "expo-status-bar",
       [

@@ -132,7 +132,7 @@ const createVerificationChallenge = async (
 const consumeChallenge = async (
 	challengeId,
 	code,
-	{ purposes, userId } = {},
+	{ purposes, userId, beforeConsume } = {},
 ) => {
 	if (!challengeId || !/^\d{6}$/.test(String(code || ''))) {
 		throw createAuthError(
@@ -190,8 +190,28 @@ const consumeChallenge = async (
 		)
 	}
 
-	challenge.consumedAt = new Date()
-	await challenge.save()
+	// Validate password recovery before burning a correct code. The final claim
+	// still checks expiry and consumption atomically after asynchronous validation.
+	await beforeConsume?.(challenge)
+	const consumedAt = new Date()
+	const claimed = await EmailVerification.updateOne(
+		{
+			_id: challenge._id,
+			consumedAt: null,
+			expiresAt: { $gt: consumedAt },
+			attempts: { $lt: challenge.maxAttempts },
+			otpHash: challenge.otpHash,
+		},
+		{ $set: { consumedAt } },
+	)
+	if (claimed.modifiedCount !== 1) {
+		throw createAuthError(
+			'This verification request is no longer valid. Request a new code.',
+			400,
+			'INVALID_OTP',
+		)
+	}
+	challenge.consumedAt = consumedAt
 	return challenge
 }
 
@@ -387,21 +407,26 @@ const resetPassword = async (
 			'WEAK_PASSWORD',
 		)
 	}
+	let user
+	let passwordHash
 	const challenge = await consumeChallenge(challengeId, code, {
 		purposes: ['reset_password'],
+		beforeConsume: async (verifiedChallenge) => {
+			user = await User.findById(verifiedChallenge.userId).select('+passwordHash')
+			if (!user || user.status !== 'active') {
+				throw createAuthError('Account is inactive or unavailable.')
+			}
+			if (await verifyPassword(newPassword, user.passwordHash)) {
+				throw createAuthError(
+					'Your new password must be different from your current password.',
+					400,
+					'PASSWORD_REUSED',
+				)
+			}
+			passwordHash = await hashPassword(newPassword)
+		},
 	})
-	const user = await User.findById(challenge.userId).select('+passwordHash')
-	if (!user || user.status !== 'active') {
-		throw createAuthError('Account is inactive or unavailable.')
-	}
-	if (await verifyPassword(newPassword, user.passwordHash)) {
-		throw createAuthError(
-			'Your new password must be different from your current password.',
-			400,
-			'PASSWORD_REUSED',
-		)
-	}
-	user.passwordHash = await hashPassword(newPassword)
+	user.passwordHash = passwordHash
 	user.forcePasswordReset = false
 	if (!user.emailVerifiedAt) user.emailVerifiedAt = new Date()
 	await Promise.all([

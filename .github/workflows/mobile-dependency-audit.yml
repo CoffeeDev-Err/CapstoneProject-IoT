@@ -1,0 +1,34 @@
+name: Mobile dependency audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+  pull_request:
+    paths:
+      - 'bantaycabagan-mobileapp/package*.json'
+      - 'bantaycabagan-mobileapp/dependency-audit-policy.json'
+      - 'bantaycabagan-mobileapp/scripts/dependency-audit.cjs'
+      - 'bantaycabagan-mobileapp/App.tsx'
+      - '.github/workflows/mobile-dependency-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: bantaycabagan-mobileapp/package-lock.json
+      - run: npm ci --ignore-scripts --prefix bantaycabagan-mobileapp
+      - run: npm run audit:dependencies --prefix bantaycabagan-mobileapp
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-dependency-audit
+          path: bantaycabagan-mobileapp/security-reports/dependency-audit.json

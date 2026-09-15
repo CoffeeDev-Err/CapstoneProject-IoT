@@ -4,7 +4,6 @@ const { findCursorPage } = require('./operations/pagination')
 
 const PERSONNEL_ROOM_PREFIX = 'personnel:'
 const SUPERVISOR_ROOM = 'role:supervisor'
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 const LEGACY_SUPERVISOR_SELF_NOTIFICATION_TITLES = [
 	'Deployment Updated',
 	'Officer Account Created',
@@ -49,6 +48,7 @@ const createNotificationRecord = async ({
 	priority = 'normal',
 	data = {},
 	dedupeKey,
+	queuePush = false,
 }) => {
 	if (dedupeKey) {
 		const existing = await Notification.findOne({ recipientId, dedupeKey }).lean()
@@ -67,6 +67,7 @@ const createNotificationRecord = async ({
 			priority,
 			data,
 			dedupeKey,
+			pushQueuePending: queuePush && recipientId !== 'supervisor' && recipientId !== 'all',
 		})
 		return { notification: toNotificationPayload(notification), created: true }
 	} catch (error) {
@@ -81,60 +82,8 @@ const createNotification = async (payload) => (
 	(await createNotificationRecord(payload)).notification
 )
 
-const sendExpoPush = async (recipientId, notification) => {
-	const devices = await PushDevice.find({ personnelId: recipientId, status: 'active' }).lean()
-	if (devices.length === 0) return { attempted: 0 }
-
-	const messages = devices.map((device) => ({
-		to: device.expoPushToken,
-		title: notification.title,
-		body: notification.message,
-		sound: notification.priority === 'low' ? null : 'default',
-		priority: notification.priority === 'critical' || notification.priority === 'high'
-			? 'high'
-			: 'default',
-		channelId: 'officer-alerts',
-		data: {
-			notificationId: notification.id,
-			referenceType: notification.referenceType,
-			referenceId: notification.referenceId,
-			...notification.data,
-		},
-	}))
-
-	try {
-		const response = await fetch(EXPO_PUSH_URL, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(messages),
-		})
-		if (!response.ok) return { attempted: messages.length, accepted: 0 }
-
-		const result = await response.json()
-		const tickets = Array.isArray(result.data) ? result.data : [result.data]
-		const invalidTokens = tickets.flatMap((ticket, index) => (
-			ticket?.details?.error === 'DeviceNotRegistered'
-				? [devices[index]?.expoPushToken]
-				: []
-		)).filter(Boolean)
-		if (invalidTokens.length > 0) {
-			await PushDevice.updateMany(
-				{ expoPushToken: { $in: invalidTokens } },
-				{ $set: { status: 'invalid' } },
-			)
-		}
-		return { attempted: messages.length, accepted: messages.length - invalidTokens.length }
-	} catch (error) {
-		console.error('Expo push delivery failed:', error.message)
-		return { attempted: messages.length, accepted: 0 }
-	}
-}
-
 const deliverNotification = async ({ io, ...payload }) => {
-	const result = await createNotificationRecord(payload)
+	const result = await createNotificationRecord({ ...payload, queuePush: true })
 	if (!result.created) return result.notification
 
 	if (!payload.recipientId || payload.recipientId === 'supervisor') {
@@ -142,9 +91,6 @@ const deliverNotification = async ({ io, ...payload }) => {
 	} else {
 		io?.to(`${PERSONNEL_ROOM_PREFIX}${payload.recipientId}`)
 			.emit('notification:created', result.notification)
-		void sendExpoPush(payload.recipientId, result.notification).catch((error) => {
-			console.error('Expo push delivery failed:', error.message)
-		})
 	}
 	return result.notification
 }

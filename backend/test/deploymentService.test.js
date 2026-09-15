@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 const createDeploymentService = require('../src/services/operations/deploymentService')
+const { formatDeploymentNotificationMessage } = createDeploymentService
 
 const createService = ({ Deployment, Personnel, published = [], audits = [] }) => createDeploymentService({
 	io: { emit: () => {}, to: () => ({ emit: () => {} }) },
@@ -114,5 +115,31 @@ describe('deployment reconciliation', () => {
 		assert.equal(deploymentUpdates[1].update.$set.status, 'active')
 		assert.equal(personnelUpdates[0].update.$set.dutyStatus, 'On Duty')
 		assert.equal(personnelUpdates[1].update.$set.dutyStatus, 'Off Duty')
+	})
+})
+
+describe('deployment notifications', () => {
+	it('includes provided instructions in active and scheduled assignment messages', () => {
+		const assignment = { patrolArea: 'Barangay Centro', notes: 'Use the eastern checkpoint' }
+
+		assert.equal(
+			formatDeploymentNotificationMessage({ assignment, scheduled: true, scheduleText: 'Sep 16, 2026, 8:00 AM' }),
+			'You are scheduled at Barangay Centro on Sep 16, 2026, 8:00 AM. Instructions: Use the eastern checkpoint.',
+		)
+		assert.equal(
+			formatDeploymentNotificationMessage({ assignment, scheduled: false, scheduleText: '' }),
+			'You are assigned to Barangay Centro. Instructions: Use the eastern checkpoint. Open Map to confirm your deployment.',
+		)
+	})
+
+	it('keeps the assignment message concise when no instructions were provided', () => {
+		assert.equal(
+			formatDeploymentNotificationMessage({
+				assignment: { patrolArea: 'Barangay Centro', notes: '   ' },
+				scheduled: false,
+				scheduleText: '',
+			}),
+			'You are assigned to Barangay Centro. Open Map to confirm your deployment.',
+		)
 	})
 })

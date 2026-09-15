@@ -792,7 +792,7 @@ function AssignAreaPage({ view = 'form' }) {
               selectionHint={personnelSelectionHint}
             />
             <label className="assignment-field assignment-field--notes">
-              <span>Notes</span>
+              <span>Instructions</span>
               <textarea
                 className="settings-input w-100"
                 value={assignmentForm.notes}

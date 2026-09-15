@@ -1,0 +1,13 @@
+{
+  "exceptions": [
+    {
+      "package": "decode-uri-component",
+      "url": "https://github.com/advisories/GHSA-vcc3-ghjq-m6fr",
+      "severity": "moderate",
+      "expiresAt": "2026-10-15T00:00:00Z",
+      "reason": "No upstream fix is available. React Navigation uses query-string, but GeoSentri does not configure inbound navigation linking or parse external URLs into navigation state. Reassess before adding deep links or web navigation; this is tracked exposure, not a vulnerability fix.",
+      "owner": "GeoSentri maintainer",
+      "review": "Weekly and before each release; remove when upstream resolves it."
+    }
+  ]
+}

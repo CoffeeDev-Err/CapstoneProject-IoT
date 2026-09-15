@@ -12,6 +12,7 @@ const createOperationalRuntime = ({
 	const {
 		emitPersonnelCollection,
 		evaluatePersonnelGeofences,
+		evaluatePersonnelGpsAvailability,
 		evaluatePersonnelInactivity,
 		getPersonnelWithLocations,
 		updateMockLocations,
@@ -77,6 +78,7 @@ const createOperationalRuntime = ({
 		try {
 			await operationalService.reconcileDeploymentShifts()
 			await operationalService.reconcileTaskArrivals()
+			await evaluatePersonnelGpsAvailability({ io })
 			await evaluatePersonnelInactivity({ io })
 			await evaluatePersonnelGeofences({ io })
 			await operationalService.finalizeReportRouteSnapshots()
