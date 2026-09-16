@@ -31,6 +31,12 @@
   font-size: var(--font-size-sm);
 }
 
+.report-date-filter {
+  flex: 0 1 210px;
+  width: min(210px, 100%);
+  min-width: 180px;
+}
+
 .report-list-controls {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(150px, 190px) minmax(160px, 200px);
@@ -95,6 +101,17 @@
   padding: 0.55rem 2rem 0.55rem 0.7rem;
   cursor: pointer;
   text-transform: capitalize;
+}
+
+@media (max-width: 600px) {
+  .report-list-panel__header {
+    align-items: stretch;
+  }
+
+  .report-date-filter {
+    flex-basis: 100%;
+    width: 100%;
+  }
 }
 
 .report-list {

@@ -12,7 +12,6 @@ import {
 import { useReportsPageState } from '../features/reports/useReportsPageState'
 
 import { readReportFilters, REPORT_PERIODS } from '../utils/reportFilters'
-import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
 
 function ReportsPage() {
   const [params, setParams] = useSearchParams()
@@ -91,20 +90,15 @@ function ReportsPage() {
             <h3 className="widget-title mb-0">Submitted reports</h3>
             <p>{reports.length} of {pagination.total} matching reports shown</p>
           </div>
+          <label className="report-filter report-date-filter">
+            <span>Dates (Philippine time)</span>
+            <select value={filters.period} onChange={(event) => updateFilter('period', event.target.value)}>
+              {REPORT_PERIODS.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
+            </select>
+          </label>
         </div>
 
         <div className="report-list-controls">
-          {[
-            ['period', 'Dates (Philippine time)', filters.period, REPORT_PERIODS],
-            ['validation_status', 'Validation', filters.validationStatus, [['all', 'All validations'], ['pending', 'Pending'], ['validated', 'Validated'], ['rejected', 'Rejected']]],
-            ['category', 'Category', filters.category, [['all', 'All categories'], ['incident', 'Incident'], ['routine', 'Routine']]],
-            ['barangay', 'Barangay', filters.barangay, [['all', 'All barangays'], ...CABAGAN_BARANGAYS.map((name) => [name, name])]],
-          ].map(([key, label, value, options]) => <label className="report-filter" key={key}>
-            <span>{label}</span><select value={value} onChange={(event) => updateFilter(key, event.target.value)}>
-              {options.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
-            </select>
-          </label>)}
-
           <label className="report-search">
             <span className="visually-hidden">Search reports</span>
             <Search className="report-search__icon" aria-hidden="true" />
