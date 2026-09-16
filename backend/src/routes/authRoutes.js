@@ -26,7 +26,7 @@ const createAuthRoutes = ({ authService, controller }) => {
 	const limitPasswordByAccount = createRateLimit({
 		keyPrefix: 'auth-password-account',
 		windowMs: passwordWindowMs,
-		max: 10,
+		max: 5,
 		keyGenerator: (req) => normalizeKeyPart(req.body?.username, 'missing-login-id'),
 		skipSuccessfulRequests: true,
 	})

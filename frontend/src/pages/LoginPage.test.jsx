@@ -39,6 +39,31 @@ async function openVerification() {
 }
 
 describe('automatic login verification', () => {
+  it('shows the server countdown and blocks only the rate-limited Login ID', async () => {
+    vi.useFakeTimers()
+    const receivedAt = Date.now()
+    beginLogin.mockRejectedValueOnce(Object.assign(new Error('Too many requests.'), {
+      code: 'RATE_LIMITED', status: 429, receivedAt,
+      serverTime: new Date(receivedAt).toISOString(),
+      retryAt: new Date(receivedAt + 5_000).toISOString(),
+    }))
+    renderLogin()
+    fireEvent.change(screen.getByLabelText('Login ID'), { target: { value: '01-2002' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong-password' } })
+    await act(async () => { fireEvent.click(screen.getByText('Sign In')) })
+    expect(screen.getByText('Too many failed sign-in attempts. Try again in 0:05.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Login ID'), { target: { value: '02-2002' } })
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled()
+    fireEvent.change(screen.getByLabelText('Login ID'), { target: { value: '01-2002' } })
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeDisabled()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled()
+    expect(screen.queryByText(/Too many failed sign-in attempts/)).not.toBeInTheDocument()
+  })
+
   it('clears an incorrect code and focuses the first digit for a fresh attempt', async () => {
     verifyLoginCode.mockRejectedValueOnce(Object.assign(new Error('Wrong'), { code: 'INCORRECT_OTP' }))
     await openVerification()

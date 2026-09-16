@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import pnpLogo from '../assets/pnp-logo.png'
 import VerificationCodeInput from '../components/VerificationCodeInput'
-import { verificationFeedback } from '../features/auth/verificationFeedback'
+import { formatCountdown, verificationFeedback } from '../features/auth/verificationFeedback'
 import { useVerificationTiming } from '../features/auth/useVerificationTiming'
 import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
 import { useAuth } from '../context/useAuth'
@@ -52,8 +52,22 @@ function LoginPage() {
   const [pending, setPending] = useState(false)
   const [pendingAction, setPendingAction] = useState('')
   const [resendRetry, setResendRetry] = useState(null)
+  const [loginRetry, setLoginRetry] = useState(null)
   const [focusRequest, setFocusRequest] = useState(0)
   const timing = useVerificationTiming(challenge, resendRetry)
+  const loginTiming = useVerificationTiming(null, loginRetry)
+  const normalizedAccountId = accountId.trim().toLowerCase()
+  const loginRateLimited = Boolean(
+    loginRetry
+    && loginRetry.loginId === normalizedAccountId
+    && loginTiming.resendSeconds > 0,
+  )
+  const loginRateLimitMessage = loginRateLimited
+    ? `Too many failed sign-in attempts. Try again in ${formatCountdown(loginTiming.resendSeconds)}.`
+    : ''
+  const loginFeedbackError = loginRetry?.loginId === normalizedAccountId
+    ? loginRateLimitMessage
+    : error
   const verificationBusy = useRef(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -85,6 +99,7 @@ function LoginPage() {
 
   const handleLogin = async (event) => {
     event.preventDefault()
+    if (loginRateLimited) return
     clearFeedback()
     const nextFieldErrors = {}
     if (!accountId.trim()) nextFieldErrors.accountId = 'Login ID is required.'
@@ -100,13 +115,17 @@ function LoginPage() {
     setPending(true)
     try {
       const nextChallenge = await beginLogin(accountId.trim(), password)
+      setLoginRetry(null)
       setChallenge(nextChallenge)
       setResendRetry(null)
       setCode('')
       setMode('otp')
       setMessage(`A verification code was sent to ${nextChallenge.maskedEmail}.`)
     } catch (requestError) {
-      showRequestError(requestError, true)
+      if (requestError?.code === 'RATE_LIMITED' && requestError.retryAt) {
+        setLoginRetry({ ...requestError, loginId: normalizedAccountId })
+      }
+      showRequestError(requestError)
     } finally {
       setPending(false)
     }
@@ -353,8 +372,13 @@ function LoginPage() {
               >
                 Forgot password?
               </button>
-              <AuthFeedback error={error} message={message} />
-              <SubmitButton pending={pending} pendingLabel={pendingAction} label="Sign In" />
+              <AuthFeedback error={loginFeedbackError} message={message} />
+              <SubmitButton
+                pending={pending}
+                pendingLabel={pendingAction}
+                label="Sign In"
+                disabled={loginRateLimited}
+              />
               </form>
             )}
 
@@ -504,9 +528,9 @@ function AuthFeedback({ error, message }) {
   )
 }
 
-function SubmitButton({ pending, label, pendingLabel = 'Please wait...' }) {
+function SubmitButton({ pending, label, pendingLabel = 'Please wait...', disabled = false }) {
   return (
-    <button type="submit" className="btn btn-lg w-100 login-submit-btn fs-6 rounded-3" disabled={pending}>
+    <button type="submit" className="btn btn-lg w-100 login-submit-btn fs-6 rounded-3" disabled={pending || disabled}>
       {pending ? pendingLabel : label}
     </button>
   )

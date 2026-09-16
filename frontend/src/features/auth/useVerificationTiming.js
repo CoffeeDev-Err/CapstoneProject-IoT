@@ -6,7 +6,20 @@ export function useVerificationTiming(challenge, retry) {
   useEffect(() => {
     if (!challenge && !retry) return
     // Recalculate from timestamps so backgrounding does not pause the countdown.
-    const timer = setInterval(() => setNow(Date.now()), 1000)
+    const deadlines = [
+      { value: challenge?.resendAvailableAt, timing: challenge },
+      { value: challenge?.expiresAt, timing: challenge },
+      { value: retry?.retryAt, timing: retry },
+    ].filter(({ value }) => value)
+    const timer = setInterval(() => {
+      const nextNow = Date.now()
+      setNow(nextNow)
+      if (deadlines.every(({ value, timing }) => deadlineRemaining(
+        value,
+        timing,
+        nextNow,
+      ) === 0)) clearInterval(timer)
+    }, 1000)
     return () => clearInterval(timer)
   }, [challenge, retry])
   const resendSeconds = Math.max(
