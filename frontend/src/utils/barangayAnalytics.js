@@ -1,3 +1,4 @@
+import { reportPeriodRange } from './reportFilters.js'
 import { isCabaganBarangay } from '../constants/cabaganBarangays.js'
 
 const SEVERITY_LEVELS = {
@@ -41,37 +42,16 @@ export const getAnalyticsReferenceDate = (reports) => {
   return timestamps.length > 0 ? new Date(Math.max(...timestamps)) : new Date()
 }
 
-const startOfDay = (date) => {
-  const value = new Date(date)
-  value.setHours(0, 0, 0, 0)
-  return value
-}
-
-const endOfDay = (date) => {
-  const value = new Date(date)
-  value.setHours(23, 59, 59, 999)
-  return value
-}
-
 export const getAnalyticsPeriodRange = (period, referenceDate) => {
-  const end = endOfDay(referenceDate)
-  const start = startOfDay(referenceDate)
-
-  if (period === 'weekly') {
-    start.setDate(start.getDate() - 6)
-  } else if (period === 'monthly') {
-    start.setDate(1)
-  } else {
-    start.setMonth(0, 1)
-  }
-
-  return { start, end }
+  const { from, to } = reportPeriodRange(period, referenceDate)
+  return { start: new Date(from), end: new Date(to) }
 }
 
 const formatPeriodLabel = (period, start, end) => {
   if (period === 'weekly') {
     const formatter = new Intl.DateTimeFormat('en-PH', {
       month: 'short',
+      timeZone: 'Asia/Manila',
       day: 'numeric',
       year: 'numeric',
     })
@@ -83,12 +63,12 @@ const formatPeriodLabel = (period, start, end) => {
 
   if (period === 'monthly') {
     return new Intl.DateTimeFormat('en-PH', {
-      month: 'long',
+      month: 'long', timeZone: 'Asia/Manila',
       year: 'numeric',
     }).format(end)
   }
 
-  return String(end.getFullYear())
+  return new Intl.DateTimeFormat('en-PH', { year: 'numeric', timeZone: 'Asia/Manila' }).format(end)
 }
 
 const getPriorityLevel = (score) => {
@@ -136,7 +116,8 @@ const getTimePattern = (incidents) => {
   incidents.forEach((incident) => {
     const incidentDate = getReportDate(incident)
     if (incidentDate) {
-      counts[Math.floor(incidentDate.getHours() / 4)] += 1
+      const philippineHour = new Date(+incidentDate + 8 * 3600000).getUTCHours()
+      counts[Math.floor(philippineHour / 4)] += 1
     }
   })
 
@@ -177,7 +158,7 @@ export const filterReportsForAnalyticsPeriod = (reports, period, referenceDate) 
   const { start, end } = getAnalyticsPeriodRange(period, referenceDate)
 
   return reports.filter((report) => {
-    const reportDate = getReportDate(report)
+    const reportDate = new Date(report.date_time || report.occurred_at)
     return reportDate && reportDate >= start && reportDate <= end
   })
 }
@@ -186,7 +167,7 @@ export const buildBarangayAnalytics = ({
   reports,
   deploymentCoverage,
   period = 'weekly',
-  referenceDate = getAnalyticsReferenceDate(reports),
+  referenceDate = new Date(),
 }) => {
   const { start, end } = getAnalyticsPeriodRange(period, referenceDate)
   const periodLabel = formatPeriodLabel(period, start, end)
@@ -197,7 +178,8 @@ export const buildBarangayAnalytics = ({
   const incidentReports = periodReports.filter((report) => report.is_incident)
   const resolvedCases = incidentReports.filter((report) => report.case_status === 'resolved')
   const barangayNames = new Set(
-    periodReports.map((report) => report.barangay).filter(Boolean),
+    [...periodReports.map((report) => report.barangay),
+      ...deploymentCoverage.map((coverage) => coverage.barangay)].filter(isCabaganBarangay),
   )
 
   const validatedIncidentCounts = [...barangayNames].map((barangay) => periodReports.filter(

@@ -1,8 +1,22 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import ReportDetailDrawer from './ReportDetailDrawer'
 vi.mock('./ReportLocationMap', () => ({ default: () => <div>Report map</div> }))
 afterEach(cleanup)
+it('keeps content during exit and provides footer PDF/Close actions without a header X', async () => {
+  const onClose = vi.fn()
+  const report = { id: 'RPT-EXIT', title: 'Exit animation', officer: 'Officer', report_type: 'patrol', description: 'Keep visible' }
+  const props = { formatDateTime: () => '-', onClose, onDownload: vi.fn(), onValidationChange: vi.fn() }
+  const page = render(<ReportDetailDrawer {...props} report={report} />)
+  expect(screen.queryByLabelText('Close report details')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Download PDF' })).toBeTruthy()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(onClose).toHaveBeenCalledOnce()
+  page.rerender(<ReportDetailDrawer {...props} report={null} />)
+  expect(screen.getByText('Keep visible')).toBeTruthy()
+  expect(document.querySelector('.report-drawer-backdrop')).toHaveClass('is-closing')
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+})
 it('shows the current report fields without exposing internal report history', async () => {
   render(<ReportDetailDrawer report={{ id: 'RPT-ONE', title: 'Corrected title', description: 'Corrected description',
     officer: 'Officer One', report_type: 'incident', is_incident: true, severity: 3, validation_status: 'pending',

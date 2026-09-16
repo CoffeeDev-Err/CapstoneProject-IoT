@@ -5,7 +5,7 @@ const {
 	normalizeBarangayCode,
 	point,
 } = require('../../utils/geo')
-const { findCabaganBarangay } = require('../../constants/cabaganBarangays')
+const { findCabaganBarangay, CABAGAN_BARANGAYS } = require('../../constants/cabaganBarangays')
 const {
 	buildDateRange,
 	buildPrefixSearchConditions,
@@ -88,6 +88,7 @@ const createReportService = ({
 		if (query.category === 'incident') filter.isIncident = true
 		if (query.category === 'routine') filter.isIncident = false
 		if (query.barangay) filter.barangayCode = normalizeBarangayCode(query.barangay)
+		if (query.scope === 'cabagan') appendFilterCondition(filter, { barangayCode: { $in: CABAGAN_BARANGAYS.map(({ code }) => code) } })
 		if (['open', 'resolved', 'not_applicable'].includes(query.case_status)) filter.caseStatus = query.case_status
 		if (['pending', 'validated', 'rejected'].includes(query.validation_status)) filter.validationStatus = query.validation_status
 		const dateRange = buildDateRange(query.from, query.to)
@@ -132,7 +133,7 @@ const createReportService = ({
 			...(officerPersonnelId ? { submittedBy: officerPersonnelId } : {}),
 		}).lean()
 		if (!report) return null
-		const personnelById = await loadPersonnelMap([report.submittedBy])
+		const personnelById = await loadPersonnelMap([report.submittedBy, report.resolution?.resolvedBy].filter(Boolean))
 		return serializeReport(report, personnelById)
 	}
 

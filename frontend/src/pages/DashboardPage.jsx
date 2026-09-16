@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom'
+import DashboardActivityModal from '../components/DashboardActivityModal'
 import { requestErrorMessage } from '../utils/requestFeedback'
 import { useEffect, useMemo, useState } from 'react'
 import { useFeedback } from '../context/useFeedback'
@@ -26,6 +28,8 @@ const formatActivityTime = (timestamp) => {
 }
 
 function DashboardPage() {
+  const navigate = useNavigate()
+  const [modal, setModal] = useState(null)
   const [summary, setSummary, hasSummary] = useCachedPageData('dashboard', initialSummary)
   const [loadMessage, setLoadMessage] = useState('Loading live operational summary...')
   const [loadError, setLoadError] = useState('')
@@ -86,28 +90,28 @@ function DashboardPage() {
 
   const stats = useMemo(() => [
     {
-      label: 'Personnel On Field',
+      label: 'Personnel On Field', action: 'View personnel on map', destination: '/',
       value: summary.activePersonnel,
       subtext: `${summary.totalPersonnel} active personnel accounts`,
       signal: 'Live',
       tone: 'live',
     },
     {
-      label: 'Open Response Tasks',
+      label: 'Open Response Tasks', action: 'View backup requests', modal: 'tasks',
       value: summary.openTasks,
       subtext: 'Backup and urgent requests',
       signal: summary.openTasks > 0 ? 'Action needed' : 'Clear',
       tone: summary.openTasks > 0 ? 'urgent' : 'clear',
     },
     {
-      label: 'Reports Today',
+      label: 'Reports Today', action: "View today's reports", destination: '/reports?period=today',
       value: summary.reportsToday,
       subtext: 'Submitted from the mobile app',
       signal: 'Today',
       tone: 'info',
     },
     {
-      label: 'Open Incidents',
+      label: 'Open Incidents', action: 'View open incidents', modal: 'incidents',
       value: summary.openIncidents,
       subtext: 'Incident reports awaiting resolution',
       signal: summary.openIncidents > 0 ? 'Review' : 'Clear',
@@ -142,14 +146,15 @@ function DashboardPage() {
       <div className="stats-grid row g-3 mb-3 mx-0">
         {stats.map((stat) => (
           <div key={stat.label} className="col-12 col-sm-6 col-xl-3">
-            <div className="stat-card slide-up h-100">
+            <button type="button" className="stat-card stat-card--action slide-up h-100" onClick={() => stat.destination ? navigate(stat.destination) : setModal(stat.modal)}>
               <div className="stat-card__heading">
                 <p className="stat-card__label">{stat.label}</p>
                 <span className={`stat-card__signal stat-card__signal--${stat.tone}`}>{stat.signal}</span>
               </div>
               <strong className="stat-card__value">{stat.value}</strong>
               <p className="stat-card__subtext">{stat.subtext}</p>
-            </div>
+              <span className="stat-card__action">{stat.action} &rarr;</span>
+            </button>
           </div>
         ))}
       </div>
@@ -197,6 +202,7 @@ function DashboardPage() {
       </div>
       </>
       )}
+      {modal && <DashboardActivityModal key={modal} kind={modal} onClose={() => setModal(null)} />}
     </div>
   )
 }

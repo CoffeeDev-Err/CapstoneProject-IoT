@@ -40,9 +40,11 @@ const getMetricValue = (barangay, metric) => Number(
   metric === 'incidents' ? barangay.validatedIncidentCount : barangay.reportCount,
 ) || 0
 
-function BarangayOperationalAnalytics({ analytics, period }) {
+function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, onViewReports }) {
   const [metric, setMetric] = useState('reports')
-  const [selectedBarangayName, setSelectedBarangayName] = useState('')
+  const [selection, setSelection] = useState({ name: '', request: priorityRequest })
+  const selectedBarangayName = selection.request === priorityRequest ? selection.name : ''
+  const setSelectedBarangayName = (name) => setSelection({ name, request: priorityRequest })
 
   const metricRanking = useMemo(
     () => analytics.barangays
@@ -144,7 +146,7 @@ function BarangayOperationalAnalytics({ analytics, period }) {
           </div>
         </section>
 
-        <section className="barangay-priority-section" aria-labelledby="barangay-priority-title">
+        <section id="barangay-priority-section" tabIndex={-1} className="barangay-priority-section" aria-labelledby="barangay-priority-title">
           <div className="barangay-analytics__section-header">
             <div>
               <h4 id="barangay-priority-title">Deployment priority</h4>
@@ -233,6 +235,7 @@ function BarangayOperationalAnalytics({ analytics, period }) {
             <span>
               Coverage: {selectedBarangay.availablePersonnel} available of {selectedBarangay.requiredPersonnel} required
             </span>
+            <button className="report-action-btn" onClick={() => onViewReports?.(selectedBarangay.barangay)}>View reports from this barangay &rarr;</button>
             <small>Advisory score only. Final deployment remains with the supervisor.</small>
           </footer>
         </section>

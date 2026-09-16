@@ -182,8 +182,8 @@ const buildOperationalAnalytics = async ({ period: requestedPeriod } = {}) => {
 }
 
 const getDashboardSummary = async () => {
-	const startOfDay = new Date()
-	startOfDay.setHours(0, 0, 0, 0)
+	const phNow = new Date(Date.now() + 8 * 3600000)
+	const startOfDay = new Date(Date.UTC(phNow.getUTCFullYear(), phNow.getUTCMonth(), phNow.getUTCDate()) - 8 * 3600000)
 	const [
 		totalPersonnel,
 		activePersonnel,
@@ -201,7 +201,7 @@ const getDashboardSummary = async () => {
 			dutyStatus: { $ne: 'Off Duty' },
 		}),
 		Task.countDocuments({ status: { $in: ['open', 'full'] } }),
-		Report.countDocuments({ submittedAt: { $gte: startOfDay } }),
+		Report.countDocuments({ submittedAt: { $gte: startOfDay, $lt: new Date(+startOfDay + 86400000) } }),
 		Report.countDocuments({ isIncident: true, caseStatus: 'open' }),
 		Report.find().sort({ submittedAt: -1 }).limit(5).lean(),
 		Task.find().sort({ createdAt: -1 }).limit(5).lean(),

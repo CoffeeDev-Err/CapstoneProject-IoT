@@ -95,6 +95,8 @@ const serializeReport = (report, personnelById = new Map()) => ({
 	...(report.clientSubmissionId && { client_submission_id: report.clientSubmissionId }),
 	personnel_id: report.submittedBy,
 	officer: personnelById.get(report.submittedBy)?.fullName || report.officerName,
+	officer_rank: personnelById.get(report.submittedBy)?.rank || '',
+	badge_number: personnelById.get(report.submittedBy)?.badgeNumber || '',
 	date_time: report.submittedAt?.toISOString(),
 	occurred_at: report.incidentAt?.toISOString(),
 	assigned_area: report.assignedArea,
@@ -146,6 +148,7 @@ const serializeReport = (report, personnelById = new Map()) => ({
 	...(report.resolution?.resolvedAt && {
 		resolved_at: report.resolution.resolvedAt.toISOString(),
 		resolved_by: report.resolution.resolvedBy,
+		resolved_by_name: personnelById.get(report.resolution.resolvedBy)?.fullName || report.resolution.resolvedBy,
 		resolution_notes: report.resolution.notes,
 	}),
 	...(report.backupResponse?.taskId && {
@@ -182,6 +185,7 @@ const serializeDeployment = (deployment, personnelById = new Map()) => {
 		personnelId: deployment.personnelId,
 		personnelName: personnelById.get(deployment.personnelId)?.fullName || deployment.personnelName,
 		rank: personnelById.get(deployment.personnelId)?.rank || deployment.rank,
+		barangay: barangayNameFromCode(deployment.barangayCode),
 		patrolArea: deployment.patrolArea,
 		shiftStart: deployment.shiftStart?.toISOString(),
 		shiftEnd: deployment.shiftEnd?.toISOString(),

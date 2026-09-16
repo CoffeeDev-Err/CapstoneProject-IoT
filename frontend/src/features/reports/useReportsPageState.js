@@ -4,7 +4,6 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useCachedPageData } from '../../hooks/useCachedPageData'
 import { getReport, getReportsList, updateReportValidation } from '../../services/operations'
 import {
-  downloadReportCsv,
   EMPTY_PAGINATION,
   REPORTS_PER_REQUEST,
 } from './reportPresentation'
@@ -15,13 +14,19 @@ export function useReportsPageState({
   requestedReportId,
   requestedReportRequestId,
   showFeedback,
+  filters, onFilterChange,
 }) {
   const [selectedReportId, setSelectedReportId] = useState(null)
   const [selectedReportOverride, setSelectedReportOverride] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [localSearch, setSearchTerm] = useState('')
+  const searchTerm = filters?.search ?? localSearch
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 250)
-  const [reportTypeFilter, setReportTypeFilter] = useState('all')
-  const [caseStatusFilter, setCaseStatusFilter] = useState('all')
+  const [localType, setReportTypeFilter] = useState('all')
+  const reportTypeFilter = filters?.reportType ?? localType
+  const [localCase, setCaseStatusFilter] = useState('all')
+  const caseStatusFilter = filters?.caseStatus ?? localCase
+  const { validationStatus = 'all', category = 'all', barangay = 'all', from, to, cabaganOnly = false } = filters || {}
+  const [isDownloading, setIsDownloading] = useState(false)
   const [sortBy, setSortBy] = useState('submitted_at')
   const [sortOrder, setSortOrder] = useState('desc')
   const [refreshVersion, setRefreshVersion] = useState(0)
@@ -29,7 +34,7 @@ export function useReportsPageState({
   // Revisions trigger a refresh, not a new cache entry. Filter variants must
   // stay separate so a previous query's rows are never shown for a new query.
   const queryKey = JSON.stringify([debouncedSearchTerm, reportTypeFilter,
-    caseStatusFilter, sortBy, sortOrder])
+    caseStatusFilter, sortBy, sortOrder, validationStatus, category, barangay, from, to, cabaganOnly])
   const requestKey = JSON.stringify([queryKey, refreshVersion, reportsRevision])
   const [reportResults, setReportResults, hasReports] = useCachedPageData(`reports:${queryKey}`, {
     data: [], pagination: EMPTY_PAGINATION,
@@ -44,6 +49,7 @@ export function useReportsPageState({
       search: debouncedSearchTerm,
       reportType: reportTypeFilter,
       caseStatus: caseStatusFilter,
+      validationStatus, category, barangay, from, to, cabaganOnly,
       sortBy,
       sortOrder,
       signal: requestController.signal,
@@ -63,7 +69,7 @@ export function useReportsPageState({
       requestController.abort()
     }
   }, [caseStatusFilter, debouncedSearchTerm, refreshVersion, reportTypeFilter,
-    reportsRevision, requestKey, setReportResults, sortBy, sortOrder])
+    reportsRevision, requestKey, setReportResults, sortBy, sortOrder, validationStatus, category, barangay, from, to, cabaganOnly])
 
   useEffect(() => {
     if (!requestedReportId) return undefined
@@ -119,10 +125,18 @@ export function useReportsPageState({
       showFeedback(requestErrorMessage(error, { action: 'update the report review', write: true }), { type: 'error', title: 'Report update needs attention' })
     }
   }, [refreshReports, reviewState.isSaving, selectedReport, showFeedback])
-  const handleDownloadReport = useCallback((report) => {
-    downloadReportCsv(report)
-    showFeedback(`${report.id} downloaded successfully.`, { type: 'success' })
-  }, [showFeedback])
+  const handleDownloadReport = useCallback(async (report) => {
+    if (isDownloading) return
+    setIsDownloading(true)
+    try {
+      const fresh = await getReport(report.id)
+      const { downloadIndividualReport } = await import('../../utils/reportExports')
+      await downloadIndividualReport(fresh)
+      showFeedback(`${report.id} PDF downloaded.`, { type: 'success' })
+    } catch (error) {
+      showFeedback(requestErrorMessage(error, { action: 'download the report PDF' }), { type: 'error' })
+    } finally { setIsDownloading(false) }
+  }, [showFeedback, isDownloading])
   const updateSort = (field) => {
     setSortOrder((current) => (sortBy === field && current === 'desc' ? 'asc' : 'desc'))
     setSortBy(field)
@@ -130,6 +144,7 @@ export function useReportsPageState({
 
   return {
     caseStatusFilter,
+    isDownloading,
     handleCloseReport,
     handleDownloadReport,
     handleOpenReport,
@@ -148,9 +163,9 @@ export function useReportsPageState({
     setSearchTerm,
     sortBy,
     sortOrder,
-    updateSearchTerm: setSearchTerm,
-    updateReportTypeFilter: setReportTypeFilter,
-    updateCaseStatusFilter: setCaseStatusFilter,
+    updateSearchTerm: (value) => onFilterChange ? onFilterChange('search', value) : setSearchTerm(value),
+    updateReportTypeFilter: (value) => onFilterChange ? onFilterChange('report_type', value) : setReportTypeFilter(value),
+    updateCaseStatusFilter: (value) => onFilterChange ? onFilterChange('case_status', value) : setCaseStatusFilter(value),
     updateSort,
   }
 }

@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Eye, Search } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Search } from 'lucide-react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
 import { ReportListSkeleton } from '../components/LoadingSkeleton'
 import { useFeedback } from '../context/useFeedback'
@@ -11,7 +11,18 @@ import {
 } from '../features/reports/reportPresentation'
 import { useReportsPageState } from '../features/reports/useReportsPageState'
 
+import { readReportFilters, REPORT_PERIODS } from '../utils/reportFilters'
+import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays'
+
 function ReportsPage() {
+  const [params, setParams] = useSearchParams()
+  const filters = readReportFilters(params)
+  const updateFilter = (key, value) => setParams((previous) => {
+    const next = new URLSearchParams(previous)
+    if (!value || value === 'all') next.delete(key); else next.set(key, value)
+    if (key === 'period') { next.delete('from'); next.delete('to') }
+    return next
+  })
   const location = useLocation()
   const { refreshReports, reportsRevision } = usePersonnelContext()
   const { showFeedback } = useFeedback()
@@ -22,6 +33,7 @@ function ReportsPage() {
     handleOpenReport,
     handleValidationChange,
     isReportsLoading,
+    isDownloading,
     pagination,
     reportTypeFilter,
     reports,
@@ -39,7 +51,8 @@ function ReportsPage() {
   } = useReportsPageState({
     refreshReports,
     reportsRevision,
-    requestedReportId: location.state?.reportId,
+    requestedReportId: params.get('report') || location.state?.reportId,
+    filters, onFilterChange: updateFilter,
     requestedReportRequestId: location.state?.notificationRequestId,
     showFeedback,
   })
@@ -81,6 +94,17 @@ function ReportsPage() {
         </div>
 
         <div className="report-list-controls">
+          {[
+            ['period', 'Dates (Philippine time)', filters.period, REPORT_PERIODS],
+            ['validation_status', 'Validation', filters.validationStatus, [['all', 'All validations'], ['pending', 'Pending'], ['validated', 'Validated'], ['rejected', 'Rejected']]],
+            ['category', 'Category', filters.category, [['all', 'All categories'], ['incident', 'Incident'], ['routine', 'Routine']]],
+            ['barangay', 'Barangay', filters.barangay, [['all', 'All barangays'], ...CABAGAN_BARANGAYS.map((name) => [name, name])]],
+          ].map(([key, label, value, options]) => <label className="report-filter" key={key}>
+            <span>{label}</span><select value={value} onChange={(event) => updateFilter(key, event.target.value)}>
+              {options.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
+            </select>
+          </label>)}
+
           <label className="report-search">
             <span className="visually-hidden">Search reports</span>
             <Search className="report-search__icon" aria-hidden="true" />
@@ -120,6 +144,9 @@ function ReportsPage() {
           </label>
         </div>
 
+        {filters.cabaganOnly && <p className="settings-hint">Cabagan reports for the linked analytics period (submission date).
+          <button className="report-action-btn" onClick={() => setParams({})}>Clear filters</button>
+        </p>}
         {reportsError && reports.length > 0 && (
           <p className="field-error" role="status">
             Could not refresh reports. Showing previously loaded data. {reportsError}
@@ -178,14 +205,6 @@ function ReportsPage() {
               <div className="report-list__actions" role="cell">
                 <button
                   type="button"
-                  className="report-action-btn report-action-btn--secondary"
-                  onClick={() => handleDownloadReport(report)}
-                >
-                  <Download aria-hidden="true" />
-                  Download
-                </button>
-                <button
-                  type="button"
                   className="report-action-btn report-action-btn--primary"
                   onClick={() => handleOpenReport(report.id)}
                 >
@@ -212,6 +231,7 @@ function ReportsPage() {
         formatDateTime={formatDateTime}
         onClose={handleCloseReport}
         onDownload={handleDownloadReport}
+        isDownloading={isDownloading}
         onValidationChange={handleValidationChange}
         validationState={reviewState}
       />

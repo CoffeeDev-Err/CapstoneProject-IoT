@@ -1,7 +1,7 @@
 import { requestErrorMessage } from '../utils/requestFeedback'
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, Download, Maximize2, Route, X, XCircle } from 'lucide-react'
+import { CheckCircle2, Download, Maximize2, Route, XCircle } from 'lucide-react'
 import { SkeletonBlock } from './LoadingSkeleton'
 import { getReportRoute } from '../services/operations'
 import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
@@ -79,13 +79,14 @@ const EvidenceFigure = ({ evidence, label, report, formatDateTime, correctionInd
   </figure>
 }
 
-function ReportDetailDrawer({
+function ReportDrawerContent({
   report,
   formatDateTime,
   onClose,
   onDownload,
   onValidationChange,
   validationState,
+  isClosing, isDownloading,
 }) {
   const closeButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(Boolean(report), onClose, closeButtonRef)
@@ -154,7 +155,7 @@ function ReportDetailDrawer({
   }
 
   return createPortal(
-    <div className="report-drawer-backdrop" role="presentation" onClick={onClose}>
+    <div className={`report-drawer-backdrop${isClosing ? ' is-closing' : ''}`} role="presentation" onClick={onClose}>
       <aside
         ref={dialogRef}
         className="report-detail-drawer"
@@ -169,16 +170,6 @@ function ReportDetailDrawer({
             <span className="report-detail-drawer__eyebrow">Report {report.id}</span>
             <h3 id="report-detail-title">{report.title}</h3>
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="report-detail-drawer__close"
-            onClick={onClose}
-            aria-label="Close report details"
-            title="Close"
-          >
-            <X aria-hidden="true" />
-          </button>
         </header>
 
         <div className="report-detail-drawer__summary">
@@ -411,22 +402,37 @@ function ReportDetailDrawer({
         </div>
 
         <footer className="report-detail-drawer__footer">
-          <button type="button" className="report-action-btn report-action-btn--secondary" onClick={onClose}>
+          <button ref={closeButtonRef} type="button" className="report-action-btn report-action-btn--danger-outline" onClick={onClose}>
             Close
           </button>
           <button
             type="button"
             className="report-action-btn report-action-btn--primary"
             onClick={() => onDownload(report)}
+            disabled={isDownloading || isClosing}
           >
             <Download aria-hidden="true" />
-            Download report
+            {isDownloading ? 'Preparing PDF...' : 'Download PDF'}
           </button>
         </footer>
       </aside>
     </div>,
     document.body
   )
+}
+
+function ReportDetailDrawer({ report, ...props }) {
+  const [retained, setRetained] = useState({ input: report, report })
+  if (retained.input !== report) setRetained({ input: report, report: report || retained.report })
+  const displayed = report || retained.report
+  const isClosing = !report && Boolean(displayed)
+  useEffect(() => {
+    if (!isClosing) return undefined
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const timer = setTimeout(() => setRetained({ input: null, report: null }), reduced ? 0 : 220)
+    return () => clearTimeout(timer)
+  }, [isClosing])
+  return displayed ? <ReportDrawerContent {...props} report={displayed} isClosing={isClosing} /> : null
 }
 
 export default ReportDetailDrawer

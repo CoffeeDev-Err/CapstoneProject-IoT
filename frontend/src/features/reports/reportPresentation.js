@@ -13,6 +13,7 @@ export const formatReportDateTime = (isoValue) => {
   if (!isoValue) return '-'
   return new Intl.DateTimeFormat('en-PH', {
     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    timeZone: 'Asia/Manila',
   }).format(new Date(isoValue))
 }
 

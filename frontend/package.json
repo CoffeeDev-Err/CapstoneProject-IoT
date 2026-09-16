@@ -21,6 +21,9 @@
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
+    "exceljs": "^4.4.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.28.0",
     "maplibre-gl": "^6.3.0",
     "react": "^19.2.0",

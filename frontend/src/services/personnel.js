@@ -1,10 +1,7 @@
 import { apiRequest } from './apiClient'
+import { getPaginatedCollection } from './apiCollections'
 
-export const getPersonnel = async () => {
-  const payload = await apiRequest('/api/personnel?limit=100')
-
-  return Array.isArray(payload.data) ? payload.data : []
-}
+export const getPersonnel = () => getPaginatedCollection('/api/personnel', 'Unable to load personnel.')
 
 export const getPersonnelLocationHistory = async ({
   personnelId,
