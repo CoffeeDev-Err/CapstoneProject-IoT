@@ -12,7 +12,7 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://13.229.17.177",
+        "EXPO_PUBLIC_API_URL": "https://geosentri.com",
         "ALLOW_CLEARTEXT_TRAFFIC": "false",
         "EXPO_PUBLIC_MAP_PREVIEW": "true"
       },
@@ -23,7 +23,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://13.229.17.177",
+        "EXPO_PUBLIC_API_URL": "https://geosentri.com",
         "ALLOW_CLEARTEXT_TRAFFIC": "false",
         "EXPO_PUBLIC_MAP_PREVIEW": "false"
       }

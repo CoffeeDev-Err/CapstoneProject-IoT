@@ -19,7 +19,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
 const flush = () => act(async () => {})
 describe('session outage recovery', () => {
-  it('preserves the cached profile during outages without granting unverified access', async () => {
+  it('removes a legacy cached profile during outages without granting unverified access', async () => {
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user))
     getCurrentUser.mockRejectedValueOnce({ status: 503 }).mockResolvedValueOnce({ user })
     const { result } = renderHook(useAuth, { wrapper: AuthProvider })
@@ -27,10 +27,11 @@ describe('session outage recovery', () => {
     expect(result.current.loading).toBe(false)
     expect(result.current.isAuthenticated).toBe(false)
     expect(result.current.sessionError).toMatch(/Unable to verify/)
-    expect(JSON.parse(localStorage.getItem(AUTH_USER_KEY))).toEqual(user)
+    expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull()
     await act(async () => { await result.current.refreshSession() })
     expect(result.current.isAuthenticated).toBe(true)
     expect(result.current.sessionError).toBe('')
+    expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull()
   })
   it('shows recovery instead of login on protected and guest routes', async () => {
     getCurrentUser.mockRejectedValue({ code: 'NETWORK_ERROR' })

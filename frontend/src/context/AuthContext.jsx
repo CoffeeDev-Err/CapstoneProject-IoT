@@ -7,16 +7,8 @@ import {
 } from '../services/auth'
 import { AuthContext } from './AuthContextObject'
 
-const readStoredUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem(AUTH_USER_KEY) || 'null')
-  } catch {
-    return null
-  }
-}
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(readStoredUser)
+  const [user, setUser] = useState(null)
   // The session token now lives in an httpOnly cookie the browser attaches
   // automatically, so we can never read it from JavaScript. Bootstrap therefore
   // always asks the server who the current user is.
@@ -27,6 +19,12 @@ export function AuthProvider({ children }) {
   const generation = useRef(0)
   const inFlight = useRef(null)
 
+  useEffect(() => {
+    // One-time migration cleanup for browsers that used an older build.
+    localStorage.removeItem(AUTH_TOKEN_KEY)
+    localStorage.removeItem(AUTH_USER_KEY)
+  }, [])
+
   const clearSession = useCallback(() => {
     generation.current += 1
     inFlight.current = null
@@ -34,8 +32,8 @@ export function AuthProvider({ children }) {
     setSessionError('')
     setCheckingSession(false)
     setLoading(false)
-    // AUTH_TOKEN_KEY is only removed to purge any legacy token left behind by a
-    // pre-cookie build; new sessions never write it.
+    // Both keys are removed to purge data left by older builds. Current web
+    // sessions keep the token in an httpOnly cookie and the user only in memory.
     localStorage.removeItem(AUTH_TOKEN_KEY)
     localStorage.removeItem(AUTH_USER_KEY)
     setUser(null)
@@ -48,9 +46,6 @@ export function AuthProvider({ children }) {
     setSessionError('')
     setCheckingSession(false)
     setLoading(false)
-    // The backend delivers the session as an httpOnly cookie; only the
-    // non-sensitive user profile is cached locally for a fast first paint.
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(session.user))
     setUser(session.user)
   }, [])
 
@@ -68,7 +63,6 @@ export function AuthProvider({ children }) {
         const { user: currentUser } = await getCurrentUser()
         if (requestGeneration !== generation.current) return
         if (!currentUser?.id) throw new Error('Invalid session response')
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser))
         setVerified(true)
         setUser(currentUser)
         setSessionError('')
