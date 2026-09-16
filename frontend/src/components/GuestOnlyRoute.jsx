@@ -11,7 +11,7 @@ function GuestOnlyRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/map" replace />
   }
 
   if (sessionError) return <SessionRecovery />

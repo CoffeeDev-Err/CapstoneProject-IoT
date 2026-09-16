@@ -27,7 +27,7 @@ afterEach(() => { cleanup(); vi.useRealTimers() })
 function renderLogin() {
   render(<MemoryRouter initialEntries={['/login']}><Routes>
     <Route path="/login" element={<LoginPage />} />
-    <Route path="/" element={<p>Signed in</p>} />
+    <Route path="/map" element={<p>Signed in</p>} />
   </Routes></MemoryRouter>)
 }
 async function openVerification() {

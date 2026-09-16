@@ -24,7 +24,7 @@ const navSections = [
     title: 'Overview',
     items: [
       {
-        to: '/',
+        to: '/map',
         icon: MapIcon,
         label: 'Live Map',
       },
@@ -85,7 +85,7 @@ const navSections = [
 function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
   const handleNavItemClick = (item) => {
     onNavigate?.()
-    if (item.to === '/' && typeof window !== 'undefined') {
+    if (item.to === '/map' && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('focus-live-map'))
     }
   }
@@ -116,7 +116,7 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    end={item.to === '/'}
+                    end={item.to === '/map'}
                     onClick={() => handleNavItemClick(item)}
                     aria-label={item.label}
                     className={({ isActive }) =>

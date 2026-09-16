@@ -62,7 +62,7 @@ describe('Personnel roster', () => {
     render(<PersonnelPage />)
     fireEvent.click(screen.getByRole('button', { name: 'View Ana Santos on live map' }))
     expect(fixture.navigate).toHaveBeenCalledTimes(1)
-    expect(fixture.navigate).toHaveBeenCalledWith('/', { state: { locatePersonnelId: 'p-001' } })
+    expect(fixture.navigate).toHaveBeenCalledWith('/map', { state: { locatePersonnelId: 'p-001' } })
     for (const name of ['Ben Reyes', 'Cora Dela Cruz', 'Dan Ramos']) {
       expect(screen.getByRole('button', { name: `View ${name} on live map` })).toBeDisabled()
       fireEvent.click(screen.getByText(name).closest('tr'))

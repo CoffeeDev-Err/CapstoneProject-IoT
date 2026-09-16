@@ -52,7 +52,7 @@ function AppRoutes() {
           element={withPageLoader(<EvidenceViewerPage />)}
         />
         <Route element={<AppLayout />}>
-          <Route path="/" element={withPageLoader(<MonitoringPage />)} />
+          <Route path="/map" element={withPageLoader(<MonitoringPage />)} />
           <Route path="/monitoring" element={withPageLoader(<DashboardPage />)} />
           <Route path="/analytics" element={withPageLoader(<AnalyticsPage />)} />
           <Route path="/assign-area" element={withPageLoader(<AssignAreaPage key="deployment-form" />)} />
@@ -64,8 +64,9 @@ function AppRoutes() {
       </Route>
 
       <Route element={<GuestOnlyRoute />}>
-        <Route path="/login" element={withPageLoader(<LoginPage />)} />
+        <Route path="/" element={withPageLoader(<LoginPage />)} />
       </Route>
+      <Route path="/login" element={<Navigate to="/" replace />} />
 
       {/* Redirect any unrecognised path back to the dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />

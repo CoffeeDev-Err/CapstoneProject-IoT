@@ -80,7 +80,7 @@ function PersonnelPage() {
 
   const locatePersonnel = (officer) => {
     if (officer.dutyStatus === 'Off Duty' || officer.isLocationStale || officer.isVisibleOnMap === false) return
-    navigate('/', { state: { locatePersonnelId: officer.id } })
+    navigate('/map', { state: { locatePersonnelId: officer.id } })
   }
 
   return (

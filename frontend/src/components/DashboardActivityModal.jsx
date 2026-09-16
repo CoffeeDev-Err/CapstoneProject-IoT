@@ -64,8 +64,8 @@ export default function DashboardActivityModal({ kind, onClose }) {
               : <div><dt>Severity</dt><dd>{row.severity}/5</dd></div>}
           </dl>
           <div className="activity-record__actions">{isTasks ? <>
-            <button className="report-action-btn" onClick={() => open('/', { taskId: row.id, notificationRequestId: Date.now() })}>View on Map</button>
-            <button className="report-action-btn report-action-btn--primary" onClick={() => open('/', { taskId: row.id, notificationRequestId: Date.now() })}>Open Request</button>
+            <button className="report-action-btn" onClick={() => open('/map', { taskId: row.id, notificationRequestId: Date.now() })}>View on Map</button>
+            <button className="report-action-btn report-action-btn--primary" onClick={() => open('/map', { taskId: row.id, notificationRequestId: Date.now() })}>Open Request</button>
           </> : <button className="report-action-btn report-action-btn--primary" onClick={() => open(`/reports?report=${encodeURIComponent(row.id)}`)}>View Report</button>}</div>
         </article>)}
       </div>

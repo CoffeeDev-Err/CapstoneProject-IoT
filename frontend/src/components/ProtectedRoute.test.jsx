@@ -17,13 +17,13 @@ function CachedPage() {
   </>
 }
 function App() {
-  return <MemoryRouter initialEntries={['/']}>
+  return <MemoryRouter initialEntries={['/map']}>
     <Routes>
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<CachedPage />} />
-        <Route path="/other" element={<Link to="/">Return to page</Link>} />
+        <Route path="/map" element={<CachedPage />} />
+        <Route path="/other" element={<Link to="/map">Return to page</Link>} />
       </Route>
-      <Route path="/login" element={<Link to="/">Sign in again</Link>} />
+      <Route path="/" element={<Link to="/map">Sign in again</Link>} />
     </Routes>
   </MemoryRouter>
 }

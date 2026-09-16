@@ -145,7 +145,7 @@ function LoginPage() {
     try {
       const session = await verifyLoginCode(challenge.challengeId, nextCode)
       establishSession(session)
-      navigate(location.state?.from || '/', { replace: true })
+      navigate(location.state?.from || '/map', { replace: true })
     } catch (requestError) {
       showRequestError(requestError)
     } finally {
