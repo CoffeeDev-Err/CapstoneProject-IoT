@@ -23,7 +23,7 @@ function App() {
         <Route path="/map" element={<CachedPage />} />
         <Route path="/other" element={<Link to="/map">Return to page</Link>} />
       </Route>
-      <Route path="/" element={<Link to="/map">Sign in again</Link>} />
+      <Route path="/login" element={<Link to="/map">Sign in again</Link>} />
     </Routes>
   </MemoryRouter>
 }

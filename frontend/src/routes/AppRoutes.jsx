@@ -6,7 +6,9 @@
  * and top-bar once, then injects the active child page via <Outlet />.
  *
  * Route map:
- *   /             → MonitoringPage  (live MapLibre map with GPS markers)
+ *   /             → PublicHomePage  (public GeoSentri information)
+ *   /login        → LoginPage       (authorized personnel sign-in)
+ *   /map          → MonitoringPage  (live MapLibre map with GPS markers)
  *   /monitoring   → DashboardPage   (overview stats & recent activity)
  *   /analytics    → AnalyticsPage   (data insights: weekly patrol vs incident chart)
  *   /assign-area  → AssignAreaPage  (deployment and patrol area assignments)
@@ -28,6 +30,7 @@ const DashboardPage = lazy(() => import('../pages/DashboardPage'))
 const EvidenceViewerPage = lazy(() => import('../pages/EvidenceViewerPage'))
 const LoginPage = lazy(() => import('../pages/LoginPage'))
 const MonitoringPage = lazy(() => import('../pages/MonitoringPage'))
+const PublicHomePage = lazy(() => import('../pages/PublicHomePage'))
 const PersonnelPage = lazy(() => import('../pages/PersonnelPage'))
 const ReportsPage = lazy(() => import('../pages/ReportsPage'))
 const SettingsPage = lazy(() => import('../pages/SettingsPage'))
@@ -63,10 +66,10 @@ function AppRoutes() {
         </Route>
       </Route>
 
+      <Route path="/" element={withPageLoader(<PublicHomePage />)} />
       <Route element={<GuestOnlyRoute />}>
-        <Route path="/" element={withPageLoader(<LoginPage />)} />
+        <Route path="/login" element={withPageLoader(<LoginPage />)} />
       </Route>
-      <Route path="/login" element={<Navigate to="/" replace />} />
 
       {/* Redirect any unrecognised path back to the dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />

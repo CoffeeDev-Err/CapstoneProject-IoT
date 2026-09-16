@@ -2,6 +2,7 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /socket.io/
+Disallow: /login
 Disallow: /map
 Disallow: /monitoring
 Disallow: /analytics

@@ -3,6 +3,7 @@
 @import './styles/motion.css';
 @import './styles/page-scaffold.css';
 @import './styles/auth.css';
+@import './styles/public-home.css';
 @import './styles/shared.css';
 @import './styles/dashboard.css';
 @import './styles/analytics.css';

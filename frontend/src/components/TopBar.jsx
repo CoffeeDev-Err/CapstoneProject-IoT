@@ -159,12 +159,12 @@ function TopBar({
   const handleLogout = async () => {
     setDropdownOpen(false)
     await logout()
-    navigate('/', { replace: true })
+    navigate('/login', { replace: true })
   }
 
   const handlePasswordChanged = () => {
     clearSession()
-    navigate('/', {
+    navigate('/login', {
       replace: true,
       state: { passwordChanged: true },
     })

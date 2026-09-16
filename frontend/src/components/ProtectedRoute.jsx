@@ -13,7 +13,7 @@ function ProtectedRoute() {
   }
   if (!isAuthenticated) {
     if (sessionError) return <SessionRecovery />
-    return <Navigate to="/" replace state={{ from: location.pathname }} />
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
   return (
     <PageCacheProvider key={user?.id || user?._id || user?.username}>
