@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /socket.io/
+Disallow: /monitoring
+Disallow: /analytics
+Disallow: /assign-area
+Disallow: /deployments
+Disallow: /personnel
+Disallow: /reports
+Disallow: /settings
+
+Sitemap: https://geosentri.com/sitemap.xml
