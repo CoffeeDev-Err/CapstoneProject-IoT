@@ -37,6 +37,17 @@
   min-width: 180px;
 }
 
+.settings-hint.report-linked-filter-note {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+}
+
+.settings-hint.report-linked-filter-note .report-action-btn {
+  flex: 0 0 auto;
+}
+
 .report-list-controls {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(150px, 190px) minmax(160px, 200px);
@@ -111,6 +122,11 @@
   .report-date-filter {
     flex-basis: 100%;
     width: 100%;
+  }
+
+  .report-linked-filter-note {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

@@ -12,6 +12,10 @@
   gap: 0.75rem;
 }
 
+.settings-hint.analytics-period-note {
+  margin: 0 0 1rem;
+}
+
 .barangay-analytics__header {
   display: flex;
   align-items: flex-start;

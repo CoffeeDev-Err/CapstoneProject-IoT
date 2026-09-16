@@ -82,6 +82,12 @@ function ReportsPage() {
           <h2 className="page-title">Reports</h2>
           <p className="page-subtitle">Police incident and patrol report records</p>
         </div>
+        <label className="report-filter report-date-filter">
+          <span>Dates (Philippine time)</span>
+          <select value={filters.period} onChange={(event) => updateFilter('period', event.target.value)}>
+            {REPORT_PERIODS.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
+          </select>
+        </label>
       </header>
 
       <div className="widget-card slide-up report-list-panel report-list-panel--reports">
@@ -90,12 +96,6 @@ function ReportsPage() {
             <h3 className="widget-title mb-0">Submitted reports</h3>
             <p>{reports.length} of {pagination.total} matching reports shown</p>
           </div>
-          <label className="report-filter report-date-filter">
-            <span>Dates (Philippine time)</span>
-            <select value={filters.period} onChange={(event) => updateFilter('period', event.target.value)}>
-              {REPORT_PERIODS.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
-            </select>
-          </label>
         </div>
 
         <div className="report-list-controls">
@@ -138,9 +138,10 @@ function ReportsPage() {
           </label>
         </div>
 
-        {filters.cabaganOnly && <p className="settings-hint">Cabagan reports for the linked analytics period (submission date).
-          <button className="report-action-btn" onClick={() => setParams({})}>Clear filters</button>
-        </p>}
+        {filters.cabaganOnly && <div className="settings-hint report-linked-filter-note">
+          <span>Cabagan reports for the linked analytics period (submission date).</span>
+          <button type="button" className="report-action-btn report-action-btn--secondary" onClick={() => setParams({})}>Clear filters</button>
+        </div>}
         {reportsError && reports.length > 0 && (
           <p className="field-error" role="status">
             Could not refresh reports. Showing previously loaded data. {reportsError}

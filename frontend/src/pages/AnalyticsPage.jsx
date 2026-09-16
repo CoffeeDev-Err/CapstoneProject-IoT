@@ -101,7 +101,7 @@ export default function AnalyticsPage() {
     </header>
     {error && <p className="field-error" role="alert">{error} <button className="report-action-btn" onClick={() => { setRetry((value) => value + 1); retryInitialData?.() }}>Retry</button></p>}
     {loading ? <AnalyticsContentSkeleton /> : !error && <>
-      <p className="settings-hint">Period counts use submission dates in Philippine time. Personnel coverage is current.</p>
+      <p className="settings-hint analytics-period-note">Period counts use submission dates in Philippine time. Personnel coverage is current.</p>
       <div className="stats-grid analytics-stats-grid row g-3 mb-3 mx-0">
         {stats.map((stat) => <div className="col-12 col-sm-6 col-xl-3" key={stat.label}>
           <button type="button" className="stat-card stat-card--action slide-up h-100" onClick={stat.click}>
