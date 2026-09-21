@@ -148,6 +148,7 @@ export default function ChangePasswordModal({
   return (
     <SwipeDismissSheet
       visible={visible}
+      initiallyExpanded
       onClose={onClose}
       sheetStyle={[styles.sheet, isDark && darkStyles.sheet]}
     >

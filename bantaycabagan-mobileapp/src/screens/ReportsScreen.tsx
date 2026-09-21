@@ -52,7 +52,7 @@ import { useReportFormController } from '../features/reports/useReportFormContro
 
 const reportTypes = REPORT_TYPES;
 const reportFilters = REPORT_FILTERS;
-const SUBMIT_MODAL_TOP_OFFSET = 1;
+const PAGE_HEADER_CONTENT_HEIGHT = 54;
 type ReportDatePreset = 'all' | 'today' | '7days' | '30days';
 
 const datePresetLabels: Record<ReportDatePreset, string> = {
@@ -136,6 +136,7 @@ export default function ReportsScreen() {
   }, 'Reports'>>();
   const handledDraftRequestRef = useRef<number | null>(null);
   const handledBackupReportRequestRef = useRef<number | null>(null);
+  const [expandFormAfterMap, setExpandFormAfterMap] = useState(false);
   const { reportId, openReport, selectedReport, loading: detailLoading, error: detailError, refresh: refreshDetail } = useReportDetails(token, reports);
   useEffect(() => {
     if (route.params?.reportId) { openReport(route.params.reportId); refreshDetail(); }
@@ -337,10 +338,14 @@ export default function ReportsScreen() {
 
       <SwipeDismissSheet
         visible={formVisible && !locationPickerVisible}
-        topInset={insets.top + SUBMIT_MODAL_TOP_OFFSET}
+        initiallyExpanded={expandFormAfterMap}
+        topInset={insets.top + PAGE_HEADER_CONTENT_HEIGHT}
         tapOutsideToClose={false}
         sheetStyle={[styles.modalScreen, isDark && themeStyles.screen]}
-        onClose={closeReportForm}
+        onClose={() => {
+          setExpandFormAfterMap(false);
+          closeReportForm();
+        }}
       >
         {({ close }) => (
         <SafeAreaView
@@ -433,7 +438,10 @@ export default function ReportsScreen() {
               form={form}
               onEditLocation={updateManualLocation}
               onOpenBarangays={() => setBarangayPickerVisible(true)}
-              onOpenMap={() => setLocationPickerVisible(true)}
+              onOpenMap={() => {
+                setExpandFormAfterMap(true);
+                setLocationPickerVisible(true);
+              }}
               onUseCurrentGps={useCurrentGpsSuggestion}
             />
 
@@ -938,6 +946,7 @@ const styles = StyleSheet.create({
   submitModalRoot: { flex: 1 },
   modalScreen: {
     flex: 1,
+    maxHeight: '100%',
     overflow: 'hidden',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,

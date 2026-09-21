@@ -75,6 +75,7 @@ type SwipeDismissSheetProps = {
   children: React.ReactNode | ((controls: SwipeDismissControls) => React.ReactNode);
   containerStyle?: StyleProp<ViewStyle>;
   handleColor?: string;
+  initiallyExpanded?: boolean;
   onClose: () => void;
   sheetStyle?: StyleProp<ViewStyle>;
   tapOutsideToClose?: boolean;
@@ -191,10 +192,12 @@ export function SheetFlatList<ItemT>({
 const useExpandableSheetMotion = ({
   active,
   dismissDistance,
+  initiallyExpanded,
   onClose,
 }: {
   active: boolean;
   dismissDistance: number;
+  initiallyExpanded: boolean;
   onClose: () => void;
 }) => {
   const translateY = useSharedValue(dismissDistance);
@@ -259,9 +262,9 @@ const useExpandableSheetMotion = ({
     openedRef.current = true;
     translateY.value = dismissDistance;
     entranceOpacity.value = 0;
-    scrollLocked.value = false;
-    updateScrollEnabled(true);
-    translateY.value = withTiming(0, {
+    scrollLocked.value = !initiallyExpanded;
+    updateScrollEnabled(initiallyExpanded);
+    translateY.value = withTiming(initiallyExpanded ? 0 : lowerSnap.value, {
       duration: OPEN_DURATION,
       easing: OPEN_EASING,
     });
@@ -269,7 +272,7 @@ const useExpandableSheetMotion = ({
       duration: 240,
       easing: Easing.out(Easing.cubic),
     });
-  }, [active, dismissDistance, entranceOpacity, lowerSnap, measuredHeight, scrollLocked, translateY, updateScrollEnabled]);
+  }, [active, dismissDistance, entranceOpacity, initiallyExpanded, lowerSnap, measuredHeight, scrollLocked, translateY, updateScrollEnabled]);
 
   const close = useCallback((afterClose?: () => void) => {
     if (closingRef.current) return;
@@ -536,6 +539,7 @@ export function SwipeDismissSheet({
   children,
   containerStyle,
   handleColor = '#cbd5e1',
+  initiallyExpanded = false,
   onClose,
   sheetStyle,
   tapOutsideToClose = true,
@@ -547,6 +551,7 @@ export function SwipeDismissSheet({
   const motion = useExpandableSheetMotion({
     active: visible,
     dismissDistance: screenHeight,
+    initiallyExpanded,
     onClose,
   });
   const scrollContext = useMemo<SheetScrollContextValue>(() => ({

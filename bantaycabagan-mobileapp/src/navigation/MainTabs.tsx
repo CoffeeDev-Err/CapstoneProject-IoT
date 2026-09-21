@@ -31,7 +31,6 @@ import { useReportDraftReminder } from '../features/reports/useReportDraftRemind
 import type { OperationalTask } from '../types/operations';
 
 const Tab = createBottomTabNavigator();
-const TASK_MODAL_TOP_OFFSET = 1;
 const PAGE_HEADER_CONTENT_HEIGHT = 54;
 const TAB_BAR_MIN_BOTTOM_OFFSET = 8;
 const TAB_BAR_SYSTEM_GAP = 4;
@@ -332,7 +331,7 @@ export default function MainTabs() {
 
       <SwipeDismissSheet
         visible={tasksVisible}
-        topInset={insets.top + TASK_MODAL_TOP_OFFSET}
+        topInset={insets.top + PAGE_HEADER_CONTENT_HEIGHT}
         onClose={() => setTasksVisible(false)}
         sheetStyle={[styles.taskSheet, isDark && styles.taskSheetDark]}
       >
@@ -353,7 +352,7 @@ export default function MainTabs() {
 
       <SwipeDismissSheet
         visible={notificationsVisible}
-        topInset={insets.top + TASK_MODAL_TOP_OFFSET}
+        topInset={insets.top + PAGE_HEADER_CONTENT_HEIGHT}
         onClose={() => setNotificationsVisible(false)}
         sheetStyle={[styles.taskSheet, isDark && styles.taskSheetDark]}
       >
@@ -499,7 +498,8 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
   taskSheet: {
-    height: '92%',
+    height: '100%',
+    maxHeight: '100%',
     backgroundColor: mobileTheme.surface,
   },
   taskSheetDark: { backgroundColor: '#0b1528' },
