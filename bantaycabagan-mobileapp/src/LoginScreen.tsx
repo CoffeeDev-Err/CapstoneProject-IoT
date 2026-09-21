@@ -244,7 +244,7 @@ export default function LoginScreen() {
             />
             <View>
               <Text style={styles.brandName}>GeoSentri</Text>
-              <Text style={styles.brandCaption}>Police Personnel Portal</Text>
+              <Text style={styles.brandCaption}>Philippine National Police</Text>
             </View>
           </View>
 

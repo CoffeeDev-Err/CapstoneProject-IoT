@@ -16,8 +16,8 @@ export function PolicePageHeader({ onOpenNotifications }: { onOpenNotifications?
         resizeMode="contain"
       />
       <View style={styles.identity}>
-        <Text style={[styles.title, { color: colors.text }]}>Philippine National Police</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>Cabagan Police Station</Text>
+        <Text style={[styles.title, { color: colors.text }]}>GeoSentri</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>Philippine National Police</Text>
       </View>
       {onOpenNotifications && <NotificationBellButton onPress={onOpenNotifications} />}
     </View>

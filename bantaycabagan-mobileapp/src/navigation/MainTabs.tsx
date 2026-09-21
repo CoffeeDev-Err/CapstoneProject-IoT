@@ -175,11 +175,11 @@ function FloatingTabBar({
             style={styles.tabItem}
             onPress={handlePress}
           >
-            <View style={[styles.iconShell, focused && styles.iconShellActive]}>
+            <View style={styles.iconShell}>
               <Icon
                 name={tabIcons[route.name]}
                 size={22}
-                color={focused ? '#ffffff' : colors.textMuted}
+                color={focused ? mobileTheme.blue : colors.textMuted}
               />
               {isTasks && openTaskCount > 0 && (
                 <View style={styles.badge}>
@@ -190,11 +190,12 @@ function FloatingTabBar({
               )}
               <Text style={[
                 styles.tabLabel,
-                { color: focused ? '#ffffff' : colors.textMuted },
+                { color: focused ? mobileTheme.blue : colors.textMuted },
                 focused && styles.tabLabelActive,
               ]}>
                 {label}
               </Text>
+              {focused ? <View style={styles.activeTabIndicator} /> : null}
             </View>
           </TouchableOpacity>
         );
@@ -424,6 +425,8 @@ const styles = StyleSheet.create({
     left: 0,
     zIndex: 20,
     overflow: 'hidden',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     backgroundColor: '#ffffff',
   },
   fixedHeaderArea: { zIndex: 20, backgroundColor: '#ffffff' },
@@ -466,16 +469,21 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     overflow: 'visible',
   },
-  iconShellActive: {
-    backgroundColor: mobileTheme.blue,
-    borderRadius: 14,
-  },
   tabLabel: {
     fontSize: 8,
     fontWeight: '700',
     lineHeight: 9,
   },
   tabLabelActive: { fontWeight: '800' },
+  activeTabIndicator: {
+    position: 'absolute',
+    bottom: -4,
+    width: 34,
+    height: 3,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    backgroundColor: mobileTheme.blue,
+  },
   badge: {
     position: 'absolute',
     top: -5,
