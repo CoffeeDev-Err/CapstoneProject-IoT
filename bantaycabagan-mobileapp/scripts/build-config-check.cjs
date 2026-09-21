@@ -36,7 +36,7 @@ const getAndroidProperties = () => resolveAppConfig({ config: { plugins: [] } })
 try {
   for (const profileName of ['preview', 'production']) {
     const environment = easConfig.build[profileName].env;
-    assert.equal(environment.EXPO_PUBLIC_API_URL, 'https://13.229.17.177');
+    assert.equal(environment.EXPO_PUBLIC_API_URL, 'https://geosentri.com');
     assert.equal(environment.ALLOW_CLEARTEXT_TRAFFIC, 'false');
     for (const name of Object.keys(originalEnvironment)) delete process.env[name];
     Object.assign(process.env, environment);

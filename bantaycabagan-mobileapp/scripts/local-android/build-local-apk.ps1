@@ -39,7 +39,7 @@ Import-DotEnv (Join-Path $projectRoot '.env')
 $env:EXPO_PUBLIC_MAP_PREVIEW = 'false'
 $env:ALLOW_CLEARTEXT_TRAFFIC = 'false'
 
-if ($env:EXPO_PUBLIC_API_URL -ne 'https://13.229.17.177') {
+if ($env:EXPO_PUBLIC_API_URL -ne 'https://geosentri.com') {
     throw 'EXPO_PUBLIC_API_URL must target the deployed GeoSentri AWS backend.'
 }
 if ([string]::IsNullOrWhiteSpace($env:EXPO_PUBLIC_MAPTILER_API_KEY)) {
