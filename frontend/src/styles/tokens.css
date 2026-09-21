@@ -166,15 +166,15 @@
   --text-secondary: #cbd5e1;
   --text-tertiary: #a8b4c7;
   --text-muted: #94a3b8;
-  --bg-primary: #1e293b;
+  --bg-primary: #18273d;
   --bg-secondary: #0f172a;
-  --bg-tertiary: #111d33;
+  --bg-tertiary: #122039;
   --surface-page: var(--bg-secondary);
   --surface-shell: #020817;
   --surface-card: var(--bg-primary);
-  --surface-muted: #111d33;
+  --surface-muted: #122039;
   --surface-selected: rgba(37, 99, 235, 0.16);
-  --surface-border: #334155;
+  --surface-border: #30465f;
   --scrollbar-track: #0b1528;
   --scrollbar-thumb: #285681;
   --scrollbar-thumb-hover: #356fa6;
@@ -184,8 +184,8 @@
   --interactive-focus-shadow: rgba(96, 165, 250, 0.24);
   --border-strong: #475569;
   --shadow-overlay: 0 16px 32px -18px rgba(0, 0, 0, 0.72);
-  --border-color: rgba(148, 163, 184, 0.2);
-  --border-color-light: rgba(148, 163, 184, 0.13);
+  --border-color: rgba(125, 154, 194, 0.22);
+  --border-color-light: rgba(125, 154, 194, 0.14);
   --focus-ring: rgba(96, 165, 250, 0.72);
 }
 

@@ -7,6 +7,15 @@
   color: #e2e8f0;
 }
 
+[data-theme="dark"] .layout-body {
+  background: radial-gradient(
+    ellipse at top right,
+    rgba(30, 58, 100, 0.72) 0%,
+    rgba(15, 23, 42, 0.97) 40%,
+    #080f1f 78%
+  );
+}
+
 /* Navy scrollbars keep native scrolling visible without introducing a bright
    gray strip against the dark application shell. */
 :root[data-theme="dark"],
