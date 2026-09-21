@@ -183,12 +183,12 @@ export function useReportFormController({
         );
         setForm((backupTask && !draftBelongsToRequestedBackup ? {
           ...draft.form,
-          assigned_area: draft.form.assigned_area || assignedArea,
+          assigned_area: assignedArea,
         } : {
           ...emptyForm,
           ...draft.form,
           ...(draftBelongsToRequestedBackup && { backup_context: backupContext }),
-          assigned_area: draft.form.assigned_area || assignedArea,
+          assigned_area: emptyForm.assigned_area,
         }) as ReportForm);
         setEvidencePhoto(draft.evidencePhoto);
         if (backupTask && !draftBelongsToRequestedBackup) {
@@ -393,6 +393,7 @@ export function useReportFormController({
   };
 
   const updateForm = <Field extends keyof ReportForm>(field: Field, value: ReportForm[Field]) => {
+    if (field === 'assigned_area') return;
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -573,8 +574,12 @@ export function useReportFormController({
         ));
         return;
       }
+      const assignedArea = form.backup_context?.assigned_area
+        || selectPersonnelDeployment(deployments, currentPersonnelId)?.patrolArea
+        || '';
       const result = await submitReport({
         ...form,
+        assigned_area: assignedArea,
         ...(evidencePhoto && { evidence_photo: evidencePhoto }),
       });
       draftHydratedRef.current = false;

@@ -844,11 +844,13 @@ const styles = StyleSheet.create({
   dateFilterRow: { marginTop: -7, marginBottom: 12 },
   dateFilterChips: {
     paddingHorizontal: 22,
+    flexGrow: 1,
     gap: 8,
   },
   datePresetChip: {
+    flex: 1,
     minHeight: 40,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

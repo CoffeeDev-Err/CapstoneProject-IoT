@@ -259,7 +259,9 @@ const useExpandableSheetMotion = ({
     openedRef.current = true;
     translateY.value = dismissDistance;
     entranceOpacity.value = 0;
-    translateY.value = withTiming(lowerSnap.value, {
+    scrollLocked.value = false;
+    updateScrollEnabled(true);
+    translateY.value = withTiming(0, {
       duration: OPEN_DURATION,
       easing: OPEN_EASING,
     });
@@ -267,7 +269,7 @@ const useExpandableSheetMotion = ({
       duration: 240,
       easing: Easing.out(Easing.cubic),
     });
-  }, [active, dismissDistance, entranceOpacity, lowerSnap, measuredHeight, translateY]);
+  }, [active, dismissDistance, entranceOpacity, lowerSnap, measuredHeight, scrollLocked, translateY, updateScrollEnabled]);
 
   const close = useCallback((afterClose?: () => void) => {
     if (closingRef.current) return;

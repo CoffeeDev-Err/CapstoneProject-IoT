@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { Alert, AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useReportFormController } from './useReportFormController';
-import type { LivePersonnel, OperationalTask, PoliceReport } from '../../types/operations';
+import type { DeploymentAssignment, LivePersonnel, OperationalTask, PoliceReport } from '../../types/operations';
 import {
   clearReportDraft,
 	discardTemporaryEvidence,
@@ -260,6 +260,55 @@ it('restores the officer report draft after the form is reopened', async () => {
     location: 'ISU Cabagan gate',
     barangay: 'Catabayungan',
   });
+});
+
+it('keeps the assigned area locked to the officer deployment', async () => {
+  const deployment: DeploymentAssignment = {
+    id: 'DEP-CURRENT',
+    groupId: 'GROUP-ONE',
+    personnelId: 'one',
+    personnelName: 'Officer One',
+    rank: 'Police Corporal',
+    patrolArea: 'Catabayungan Patrol Area',
+    assignedAt: '2026-09-22T00:00:00.000Z',
+    latitude: 17.4305,
+    longitude: 121.765,
+    status: 'active',
+    isCurrentShift: true,
+    acknowledged: true,
+  };
+  jest.mocked(loadReportDraft).mockResolvedValueOnce({
+    form: {
+      report_type: 'patrol',
+      title: 'Patrol observation',
+      description: 'Routine patrol completed.',
+      location: 'Public market entrance',
+      barangay: 'Catabayungan',
+      severity: 2,
+      occurred_at: new Date(Date.now() - 60_000).toISOString(),
+      assigned_area: 'Old deployment area',
+      location_source: 'manual',
+    },
+    evidencePhoto: null,
+    updatedAt: '2026-09-22T01:05:00.000Z',
+  });
+  const submitReport = jest.fn(async () => 'submitted' as const);
+  const { result } = await renderHook(() => useReportFormController({
+    ...options,
+    deployments: [deployment],
+    submitReport,
+  }));
+
+  await act(async () => { await result.current.openSubmitForm(); });
+  expect(result.current.form.assigned_area).toBe('Catabayungan Patrol Area');
+
+  await act(() => result.current.updateForm('assigned_area', 'Manually changed area'));
+  expect(result.current.form.assigned_area).toBe('Catabayungan Patrol Area');
+
+  await act(async () => { await result.current.handleSubmit(jest.fn()); });
+  expect(submitReport).toHaveBeenCalledWith(expect.objectContaining({
+    assigned_area: 'Catabayungan Patrol Area',
+  }));
 });
 
 const completedBackupTask: OperationalTask = {
