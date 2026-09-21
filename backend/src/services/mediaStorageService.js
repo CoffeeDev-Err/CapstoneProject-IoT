@@ -272,7 +272,15 @@ const createPresignedDownloadUrl = async (key, { download = false } = {}) => {
 	)
 }
 
+const readStoredS3Media = async (key) => {
+	const { client, config } = getS3Client()
+	return client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }), {
+		abortSignal: AbortSignal.timeout(15000),
+	})
+}
+
 module.exports = {
+	readStoredS3Media,
 	createPresignedDownloadUrl,
 	deleteStoredMedia,
 	parseS3Reference,

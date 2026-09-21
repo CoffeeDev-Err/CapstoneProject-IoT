@@ -1,5 +1,4 @@
 import { resolveMediaUrl } from './mediaUrls'
-import geosentriLogo from '../assets/geosentri-logo.png'
 import pnpLogo from '../assets/pnp-logo.png'
 
 export const exportDateTime = (value) => value && Number.isFinite(Date.parse(value))
@@ -30,7 +29,15 @@ export const reportExportRows = (report) => [
 ].map(([label, value]) => [label, text(value)])
 
 const loadImage = async (url) => {
-  const response = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(15000) })
+  // Signed media endpoints stream export bytes without redirecting fetch to S3.
+  const imageUrl = new URL(url, window.location.href)
+  if (imageUrl.pathname.startsWith('/api/media/')) imageUrl.searchParams.set('export', '1')
+  let response
+  try {
+    response = await fetch(imageUrl.href, { credentials: 'include', signal: AbortSignal.timeout(20000) })
+  } catch {
+    throw new Error('The report photo could not be loaded for the PDF. Please retry the download.')
+  }
   if (!response.ok) throw new Error('The photo could not be loaded. Retry the PDF download.')
   const blob = await response.blob()
   const bitmap = await createImageBitmap(blob)
@@ -44,11 +51,11 @@ const loadImage = async (url) => {
   return { data: canvas.toDataURL('image/jpeg', 0.88), width: canvas.width, height: canvas.height }
 }
 const pdfWriter = async (title, generatedAt) => {
-  const [{ jsPDF }, { autoTable }, logos] = await Promise.all([
-    import('jspdf'), import('jspdf-autotable'), Promise.all([loadImage(geosentriLogo), loadImage(pnpLogo)]),
+  const [{ jsPDF }, { autoTable }, logo] = await Promise.all([
+    import('jspdf'), import('jspdf-autotable'), loadImage(pnpLogo),
   ])
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
-  doc.setProperties({ title, author: 'GeoSentri / Cabagan PNP', subject: title })
+  doc.setProperties({ title, author: 'Philippine National Police - Cabagan Municipal Police Station', subject: title })
   let y = 42
   const section = (heading, head, body, options = {}) => {
     if (y > 240) { doc.addPage(); y = 42 }
@@ -87,10 +94,10 @@ const pdfWriter = async (title, generatedAt) => {
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page)
       doc.setFillColor(15, 37, 69); doc.rect(0, 0, 210, 32, 'F')
-      logos.forEach((logo, index) => { const size = fitImage(logo.width, logo.height, 22, 22)
-        doc.addImage(logo.data, 'JPEG', index ? 172 : 16, 5, size.width, size.height) })
+      const logoSize = fitImage(logo.width, logo.height, 22, 22)
+      doc.addImage(logo.data, 'JPEG', 16, 5, logoSize.width, logoSize.height)
       doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15)
-      doc.text('GeoSentri / PNP', 105, 12, { align: 'center' })
+      doc.text('Philippine National Police', 105, 12, { align: 'center' })
       doc.setFontSize(9); doc.setFont('helvetica', 'normal')
       doc.text('Cabagan Municipal Police Station', 105, 19, { align: 'center' })
       doc.text(title, 105, 26, { align: 'center' })

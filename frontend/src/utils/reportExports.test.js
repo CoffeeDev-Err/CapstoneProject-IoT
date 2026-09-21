@@ -1,5 +1,20 @@
-import { expect, it } from 'vitest'
-import { analyticsSheets, buildAnalyticsWorkbook, currentEvidence, fitImage, reportExportRows } from './reportExports'
+import { expect, it, vi } from 'vitest'
+import { analyticsSheets, buildAnalyticsWorkbook, buildIndividualReportPdf, currentEvidence, fitImage, reportExportRows } from './reportExports'
+
+it('requests signed photo bytes through the export endpoint and explains photo network failures', async () => {
+  const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+  vi.stubGlobal('fetch', fetchMock)
+  try {
+    await expect(buildIndividualReportPdf({ evidence_photo: { url: '/api/media/token?expires=123&signature=signed' } }))
+      .rejects.toThrow('The report photo could not be loaded for the PDF')
+    const requested = new URL(fetchMock.mock.calls[0][0])
+    expect(requested.pathname).toBe('/api/media/token')
+    expect(requested.searchParams.get('signature')).toBe('signed')
+    expect(requested.searchParams.get('export')).toBe('1')
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
 
 it('exports all officer fields, coordinates and dates without review history', () => {
   const rows = reportExportRows({ id: 'RPT-1', officer: 'Officer One', officer_rank: 'Police Corporal', badge_number: '001',

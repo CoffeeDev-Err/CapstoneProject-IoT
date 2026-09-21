@@ -1,8 +1,10 @@
 const express = require('express')
+const { pipeline } = require('node:stream/promises')
 const asyncHandler = require('../middleware/asyncHandler')
 const {
 	createPresignedDownloadUrl,
 	verifyMediaAccess,
+	readStoredS3Media,
 } = require('../services/mediaStorageService')
 
 const createMediaRoutes = () => {
@@ -26,6 +28,15 @@ const createMediaRoutes = () => {
 			return res.sendFile(media.absolutePath, {
 				dotfiles: 'deny',
 			})
+		}
+		// PDF generation needs image bytes from our origin, not an S3 redirect.
+		// The same expiring signature above protects both delivery modes.
+		if (req.query.export === '1') {
+			const object = await readStoredS3Media(media.key)
+			res.type(object.ContentType || 'application/octet-stream')
+			if (object.ContentLength != null) res.set('Content-Length', String(object.ContentLength))
+			await pipeline(object.Body, res)
+			return
 		}
 		const url = await createPresignedDownloadUrl(media.key, { download })
 		return res.redirect(302, url)
