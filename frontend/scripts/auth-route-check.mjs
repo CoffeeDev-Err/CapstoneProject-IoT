@@ -11,7 +11,7 @@ const loginPage = fs.readFileSync(path.join(projectRoot, 'src/pages/LoginPage.js
 
 assert.match(routes, /<Route element={<GuestOnlyRoute \/>}>[\s\S]*path="\/login"/,
   'The login page must be restricted to unauthenticated visitors')
-assert.match(guestOnlyRoute, /isAuthenticated[\s\S]*<Navigate to="\/" replace \/>/,
+assert.match(guestOnlyRoute, /isAuthenticated[\s\S]*<Navigate to="\/map" replace \/>/,
   'An authenticated visitor must be redirected away from login')
 assert.match(protectedRoute, /!isAuthenticated[\s\S]*<Navigate to="\/login" replace/,
   'Protected pages must redirect unauthenticated visitors to login')

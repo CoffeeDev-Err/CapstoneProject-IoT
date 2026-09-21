@@ -18,7 +18,7 @@ assert.match(drawerSource, /Open evidence viewer/)
 assert.match(viewerSource, /getReport\(reportId\)/)
 assert.match(viewerSource, /getMediaDownloadUrl\(evidence\?\.url\)/)
 assert.match(operationsSource, /\/api\/reports\/\$\{encodeURIComponent\(reportId\)\}/)
-assert.match(indexSource, /geosentri-icon\.png/)
+assert.match(indexSource, /\/geosentri-app-icon\.png/)
 assert.doesNotMatch(indexSource, /vite\.svg/)
 
 console.log('Protected evidence viewer checks passed.')

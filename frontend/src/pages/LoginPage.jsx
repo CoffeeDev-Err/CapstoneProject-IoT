@@ -313,7 +313,7 @@ function LoginPage() {
             </span>
             <div>
               <strong>GeoSentri</strong>
-              <span>Cabagan Police Station Operations Portal</span>
+              <span>Philippine National Police</span>
             </div>
           </div>
 
