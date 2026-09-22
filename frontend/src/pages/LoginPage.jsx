@@ -310,9 +310,9 @@ function LoginPage() {
           <p className="login-intro__eyebrow">Police Personnel Monitoring System</p>
           <h1 id="login-intro-title">Operational visibility for a safer Cabagan.</h1>
           <p className="login-intro__description">
-            GeoSentri is the secure web and mobile operations portal of the Cabagan Police Station
-            in Isabela. It supports authorized personnel monitoring, deployment coordination,
-            geofencing alerts, and operational reporting.
+            Stay informed. Respond with confidence. GeoSentri brings personnel locations,
+            deployments, alerts, and incident reports together, giving your team a clearer
+            picture when it matters most.
           </p>
           <p className="login-intro__access-note">
             Access is restricted to authorized police personnel and administrators.
