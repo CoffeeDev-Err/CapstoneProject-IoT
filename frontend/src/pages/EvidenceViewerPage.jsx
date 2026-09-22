@@ -22,7 +22,7 @@ function EvidenceViewerPage() {
   const { reportId = '' } = useParams()
 	const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark')
+  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') !== 'light')
   const [loadVersion, setLoadVersion] = useState(0)
   const [state, setState] = useState({ reportId: '', status: 'loading', report: null, error: '' })
   const [failedImageUrl, setFailedImageUrl] = useState('')

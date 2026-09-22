@@ -33,7 +33,7 @@ function AppLayout() {
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
 
   // Dark mode — initialised from localStorage so the preference persists
-  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark')
+  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') !== 'light')
 
   // Apply / remove [data-theme="dark"] on <html> whenever isDark changes
   useEffect(() => {

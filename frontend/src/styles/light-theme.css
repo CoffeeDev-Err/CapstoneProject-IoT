@@ -528,7 +528,9 @@
 
 /* Login and recovery surfaces use the same light-mode language. */
 :root:not([data-theme="dark"]) .login-page {
-  background: #f6f8fc;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.12), transparent 27rem),
+    linear-gradient(145deg, #f8fbff 0%, #eef4fc 100%);
   color: var(--text-primary);
 }
 

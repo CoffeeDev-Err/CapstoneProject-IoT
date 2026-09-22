@@ -303,6 +303,8 @@ function LoginPage() {
 
   return (
     <div className="login-page">
+      <div className="login-accent login-accent--top" aria-hidden="true" />
+      <div className="login-accent login-accent--bottom" aria-hidden="true" />
       <main className="login-layout">
         <section className="login-intro" aria-labelledby="login-intro-title">
           <p className="login-intro__eyebrow">Police Personnel Monitoring System</p>
