@@ -380,8 +380,9 @@ function SettingsPage() {
       <div className="settings-grid row g-3 mx-0">
         <div className="col-12">
           <div className="widget-card slide-up account-management-card">
+            <div className="account-management-toolbar mb-3">
             <div
-              className="account-view-nav smooth-underline-control mb-3"
+              className="account-view-nav smooth-underline-control"
               role="tablist"
               aria-label="Account management views"
               style={{ '--smooth-underline-left': activeAccountView === 'create' ? '25%' : '75%' }}
@@ -405,23 +406,38 @@ function SettingsPage() {
                 Manage Accounts
               </button>
             </div>
+            {canManageSupervisors && activeAccountView === 'create' && !editingAccountId && (
+              <label className="account-type-picker">
+                <span>Account type</span>
+                <select
+                  className="settings-input"
+                  value={accountType}
+                  onChange={(event) => {
+                    if (event.target.value === accountType) return
+                    setAccountType(event.target.value)
+                    resetFormToCreate()
+                  }}
+                >
+                  <option value="officer">Police Personnel</option>
+                  <option value="supervisor">Supervisor</option>
+                </select>
+              </label>
+            )}
+            </div>
 
             {activeAccountView === 'create' && (
               <div className="account-create-section">
-				{canManageSupervisors && !editingAccountId && (
-					<div className="account-view-nav mb-3" role="group" aria-label="Account type">
-						<button type="button" className={`account-view-tab ${accountType === 'officer' ? 'account-view-tab--active' : ''}`} onClick={() => { setAccountType('officer'); resetFormToCreate() }}>Police Personnel</button>
-						<button type="button" className={`account-view-tab ${accountType === 'supervisor' ? 'account-view-tab--active' : ''}`} onClick={() => { setAccountType('supervisor'); resetFormToCreate() }}>Supervisor</button>
-					</div>
-				)}
                 <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount} noValidate>
+				  <div className="account-form-heading">
+				    <h3>{editingAccountId ? `Edit ${isEditingSupervisor ? 'Supervisor' : 'Personnel'} Account` : `Create ${isEditingSupervisor ? 'Supervisor' : 'Personnel'} Account`}</h3>
 	                  {isEditingSupervisor && (
 	                    <p className="settings-hint account-role-note">
 						{editingAccount?.isProtected
 							? 'Primary supervisor account. Only this account can manage supervisors, and it cannot be deactivated.'
-							: 'Supervisor accounts have full operational access. Only the primary supervisor can manage supervisor accounts. A badge, mobile number, and GPS device are not required.'}
+							: 'Full operational access; only the primary supervisor can manage supervisor accounts. No badge or GPS device required.'}
 	                    </p>
 	                  )}
+				  </div>
 	                  <div className="account-form-grid">
 	                <div className="account-field account-field--full account-photo-field">
 	                  <span>Profile Photo</span>
@@ -539,7 +555,7 @@ function SettingsPage() {
                   {formErrors.officialEmail && <small className="field-error">{formErrors.officialEmail}</small>}
                 </label>
 
-                <div className="account-field">
+                <div className={`account-field ${isEditingSupervisor ? 'account-field--full' : ''}`}>
                   <span>{editingAccountId ? 'New Temporary Password' : 'Temporary Password *'}</span>
                   <div className="account-password-row">
                     <input
@@ -594,7 +610,7 @@ function SettingsPage() {
                     {editingAccountId && (
                       <button
                         type="button"
-                        className="account-action-btn ms-2"
+                        className="account-action-btn"
                         onClick={handleCancelEditAccount}
                       >
                         Cancel Edit

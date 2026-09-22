@@ -51,6 +51,9 @@
   .widget-card { min-width: 0; }
   .settings-input { min-width: 0; max-width: 100%; }
   .account-view-nav, .deployment-view-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; align-items: stretch; }
+  .account-management-toolbar { align-items: stretch; }
+  .account-type-picker { width: 100%; }
+  .account-create-section { width: 100%; }
   .account-view-tab, .deployment-view-tab { min-width: 0; min-height: 48px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
   .deployment-view-tab { flex-wrap: wrap; gap: 0.25rem; }
 
