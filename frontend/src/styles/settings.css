@@ -54,33 +54,18 @@
 .account-form {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 0.85rem;
 }
 
 .account-management-toolbar {
   display: flex;
-  align-items: end;
+  align-items: stretch;
   flex-wrap: wrap;
   gap: 0.85rem;
 }
 
 .account-type-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
   width: min(100%, 220px);
-}
-
-.account-type-picker > span {
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.account-type-picker .settings-input {
-  width: 100%;
   min-height: 44px;
   cursor: pointer;
 }
@@ -126,17 +111,9 @@
 
 .account-create-section {
   flex: 0 1 auto;
-  width: min(100%, 960px);
-  margin-inline: auto;
   min-height: auto;
   overflow: visible;
-}
-
-.account-form-heading h3 {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: 750;
-  color: var(--text-primary);
+  padding-right: 0.2rem;
 }
 
 .page-container--settings {
@@ -161,22 +138,19 @@
 }
 
 .account-role-note {
-  margin-top: 0.35rem;
-  line-height: 1.5;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  line-height: 1.45;
 }
 
 .account-form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
   align-items: start;
-}
-
-.account-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.65rem;
 }
 
 .account-field {
