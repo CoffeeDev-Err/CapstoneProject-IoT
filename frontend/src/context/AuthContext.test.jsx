@@ -33,21 +33,26 @@ describe('session outage recovery', () => {
     expect(result.current.sessionError).toBe('')
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull()
   })
-  it('shows recovery instead of login on protected and guest routes', async () => {
+  it('shows recovery on protected routes while keeping the public sign-in visible during an outage', async () => {
     getCurrentUser.mockRejectedValue({ code: 'NETWORK_ERROR' })
-    for (const path of ['/', '/login']) {
-      const view = render(<AuthProvider><MemoryRouter initialEntries={[path]}><Routes>
-        <Route element={<ProtectedRoute />}><Route path="/" element={<p>Private page</p>} /></Route>
-        <Route element={<GuestOnlyRoute />}><Route path="/login" element={<p>Login form</p>} /></Route>
-      </Routes></MemoryRouter></AuthProvider>)
-      await flush()
-      expect(screen.getByRole('heading', { name: 'Unable to verify your session' })).toBeInTheDocument()
-      expect(screen.queryByText('Private page')).not.toBeInTheDocument()
-      expect(screen.queryByText('Login form')).not.toBeInTheDocument()
-      fireEvent.click(screen.getByText('Try again'))
-      await flush()
-      view.unmount()
-    }
+    const protectedView = render(<AuthProvider><MemoryRouter initialEntries={['/map']}><Routes>
+      <Route element={<ProtectedRoute />}><Route path="/map" element={<p>Private page</p>} /></Route>
+    </Routes></MemoryRouter></AuthProvider>)
+    await flush()
+    expect(screen.getByRole('heading', { name: 'Unable to verify your session' })).toBeInTheDocument()
+    expect(screen.queryByText('Private page')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Try again'))
+    await flush()
+    protectedView.unmount()
+
+    const guestView = render(<AuthProvider><MemoryRouter initialEntries={['/']}><Routes>
+      <Route element={<GuestOnlyRoute />}><Route path="/" element={<p>Login form</p>} /></Route>
+    </Routes></MemoryRouter></AuthProvider>)
+    expect(screen.getByText('Login form')).toBeInTheDocument()
+    await flush()
+    expect(screen.getByText('Login form')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Unable to verify your session' })).not.toBeInTheDocument()
+    guestView.unmount()
   })
   it('keeps a verified user signed in when a background check times out', async () => {
     getCurrentUser.mockResolvedValueOnce({ user }).mockRejectedValueOnce({ status: 408 })

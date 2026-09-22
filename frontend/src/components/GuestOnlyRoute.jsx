@@ -1,20 +1,13 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
-import { AuthLoadingSkeleton } from './LoadingSkeleton'
-import SessionRecovery from './SessionRecovery'
 
 function GuestOnlyRoute() {
-  const { loading, isAuthenticated, sessionError } = useAuth()
-
-  if (loading) {
-    return <AuthLoadingSkeleton />
-  }
+  const { isAuthenticated } = useAuth()
 
   if (isAuthenticated) {
     return <Navigate to="/map" replace />
   }
 
-  if (sessionError) return <SessionRecovery />
   return <Outlet />
 }
 
