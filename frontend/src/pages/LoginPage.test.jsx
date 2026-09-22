@@ -25,7 +25,8 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 function renderLogin() {
-  render(<MemoryRouter initialEntries={['/login']}><Routes>
+  render(<MemoryRouter initialEntries={['/']}><Routes>
+    <Route path="/" element={<LoginPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/map" element={<p>Signed in</p>} />
   </Routes></MemoryRouter>)
@@ -39,6 +40,15 @@ async function openVerification() {
 }
 
 describe('automatic login verification', () => {
+  it('shows the system introduction beside the sign-in form on the homepage', () => {
+    renderLogin()
+    expect(screen.getByRole('heading', { level: 1, name: 'Operational visibility for a safer Cabagan.' }))
+      .toBeInTheDocument()
+    expect(screen.getByText(/secure web and mobile operations portal/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /sign in to geosentri/i })).not.toBeInTheDocument()
+  })
+
   it('shows the server countdown and blocks only the rate-limited Login ID', async () => {
     vi.useFakeTimers()
     const receivedAt = Date.now()

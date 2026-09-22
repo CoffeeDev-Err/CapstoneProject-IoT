@@ -303,9 +303,19 @@ function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-accent login-accent--top" aria-hidden="true" />
-      <div className="login-accent login-accent--bottom" aria-hidden="true" />
       <main className="login-layout">
+        <section className="login-intro" aria-labelledby="login-intro-title">
+          <p className="login-intro__eyebrow">Police Personnel Monitoring System</p>
+          <h1 id="login-intro-title">Operational visibility for a safer Cabagan.</h1>
+          <p className="login-intro__description">
+            GeoSentri is the secure web and mobile operations portal of the Cabagan Police Station
+            in Isabela. It supports authorized personnel monitoring, deployment coordination,
+            geofencing alerts, and operational reporting.
+          </p>
+          <p className="login-intro__access-note">
+            Access is restricted to authorized police personnel and administrators.
+          </p>
+        </section>
         <section className="login-card" aria-labelledby="login-title">
           <div className="login-brand">
             <span className="login-brand__logo-frame">
@@ -320,7 +330,7 @@ function LoginPage() {
           <div className="login-form-card">
             <div className="login-copy">
               <div className="login-badge">{copy.badge}</div>
-              <h1 id="login-title" className="login-copy-title">{copy.title}</h1>
+              <h2 id="login-title" className="login-copy-title">{copy.title}</h2>
               {copy.subtitle && <p className="login-copy-subtitle">{copy.subtitle}</p>}
             </div>
 

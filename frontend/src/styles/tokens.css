@@ -19,7 +19,7 @@
   --font-size-brand-geo: 1.04em;
   --font-size-brand-sentri: 0.98em;
   --font-size-fluid-display: clamp(2.55rem, 6vw, 5.4rem);
-  --font-size-fluid-display-mobile: clamp(2.4rem, 13vw, 3.7rem);
+  --font-size-fluid-display-mobile: clamp(2.25rem, 10vw, 3rem);
   --font-size-fluid-intro: clamp(1rem, 1.6vw, 1.15rem);
   --font-size-fluid-section: clamp(1.8rem, 3.2vw, 2.65rem);
 

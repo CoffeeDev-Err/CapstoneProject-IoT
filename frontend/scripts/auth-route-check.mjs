@@ -9,8 +9,12 @@ const protectedRoute = fs.readFileSync(path.join(projectRoot, 'src/components/Pr
 const authStyles = fs.readFileSync(path.join(projectRoot, 'src/styles/auth.css'), 'utf8')
 const loginPage = fs.readFileSync(path.join(projectRoot, 'src/pages/LoginPage.jsx'), 'utf8')
 
+assert.match(routes, /<Route element={<GuestOnlyRoute \/>}>[\s\S]*path="\/" element=\{withPageLoader\(<LoginPage \/>\)\}/,
+  'The homepage must open the login page for unauthenticated visitors')
 assert.match(routes, /<Route element={<GuestOnlyRoute \/>}>[\s\S]*path="\/login"/,
-  'The login page must be restricted to unauthenticated visitors')
+  'The login alias must remain restricted to unauthenticated visitors')
+assert.doesNotMatch(routes, /PublicHomePage/,
+  'The former public landing page must not remain in the route tree')
 assert.match(guestOnlyRoute, /isAuthenticated[\s\S]*<Navigate to="\/map" replace \/>/,
   'An authenticated visitor must be redirected away from login')
 assert.match(protectedRoute, /!isAuthenticated[\s\S]*<Navigate to="\/login" replace/,
