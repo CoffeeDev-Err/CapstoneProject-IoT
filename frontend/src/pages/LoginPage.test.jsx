@@ -44,7 +44,7 @@ describe('automatic login verification', () => {
     renderLogin()
     expect(screen.getByRole('heading', { level: 1, name: 'Operational visibility for a safer Cabagan.' }))
       .toBeInTheDocument()
-    expect(screen.getByText(/secure web and mobile operations portal/)).toBeInTheDocument()
+    expect(screen.getByText(/Stay informed\. Respond with confidence\./)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /sign in to geosentri/i })).not.toBeInTheDocument()
   })
