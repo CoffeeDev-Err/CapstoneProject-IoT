@@ -4,6 +4,7 @@ import { resolveApiAssetUrl } from '../../services/apiAssets'
 import { formatDateTime, getDeviceCode } from './accountPresentation'
 
 function AccountTable({
+  canManageSupervisors,
   accountRequestPending,
   accountSearch,
   accounts,
@@ -100,18 +101,20 @@ function AccountTable({
                             <td>{formatDateTime(account.createdAt)}</td>
                             <td className="account-actions-cell">
                               <div className="account-table-actions">
-                                <button
+								{(account.role !== 'Supervisor' || canManageSupervisors) && <button
                                   type="button"
                                   className="account-table-btn account-table-btn--edit"
                                   onClick={() => onEdit(account.id)}
                                   disabled={accountRequestPending}
                                 >
                                   Edit
-                                </button>
-                                {account.isProtected || account.role === 'Supervisor' ? (
-                                  <span className="account-protected-label" title="COP/admin accounts cannot be deactivated.">
+                                </button>}
+								{account.isProtected ? (
+								  <span className="account-protected-label" title="The primary supervisor cannot be deactivated.">
                                     Protected
                                   </span>
+								) : account.role === 'Supervisor' && !canManageSupervisors ? (
+								  <span className="account-protected-label" title="Only the primary supervisor can manage this account.">Primary supervisor only</span>
                                 ) : (
                                   <button
                                     type="button"

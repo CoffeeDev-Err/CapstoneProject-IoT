@@ -14,6 +14,7 @@ import { createInitialAccountForm, createTempPassword } from './accountPresentat
 const initialFormState = createInitialAccountForm()
 
 export function useAccountForm({
+	accountType,
   createdAccounts,
   editingAccount,
   editingAccountId,
@@ -24,7 +25,7 @@ export function useAccountForm({
   const [formErrors, setFormErrors] = useState({})
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
-  const isEditingSupervisor = editingAccount?.role === 'Supervisor'
+	const isEditingSupervisor = editingAccount?.role === 'Supervisor' || (!editingAccountId && accountType === 'supervisor')
   const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
   const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount
 

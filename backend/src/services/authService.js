@@ -38,6 +38,7 @@ const serializeUser = (user, profile) => ({
 	rank: profile?.rank || user.rank || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role,
+	supervisorAuthority: user.role === 'supervisor' ? (user.supervisorAuthority || 'delegated') : null,
 	personnelId: user.personnelId,
 	photoUrl: toMediaAccessPath(profile?.photoUrl || user.photoUrl || ''),
 	forcePasswordReset: user.forcePasswordReset,

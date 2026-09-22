@@ -40,7 +40,7 @@ it('revokes active sessions after a supervisor changes sensitive account credent
 			loginId: user.username,
 			officialEmail: 'new.supervisor@example.org',
 			temporaryPassword: 'NewSecure!2026',
-		})
+		}, { actor: { role: 'supervisor', supervisorAuthority: 'primary' } })
 
 		assert.equal(revoked.length, 1)
 		assert.equal(revoked[0].filter.userId, user._id)

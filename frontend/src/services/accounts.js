@@ -24,6 +24,14 @@ export const createAccount = async (account, profilePhoto) => {
   return payload.account
 }
 
+export const createSupervisorAccount = async (account, profilePhoto) => {
+  const payload = await apiRequest('/api/accounts/supervisors', {
+    method: 'POST',
+    body: createRequestBody(account, profilePhoto),
+  })
+  return payload.account
+}
+
 export const updateAccount = async (accountId, account, profilePhoto) => {
   const payload = await apiRequest(`/api/accounts/${accountId}`, {
     method: 'PUT',

@@ -113,10 +113,18 @@ const findProvisionedUser = ({ username, email, personnelId }) => {
 }
 
 const findProvisionedSupervisor = async ({ username, email }, userModel = User) => {
+	const primary = await userModel.findOne({ supervisorAuthority: 'primary' })
+	if (primary) return primary
 	const emailMatch = email ? await userModel.findOne({ email }) : null
-	if (emailMatch) return emailMatch
+	if (emailMatch) {
+		if (emailMatch.role !== 'supervisor') throw new Error('The configured supervisor email belongs to another role.')
+		return emailMatch
+	}
 	const usernameMatch = username ? await userModel.findOne({ username }) : null
-	if (usernameMatch) return usernameMatch
+	if (usernameMatch) {
+		if (usernameMatch.role !== 'supervisor') throw new Error('The configured supervisor Login ID belongs to another role.')
+		return usernameMatch
+	}
 	const supervisors = await userModel.find({ role: 'supervisor' }).limit(2)
 	if (supervisors.length > 1) {
 		throw new Error(
@@ -295,12 +303,17 @@ const seedDatabase = async (models) => {
 				rank: supervisorRank,
 				passwordHash: await hashPassword(supervisorPassword),
 				role: 'supervisor',
+				supervisorAuthority: 'primary',
 				status: 'active',
 				forcePasswordReset: true,
 			})
 			console.log(`Created initial supervisor account: ${supervisorLoginId}`)
 		} else {
-			await migrateProvisionedLoginId(existingSupervisor, supervisorLoginId, 'supervisor')
+			const otherPrimary = await User.findOne({ supervisorAuthority: 'primary', _id: { $ne: existingSupervisor._id } })
+			if (otherPrimary) throw new Error('A different primary supervisor account already exists.')
+			const alreadyPrimary = existingSupervisor.supervisorAuthority === 'primary'
+			existingSupervisor.supervisorAuthority = 'primary'
+			if (!alreadyPrimary) await migrateProvisionedLoginId(existingSupervisor, supervisorLoginId, 'supervisor')
 			if (!existingSupervisor.email) existingSupervisor.email = supervisorEmail
 			if (supervisorFullName) existingSupervisor.fullName = supervisorFullName
 			if (supervisorRank) existingSupervisor.rank = supervisorRank

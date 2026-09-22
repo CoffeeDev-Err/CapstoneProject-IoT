@@ -11,6 +11,7 @@ const {
 const { hashPassword, isStrongPassword } = require('../utils/password')
 const {
 	assertAccountCanBeDeactivated,
+	assertCanManageSupervisor,
 	isProtectedAccount,
 } = require('../utils/accountProtection')
 const {
@@ -61,6 +62,7 @@ const serializeAccount = (user, profile, device) => ({
 	officialEmail: user.email || '',
 	emailVerified: Boolean(user.emailVerifiedAt),
 	role: user.role === 'officer' ? 'Officer' : 'Supervisor',
+	supervisorAuthority: user.role === 'supervisor' ? (user.supervisorAuthority || 'delegated') : null,
 	isProtected: isProtectedAccount(user),
 	isMockAccount: Boolean(user.isMockAccount),
 	accountStatus: user.status === 'active' ? 'Active' : 'Inactive',
@@ -284,10 +286,38 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 		}
 	}
 
+	const createSupervisorAccount = async (payload, { ipAddress, actor } = {}) => {
+		assertCanManageSupervisor(actor)
+		validateAccountPayload(payload, { requirePersonnel: false, requireDevice: false })
+		const user = await User.create({
+			username: normalizeLoginId(payload.loginId),
+			email: normalizeEmail(payload.officialEmail),
+			fullName: normalizeHumanName(payload.fullName),
+			rank: String(payload.rank || '').trim(),
+			passwordHash: await hashPassword(payload.temporaryPassword),
+			role: 'supervisor',
+			supervisorAuthority: 'delegated',
+			photoUrl: payload.photoUrl || '',
+			status: 'active',
+			forcePasswordReset: true,
+		})
+		await recordAudit({
+			actor,
+			action: 'account.created',
+			entityType: 'user',
+			entityId: String(user._id),
+			changes: { role: user.role, supervisorAuthority: 'delegated' },
+			ipAddress,
+		})
+		await broadcastAccountData()
+		return serializeAccount(user)
+	}
+
 	const updateAccount = async (accountId, payload, { ipAddress, actor } = {}) => {
 		const user = await User.findById(accountId)
 		if (!user) throw createHttpError('Account not found.', 404)
 		const isSupervisor = user.role === 'supervisor'
+		if (isSupervisor) assertCanManageSupervisor(actor)
 
 		validateAccountPayload(payload, {
 			requirePassword: false,
@@ -297,7 +327,9 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 		})
 		const nextLoginId = normalizeLoginId(payload.loginId)
 		const nextEmail = normalizeEmail(payload.officialEmail)
-		const nextStatus = isSupervisor ? 'active' : normalizeStatus(payload.accountStatus)
+		const nextStatus = isSupervisor
+			? normalizeStatus(payload.accountStatus || user.status)
+			: normalizeStatus(payload.accountStatus)
 		const shouldRevokeSessions = (
 			user.username !== nextLoginId
 			|| user.email !== nextEmail
@@ -323,7 +355,7 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 				user.email = nextEmail
 				user.emailVerifiedAt = null
 			}
-			user.status = 'active'
+			user.status = nextStatus
 			if (payload.photoUrl) user.photoUrl = payload.photoUrl
 			if (payload.temporaryPassword) {
 				user.passwordHash = await hashPassword(payload.temporaryPassword)
@@ -467,20 +499,25 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 	const deactivateAccount = async (accountId, { ipAddress, actor } = {}) => {
 		const user = await User.findById(accountId)
 		if (!user) throw createHttpError('Account not found.', 404)
+		if (user.role === 'supervisor') assertCanManageSupervisor(actor)
 		assertAccountCanBeDeactivated(user)
 
 		const now = new Date()
 		user.status = 'inactive'
 		await Promise.all([
 			user.save(),
-			Personnel.updateOne(
+			AuthSession.updateMany(
+				{ userId: user._id, revokedAt: null },
+				{ $set: { revokedAt: now } },
+			),
+			...(user.role === 'officer' ? [Personnel.updateOne(
 				{ personnelId: user.personnelId },
 				{ $set: { status: 'inactive', dutyStatus: 'Off Duty' } },
 			),
 			GpsDeviceAssignment.updateMany(
 				{ personnelId: user.personnelId, status: 'active' },
 				{ $set: { status: 'released', unassignedAt: now } },
-			),
+			)] : []),
 		])
 		await recordAudit({
 			actor,
@@ -496,12 +533,15 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 			accountStatus: user.status,
 		})
 		return {
-			message: 'Account deactivated and GPS assignment released.',
+			message: user.role === 'supervisor'
+				? 'Supervisor account deactivated and sessions revoked.'
+				: 'Account deactivated and GPS assignment released.',
 		}
 	}
 
 	return {
 		createAccount,
+		createSupervisorAccount,
 		deactivateAccount,
 		getAccountPhotoReference,
 		loadAccounts,

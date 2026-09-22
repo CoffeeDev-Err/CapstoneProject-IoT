@@ -13,6 +13,11 @@ const registerSocketGateway = ({
 		const token = bearerToken || readSessionCookie(socket.handshake.headers?.cookie)
 		try {
 			socket.data.auth = await authService.authenticate(token)
+			if (socket.data.auth?.user?.forcePasswordReset) {
+				const error = new Error('Change your temporary password before using GeoSentri.')
+				error.code = 'PASSWORD_CHANGE_REQUIRED'
+				return next(error)
+			}
 			return next()
 		} catch (error) {
 			return next(error)

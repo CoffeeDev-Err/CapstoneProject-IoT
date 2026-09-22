@@ -30,6 +30,24 @@ const createAccountController = (accountService) => ({
 		}
 	},
 
+	createSupervisorAccount: async (req, res) => {
+		let storedPhoto
+		try {
+			storedPhoto = req.file
+				? await storeUploadedMedia(req.file, 'profile-photos')
+				: undefined
+			const { photoUrl: _clientPhotoUrl, ...accountInput } = req.body
+			const account = await accountService.createSupervisorAccount({
+				...accountInput,
+				...(storedPhoto ? { photoUrl: storedPhoto } : {}),
+			}, { ipAddress: req.ip, actor: req.auth.user })
+			return res.status(201).json({ success: true, account })
+		} catch (error) {
+			if (storedPhoto) await deleteStoredMedia(storedPhoto).catch(() => {})
+			throw error
+		}
+	},
+
 	updateAccount: async (req, res) => {
 		let storedPhoto
 		const previousPhoto = req.file

@@ -3,7 +3,7 @@ const { describe, it } = require('node:test')
 const models = require('../src/models')
 
 const EXPECTED_MODEL_CONTRACTS = {
-	User: ['users', 4],
+	User: ['users', 5],
 	AuthSession: ['auth_sessions', 3],
 	EmailVerification: ['email_verifications', 2],
 	OtpRequestWindow: ['otp_request_windows', 1],

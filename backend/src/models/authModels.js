@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
 	emailVerifiedAt: Date,
 	passwordHash: { type: String, required: true, select: false },
 	role: { type: String, enum: ['supervisor', 'officer'], default: 'officer' },
+	supervisorAuthority: { type: String, enum: ['primary', 'delegated'], default: 'delegated' },
 	personnelId: { type: String, trim: true, maxlength: 100 },
 	photoUrl: { type: String, trim: true, default: '', maxlength: 2048 },
 	isMockAccount: { type: Boolean, default: false },
@@ -26,6 +27,10 @@ userSchema.index(
 )
 userSchema.index({ personnelId: 1 })
 userSchema.index({ status: 1 })
+userSchema.index({ supervisorAuthority: 1 }, {
+	unique: true,
+	partialFilterExpression: { supervisorAuthority: 'primary' },
+})
 
 const authSessionSchema = new mongoose.Schema({
 	userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

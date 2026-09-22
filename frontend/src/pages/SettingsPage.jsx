@@ -8,8 +8,10 @@ import { requestErrorMessage } from '../utils/requestFeedback'
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useFeedback } from '../context/useFeedback'
+import { useAuth } from '../context/useAuth'
 import {
   createAccount,
+  createSupervisorAccount,
   deactivateAccount,
   getAccounts,
   updateAccount,
@@ -38,11 +40,14 @@ import { useCachedPageData } from '../hooks/useCachedPageData'
 
 function SettingsPage() {
   const { showFeedback } = useFeedback()
+  const { user } = useAuth()
+  const canManageSupervisors = user?.role === 'supervisor' && user?.supervisorAuthority === 'primary'
   const [createdAccounts, setCreatedAccounts, hasAccounts] = useCachedPageData('accounts', [])
   const [accountSearch, setAccountSearch] = useState('')
   const deferredAccountSearch = useDeferredValue(accountSearch)
   const [editingAccountId, setEditingAccountId] = useState(null)
   const [activeAccountView, setActiveAccountView] = useState('create')
+  const [accountType, setAccountType] = useState('officer')
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState(null)
   const [formMessage, setFormMessage] = useState('')
   const [formMessageKind, setFormMessageKind] = useState('success')
@@ -156,6 +161,7 @@ function SettingsPage() {
     handleGenerateTemporaryPassword,
     resetFormToCreate,
   } = useAccountForm({
+    accountType,
     createdAccounts,
     editingAccount,
     editingAccountId,
@@ -176,8 +182,10 @@ function SettingsPage() {
     if (!account) {
       return
     }
+	if (account.role === 'Supervisor' && !canManageSupervisors) return
 
     setEditingAccountId(accountId)
+	setAccountType(account.role === 'Supervisor' ? 'supervisor' : 'officer')
     setActiveAccountView('create')
     setAccountForm({
       fullName: account.fullName ?? '',
@@ -202,9 +210,9 @@ function SettingsPage() {
   const handleDeleteAccount = (accountId) => {
     const account = createdAccounts.find((item) => item.id === accountId)
 
-    if (!account || account.isProtected || account.role === 'Supervisor') {
+	if (!account || account.isProtected || (account.role === 'Supervisor' && !canManageSupervisors)) {
       if (account) {
-        setFormMessage('COP/admin accounts are protected and cannot be deactivated.')
+		setFormMessage('Only the primary supervisor can manage supervisor accounts. The primary account cannot be deactivated.')
         setFormMessageKind('error')
       }
       return
@@ -320,7 +328,9 @@ function SettingsPage() {
         )))
         setFormMessage(`${updatedAccount.fullName || updatedAccount.loginId} account updated successfully.`)
       } else {
-        const newAccount = await createAccount(normalizedPayload, profilePhoto)
+		const newAccount = isEditingSupervisor
+			? await createSupervisorAccount(normalizedPayload, profilePhoto)
+			: await createAccount(normalizedPayload, profilePhoto)
         accountsRequest.current += 1
         setAccountsLoading(false)
         setCreatedAccounts((prev) => [newAccount, ...prev])
@@ -364,7 +374,7 @@ function SettingsPage() {
     <div className="page-container page-container--settings fade-in p-3 p-md-4">
       <header className="page-header mb-4">
         <h2 className="page-title">Account Management</h2>
-        <p className="page-subtitle">Create and manage officer mobile accounts</p>
+		<p className="page-subtitle">Manage personnel accounts{canManageSupervisors ? ' and delegated supervisors' : ''}</p>
       </header>
 
       <div className="settings-grid row g-3 mx-0">
@@ -398,10 +408,18 @@ function SettingsPage() {
 
             {activeAccountView === 'create' && (
               <div className="account-create-section">
+				{canManageSupervisors && !editingAccountId && (
+					<div className="account-view-nav mb-3" role="group" aria-label="Account type">
+						<button type="button" className={`account-view-tab ${accountType === 'officer' ? 'account-view-tab--active' : ''}`} onClick={() => { setAccountType('officer'); resetFormToCreate() }}>Police Personnel</button>
+						<button type="button" className={`account-view-tab ${accountType === 'supervisor' ? 'account-view-tab--active' : ''}`} onClick={() => { setAccountType('supervisor'); resetFormToCreate() }}>Supervisor</button>
+					</div>
+				)}
                 <form className="account-form account-form--fixed" onSubmit={handleSubmitAccount} noValidate>
 	                  {isEditingSupervisor && (
 	                    <p className="settings-hint account-role-note">
-	                      This protected COP/admin account is for web monitoring and administration. It cannot be deactivated. A badge, mobile number, and GPS device are not required.
+						{editingAccount?.isProtected
+							? 'Primary supervisor account. Only this account can manage supervisors, and it cannot be deactivated.'
+							: 'Supervisor accounts have full operational access. Only the primary supervisor can manage supervisor accounts. A badge, mobile number, and GPS device are not required.'}
 	                    </p>
 	                  )}
 	                  <div className="account-form-grid">
@@ -571,7 +589,7 @@ function SettingsPage() {
                     >
                       {accountRequestPending
                         ? 'Saving...'
-                        : editingAccountId ? 'Save Changes' : 'Create Account'}
+						: editingAccountId ? 'Save Changes' : isEditingSupervisor ? 'Create Supervisor' : 'Create Account'}
                     </button>
                     {editingAccountId && (
                       <button
@@ -594,6 +612,7 @@ function SettingsPage() {
                 <button type="button" className="account-action-btn" disabled={accountsLoading} onClick={loadAccounts}>Retry</button>
               </p>}
               <AccountTable
+                canManageSupervisors={canManageSupervisors}
                 accountRequestPending={accountRequestPending}
                 accountSearch={accountSearch}
                 accounts={createdAccounts}

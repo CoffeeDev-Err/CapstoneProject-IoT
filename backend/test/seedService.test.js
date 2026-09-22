@@ -7,6 +7,17 @@ const {
 } = require('../src/services/seedService')
 
 describe('provisioned account Login ID migration', () => {
+	it('keeps the designated primary account when delegated supervisors also exist', async () => {
+		const primary = { username: '00-0001', role: 'supervisor', supervisorAuthority: 'primary' }
+		const userModel = {
+			findOne: async (query) => query.supervisorAuthority === 'primary' ? primary : null,
+			find: () => { throw new Error('Fallback must not run after primary designation.') },
+		}
+		const result = await findProvisionedSupervisor({
+			username: '12-2004', email: 'delegated@example.org',
+		}, userModel)
+		assert.equal(result, primary)
+	})
 	it('falls back to the single existing supervisor before creating another account', async () => {
 		const legacySupervisor = { username: 'supervisor', role: 'supervisor' }
 		const userModel = {

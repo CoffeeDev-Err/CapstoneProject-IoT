@@ -15,7 +15,7 @@ const strongPassword = (value) => (
   && /[^A-Za-z0-9]/.test(value)
 )
 
-function PasswordChangeModal({ open, onClose, onChanged }) {
+function PasswordChangeModal({ open, onClose, onChanged, onSignOut, required = false }) {
   const [step, setStep] = useState('password')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -30,6 +30,7 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
     : code.length !== 6 || !newPassword || !confirmPassword
 
   const resetAndClose = () => {
+	if (required) return
     setStep('password')
     setCurrentPassword('')
     setNewPassword('')
@@ -97,7 +98,7 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
     setError('')
     try {
       await confirmPasswordChange(challenge.challengeId, code, newPassword)
-      resetAndClose()
+		if (!required) resetAndClose()
       onChanged()
     } catch (requestError) {
       setError(requestErrorMessage(requestError, { action: 'change your password', write: true, recovery: 'Check your connection. If necessary, sign in with your new password to check whether the change completed before requesting another change.' }))
@@ -128,16 +129,15 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
         <div className="auth-modal__header">
           <div>
             <span className="auth-modal__step">Step {step === 'password' ? '1' : '2'} of 2</span>
-            <h2 id="change-password-title">Change Password</h2>
+			<h2 id="change-password-title">{required ? 'Set Your Personal Password' : 'Change Password'}</h2>
             <p>
-              {step === 'password'
+				{required && <span>Your temporary password must be changed before you can access GeoSentri. </span>}
+				{step === 'password'
                 ? 'Confirm your current password first.'
                 : `Enter the code sent to ${challenge?.maskedEmail}.`}
             </p>
           </div>
-          <button type="button" className="auth-modal__close" onClick={resetAndClose} aria-label="Close">
-            &times;
-          </button>
+			{!required && <button type="button" className="auth-modal__close" onClick={resetAndClose} aria-label="Close">&times;</button>}
         </div>
 
         <form onSubmit={step === 'password' ? requestCode : submitChange} noValidate>
@@ -194,6 +194,7 @@ function PasswordChangeModal({ open, onClose, onChanged }) {
               Resend code
             </button>
           )}
+			{required && <button type="button" className="login-text-action login-text-action--center" onClick={onSignOut}>Sign out</button>}
         </form>
       </div>
     </div>
