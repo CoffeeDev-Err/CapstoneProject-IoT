@@ -125,6 +125,9 @@ if (process.env.NODE_ENV === 'production') {
 	const frontendIndex = path.join(frontendDirectory, 'index.html')
 
 	if (fs.existsSync(frontendIndex)) {
+		app.get('/favicon.ico', (_req, res) => {
+			res.redirect(301, '/geosentri-app-icon.png')
+		})
 		app.use(express.static(frontendDirectory, {
 			index: false,
 			maxAge: '1h',
