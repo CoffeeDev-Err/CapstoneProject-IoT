@@ -52,5 +52,16 @@ describe('GpsTrackingReminder', () => {
     expect(view.getByText('REMINDER')).toBeTruthy();
     expect(view.getByText(/Keep your assigned GPS tracker powered on, charged/)).toBeTruthy();
     expect(view.getByText('Check Again')).toBeTruthy();
+
+    await view.rerender(
+      <GpsTrackingReminder
+        assignment={{ ...assignment, shiftEnd: new Date(now - 1).toISOString() }}
+        isConnected
+        officer={officer}
+        onRefresh={jest.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(view.queryByLabelText('GPS tracking unavailable. View reminder')).toBeNull();
+    expect(view.queryByText('GPS Tracking Required')).toBeNull();
   });
 });

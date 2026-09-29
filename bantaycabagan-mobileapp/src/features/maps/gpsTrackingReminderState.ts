@@ -1,4 +1,5 @@
 import type { DeploymentAssignment, LivePersonnel } from '../../types/operations';
+import { isDeploymentActiveNow } from '../operations/operationalState';
 
 export const GPS_TRACKING_REMINDER_GRACE_MS = 2 * 60 * 1000;
 
@@ -28,12 +29,14 @@ export const getGpsTrackingReminderState = ({
   officer: LivePersonnel;
   now?: number;
 }): GpsTrackingReminderState | null => {
-  if (!assignment || assignment.status !== 'active' || assignment.isCurrentShift === false) return null;
+  if (!assignment || !isDeploymentActiveNow(assignment, now) || officer.isOnDuty === false) return null;
 
   const shiftStartedAt = asTimestamp(assignment.shiftStart) ?? asTimestamp(assignment.assignedAt);
   if (!shiftStartedAt || now - shiftStartedAt < GPS_TRACKING_REMINDER_GRACE_MS) return null;
 
-  const recordedAt = asTimestamp(officer.locationRecordedAt);
+  const previousReading = asTimestamp(officer.locationRecordedAt);
+  const recordedAt = previousReading !== null && previousReading >= shiftStartedAt
+    ? previousReading : null;
   const staleAfterMs = Math.max(30, officer.locationStaleAfterSeconds || 120) * 1000;
   const ageMs = recordedAt === null ? Number.POSITIVE_INFINITY : now - recordedAt;
   const hasCoordinates = Number.isFinite(officer.latitude) && Number.isFinite(officer.longitude);

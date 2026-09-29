@@ -38,3 +38,25 @@ it('does not label missing or invalid GPS timestamps as fresh', () => {
   expect(getGpsReadingStatus(fix, new Date(fix).getTime() + 125_000).label)
     .toBe('GPS reading: 2m 5s ago · Delayed');
 });
+
+it('resets the compact deployment reading for a new shift', async () => {
+  const view = await render(<GpsReadingAge
+    recordedAt={fix}
+    shiftStart="2026-09-07T00:01:00.000Z"
+    compact
+  />);
+  expect(view.getByText('Awaiting GPS fix')).toBeTruthy();
+  await view.rerender(<GpsReadingAge
+    recordedAt="2026-09-07T00:01:00.000Z"
+    shiftStart="2026-09-07T00:01:00.000Z"
+    compact
+  />);
+  expect(view.getByText('Last GPS: 0s ago')).toBeTruthy();
+  await view.rerender(<GpsReadingAge
+    recordedAt="2026-09-07T00:00:00.000Z"
+    shiftStart="2026-09-07T00:00:00.000Z"
+    compact
+  />);
+  await act(() => jest.advanceTimersByTime(1000));
+  expect(view.getByText('Last GPS: 30s ago')).toBeTruthy();
+});

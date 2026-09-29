@@ -17,8 +17,16 @@ export const isActiveTask = (task: OperationalTask) => (
   task.status === 'open' || task.status === 'full'
 );
 
-export const selectCurrentDeployment = (deployments: DeploymentAssignment[]) => (
-  deployments.find((deployment) => deployment.isCurrentShift !== false)
+export const isDeploymentActiveNow = (deployment: DeploymentAssignment, now = Date.now()) => {
+  if (deployment.status !== 'active' || deployment.isCurrentShift === false) return false;
+  const start = deployment.shiftStart ? Date.parse(deployment.shiftStart) : null;
+  const end = deployment.shiftEnd ? Date.parse(deployment.shiftEnd) : null;
+  return (start === null || (Number.isFinite(start) && start <= now))
+    && (end === null || (Number.isFinite(end) && end > now));
+};
+
+export const selectCurrentDeployment = (deployments: DeploymentAssignment[], now = Date.now()) => (
+  deployments.find((deployment) => isDeploymentActiveNow(deployment, now))
 );
 
 export const selectPersonnelDeployment = (

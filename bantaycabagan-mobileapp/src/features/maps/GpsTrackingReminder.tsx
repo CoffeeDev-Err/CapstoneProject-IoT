@@ -72,8 +72,12 @@ export function GpsTrackingReminder({
           <Icon name="gps-off" size={19} color="#ffffff" />
         </View>
         <View style={styles.bannerCopy}>
-          <Text style={[styles.bannerTitle, { color: colors.text }]}>GPS tracking unavailable</Text>
-          <Text style={[styles.bannerText, { color: colors.textMuted }]}>Tap to view tracker reminder</Text>
+          <Text style={[styles.bannerTitle, { color: colors.text }]}>
+            {reminder.kind === 'stale' ? 'GPS signal delayed' : 'Waiting for GPS fix'}
+          </Text>
+          <Text style={[styles.bannerText, { color: colors.textMuted }]}>
+            {reminder.kind === 'stale' ? 'Tap to check your tracker' : 'No reading this shift - tap for help'}
+          </Text>
         </View>
         <Icon name="chevron-right" size={21} color={colors.warning} />
       </TouchableOpacity>
@@ -151,9 +155,9 @@ export function GpsTrackingReminder({
 
 const styles = StyleSheet.create({
   banner: {
-    minHeight: 54,
+    minHeight: 48,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 7,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -166,8 +170,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   bannerIcon: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,

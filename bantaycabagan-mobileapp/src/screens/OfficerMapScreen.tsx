@@ -9,6 +9,7 @@ import React, {
 import {
   Alert,
   Animated,
+  AppState,
   Easing,
   Platform,
   StyleSheet,
@@ -104,10 +105,22 @@ export default function OfficerMapScreen({
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
-  const assignment = selectCurrentDeployment(deployments);
-  const canRequestBackup = Boolean(assignment && currentOfficer.isOnDuty !== false);
-  const hasCurrentGpsFix = currentOfficer.isLocationStale !== true
+  const [clockNow, setClockNow] = useState(Date.now);
+  const assignment = currentOfficer.isOnDuty === false
+    ? undefined : selectCurrentDeployment(deployments, clockNow);
+  const canRequestBackup = Boolean(assignment);
+  const recordedAt = Date.parse(currentOfficer.locationRecordedAt || '');
+  const shiftStartedAt = Date.parse(assignment?.shiftStart || '');
+  const hasShiftGpsReading = Number.isFinite(recordedAt)
+    && (!Number.isFinite(shiftStartedAt) || recordedAt >= shiftStartedAt);
+  const hasCurrentGpsFix = hasShiftGpsReading
+    && Number.isFinite(currentOfficer.latitude)
+    && Number.isFinite(currentOfficer.longitude)
+    && currentOfficer.isLocationStale !== true
     && currentOfficer.isVisibleOnMap !== false;
+  const gpsStatusLabel = !isConnected ? 'OFFLINE'
+    : hasCurrentGpsFix ? 'LIVE'
+      : hasShiftGpsReading ? 'GPS STALE' : 'NO GPS';
   const deploymentPromptVisible = Boolean(assignment && !assignment.acknowledged);
   const overlayTranslateY = headerVisibility?.interpolate({
     inputRange: [0, 1],
@@ -118,6 +131,23 @@ export default function OfficerMapScreen({
     headerContentHeight,
     headerVisibilityValue,
   );
+
+  useEffect(() => {
+    const nextShiftEnd = Math.min(...deployments
+      .map((deployment) => Date.parse(deployment.shiftEnd || ''))
+      .filter((end) => Number.isFinite(end) && end > clockNow));
+    if (!Number.isFinite(nextShiftEnd)) return undefined;
+    const timer = setTimeout(() => setClockNow(Date.now()),
+      Math.min(2_147_483_647, Math.max(0, nextShiftEnd - Date.now() + 50)));
+    return () => clearTimeout(timer);
+  }, [clockNow, deployments]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setClockNow(Date.now());
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (!headerVisibility) {
@@ -158,6 +188,7 @@ export default function OfficerMapScreen({
   }, [onMapInteractionChange]);
 
   useFocusEffect(useCallback(() => {
+    setClockNow(Date.now());
     onMapInteractionChange?.(false);
     return () => {
       if (mapInteractionIdleTimer.current) clearTimeout(mapInteractionIdleTimer.current);
@@ -167,8 +198,8 @@ export default function OfficerMapScreen({
   }, [onMapInteractionChange]));
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => (
-    selectVisiblePersonnel(personnel, currentPersonnelId, currentOfficer)
-  ), [currentOfficer, currentPersonnelId, personnel]);
+    assignment ? selectVisiblePersonnel(personnel, currentPersonnelId, currentOfficer) : []
+  ), [assignment, currentOfficer, currentPersonnelId, personnel]);
 
   const emergencyPersonnelIds = useMemo(() => selectEmergencyPersonnelIds(tasks), [tasks]);
 
@@ -477,20 +508,30 @@ export default function OfficerMapScreen({
                 styles.deploymentPill,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}>
-                <Icon name="place" size={17} color={colors.blue} />
+                <View style={[styles.deploymentIcon, { backgroundColor: colors.blueSoft }]}>
+                  <Icon name="place" size={17} color={colors.blue} />
+                </View>
                 <View style={styles.deploymentText}>
                   <Text style={[styles.deploymentLabel, { color: colors.textMuted }]}>CURRENT DEPLOYMENT</Text>
                   <Text style={[styles.deploymentArea, { color: colors.text }]} numberOfLines={1}>
                     {assignment?.patrolArea || 'No active assignment'}
                   </Text>
-                  <GpsReadingAge recordedAt={currentOfficer.locationRecordedAt} color={colors.textMuted} />
+                  <GpsReadingAge
+                    recordedAt={currentOfficer.locationRecordedAt}
+                    shiftStart={assignment?.shiftStart}
+                    color={colors.textMuted}
+                    compact
+                  />
                 </View>
-                <Text style={[
-                  styles.liveText,
-                  (!isConnected || !hasCurrentGpsFix) && styles.offlineText,
+                <View style={[
+                  styles.gpsStatusBadge,
+                  { backgroundColor: hasCurrentGpsFix ? colors.successSoft : colors.warningSoft },
                 ]}>
-                  {!isConnected ? 'OFFLINE' : (hasCurrentGpsFix ? 'LIVE' : 'GPS STALE')}
-                </Text>
+                  <Text style={[
+                    styles.gpsStatusText,
+                    { color: hasCurrentGpsFix ? colors.success : colors.warning },
+                  ]}>{gpsStatusLabel}</Text>
+                </View>
               </View>
             )}
           </View>
@@ -658,11 +699,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deploymentPill: {
-    minHeight: 44,
-    paddingHorizontal: 11,
+    minHeight: 60,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     borderWidth: 1,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.96)',
@@ -672,11 +714,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  deploymentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
   deploymentText: { flex: 1 },
   deploymentLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
-  deploymentArea: { marginTop: 2, color: mobileTheme.text, fontSize: 13, fontWeight: '800' },
-  liveText: { color: mobileTheme.success, fontSize: 10, fontWeight: '800' },
-  offlineText: { color: mobileTheme.danger },
+  deploymentArea: { marginTop: 2, marginBottom: 1, color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
+  gpsStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
+  gpsStatusText: { fontSize: 9, fontWeight: '800' },
   followBanner: {
     minHeight: 42,
     paddingLeft: 12,

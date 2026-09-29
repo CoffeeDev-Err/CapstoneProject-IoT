@@ -32,7 +32,7 @@ describe('GPS tracking reminder state', () => {
   });
 
   it('hides after a fresh GPS reading and identifies an old reading as stale', () => {
-    const now = shiftStartedAt + GPS_TRACKING_REMINDER_GRACE_MS;
+    const now = shiftStartedAt + GPS_TRACKING_REMINDER_GRACE_MS + 2_000;
     const currentOfficer = {
       ...officer,
       latitude: 17.42,
@@ -52,5 +52,25 @@ describe('GPS tracking reminder state', () => {
       },
       now,
     })).toEqual({ kind: 'stale', statusText: 'The last GPS update was 2m 1s ago.' });
+  });
+
+  it('stops after duty and does not carry an older shift GPS reading into a new shift', () => {
+    const now = shiftStartedAt + GPS_TRACKING_REMINDER_GRACE_MS;
+    const previousShiftReading = {
+      ...officer,
+      locationRecordedAt: new Date(shiftStartedAt - 24 * 60 * 60_000).toISOString(),
+    } as LivePersonnel;
+    expect(getGpsTrackingReminderState({ assignment, officer: previousShiftReading, now }))
+      .toEqual({ kind: 'unavailable', statusText: 'No GPS location has been received for this active shift.' });
+    expect(getGpsTrackingReminderState({
+      assignment: { ...assignment, shiftEnd: new Date(now).toISOString() },
+      officer: previousShiftReading,
+      now,
+    })).toBeNull();
+    expect(getGpsTrackingReminderState({
+      assignment,
+      officer: { ...previousShiftReading, isOnDuty: false },
+      now,
+    })).toBeNull();
   });
 });
