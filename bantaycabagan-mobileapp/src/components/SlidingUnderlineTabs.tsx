@@ -3,7 +3,6 @@ import {
   type LayoutChangeEvent,
   type StyleProp,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   type ViewStyle,
@@ -11,6 +10,10 @@ import {
 import Animated, {
   cancelAnimation,
   Easing,
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -20,6 +23,34 @@ import { useMobileTheme } from '../context/ThemeContext';
 
 const INDICATOR_DURATION_MS = 190;
 const INDICATOR_EASING = Easing.bezier(0.2, 0, 0, 1);
+
+function SlidingTabLabel({
+  index,
+  indicatorX,
+  label,
+  mutedColor,
+  tabWidth,
+}: {
+  index: number;
+  indicatorX: SharedValue<number>;
+  label: string;
+  mutedColor: string;
+  tabWidth: number;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const distance = tabWidth > 0
+      ? Math.min(1, Math.abs(indicatorX.value - (index * tabWidth)) / tabWidth)
+      : 1;
+    return {
+      color: interpolateColor(distance, [0, 1], [mobileTheme.blue, mutedColor]),
+      transform: [{
+        scale: interpolate(distance, [0, 1], [1.035, 1], Extrapolation.CLAMP),
+      }],
+    };
+  }, [index, mutedColor, tabWidth]);
+
+  return <Animated.Text style={[styles.label, animatedStyle]}>{label}</Animated.Text>;
+}
 
 export function SlidingUnderlineTabs<T extends string>({
   items,
@@ -56,6 +87,16 @@ export function SlidingUnderlineTabs<T extends string>({
   const measure = (event: LayoutChangeEvent) => {
     setWidth(event.nativeEvent.layout.width);
   };
+  const selectTab = (item: T, index: number) => {
+    if (tabWidth > 0) {
+      cancelAnimation(indicatorX);
+      indicatorX.value = withTiming(index * tabWidth, {
+        duration: INDICATOR_DURATION_MS,
+        easing: INDICATOR_EASING,
+      });
+    }
+    onSelect(item);
+  };
 
   return (
     <View onLayout={measure} style={[styles.container, style]}>
@@ -67,16 +108,16 @@ export function SlidingUnderlineTabs<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             activeOpacity={0.68}
-            onPress={() => onSelect(item)}
+            onPress={() => selectTab(item, index)}
             style={styles.tab}
           >
-            <Text style={[
-              styles.label,
-              { color: active ? mobileTheme.blue : colors.textMuted },
-              active && styles.activeLabel,
-            ]}>
-              {labels[index]}
-            </Text>
+            <SlidingTabLabel
+              index={index}
+              indicatorX={indicatorX}
+              label={labels[index]}
+              mutedColor={colors.textMuted}
+              tabWidth={tabWidth}
+            />
           </TouchableOpacity>
         );
       })}
@@ -104,9 +145,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  activeLabel: {
     fontWeight: '800',
   },
   indicator: {

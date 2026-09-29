@@ -337,12 +337,13 @@ export default function ReportsScreen() {
           ref={reportListRef}
           data={reports}
           extraData={[filter, datePreset, expandedReportIds]}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => `${filter}:${datePreset}:${item.id}`}
           renderItem={renderReport}
           style={styles.listViewport}
           contentContainerStyle={styles.list}
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={16}
           windowSize={7}
           removeClippedSubviews={false}
           showsVerticalScrollIndicator={false}
