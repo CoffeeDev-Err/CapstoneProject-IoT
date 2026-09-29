@@ -35,6 +35,8 @@ type Props = {
   token: string;
   onClose: () => void;
   onChanged: () => void;
+  required?: boolean;
+  onSignOut?: () => void;
 };
 
 type SheetClose = (afterClose?: () => void) => void;
@@ -44,6 +46,8 @@ export default function ChangePasswordModal({
   token,
   onClose,
   onChanged,
+  required = false,
+  onSignOut,
 }: Props) {
   const { isDark } = useMobileTheme();
   const [step, setStep] = useState<'password' | 'verify'>('password');
@@ -149,6 +153,7 @@ export default function ChangePasswordModal({
     <SwipeDismissSheet
       visible={visible}
       initiallyExpanded
+      dismissible={!required}
       onClose={onClose}
       sheetStyle={[styles.sheet, isDark && darkStyles.sheet]}
     >
@@ -157,11 +162,18 @@ export default function ChangePasswordModal({
           <View style={styles.header}>
             <View>
               <Text style={styles.step}>Step {step === 'password' ? '1' : '2'} of 2</Text>
-              <Text style={[styles.title, isDark && darkStyles.text]}>Change Password</Text>
+              <Text style={[styles.title, isDark && darkStyles.text]}>
+                {required ? 'Password Change Required' : 'Change Password'}
+              </Text>
+              {required ? (
+                <Text style={[styles.requiredNotice, isDark && darkStyles.requiredNotice]} accessibilityRole="alert">
+                  To secure your account, verify your identity and replace your temporary password before accessing GeoSentri. After the change, sign in again with your new password.
+                </Text>
+              ) : null}
               <Text style={[styles.subtitle, isDark && darkStyles.muted]}>
                 {step === 'password'
                   ? 'Confirm your current password.'
-                  : `Enter the code sent to ${challenge?.maskedEmail}.`}
+                  : `Enter the code sent to ${challenge?.maskedEmail}. Never share this code.`}
               </Text>
             </View>
           </View>
@@ -221,6 +233,11 @@ export default function ChangePasswordModal({
               accessibilityRole="button"
             >
               <Text style={[styles.resendText, pending && styles.disabled]}>Resend code</Text>
+            </TouchableOpacity>
+          ) : null}
+          {required && onSignOut ? (
+            <TouchableOpacity style={styles.resend} onPress={onSignOut} accessibilityRole="button">
+              <Text style={[styles.resendText, isDark && darkStyles.muted]}>Sign out</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -293,6 +310,7 @@ const styles = StyleSheet.create({
   },
   title: { color: mobileTheme.text, fontSize: 20, fontWeight: '800' },
   subtitle: { maxWidth: 280, marginTop: 4, color: mobileTheme.textMuted, fontSize: 12, lineHeight: 18 },
+  requiredNotice: { marginTop: 8, color: '#164a9d', fontSize: 13, lineHeight: 19, fontWeight: '700' },
   field: { marginBottom: 13 },
   label: { marginBottom: 6, color: mobileTheme.textMuted, fontSize: 12, fontWeight: '700' },
   input: {
@@ -360,4 +378,5 @@ const darkStyles = StyleSheet.create({
   input: { borderColor: '#2a3a56', backgroundColor: '#0e1a30', color: '#f8fafc' },
   text: { color: '#f8fafc' },
   muted: { color: '#9eabc0' },
+  requiredNotice: { color: '#93b9ff' },
 });

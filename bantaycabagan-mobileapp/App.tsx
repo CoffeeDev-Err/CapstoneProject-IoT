@@ -17,6 +17,7 @@ import { OperationalProvider } from './src/context/OperationalContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import { ThemeProvider, useMobileTheme } from './src/context/ThemeContext';
 import MainTabs from './src/navigation/MainTabs';
+import ChangePasswordModal from './src/components/ChangePasswordModal';
 import { mobileFontFamily } from './src/constants/mobileTheme';
 import { configureMapCache } from './src/services/mapCache';
 
@@ -75,10 +76,22 @@ function ThemedNavigation() {
 }
 
 function MainAppScreen() {
+  const { token, user, clearSession, logout } = useAuth();
+  const passwordChangeRequired = Boolean(token && user?.forcePasswordReset);
   return (
     <NotificationProvider>
       <OperationalProvider>
         <MainTabs />
+        {token ? (
+          <ChangePasswordModal
+            visible={passwordChangeRequired}
+            required
+            token={token}
+            onClose={() => undefined}
+            onChanged={() => { void clearSession(); }}
+            onSignOut={() => { void logout(); }}
+          />
+        ) : null}
       </OperationalProvider>
     </NotificationProvider>
   );
