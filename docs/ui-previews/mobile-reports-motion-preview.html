@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GeoSentri reports and navigation motion preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --app-bg: #050b18;
+      --header: #0b1528;
+      --surface: #0b1528;
+      --surface-2: #0e1a30;
+      --border: #22314a;
+      --text: #f8fafc;
+      --muted: #9eabc0;
+      --blue: #246bfd;
+      --blue-soft: #132b57;
+      --danger: #ef4444;
+      --danger-soft: #3a1720;
+      --success-soft: #123127;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 13% 8%, #24395c 0, #101a2d 28%, #070c17 68%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .board {
+      width: 1080px;
+      min-height: 1120px;
+      margin: 0 auto;
+      padding: 44px 54px;
+      display: grid;
+      grid-template-columns: 430px 1fr;
+      gap: 54px;
+      align-items: start;
+    }
+    .phone {
+      position: relative;
+      width: 430px;
+      height: 932px;
+      overflow: hidden;
+      border: 8px solid #263651;
+      border-radius: 38px;
+      background: var(--app-bg);
+      box-shadow: 0 28px 70px #000b;
+    }
+    .status {
+      height: 34px;
+      padding: 9px 23px 0;
+      display: flex;
+      justify-content: space-between;
+      background: var(--header);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .app-header {
+      position: relative;
+      z-index: 20;
+      height: 64px;
+      padding: 5px 20px 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0 0 14px 14px;
+      background: var(--header);
+    }
+    .app-header img { width: 29px; height: 38px; object-fit: contain; }
+    .brand { flex: 1; }
+    .brand strong { display: block; font-size: 14px; line-height: 18px; }
+    .brand span { display: block; color: var(--muted); font-size: 10px; }
+    .bell { position: relative; width: 34px; height: 34px; display: grid; place-items: center; color: #e7eef9; }
+    .bell svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 2; }
+    .badge { position: absolute; top: -4px; right: -2px; width: 18px; height: 18px; display: grid; place-items: center; border: 2px solid var(--header); border-radius: 50%; background: #dc2626; font-size: 9px; font-weight: 900; }
+    .scene-frame { position: absolute; inset: 98px 0 0; overflow: hidden; background: var(--app-bg); }
+    .scene {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: translateY(4px);
+      pointer-events: none;
+      transition: opacity 160ms cubic-bezier(.22,1,.36,1), transform 160ms cubic-bezier(.22,1,.36,1);
+    }
+    .scene.active { z-index: 2; opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .report-scroll { height: 100%; padding: 21px 22px 108px; overflow: hidden; }
+    .screen-heading { display: flex; align-items: center; justify-content: space-between; }
+    h1 { margin: 0; font-size: 29px; line-height: 34px; }
+    .subtitle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .add { height: 43px; padding: 0 14px; display: flex; align-items: center; gap: 7px; border: 0; border-radius: 11px; background: var(--blue); color: white; font-size: 11px; font-weight: 850; box-shadow: 0 6px 14px #001f6e88; }
+    .add span { font-size: 21px; font-weight: 400; line-height: 1; }
+    .category-tabs { position: relative; height: 48px; margin-top: 17px; display: flex; }
+    .category-tab { flex: 1; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 750; cursor: pointer; }
+    .category-tab.active { color: #78a9ff; }
+    .category-indicator { position: absolute; bottom: -1px; left: 0; width: 33.333%; height: 3px; border-radius: 3px 3px 0 0; background: var(--blue); transition: transform 190ms cubic-bezier(.22,1,.36,1); }
+    .date-row { margin: 12px 0 13px; display: grid; grid-template-columns: 1.3fr .9fr .9fr .9fr; gap: 7px; }
+    .date-chip { height: 35px; border: 1px solid transparent; border-radius: 9px; background: var(--surface-2); color: var(--muted); font-size: 10px; font-weight: 750; box-shadow: 0 3px 8px #0003; }
+    .date-chip.active { border-color: var(--blue); background: var(--blue-soft); color: #84afff; }
+    .cards { display: grid; gap: 9px; }
+    .report-card { padding: 10px 11px; border: 0; border-left: 3px solid var(--danger); border-radius: 8px; background: var(--surface); box-shadow: 0 5px 13px #0007, inset 0 1px #ffffff08; transition: box-shadow 180ms ease; }
+    .report-card.expanded { box-shadow: 0 0 0 1px var(--blue), 0 7px 16px #0009, inset 0 1px #ffffff0d; }
+    .report-card.routine { border-left-color: var(--blue); }
+    .card-main { cursor: pointer; }
+    .card-top { display: flex; justify-content: space-between; align-items: center; }
+    .tag-row { display: flex; gap: 5px; align-items: center; }
+    .tag { padding: 3px 7px; border-radius: 10px; background: var(--danger-soft); color: #f6d9de; font-size: 8px; font-weight: 900; text-transform: uppercase; }
+    .tag.blue { background: var(--blue-soft); color: #bfdbfe; }
+    .tag.green { background: var(--success-soft); color: #c9f5dd; text-transform: capitalize; }
+    .chevron { color: var(--muted); font-size: 19px; line-height: 16px; transition: transform 220ms cubic-bezier(.22,1,.36,1); }
+    .report-card.expanded .chevron { transform: rotate(180deg); }
+    .card-title { margin: 7px 0 0; font-size: 14px; font-weight: 850; }
+    .meta { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .location { margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .collapse-grid { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 230ms cubic-bezier(.2,0,0,1), opacity 190ms ease; }
+    .report-card.expanded .collapse-grid { grid-template-rows: 1fr; opacity: 1; }
+    .collapse-inner { min-height: 0; overflow: hidden; }
+    .expanded-content { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .description { margin: 0; color: #bdc9da; font-size: 11px; line-height: 16px; }
+    .actions { margin-top: 9px; display: flex; justify-content: flex-end; gap: 8px; }
+    .action { min-height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--surface-2); color: #91b8ff; font-size: 10px; font-weight: 850; box-shadow: 0 3px 8px #0004; }
+    .action.resolve { flex: 1; border-color: #15805d; background: #167451; color: white; }
+    .map-scene { background: #26364f; }
+    .map-grid { position: absolute; inset: -70px; transform: rotate(-8deg); background: repeating-linear-gradient(0deg,transparent 0 48px,#526078 49px 52px,transparent 53px 106px),repeating-linear-gradient(90deg,transparent 0 45px,#526078 46px 49px,transparent 50px 98px); opacity: .7; }
+    .map-search { position: absolute; z-index: 2; top: 16px; left: 22px; right: 22px; height: 55px; padding: 18px; border-radius: 18px; background: #091426; color: var(--muted); font-size: 12px; box-shadow: 0 4px 14px #0007; }
+    .pin { position: absolute; z-index: 2; top: 46%; left: 48%; width: 16px; height: 16px; border: 4px solid #bfdbfe; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 12px #246bfd33; }
+    .account-scene { padding: 24px 22px; }
+    .profile-card { margin-top: 18px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .avatar { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; background: var(--blue-soft); color: #a9c7ff; font-size: 24px; font-weight: 900; }
+    .profile-card h2 { margin: 13px 0 3px; font-size: 18px; }
+    .profile-card p { margin: 0; color: var(--muted); font-size: 12px; }
+    .bottom-nav { position: absolute; z-index: 30; left: 47px; right: 47px; bottom: 18px; height: 61px; display: flex; border: 0; border-radius: 20px; background: #091426f5; box-shadow: 0 9px 20px #000c, inset 0 1px #ffffff0a; }
+    .nav-indicator { position: absolute; left: 0; bottom: 0; width: 25%; height: 3px; background: var(--blue); border-radius: 3px 3px 0 0; transition: transform 220ms cubic-bezier(.22,1,.36,1); }
+    .nav-button { position: relative; z-index: 1; flex: 1; border: 0; background: transparent; color: #8fa0b7; font-size: 8px; font-weight: 750; cursor: pointer; }
+    .nav-button.active { color: #75a6ff; }
+    .nav-icon { display: block; margin: 0 auto 2px; font-size: 20px; line-height: 21px; }
+    .notes { padding-top: 45px; }
+    .eyebrow { margin: 0 0 8px; color: #74a6ff; font-size: 12px; font-weight: 850; letter-spacing: 1.5px; text-transform: uppercase; }
+    .notes h2 { max-width: 430px; margin: 0; font-size: 40px; line-height: 46px; }
+    .lead { max-width: 455px; margin: 18px 0 28px; color: #b9c7da; font-size: 16px; line-height: 25px; }
+    .spec { max-width: 470px; margin-bottom: 14px; padding: 17px 18px; border: 1px solid #2d3e5b; border-radius: 12px; background: #0b1528cc; }
+    .spec strong { display: block; margin-bottom: 5px; font-size: 14px; }
+    .spec span { color: #9eabc0; font-size: 12px; line-height: 18px; }
+    .motion-demo { max-width: 470px; margin-top: 24px; padding: 18px; border: 1px solid #31507e; border-radius: 13px; background: #10203a; }
+    .motion-demo p { margin: 0 0 12px; color: #b9c7da; font-size: 12px; }
+    .demo-buttons { display: flex; gap: 8px; }
+    .demo-button { padding: 9px 13px; border: 1px solid #35598d; border-radius: 8px; background: #0a162a; color: #bed4ff; font-weight: 750; cursor: pointer; }
+    .demo-button.active { border-color: var(--blue); background: var(--blue); color: white; }
+    .caption { margin: 14px 0 0; color: #8190a6; font-size: 11px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <section>
+      <div class="phone">
+        <div class="status"><span>10:00</span><span>▮▮▮　WiFi　42%</span></div>
+        <header class="app-header">
+          <img src="../../bantaycabagan-mobileapp/assets/pnp-logo.png" alt="PNP seal">
+          <div class="brand"><strong>GeoSentri</strong><span>Philippine National Police</span></div>
+          <div class="bell"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="badge">2</span></div>
+        </header>
+        <div class="scene-frame">
+          <section class="scene map-scene" data-scene="Map"><div class="map-grid"></div><div class="map-search">⌕　Search officer or location</div><div class="pin"></div></section>
+          <section class="scene active" data-scene="Reports">
+            <div class="report-scroll">
+              <div class="screen-heading"><div><h1>Reports</h1><p class="subtitle">Your submitted report history</p></div><button class="add"><span>+</span>New Report</button></div>
+              <nav class="category-tabs">
+                <button class="category-tab active" data-category="0">All</button><button class="category-tab" data-category="1">Incident</button><button class="category-tab" data-category="2">Routine</button><span class="category-indicator"></span>
+              </nav>
+              <div class="date-row"><button class="date-chip active">▣　All dates</button><button class="date-chip">Today</button><button class="date-chip">7 days</button><button class="date-chip">30 days</button></div>
+              <div class="cards">
+                <article class="report-card expanded">
+                  <div class="card-main"><div class="card-top"><div class="tag-row"><span class="tag">Incident</span></div><div class="tag-row"><span class="tag green">Validated</span><span class="tag green">Resolved</span><span class="chevron">⌄</span></div></div><h3 class="card-title">Shooting Incident</h3><div class="meta">Sep 21, 2026, 10:02 PM</div><div class="location">●　Market Market</div></div>
+                  <div class="collapse-grid"><div class="collapse-inner"><div class="expanded-content"><p class="description">Incident response and validation details are available for review.</p><div class="actions"><button class="action">◉　View</button></div></div></div></div>
+                </article>
+                <article class="report-card routine">
+                  <div class="card-main"><div class="card-top"><div class="tag-row"><span class="tag blue">Checkpoint</span></div><div class="tag-row"><span class="tag green">Validated</span><span class="chevron">⌄</span></div></div><h3 class="card-title">Checkpoint Activity</h3><div class="meta">Sep 8, 2026, 4:14 PM</div><div class="location">●　National Highway</div></div>
+                  <div class="collapse-grid"><div class="collapse-inner"><div class="expanded-content"><p class="description">Routine checkpoint completed and documented.</p><div class="actions"><button class="action">◉　View</button></div></div></div></div>
+                </article>
+                <article class="report-card"><div class="card-main"><div class="card-top"><span class="tag">Incident</span><div class="tag-row"><span class="tag green">Validated</span><span class="chevron">⌄</span></div></div><h3 class="card-title">Fighting</h3><div class="meta">Aug 21, 2026, 8:54 AM</div><div class="location">●　Market</div></div><div class="collapse-grid"><div class="collapse-inner"><div class="expanded-content"><p class="description">Response information and report history.</p><div class="actions"><button class="action resolve">✓ Resolve Incident</button><button class="action">View</button></div></div></div></div></article>
+              </div>
+            </div>
+          </section>
+          <section class="scene account-scene" data-scene="Account"><h1>Account</h1><p class="subtitle">Profile and security settings</p><div class="profile-card"><div class="avatar">JD</div><h2>Juan Dela Cruz</h2><p>Police Officer · Active</p></div></section>
+        </div>
+        <nav class="bottom-nav">
+          <span class="nav-indicator" style="transform:translateX(200%)"></span>
+          <button class="nav-button" data-nav="Map" data-index="0"><span class="nav-icon">▱</span>Map</button>
+          <button class="nav-button" data-nav="Tasks" data-index="1"><span class="nav-icon">▤</span>Tasks</button>
+          <button class="nav-button active" data-nav="Reports" data-index="2"><span class="nav-icon">▧</span>Reports</button>
+          <button class="nav-button" data-nav="Account" data-index="3"><span class="nav-icon">●</span>Account</button>
+        </nav>
+      </div>
+      <p class="caption">Tap report cards and Map / Reports / Account in the HTML preview.</p>
+    </section>
+    <aside class="notes">
+      <p class="eyebrow">Proposed mobile refinement</p>
+      <h2>Calmer motion, clearer filters.</h2>
+      <p class="lead">This is the intended final appearance. It keeps the current dark theme, spacing, cards, header, date filters, and navigation while changing only the interaction patterns discussed.</p>
+      <div class="spec"><strong>Report card motion</strong><span>230 ms height-and-opacity animation. Content remains mounted, so expansion does not jump or flash.</span></div>
+      <div class="spec"><strong>Primary filters</strong><span>Flat text tabs with one sliding underline replace the three separate rounded buttons in Tasks and Reports.</span></div>
+      <div class="spec"><strong>Elevated surfaces</strong><span>Inactive cards and buttons have no neutral outline. Surface contrast and a soft shadow create separation; blue appears only for the active state.</span></div>
+      <div class="spec"><strong>Page transition</strong><span>160 ms opacity transition with only 4 px vertical settling. No horizontal page shift. Map, Reports, and Account remain mounted.</span></div>
+      <div class="spec"><strong>Rendering cost</strong><span>Motion runs on the UI thread. The map is not recreated, and the transition uses only opacity and a very small transform.</span></div>
+      <div class="motion-demo"><p>Interactive preview controls</p><div class="demo-buttons"><button class="demo-button" data-demo="Map">Map</button><button class="demo-button active" data-demo="Reports">Reports</button><button class="demo-button" data-demo="Account">Account</button></div></div>
+    </aside>
+  </main>
+  <script>
+    const showScene = (name, index) => {
+      if (name === 'Tasks') return;
+      document.querySelectorAll('[data-scene]').forEach(el => el.classList.toggle('active', el.dataset.scene === name));
+      document.querySelectorAll('[data-nav]').forEach(el => el.classList.toggle('active', el.dataset.nav === name));
+      document.querySelectorAll('[data-demo]').forEach(el => el.classList.toggle('active', el.dataset.demo === name));
+      const resolved = index ?? ({ Map: 0, Reports: 2, Account: 3 }[name]);
+      document.querySelector('.nav-indicator').style.transform = `translateX(${resolved * 100}%)`;
+    };
+    document.querySelectorAll('[data-nav]').forEach(button => button.addEventListener('click', () => showScene(button.dataset.nav, Number(button.dataset.index))));
+    document.querySelectorAll('[data-demo]').forEach(button => button.addEventListener('click', () => showScene(button.dataset.demo)));
+    document.querySelectorAll('.report-card .card-main').forEach(card => card.addEventListener('click', () => card.parentElement.classList.toggle('expanded')));
+    document.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('[data-category]').forEach(el => el.classList.toggle('active', el === button));
+      document.querySelector('.category-indicator').style.transform = `translateX(${Number(button.dataset.category) * 100}%)`;
+    }));
+  </script>
+</body>
+</html>

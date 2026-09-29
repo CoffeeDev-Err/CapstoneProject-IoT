@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GeoSentri mobile login and navigation preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e8eef8; color: #10213b; font-family: Arial, sans-serif; }
+    .preview { width: 920px; margin: 0 auto; padding: 30px 24px 24px; }
+    h1 { margin: 0 0 5px; font-size: 24px; }
+    .note { margin: 0 0 22px; color: #53647e; font-size: 13px; }
+    .columns { display: flex; justify-content: center; gap: 32px; }
+    .column { width: 390px; }
+    .caption { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+    .phone { position: relative; width: 390px; height: 792px; overflow: hidden; border: 7px solid #172238; border-radius: 34px; background: #050b18; box-shadow: 0 18px 36px #25385840; }
+    .status { position: relative; z-index: 3; height: 36px; padding: 11px 22px 0; display: flex; justify-content: space-between; color: #f8fafc; font-size: 13px; font-weight: 700; }
+    .login .accent-top { position: absolute; top: -34px; left: -54px; width: 270px; height: 118px; border-radius: 0 0 96px 0; background: #132442; transform: rotate(-5deg); }
+    .login .accent-bottom { position: absolute; right: -62px; bottom: -36px; width: 286px; height: 126px; border-radius: 108px 0 0 0; background: #0b2d63; transform: rotate(-4deg); }
+    .login-content { position: relative; z-index: 1; height: calc(100% - 36px); padding: 24px; display: flex; flex-direction: column; justify-content: center; }
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+    .brand img { width: 62px; height: 72px; object-fit: contain; }
+    .brand-name { color: #fff; font-size: 22px; font-weight: 800; }
+    .brand-subtitle { margin-top: 3px; color: #93a4bd; font-size: 12px; }
+    .panel { padding: 18px; border: 1px solid #22314a; border-radius: 8px; background: #0b1528; }
+    .panel h2 { margin: 0; color: #f8fafc; font-size: 25px; font-weight: 800; }
+    .panel .description { margin: 6px 0 18px; color: #9eabc0; font-size: 13px; line-height: 19px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; margin-bottom: 6px; color: #aebbd0; font-size: 12px; font-weight: 700; }
+    .input { height: 48px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #2a3a56; border-radius: 8px; background: #0e1a30; color: #94a3b8; font-size: 14px; }
+    .eye { width: 20px; height: 20px; fill: none; stroke: #93a4bd; stroke-width: 1.8; }
+    .forgot { display: block; margin: -2px 0 14px; color: #72a7ff; text-align: right; font-size: 13px; font-weight: 700; text-decoration: none; }
+    .submit { width: 100%; height: 48px; margin: 4px 0 6px; border: 0; border-radius: 8px; background: #2864e8; color: #fff; font-size: 15px; font-weight: 800; }
+    .app { background: #050b18; }
+    .app-header { position: relative; z-index: 2; height: 54px; padding: 0 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #22314a; border-radius: 0 0 12px 12px; background: #0b1528; }
+    .app-header img { width: 24px; height: 30px; object-fit: contain; }
+    .header-copy { flex: 1; }
+    .header-copy strong { display: block; color: #f8fafc; font-size: 13px; }
+    .header-copy span { display: block; margin-top: 1px; color: #9eabc0; font-size: 9px; }
+    .bell { width: 22px; height: 22px; fill: none; stroke: #e2e8f0; stroke-width: 2; }
+    .scene { position: absolute; inset: 90px 0 0; padding: 28px 22px; opacity: 0; pointer-events: none; transition: opacity 180ms cubic-bezier(.22,1,.36,1); }
+    .scene.active { opacity: 1; pointer-events: auto; }
+    .scene h2 { margin: 0; color: #f8fafc; font-size: 28px; }
+    .scene p { margin: 7px 0 20px; color: #9eabc0; font-size: 13px; }
+    .scene-card { padding: 17px; border: 1px solid #22314a; border-radius: 12px; background: #0b1528; color: #c7d5e8; font-size: 12px; line-height: 1.5; }
+    .map-visual { position: relative; height: 430px; overflow: hidden; border: 1px solid #31435f; border-radius: 13px; background: #263853; }
+    .map-visual::before { content: ''; position: absolute; inset: -30px; transform: rotate(-16deg); background: repeating-linear-gradient(0deg,transparent 0 46px,#59657a 47px 50px,transparent 51px 103px),repeating-linear-gradient(90deg,transparent 0 44px,#59657a 45px 48px,transparent 49px 96px); opacity: .8; }
+    .map-visual::after { content: ''; position: absolute; top: 48%; left: 38%; width: 15px; height: 15px; border: 5px solid #9fd0ff; border-radius: 50%; background: #2563eb; box-shadow: 0 0 0 11px #63aaff33; }
+    .map-search { position: absolute; z-index: 1; top: 14px; right: 14px; left: 14px; padding: 12px; border-radius: 14px; background: #0b1528; color: #aebbd0; font-size: 12px; }
+    .bottom-nav { position: absolute; z-index: 4; right: 45px; bottom: 18px; left: 45px; height: 52px; padding: 0 1px; display: flex; align-items: center; border: 1px solid #22314a; border-radius: 18px; background: #0b1528; box-shadow: 0 5px 10px #0007; }
+    .tab { position: relative; flex: 1; height: 52px; padding: 5px 0 0; border: 0; background: transparent; color: #9eabc0; cursor: pointer; font-size: 8px; font-weight: 700; }
+    .tab svg { display: block; width: 22px; height: 22px; margin: 0 auto 1px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tab.active { color: #246bfd; font-weight: 800; }
+    .tab.active::after { content: ''; position: absolute; bottom: -1px; left: calc(50% - 17px); width: 34px; height: 3px; border-radius: 3px 3px 0 0; background: #246bfd; }
+    .footnote { margin: 13px 0 0; color: #64748b; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="preview">
+    <h1>GeoSentri mobile preview</h1>
+    <p class="note">Visual mockup based on the current React Native styles. The right preview has clickable tabs with a 180 ms fade.</p>
+    <div class="columns">
+      <section class="column">
+        <div class="caption">Compact login</div>
+        <div class="phone login">
+          <div class="accent-top"></div><div class="accent-bottom"></div>
+          <div class="status"><span>9:41</span><span>●●●  ▰  100%</span></div>
+          <div class="login-content">
+            <div class="brand"><img src="../../bantaycabagan-mobileapp/assets/pnp-logo.png" alt="PNP seal"><div><div class="brand-name">GeoSentri</div><div class="brand-subtitle">Philippine National Police</div></div></div>
+            <div class="panel">
+              <h2>Officer Sign In</h2>
+              <p class="description">Use your assigned Login ID and password.</p>
+              <div class="field"><label>Login ID</label><div class="input">e.g., 01-2002</div></div>
+              <div class="field"><label>Password</label><div class="input"><span>Enter your password</span><svg class="eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.5"/></svg></div></div>
+              <a class="forgot">Forgot password?</a>
+              <button class="submit">Sign In</button>
+            </div>
+          </div>
+        </div>
+        <p class="footnote">Inputs and button: 48 px high.</p>
+      </section>
+      <section class="column">
+        <div class="caption">Bottom navigation after sign in</div>
+        <div class="phone app">
+          <div class="status"><span>9:41</span><span>●●●  ▰  100%</span></div>
+          <div class="app-header"><img src="../../bantaycabagan-mobileapp/assets/pnp-logo.png" alt="PNP seal"><div class="header-copy"><strong>GeoSentri</strong><span>Philippine National Police</span></div><svg class="bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></div>
+          <div class="scene active" data-scene="Map"><div class="map-visual"><div class="map-search">⌕ &nbsp; Search officer or location</div></div></div>
+          <div class="scene" data-scene="Tasks"><h2>Tasks</h2><p>Your assigned tasks and deployments</p><div class="scene-card">Tasks appear here when assigned.</div></div>
+          <div class="scene" data-scene="Reports"><h2>Reports</h2><p>Your submitted report history</p><div class="scene-card">Incident and routine reports appear here.</div></div>
+          <div class="scene" data-scene="Account"><h2>Account</h2><p>Profile and account settings</p><div class="scene-card">Personnel details and settings.</div></div>
+          <nav class="bottom-nav" aria-label="Preview navigation">
+            <button class="tab active" data-tab="Map"><svg viewBox="0 0 24 24"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/></svg>Map</button>
+            <button class="tab" data-tab="Tasks"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v4H9zM9 12h6M9 16h6"/></svg>Tasks</button>
+            <button class="tab" data-tab="Reports"><svg viewBox="0 0 24 24"><path d="M5 2h10l4 4v16H5zM15 2v5h4M8 12h8M8 16h8"/></svg>Reports</button>
+            <button class="tab" data-tab="Account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 3-7 8-7s8 3 8 7"/></svg>Account</button>
+          </nav>
+        </div>
+        <p class="footnote">Tap a tab in the HTML preview to see the transition.</p>
+      </section>
+    </div>
+  </main>
+  <script>
+    document.querySelectorAll('[data-tab]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const selected = button.dataset.tab;
+        document.querySelectorAll('[data-tab]').forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === selected));
+        document.querySelectorAll('[data-scene]').forEach((scene) => scene.classList.toggle('active', scene.dataset.scene === selected));
+      });
+    });
+  </script>
+</body>
+</html>

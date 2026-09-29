@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GeoSentri GPS duty layout preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e8eef8; color: #10213b; font-family: Arial, sans-serif; }
+    main { width: 920px; margin: 0 auto; padding: 28px 24px; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    .intro { margin: 0 0 20px; color: #53647e; font-size: 13px; }
+    .columns { display: flex; gap: 32px; justify-content: center; }
+    .column { width: 390px; }
+    .caption { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+    .phone { position: relative; width: 390px; height: 760px; overflow: hidden; border: 7px solid #172238; border-radius: 34px; background: #050b18; box-shadow: 0 18px 36px #25385840; }
+    .status { position: relative; z-index: 3; height: 36px; padding: 11px 22px 0; display: flex; justify-content: space-between; background: #0b1528; color: #f8fafc; font-size: 13px; font-weight: 700; }
+    .header { position: relative; z-index: 3; height: 54px; padding: 0 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #22314a; border-radius: 0 0 12px 12px; background: #0b1528; }
+    .header img { width: 24px; height: 30px; object-fit: contain; }
+    .header-copy { flex: 1; }
+    .header-copy strong { display: block; color: #f8fafc; font-size: 13px; }
+    .header-copy span { display: block; margin-top: 1px; color: #9eabc0; font-size: 9px; }
+    .bell { color: #e2e8f0; font-size: 21px; }
+    .map { position: absolute; inset: 90px 0 0; overflow: hidden; background: #263853; }
+    .map::before { content: ''; position: absolute; inset: -60px; transform: rotate(-13deg); background: repeating-linear-gradient(0deg,transparent 0 55px,#4b6079 56px 59px,transparent 60px 113px),repeating-linear-gradient(90deg,transparent 0 60px,#4b6079 61px 64px,transparent 65px 123px); opacity: .8; }
+    .river { position: absolute; top: 55%; left: -10%; width: 125%; height: 115px; transform: rotate(13deg); border-radius: 50%; background: #192c49; }
+    .map-label { position: absolute; top: 57%; left: 31%; color: #e2e8f0; font-size: 24px; text-shadow: 1px 2px 3px #000; }
+    .search { position: relative; z-index: 2; height: 48px; margin: 12px 16px 0; padding: 0 13px; display: flex; align-items: center; gap: 10px; border: 1px solid #22314a; border-radius: 16px; background: #0b1528; color: #9eabc0; font-size: 12px; }
+    .search strong { color: #cbd5e1; font-size: 22px; font-weight: 400; }
+    .search span { flex: 1; }
+    .search i { width: 8px; height: 8px; border-radius: 50%; background: #2563eb; }
+    .utility { position: relative; z-index: 2; display: flex; align-items: flex-start; gap: 12px; margin: 12px 16px 0; }
+    .stack { flex: 1; min-width: 0; display: grid; gap: 8px; }
+    .reminder { width: 100%; min-height: 48px; padding: 7px 10px; display: flex; align-items: center; gap: 9px; border: 1px solid #fbbf24; border-radius: 14px; background: #3b2a0b; color: #f8fafc; text-align: left; box-shadow: 0 4px 8px #0004; cursor: pointer; }
+    .reminder-icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 10px; background: #fbbf24; color: #0b1528; font-size: 17px; }
+    .reminder-copy { flex: 1; }
+    .reminder-copy strong { display: block; font-size: 12px; }
+    .reminder-copy span { display: block; margin-top: 2px; color: #cbd5e1; font-size: 10px; }
+    .chevron { color: #fbbf24; font-size: 20px; }
+    .deployment { min-height: 60px; padding: 8px 9px; display: flex; align-items: center; gap: 8px; border: 1px solid #22314a; border-radius: 14px; background: #0b1528; box-shadow: 0 4px 8px #0004; }
+    .pin { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 9px; background: #132442; color: #60a5fa; font-size: 18px; }
+    .deployment-copy { flex: 1; min-width: 0; }
+    .deployment-copy small { display: block; color: #9eabc0; font-size: 9px; font-weight: 800; }
+    .deployment-copy strong { display: block; margin-top: 2px; overflow: hidden; color: #f8fafc; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .deployment-copy span { display: block; margin-top: 1px; color: #9eabc0; font-size: 11px; font-weight: 600; }
+    .badge { align-self: flex-start; padding: 4px 7px; border-radius: 7px; background: #3b2a0b; color: #fbbf24; font-size: 9px; font-weight: 800; white-space: nowrap; }
+    .controls { width: 46px; flex: none; display: grid; gap: 8px; }
+    .control { height: 46px; display: grid; place-items: center; border: 1px solid #22314a; border-radius: 14px; background: #0b1528; color: #f8fafc; font-size: 22px; box-shadow: 0 4px 8px #0004; }
+    .bottom-nav { position: absolute; z-index: 3; right: 45px; bottom: 18px; left: 45px; height: 52px; display: flex; align-items: center; border: 1px solid #22314a; border-radius: 18px; background: #0b1528; box-shadow: 0 5px 10px #0007; }
+    .tab { position: relative; flex: 1; color: #9eabc0; text-align: center; font-size: 8px; font-weight: 700; }
+    .tab b { display: block; margin-bottom: 1px; font-size: 19px; line-height: 22px; font-weight: 400; }
+    .tab.active { color: #246bfd; font-weight: 800; }
+    .tab.active::after { content: ''; position: absolute; bottom: -6px; left: calc(50% - 17px); width: 34px; height: 3px; border-radius: 3px 3px 0 0; background: #246bfd; }
+    .note { margin: 12px 0 0; color: #64748b; font-size: 12px; line-height: 1.5; }
+    .overlay { position: absolute; z-index: 5; inset: 0; display: none; align-items: flex-end; background: #0009; }
+    .overlay.open { display: flex; }
+    .sheet { width: 100%; padding: 18px; border-radius: 18px 18px 0 0; background: #0b1528; color: #f8fafc; }
+    .sheet h2 { margin: 0; font-size: 19px; }
+    .sheet p { color: #cbd5e1; font-size: 12px; line-height: 1.5; }
+    .sheet .status-card { padding: 12px; border: 1px solid #22314a; border-radius: 10px; background: #0e1a30; }
+    .sheet button { width: 100%; height: 44px; margin-top: 8px; border: 0; border-radius: 10px; background: #2563eb; color: white; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>GPS display when duty ends</h1>
+    <p class="intro">Visual mockup based on the updated mobile styles. Tap the GPS reminder in the left preview to see its sheet.</p>
+    <div class="columns">
+      <section class="column">
+        <div class="caption">On duty · no new GPS reading</div>
+        <div class="phone">
+          <div class="map"><div class="river"></div><div class="map-label">Cabagan</div></div>
+          <div class="status"><span>9:41</span><span>●●●  ▰  100%</span></div>
+          <div class="header"><img src="../../bantaycabagan-mobileapp/assets/pnp-logo.png" alt="PNP seal"><div class="header-copy"><strong>GeoSentri</strong><span>Philippine National Police</span></div><span class="bell">♧</span></div>
+          <div class="search"><strong>⌕</strong><span>Search officer or location</span><i></i></div>
+          <div class="utility"><div class="stack">
+            <button class="reminder" id="show-reminder"><span class="reminder-icon">⌖</span><span class="reminder-copy"><strong>Waiting for GPS fix</strong><span>No reading this shift - tap for help</span></span><span class="chevron">›</span></button>
+            <div class="deployment"><span class="pin">⌖</span><span class="deployment-copy"><small>CURRENT DEPLOYMENT</small><strong>Barangay Aggub</strong><span>Awaiting GPS fix</span></span><span class="badge">NO GPS</span></div>
+          </div><div class="controls"><div class="control">◇</div><div class="control">☷</div></div></div>
+          <div class="bottom-nav"><div class="tab active"><b>◫</b>Map</div><div class="tab"><b>▤</b>Tasks</div><div class="tab"><b>▧</b>Reports</div><div class="tab"><b>♙</b>Account</div></div>
+          <div class="overlay" id="reminder-overlay"><div class="sheet"><h2>GPS Tracking Required</h2><p>GeoSentri has not received a current location from your assigned GPS tracker.</p><div class="status-card"><strong>CURRENT STATUS</strong><p>No GPS location has been received for this active shift.</p></div><p>Keep your assigned GPS tracker powered on, charged, connected to mobile data, and with you throughout your duty.</p><button id="close-reminder">Close</button></div></div>
+        </div>
+        <p class="note">The old GPS age is replaced by “Awaiting GPS fix” on a new shift.</p>
+      </section>
+      <section class="column">
+        <div class="caption">After duty · shift ended</div>
+        <div class="phone">
+          <div class="map"><div class="river"></div><div class="map-label">Cabagan</div></div>
+          <div class="status"><span>9:41</span><span>●●●  ▰  100%</span></div>
+          <div class="header"><img src="../../bantaycabagan-mobileapp/assets/pnp-logo.png" alt="PNP seal"><div class="header-copy"><strong>GeoSentri</strong><span>Philippine National Police</span></div><span class="bell">♧</span></div>
+          <div class="search"><strong>⌕</strong><span>Search officer or location</span><i></i></div>
+          <div class="utility"><div class="stack"></div><div class="controls"><div class="control">◇</div><div class="control">☷</div></div></div>
+          <div class="bottom-nav"><div class="tab active"><b>◫</b>Map</div><div class="tab"><b>▤</b>Tasks</div><div class="tab"><b>▧</b>Reports</div><div class="tab"><b>♙</b>Account</div></div>
+        </div>
+        <p class="note">No stale timer continues counting after shift end.</p>
+      </section>
+    </div>
+  </main>
+  <script>
+    const overlay = document.getElementById('reminder-overlay');
+    document.getElementById('show-reminder').addEventListener('click', () => overlay.classList.add('open'));
+    document.getElementById('close-reminder').addEventListener('click', () => overlay.classList.remove('open'));
+  </script>
+</body>
+</html>
