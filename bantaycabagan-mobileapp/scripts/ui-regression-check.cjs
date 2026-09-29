@@ -11,6 +11,10 @@ const officerMapSource = readFileSync(
   resolve(projectRoot, 'src/screens/OfficerMapScreen.tsx'),
   'utf8',
 );
+const nativeMapSource = readFileSync(
+  resolve(projectRoot, 'src/components/OfficerMapCanvas.native.tsx'),
+  'utf8',
+);
 const swipeSheetSource = readFileSync(
   resolve(projectRoot, 'src/components/SwipeDismissSheet.tsx'),
   'utf8',
@@ -19,12 +23,48 @@ const reportsSource = readFileSync(
   resolve(projectRoot, 'src/screens/ReportsScreen.tsx'),
   'utf8',
 );
+const loginSource = readFileSync(
+  resolve(projectRoot, 'src/LoginScreen.tsx'),
+  'utf8',
+);
 const reportControllerSource = readFileSync(
   resolve(projectRoot, 'src/features/reports/useReportFormController.ts'),
   'utf8',
 );
 const reportLocationSource = readFileSync(
   resolve(projectRoot, 'src/features/reports/ReportLocationFields.tsx'),
+  'utf8',
+);
+const reportEvidenceSource = readFileSync(
+  resolve(projectRoot, 'src/features/reports/ReportEvidenceField.tsx'),
+  'utf8',
+);
+const reportDateTimeSource = readFileSync(
+  resolve(projectRoot, 'src/features/reports/ReportDateTimeField.tsx'),
+  'utf8',
+);
+const reportCardSource = readFileSync(
+  resolve(projectRoot, 'src/features/reports/ReportCard.tsx'),
+  'utf8',
+);
+const taskCardSource = readFileSync(
+  resolve(projectRoot, 'src/features/tasks/TaskCard.tsx'),
+  'utf8',
+);
+const upcomingShiftCardSource = readFileSync(
+  resolve(projectRoot, 'src/features/tasks/UpcomingShiftCard.tsx'),
+  'utf8',
+);
+const slidingTabsSource = readFileSync(
+  resolve(projectRoot, 'src/components/SlidingUnderlineTabs.tsx'),
+  'utf8',
+);
+const tasksSource = readFileSync(
+  resolve(projectRoot, 'src/screens/TasksScreen.tsx'),
+  'utf8',
+);
+const reportPaginationSource = readFileSync(
+  resolve(projectRoot, 'src/features/reports/useReportPagination.ts'),
   'utf8',
 );
 const mainTabsSource = readFileSync(
@@ -53,14 +93,84 @@ assert.match(
   /styles\.deploymentPill,\s*\{ backgroundColor: colors\.surface, borderColor: colors\.border \}/s,
 );
 assert.match(
+  nativeMapSource,
+  /androidView="texture"/,
+  'The Android map must use a composited TextureView so tab slides do not expose a SurfaceView blink',
+);
+assert.match(
   officerMapSource,
   /styles\.assignmentCard,\s*\{ backgroundColor: colors\.surface, borderColor: colors\.border \}/s,
 );
 assert.match(swipeSheetSource, /\{ backgroundColor: colors\.surface \}/);
 assert.match(
   reportsSource,
-  /<FlatList\s+key=\{`reports-\$\{filter\}`\}/s,
-  'Changing report filters must remount the virtualized list so stale cell measurements are discarded',
+  /accessibilityLabel="Create new report"[\s\S]*<Icon name="add"[\s\S]*>New Report<\/Text>/,
+  'The Reports header must label its primary action as New Report instead of showing an unlabeled plus icon',
+);
+assert.match(
+  reportCardSource,
+  /chevronProgress\.value \* 180[\s\S]*<SmoothCollapsible expanded=\{expanded\}>/,
+  'Report cards must animate measured height and chevron rotation instead of abruptly mounting details',
+);
+assert.match(
+  reportCardSource,
+  /card: \{[\s\S]*?borderWidth: 0[\s\S]*?shadowOpacity: 0\.11[\s\S]*?elevation: 4 \},\s*cardDark:/,
+  'Report cards must float on tonal surfaces without a neutral outer outline',
+);
+assert.match(
+  taskCardSource,
+  /card: \{[\s\S]*?borderWidth: 0[\s\S]*?shadowOpacity: 0\.11[\s\S]*?elevation: 4 \},\s*cardBackup:/,
+  'Task cards must float on tonal surfaces without a neutral outer outline',
+);
+assert.match(
+  upcomingShiftCardSource,
+  /card: \{[\s\S]*borderWidth: 0,[\s\S]*borderLeftWidth: 3,[\s\S]*elevation: 4/,
+  'Upcoming shifts must retain their category accent while removing the neutral card outline',
+);
+assert.match(
+  reportsSource,
+  /datePresetChip: \{[\s\S]*?borderColor: 'transparent'[\s\S]*?elevation: 2,[\s\S]*?datePresetChipActive: \{ borderColor: mobileTheme\.blue/,
+  'Inactive date filters must float without a neutral outline while the selected filter keeps its blue state',
+);
+assert.match(
+  tasksSource,
+  /filterButton: \{[\s\S]*?borderColor: 'transparent'[\s\S]*?backgroundColor: mobileTheme\.surfaceMuted[\s\S]*?filterButtonActive: \{ borderColor: mobileTheme\.blue/,
+  'Inactive task filters must float without neutral outlines while the selected filter keeps its blue state',
+);
+assert.match(
+  slidingTabsSource,
+  /INDICATOR_DURATION_MS = 190[\s\S]*withTiming\(selectedIndex \* tabWidth[\s\S]*translateX: indicatorX\.value/,
+  'All, Incident, and Routine must use the lightweight sliding underline',
+);
+assert.match(
+  reportsSource,
+  /transitionIndex=\{index\}[\s\S]*transitionProgress=\{reportListReveal\}[\s\S]*items=\{reportFilters\}[\s\S]*removeClippedSubviews=\{false\}/,
+  'Report filter changes must retain the list and pass the lightweight reveal to each card',
+);
+assert.match(
+  reportCardSource,
+  /CONTENT_REVEAL_DURATION_MS = 180[\s\S]*contentReveal\.value = withTiming\(1[\s\S]*Math\.min\(transitionProgress\?\.value \?\? 1, contentReveal\.value\)[\s\S]*opacity: 0\.78[\s\S]*translateX:/,
+  'New report data must animate at card level when a cached or refreshed filter view arrives',
+);
+assert.doesNotMatch(
+  reportsSource,
+  /key=\{`reports-\$\{filter\}`\}/,
+  'Report filter changes must not remount the full list because that causes a visible blink',
+);
+assert.match(
+  reportsSource,
+  /runReportListTransition[\s\S]*selectFilter[\s\S]*runReportListTransition\([\s\S]*selectDatePreset[\s\S]*runReportListTransition\(/,
+  'Category and date filters must share the same lightweight slide transition',
+);
+assert.match(
+  reportPaginationSource,
+  /REPORT_VIEW_CACHE_TTL_MS = 60_000[\s\S]*reportViewCache[\s\S]*exactCacheIsFresh[\s\S]*!options\.force/,
+  'Report views must reuse fresh category and date caches before background revalidation',
+);
+assert.match(
+  reportCardSource,
+  /viewButton: \{[\s\S]*?borderColor: '#b7d2ff'[\s\S]*?backgroundColor: '#e8f1ff'[\s\S]*?viewText: \{ color: mobileTheme\.blue/,
+  'The expanded report View action must remain visible against the light theme',
 );
 assert.doesNotMatch(
   reportsSource,
@@ -123,6 +233,31 @@ assert.match(
   'The report form must explain how the incident location was selected',
 );
 assert.match(
+  reportsSource,
+  /backupContextCard: \{[\s\S]*borderColor: 'transparent'[\s\S]*elevation: 4[\s\S]*typeOption: \{[\s\S]*borderColor: 'transparent'[\s\S]*input: \{[\s\S]*borderColor: 'transparent'[\s\S]*severityButton: \{[\s\S]*borderColor: 'transparent'/,
+  'Submit Report cards, fields, and inactive selectors must use floating tonal surfaces without neutral outlines',
+);
+assert.match(
+  reportLocationSource,
+  /select: \{[\s\S]*borderColor: 'transparent'[\s\S]*input: \{[\s\S]*borderColor: 'transparent'[\s\S]*mapButton: \{[\s\S]*borderColor: 'transparent'[\s\S]*floatingSurfaceDark:/,
+  'Submit Report location controls must retain the floating treatment in both themes',
+);
+assert.match(
+  reportEvidenceSource,
+  /preview: \{[\s\S]*borderColor: 'transparent'[\s\S]*captureButton: \{[\s\S]*borderColor: 'transparent'[\s\S]*floatingSurfaceDark:/,
+  'Submit Report evidence controls must use floating tonal surfaces',
+);
+assert.match(
+  reportDateTimeSource,
+  /borderColor: 'transparent'[\s\S]*shadowOpacity: 0\.1[\s\S]*inputDark:/,
+  'Submit Report date and time must use the same floating field treatment',
+);
+assert.match(
+  loginSource,
+  /AnimatedTouchableOpacity[\s\S]*LOGIN_PRESS_OUT_SPRING[\s\S]*Animated\.spring\(scale[\s\S]*springTo\(0\.97[\s\S]*formPanel: \{[\s\S]*borderColor: 'transparent'[\s\S]*elevation: 10[\s\S]*input: \{[\s\S]*borderColor: 'transparent'[\s\S]*elevation: 3[\s\S]*submit: \{[\s\S]*elevation: 6/,
+  'The login panel, fields, and primary actions must retain floating depth and a subtle spring press',
+);
+assert.match(
   mainTabsSource,
   /const bottomOffset = Math\.max\([\s\S]*insets\.bottom \+ TAB_BAR_SYSTEM_GAP/,
   'The floating tab bar must stay above Android gesture and three-button navigation areas',
@@ -131,6 +266,46 @@ assert.match(
   mainTabsSource,
   /TAB_BAR_SYSTEM_GAP = 4[\s\S]*floatingBar:[\s\S]*height:\s*52[\s\S]*tabItem:[\s\S]*height:\s*52/,
   'Bottom navigation must stay compact while retaining a touch target above the Android safe area',
+);
+assert.match(
+  mainTabsSource,
+  /PAGE_TRANSITION_DURATION_MS = 170[\s\S]*animation: route\.name === 'Tasks' \? 'none' : 'shift'[\s\S]*duration: PAGE_TRANSITION_DURATION_MS[\s\S]*freezeOnBlur: false/,
+  'Full screens must use a short retained-scene transition while Tasks remains a modal',
+);
+assert.match(
+  mainTabsSource,
+  /PAGE_TRANSITION_DISTANCE_PX = 10[\s\S]*forLightweightPageSlide[\s\S]*translateX:[\s\S]*-PAGE_TRANSITION_DISTANCE_PX[\s\S]*PAGE_TRANSITION_DISTANCE_PX[\s\S]*sceneStyleInterpolator: route\.name === 'Tasks'/,
+  'Page changes must retain both scenes and use only ten pixels of horizontal travel',
+);
+assert.doesNotMatch(
+  mainTabsSource,
+  /sceneStyle:\s*\{\s*opacity:/,
+  'Full-screen opacity transitions expose the navigator background as a visible blink',
+);
+assert.match(
+  swipeSheetSource,
+  /CLOSE_DURATION = 260[\s\S]*damping: 24[\s\S]*stiffness: 220[\s\S]*mass: 0\.8[\s\S]*overshootClamping: false[\s\S]*decelerationRate=\{decelerationRate \?\? 'fast'\}[\s\S]*Platform\.OS === 'android' \? 'never'/,
+  'Shared sheets must keep lightweight motion and Android scroll settings',
+);
+assert.match(
+  swipeSheetSource,
+  /translateY\.value = withSpring\(initiallyExpanded \? 0 : lowerSnap\.value, SNAP_SPRING\)/,
+  'Shared sheets must enter with a subtle spring instead of a rigid timing animation',
+);
+assert.match(
+  swipeSheetSource,
+  /dismissible \? \([\s\S]*accessibilityLabel="Close panel"[\s\S]*styles\.closeButton[\s\S]*name="close"[\s\S]*handleTouchArea: \{[\s\S]*height: 44[\s\S]*closeButton: \{[\s\S]*top: 12[\s\S]*right: 12[\s\S]*borderWidth: 1,[\s\S]*borderRadius: 16/,
+  'Dismissible slide-up sheets must center a circular bordered close button on the upper-right curve',
+);
+assert.match(
+  mainTabsSource,
+  /Animated\.timing\(activeIndicatorX[\s\S]*translateX: activeIndicatorX/,
+  'The active bottom-navigation indicator must glide between tabs',
+);
+assert.match(
+  mainTabsSource,
+  /borderBottomLeftRadius: 20[\s\S]*borderBottomRightRadius: 20[\s\S]*borderBottomWidth: 1/,
+  'The page header must keep a visible rounded lower edge in light and dark themes',
 );
 assert.doesNotMatch(
   profileSource,

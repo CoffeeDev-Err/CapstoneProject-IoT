@@ -17,6 +17,8 @@ const app = read('App.tsx');
 const profile = read('src/screens/OfficerProfileScreen.tsx');
 const mapCache = read('src/services/mapCache.ts');
 const webMapCache = read('src/services/mapCache.web.ts');
+const operationsCache = read('src/services/offlineOperationsCache.ts');
+const webOperationsCache = read('src/services/offlineOperationsCache.web.ts');
 const backendModel = read('../backend/src/models/index.js')
   + read('../backend/src/models/operationalModels.js');
 const backendController = read('../backend/src/controllers/operationalController.js')
@@ -66,6 +68,14 @@ assert.doesNotMatch(webQueue, /expo-sqlite/,
   'Web UI previews must not bundle the native SQLite queue');
 assert.doesNotMatch(webQueue, /offlineQueueCipher|expo-crypto/,
   'Web UI previews must not bundle the native offline-queue cipher');
+assert.match(operationsCache, /CREATE TABLE IF NOT EXISTS operational_cache/,
+  'Task, report, and deployment snapshots must survive an app restart');
+assert.match(operationsCache, /sealReportPayload\(JSON\.stringify\(data\)\)/,
+  'Operational snapshots must be encrypted before they reach SQLite');
+assert.match(operationsCache, /JSON\.parse\(await openReportPayload\(row\.payload_json\)\)/,
+  'Operational snapshots must be decrypted through the device-bound cipher');
+assert.doesNotMatch(webOperationsCache, /expo-sqlite|offlineQueueCipher/,
+  'Web UI previews must not bundle the native encrypted operational cache');
 assert.match(queue, /await sealReportPayload\([\s\S]*JSON\.stringify\(stagedInput\),[\s\S]*allowKeyCreation: !existingEncryptedRow/,
   'Staged report payloads must be encrypted before they reach SQLite');
 assert.doesNotMatch(queue, /payload_json:\s*JSON\.stringify|JSON\.parse\(row\.payload_json\)/,
