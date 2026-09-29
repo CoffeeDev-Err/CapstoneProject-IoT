@@ -36,3 +36,10 @@ it('provides retry on failure and ignores a response for a closed report', async
   await act(() => resolve({ report }));
   expect(result.current.selectedReport).toBeNull();
 });
+it('keeps cached report details visible when the network request fails', async () => {
+  jest.mocked(fetchPoliceReport).mockRejectedValue(new Error('Network request failed'));
+  const { result } = await renderHook(() => useReportDetails('session', [report]));
+  await act(() => result.current.openReport('RPT-OLD'));
+  await waitFor(() => expect(result.current.error).toBeTruthy());
+  expect(result.current.selectedReport).toEqual(report);
+});

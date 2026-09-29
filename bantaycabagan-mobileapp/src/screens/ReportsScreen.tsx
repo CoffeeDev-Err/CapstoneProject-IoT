@@ -26,7 +26,15 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { ReportLocationPickerModal } from '../components/ReportLocationPickerModal';
 import {
   SheetScrollView,
@@ -49,10 +57,17 @@ import { ReportEvidenceField } from '../features/reports/ReportEvidenceField';
 import { ReportResolutionSheet } from '../features/reports/ReportResolutionSheet';
 import { ReportLocationFields } from '../features/reports/ReportLocationFields';
 import { useReportFormController } from '../features/reports/useReportFormController';
+import { OfflineDataNotice } from '../components/OfflineDataNotice';
+import { SlidingUnderlineTabs } from '../components/SlidingUnderlineTabs';
+import { PAGE_HEADER_CONTENT_HEIGHT } from '../components/PolicePageHeader';
 
 const reportTypes = REPORT_TYPES;
 const reportFilters = REPORT_FILTERS;
-const PAGE_HEADER_CONTENT_HEIGHT = 54;
+const REPORT_LIST_TRANSITION_MS = 180;
+const REPORT_LIST_TRANSITION_EASING = Easing.bezier(0.2, 0, 0, 1);
+const PRESS_IN_SPRING = { damping: 18, stiffness: 380, mass: 0.55 };
+const PRESS_OUT_SPRING = { damping: 12, stiffness: 260, mass: 0.55 };
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 type ReportDatePreset = 'all' | 'today' | '7days' | '30days';
 
 const datePresetLabels: Record<ReportDatePreset, string> = {
@@ -61,6 +76,11 @@ const datePresetLabels: Record<ReportDatePreset, string> = {
   '7days': '7 days',
   '30days': '30 days',
 };
+
+const reportViewCacheKey = (
+  category: (typeof reportFilters)[number],
+  preset: ReportDatePreset,
+) => `${category}:${preset}`;
 
 const dateRangeFor = (preset: ReportDatePreset) => {
   if (preset === 'all') return {};
@@ -89,6 +109,7 @@ export default function ReportsScreen() {
     reportsError,
     isReportsLoading,
     isReportsLoadingMore,
+    isReportsOffline,
   } = useOperationalContext();
   const {
     barangayPickerVisible,
@@ -157,6 +178,26 @@ export default function ReportsScreen() {
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
   const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
+  const reportListRef = useRef<FlatList<PoliceReport>>(null);
+  const reportListReveal = useSharedValue(1);
+  const reportListDirection = useSharedValue(1);
+  const createReportScale = useSharedValue(1);
+  const submitReportScale = useSharedValue(1);
+  const createReportPressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: createReportScale.value }],
+  }));
+  const submitReportPressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: submitReportScale.value }],
+  }));
+  const runReportListTransition = useCallback((direction: number) => {
+    reportListDirection.value = direction;
+    cancelAnimation(reportListReveal);
+    reportListReveal.value = 0;
+    reportListReveal.value = withTiming(1, {
+      duration: REPORT_LIST_TRANSITION_MS,
+      easing: REPORT_LIST_TRANSITION_EASING,
+    });
+  }, [reportListDirection, reportListReveal]);
   const toggleReport = useCallback((reportId: string) => {
     setExpandedReportIds((current) => {
       const next = new Set(current);
@@ -168,25 +209,43 @@ export default function ReportsScreen() {
 
   const selectFilter = useCallback((nextFilter: (typeof reportFilters)[number]) => {
     if (nextFilter === filter) return;
+    runReportListTransition(reportFilters.indexOf(nextFilter) > reportFilters.indexOf(filter) ? 1 : -1);
+    setExpandedReportIds(new Set());
+    reportListRef.current?.scrollToOffset({ animated: false, offset: 0 });
     setFilter(nextFilter);
-    refreshReports(nextFilter, dateRangeFor(datePreset)).catch(() => undefined);
-  }, [datePreset, filter, refreshReports]);
+    refreshReports(nextFilter, dateRangeFor(datePreset), {
+      cacheKey: reportViewCacheKey(nextFilter, datePreset),
+    }).catch(() => undefined);
+  }, [datePreset, filter, refreshReports, runReportListTransition]);
 
   const selectDatePreset = useCallback((nextPreset: ReportDatePreset) => {
     if (nextPreset === datePreset) return;
+    const presets = Object.keys(datePresetLabels) as ReportDatePreset[];
+    runReportListTransition(presets.indexOf(nextPreset) > presets.indexOf(datePreset) ? 1 : -1);
+    setExpandedReportIds(new Set());
+    reportListRef.current?.scrollToOffset({ animated: false, offset: 0 });
     setDatePreset(nextPreset);
-    refreshReports(filter, dateRangeFor(nextPreset)).catch(() => undefined);
-  }, [datePreset, filter, refreshReports]);
+    refreshReports(filter, dateRangeFor(nextPreset), {
+      cacheKey: reportViewCacheKey(filter, nextPreset),
+    }).catch(() => undefined);
+  }, [datePreset, filter, refreshReports, runReportListTransition]);
 
-  const renderReport = useCallback(({ item }: { item: PoliceReport }) => (
+  const handleViewReport = useCallback((report: PoliceReport) => {
+    openReport(report.id);
+    refreshDetail();
+  }, [openReport, refreshDetail]);
+  const renderReport = useCallback(({ item, index }: { item: PoliceReport; index: number }) => (
     <ReportCard
       expanded={expandedReportIds.has(item.id)}
       onResolve={setResolveTarget}
       onToggle={toggleReport}
-      onView={(report) => { openReport(report.id); refreshDetail(); }}
+      onView={handleViewReport}
       report={item}
+      transitionDirection={reportListDirection}
+      transitionIndex={index}
+      transitionProgress={reportListReveal}
     />
-  ), [expandedReportIds, toggleReport, openReport, refreshDetail, setResolveTarget]);
+  ), [expandedReportIds, handleViewReport, reportListDirection, reportListReveal, setResolveTarget, toggleReport]);
 
   const isValidatedCorrection = editTarget?.validation_status === 'validated';
   const formSubmitLabel = isSaving
@@ -200,32 +259,26 @@ export default function ReportsScreen() {
           <Text style={[styles.title, isDark && themeStyles.text]}>Reports</Text>
           <Text style={[styles.subtitle, isDark && themeStyles.muted]}>Your submitted report history</Text>
         </View>
-         <TouchableOpacity style={styles.submitButton} onPress={() => { void openSubmitForm(); }}>
+         <AnimatedTouchableOpacity
+          accessibilityLabel="Create new report"
+          accessibilityRole="button"
+          activeOpacity={1}
+          style={[styles.submitButton, createReportPressStyle]}
+          onPressIn={() => { createReportScale.value = withSpring(0.95, PRESS_IN_SPRING); }}
+          onPressOut={() => { createReportScale.value = withSpring(1, PRESS_OUT_SPRING); }}
+          onPress={() => { void openSubmitForm(); }}
+        >
           <Icon name="add" size={19} color="#ffffff" />
-        </TouchableOpacity>
+          <Text style={styles.submitButtonText}>New Report</Text>
+        </AnimatedTouchableOpacity>
       </View>
 
-      <View style={styles.filters}>
-        {reportFilters.map((item) => (
-          <TouchableOpacity
-            key={item}
-            style={[
-              styles.filterButton,
-              isDark && themeStyles.filterButton,
-              filter === item && styles.filterButtonActive,
-              isDark && filter === item && themeStyles.filterButtonActive,
-            ]}
-            onPress={() => selectFilter(item)}
-          >
-            <Text style={[
-              styles.filterText,
-              isDark && themeStyles.muted,
-              filter === item && styles.filterTextActive,
-              isDark && filter === item && themeStyles.text,
-            ]}>{item}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <SlidingUnderlineTabs
+        items={reportFilters}
+        onSelect={selectFilter}
+        selected={filter}
+        style={styles.filters}
+      />
 
       <View style={styles.dateFilterRow}>
         <ScrollView
@@ -269,10 +322,21 @@ export default function ReportsScreen() {
         </ScrollView>
       </View>
 
+      {isReportsOffline && reports.length > 0 ? (
+        <OfflineDataNotice
+          message="Showing reports saved on this device. Connect to retrieve updates, photos, and complete online actions."
+          onRetry={() => refreshReports(filter, dateRangeFor(datePreset), {
+            cacheKey: reportViewCacheKey(filter, datePreset), force: true,
+          }).catch(() => undefined)}
+          retrying={isReportsLoading}
+        />
+      ) : null}
+
       <View style={styles.listTransition}>
         <FlatList
-          key={`reports-${filter}`}
+          ref={reportListRef}
           data={reports}
+          extraData={[filter, datePreset, expandedReportIds]}
           keyExtractor={(item) => item.id}
           renderItem={renderReport}
           style={styles.listViewport}
@@ -288,7 +352,7 @@ export default function ReportsScreen() {
                 <Text style={styles.listFooterError}>{reportsError}</Text>
               ) : null}
               <TouchableOpacity
-                style={[styles.loadMoreButton, isDark && themeStyles.surfaceMuted]}
+                style={[styles.loadMoreButton, isDark && themeStyles.floatingButton]}
                 onPress={() => loadMoreReports().catch(() => undefined)}
                 disabled={isReportsLoadingMore}
               >
@@ -325,7 +389,9 @@ export default function ReportsScreen() {
               {!isReportsLoading && reportsError ? (
                 <TouchableOpacity
                   style={styles.retryButton}
-                  onPress={() => refreshReports(filter, dateRangeFor(datePreset)).catch(() => undefined)}
+                  onPress={() => refreshReports(filter, dateRangeFor(datePreset), {
+                    cacheKey: reportViewCacheKey(filter, datePreset), force: true,
+                  }).catch(() => undefined)}
                 >
                   <Icon name="refresh" size={17} color="#ffffff" />
                   <Text style={styles.retryButtonText}>Try again</Text>
@@ -367,7 +433,7 @@ export default function ReportsScreen() {
             {form.backup_context ? (
               <View style={[
                 styles.backupContextCard,
-                { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                isDark && themeStyles.formFloatingDark,
               ]}>
                 <View style={styles.backupContextHeader}>
                   <View style={styles.backupContextIcon}>
@@ -409,7 +475,7 @@ export default function ReportsScreen() {
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type}
-                  style={[styles.typeOption, isDark && themeStyles.surfaceMuted, form.report_type === type && styles.typeOptionActive]}
+                  style={[styles.typeOption, isDark && themeStyles.formFloatingDark, form.report_type === type && styles.typeOptionActive]}
                   disabled={Boolean(form.backup_task_id)}
                   onPress={() => updateForm('report_type', type)}
                 >
@@ -421,13 +487,13 @@ export default function ReportsScreen() {
             </View>
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>TITLE</Text>
-            <TextInput style={[styles.input, isDark && themeStyles.input]} value={form.title} onChangeText={(value) => updateForm('title', value)} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[styles.input, isDark && themeStyles.formInputDark]} value={form.title} onChangeText={(value) => updateForm('title', value)} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>INCIDENT / ACTIVITY DATE AND TIME</Text>
             <ReportDateTimeField value={form.occurred_at} onChange={(value) => updateForm('occurred_at', value)} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>ASSIGNED AREA</Text>
-            <View style={[styles.autoField, isDark && themeStyles.input]}>
+            <View style={[styles.autoField, isDark && themeStyles.formInputDark]}>
               <Icon name="assignment-ind" size={18} color={mobileTheme.purple} />
               <Text style={[styles.autoFieldText, isDark && themeStyles.text]}>
                 {form.assigned_area || 'No active deployment assigned'}
@@ -447,7 +513,7 @@ export default function ReportsScreen() {
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>DESCRIPTION</Text>
             <TextInput
-              style={[styles.input, styles.textArea, isDark && themeStyles.input]}
+              style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]}
               value={form.description}
               onChangeText={(value) => updateForm('description', value)}
               maxLength={REPORT_FIELD_LIMITS.description}
@@ -489,7 +555,7 @@ export default function ReportsScreen() {
                   {[1, 2, 3, 4, 5].map((severity) => (
                     <TouchableOpacity
                       key={severity}
-                      style={[styles.severityButton, isDark && themeStyles.surfaceMuted, form.severity === severity && styles.severityButtonActive]}
+                      style={[styles.severityButton, isDark && themeStyles.formFloatingDark, form.severity === severity && styles.severityButtonActive]}
                       onPress={() => updateForm('severity', severity)}
                     >
                       <Text style={[styles.severityText, form.severity === severity && styles.severityTextActive]}>
@@ -503,7 +569,7 @@ export default function ReportsScreen() {
 
             {editTarget ? <>
               <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REASON FOR CORRECTION</Text>
-              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.input]} value={editReason} onChangeText={setEditReason} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
+              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]} value={editReason} onChangeText={setEditReason} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
             </> : null}
             <View style={styles.formActions}>
               <TouchableOpacity
@@ -514,14 +580,17 @@ export default function ReportsScreen() {
               >
                 <Text style={[styles.formCancelButtonText, { color: colors.danger }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <AnimatedTouchableOpacity
                 accessibilityRole="button"
-                style={[styles.primaryButton, styles.formPrimaryButton]}
+                activeOpacity={1}
+                style={[styles.primaryButton, styles.formPrimaryButton, submitReportPressStyle]}
+                onPressIn={() => { submitReportScale.value = withSpring(0.96, PRESS_IN_SPRING); }}
+                onPressOut={() => { submitReportScale.value = withSpring(1, PRESS_OUT_SPRING); }}
                 onPress={() => handleSubmit(close)}
                 disabled={isSaving}
               >
                 <Text style={styles.primaryButtonText}>{formSubmitLabel}</Text>
-              </TouchableOpacity>
+              </AnimatedTouchableOpacity>
             </View>
           </SheetScrollView>
           </SafeAreaView>
@@ -596,11 +665,18 @@ export default function ReportsScreen() {
           <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Report Details</Text>
         </View>
         {detailLoading ? <ActivityIndicator accessibilityLabel="Loading report details" style={{ padding: 20 }} color={mobileTheme.blue} /> : null}
-        {detailError ? <View style={{ padding: 20 }}>
+        {detailError && !selectedReport ? <View style={{ padding: 20 }}>
           <Text accessibilityRole="alert" style={{ color: colors.danger }}>{detailError}</Text>
           <TouchableOpacity onPress={refreshDetail}><Text style={{ color: mobileTheme.blue, paddingVertical: 12 }}>Try again</Text></TouchableOpacity>
         </View> : null}
-        {selectedReport && !detailLoading && !detailError && (
+        {selectedReport && !detailLoading && detailError ? (
+          <OfflineDataNotice
+            title="Showing saved report"
+            message="The latest server copy could not be reached. Photo evidence may require an internet connection."
+            onRetry={refreshDetail}
+          />
+        ) : null}
+        {selectedReport && !detailLoading && (
           <ScrollView
             style={styles.dialogListViewport}
             contentContainerStyle={styles.detailBody}
@@ -713,7 +789,7 @@ function RetainedEvidenceSummary({ report }: { report: PoliceReport }) {
   const latest = corrections.at(-1) || report.evidence_photo;
   const count = (report.evidence_photo ? 1 : 0) + corrections.length;
   return (
-	<View style={[styles.retainedEvidence, isDark && themeStyles.surfaceMuted]}>
+	<View style={[styles.retainedEvidence, isDark && themeStyles.formFloatingDark]}>
 	  {latest?.url ? <CachedImage
 		source={{ uri: resolveApiAssetUrl(latest.url) }}
 		cachePolicy="memory"
@@ -817,7 +893,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 50,
+    borderRadius: 11,
     backgroundColor: mobileTheme.purple,
     shadowColor: '#172554',
     shadowOffset: { width: 0, height: 4 },
@@ -826,7 +902,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   submitButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-  backupContextCard: { marginBottom: 4, padding: 12, borderWidth: 1, borderRadius: 12 },
+  backupContextCard: { marginBottom: 4, padding: 12, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 8, elevation: 4 },
   backupContextHeader: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   backupContextIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: mobileTheme.blue },
   backupContextTitleWrap: { flex: 1 },
@@ -846,8 +922,6 @@ const styles = StyleSheet.create({
   filters: {
     marginHorizontal: 22,
     marginBottom: 16,
-    flexDirection: 'row',
-    gap: 10,
   },
   dateFilterRow: { marginTop: -7, marginBottom: 12 },
   dateFilterChips: {
@@ -864,9 +938,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
     borderWidth: 1,
-    borderColor: mobileTheme.border,
+    borderColor: 'transparent',
     borderRadius: 10,
-    backgroundColor: mobileTheme.surface,
+    backgroundColor: mobileTheme.surfaceMuted,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
   },
   datePresetChipActive: { borderColor: mobileTheme.blue, backgroundColor: '#edf4ff' },
   datePresetChipText: { color: mobileTheme.textMuted, fontSize: 11, fontWeight: '700' },
@@ -958,12 +1037,12 @@ const styles = StyleSheet.create({
   form: { padding: 18, paddingBottom: 36 },
   fieldLabel: { marginTop: 14, marginBottom: 6, color: mobileTheme.textMuted, fontSize: 10, fontWeight: '800' },
   typeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  typeOption: { minHeight: 38, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 19, backgroundColor: mobileTheme.surface },
+  typeOption: { minHeight: 38, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent', borderRadius: 19, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.09, shadowRadius: 5, elevation: 2 },
   typeOptionActive: { borderColor: mobileTheme.purple, backgroundColor: mobileTheme.purpleSoft },
   typeOptionText: { color: mobileTheme.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   typeOptionTextActive: { color: mobileTheme.purple },
-  input: { minHeight: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface, color: mobileTheme.text, fontSize: 13 },
-  autoField: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  input: { minHeight: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, color: mobileTheme.text, fontSize: 13, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 7, elevation: 3 },
+  autoField: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 7, elevation: 3 },
   autoFieldText: { flex: 1, color: mobileTheme.text, fontSize: 13, lineHeight: 18 },
   selectField: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
   placeholderText: { color: mobileTheme.textMuted },
@@ -992,7 +1071,7 @@ const styles = StyleSheet.create({
   evidencePreviewMeta: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 10 },
   evidenceIconButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8 },
 	evidenceCorrectionHint: { marginTop: -4, marginBottom: 8, fontSize: 10, lineHeight: 15 },
-	retainedEvidence: { minHeight: 76, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+	retainedEvidence: { minHeight: 76, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 8, elevation: 4 },
 	retainedEvidenceImage: { width: 64, height: 58, borderRadius: 8, backgroundColor: mobileTheme.background },
 	retainedEvidencePlaceholder: { width: 64, height: 58, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 8 },
 	retainedEvidenceCopy: { flex: 1 },
@@ -1001,7 +1080,7 @@ const styles = StyleSheet.create({
   retakeButton: { minHeight: 42, marginHorizontal: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 8 },
   retakeButtonText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
   severityOptions: { flexDirection: 'row', gap: 8 },
-  severityButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 21, backgroundColor: mobileTheme.surface },
+  severityButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent', borderRadius: 21, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 2 },
   severityButtonActive: { borderColor: mobileTheme.purple, backgroundColor: mobileTheme.purple },
   severityText: { color: mobileTheme.textMuted, fontWeight: '800' },
   severityTextActive: { color: '#ffffff' },
@@ -1009,7 +1088,7 @@ const styles = StyleSheet.create({
   formCancelButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 24 },
   formCancelButtonText: { fontSize: 13, fontWeight: '800' },
   formPrimaryButton: { flex: 1.45, marginTop: 0, paddingHorizontal: 12 },
-  primaryButton: { minHeight: 48, marginTop: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: mobileTheme.purple },
+  primaryButton: { minHeight: 48, marginTop: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: mobileTheme.purple, shadowColor: '#172554', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.24, shadowRadius: 8, elevation: 5 },
   primaryButtonCompact: { minHeight: 44, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: mobileTheme.success },
   primaryButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   dialogOverlay: {
@@ -1090,6 +1169,9 @@ const themeStyles = StyleSheet.create({
   muted: { color: '#9eabc0' },
   border: { borderColor: '#22314a' },
   input: { borderColor: '#2a3a56', backgroundColor: '#0e1a30', color: '#f8fafc' },
-  filterButton: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  formInputDark: { borderColor: 'transparent', backgroundColor: '#101f38', color: '#f8fafc', shadowColor: '#000000', shadowOpacity: 0.36, elevation: 4 },
+  formFloatingDark: { borderColor: 'transparent', backgroundColor: '#101f38', shadowColor: '#000000', shadowOpacity: 0.38, elevation: 5 },
+  filterButton: { borderColor: 'transparent', backgroundColor: '#101f38', shadowColor: '#000000', shadowOpacity: 0.38, elevation: 3 },
   filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#132442' },
+  floatingButton: { backgroundColor: '#0e1a30', shadowColor: '#000000', shadowOpacity: 0.28 },
 });

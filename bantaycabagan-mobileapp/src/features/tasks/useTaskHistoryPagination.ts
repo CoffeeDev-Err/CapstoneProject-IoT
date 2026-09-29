@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { fetchTaskHistoryPage } from '../../services/operationsApi';
+import { loadCachedTasks, saveCachedTasks } from '../../services/offlineOperationsCache';
 import type { OperationalTask } from '../../types/operations';
 import { isActiveTask, mergeById } from '../operations/operationalState';
 
@@ -17,6 +18,7 @@ export function useTaskHistoryPagination({
   const [isTaskHistoryLoading, setIsTaskHistoryLoading] = useState(false);
   const [isTaskHistoryLoadingMore, setIsTaskHistoryLoadingMore] = useState(false);
   const [taskHistoryHasMore, setTaskHistoryHasMore] = useState(false);
+  const [isTaskHistoryOffline, setIsTaskHistoryOffline] = useState(false);
   const [taskHistoryCursor, setTaskHistoryCursor] = useState<string | null>(null);
   const taskHistoryRequestId = useRef(0);
 
@@ -24,6 +26,7 @@ export function useTaskHistoryPagination({
     taskHistoryRequestId.current += 1;
     setTaskHistoryCursor(null);
     setTaskHistoryHasMore(false);
+    setIsTaskHistoryOffline(false);
   }, []);
 
   const refreshTaskHistory = useCallback(async () => {
@@ -37,6 +40,19 @@ export function useTaskHistoryPagination({
       setTasks((items) => mergeById(items.filter(isActiveTask), payload.data));
       setTaskHistoryCursor(payload.pagination.nextCursor);
       setTaskHistoryHasMore(payload.pagination.hasNextPage);
+      setIsTaskHistoryOffline(false);
+      void saveCachedTasks(currentPersonnelId, payload.data).catch(() => undefined);
+    } catch (error) {
+      if (requestId !== taskHistoryRequestId.current) return;
+      const cached = await loadCachedTasks(currentPersonnelId).catch(() => null);
+      if (cached) {
+        setTasks((items) => mergeById(items.filter(isActiveTask), cached.data.filter((task) => !isActiveTask(task))));
+        setTaskHistoryCursor(null);
+        setTaskHistoryHasMore(false);
+        setIsTaskHistoryOffline(true);
+        return;
+      }
+      throw error;
     } finally {
       if (requestId === taskHistoryRequestId.current) setIsTaskHistoryLoading(false);
     }
@@ -53,6 +69,18 @@ export function useTaskHistoryPagination({
       setTasks((items) => mergeById(items, payload.data));
       setTaskHistoryCursor(payload.pagination.nextCursor);
       setTaskHistoryHasMore(payload.pagination.hasNextPage);
+      setIsTaskHistoryOffline(false);
+      void saveCachedTasks(currentPersonnelId, payload.data).catch(() => undefined);
+    } catch (error) {
+      const cached = await loadCachedTasks(currentPersonnelId).catch(() => null);
+      if (cached) {
+        setTasks((items) => mergeById(items, cached.data.filter((task) => !isActiveTask(task))));
+        setTaskHistoryCursor(null);
+        setTaskHistoryHasMore(false);
+        setIsTaskHistoryOffline(true);
+      } else {
+        throw error;
+      }
     } finally {
       setIsTaskHistoryLoadingMore(false);
     }
@@ -62,6 +90,7 @@ export function useTaskHistoryPagination({
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,
+    isTaskHistoryOffline,
     refreshTaskHistory,
     loadMoreTaskHistory,
     resetTaskHistoryPagination,

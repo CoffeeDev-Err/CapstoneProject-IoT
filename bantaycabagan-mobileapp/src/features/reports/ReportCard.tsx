@@ -1,10 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  Extrapolation,
+  interpolate,
+  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { mobileTheme } from '../../constants/mobileTheme';
 import { useMobileTheme } from '../../context/ThemeContext';
 import type { PoliceReport } from '../../types/operations';
+import { SmoothCollapsible } from '../tasks/SmoothCollapsible';
 
 type ReportCardProps = {
   expanded: boolean;
@@ -12,19 +22,69 @@ type ReportCardProps = {
   onToggle: (reportId: string) => void;
   onView: (report: PoliceReport) => void;
   report: PoliceReport;
+  transitionDirection?: SharedValue<number>;
+  transitionIndex?: number;
+  transitionProgress?: SharedValue<number>;
 };
 
-const contentEnter = FadeIn.duration(170);
-const contentExit = FadeOut.duration(130);
+const EXPANSION_DURATION_MS = 230;
+const EXPANSION_EASING = Easing.bezier(0.2, 0, 0, 1);
+const CONTENT_REVEAL_DURATION_MS = 180;
 
-export function ReportCard({ expanded, onResolve, onToggle, onView, report }: ReportCardProps) {
+export const ReportCard = React.memo(function ReportCard({
+  expanded,
+  onResolve,
+  onToggle,
+  onView,
+  report,
+  transitionDirection,
+  transitionIndex = 0,
+  transitionProgress,
+}: ReportCardProps) {
   const { colors, isDark } = useMobileTheme();
   const canResolve = report.is_incident && report.case_status !== 'resolved';
+  const chevronProgress = useSharedValue(expanded ? 1 : 0);
+  const contentReveal = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(contentReveal);
+    contentReveal.value = 0;
+    contentReveal.value = withTiming(1, {
+      duration: CONTENT_REVEAL_DURATION_MS,
+      easing: EXPANSION_EASING,
+    });
+  }, [contentReveal, report.id]);
+  useEffect(() => {
+    cancelAnimation(chevronProgress);
+    chevronProgress.value = withTiming(expanded ? 1 : 0, {
+      duration: EXPANSION_DURATION_MS,
+      easing: EXPANSION_EASING,
+    });
+  }, [chevronProgress, expanded]);
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronProgress.value * 180}deg` }],
+  }));
+  const transitionStyle = useAnimatedStyle(() => {
+    const rawProgress = Math.min(transitionProgress?.value ?? 1, contentReveal.value);
+    const staggerStart = Math.min(transitionIndex, 6) * 0.045;
+    const itemProgress = interpolate(
+      rawProgress,
+      [staggerStart, Math.min(1, staggerStart + 0.68)],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+    return {
+      opacity: 0.78 + (itemProgress * 0.22),
+      transform: [{
+        translateX: (1 - itemProgress) * (transitionDirection?.value ?? 1) * 10,
+      }],
+    };
+  });
   return (
-    <View style={[
+    <Animated.View style={[
       styles.card,
-      isDark && { backgroundColor: colors.surface },
+      isDark && styles.cardDark,
       report.is_incident ? styles.incident : styles.routine,
+      transitionStyle,
     ]}>
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded }}
         activeOpacity={0.76} onPress={() => onToggle(report.id)}>
@@ -41,7 +101,9 @@ export function ReportCard({ expanded, onResolve, onToggle, onView, report }: Re
                 <Text style={styles.caseBadgeText}>{report.case_status}</Text>
               </View>
             )}
-            <Icon name={expanded ? 'expand-less' : 'expand-more'} size={21} color={colors.textMuted} />
+            <Animated.View style={chevronStyle}>
+              <Icon name="expand-more" size={21} color={colors.textMuted} />
+            </Animated.View>
           </View>
         </View>
         <Text style={[styles.title, { color: colors.text }]}>{report.title}</Text>
@@ -55,9 +117,8 @@ export function ReportCard({ expanded, onResolve, onToggle, onView, report }: Re
           <Text style={[styles.location, { color: colors.textMuted }]} numberOfLines={1}>{report.location}</Text>
         </View>
       </TouchableOpacity>
-      {expanded && (
-        <Animated.View entering={contentEnter} exiting={contentExit}
-          style={[styles.expanded, isDark && { borderTopColor: colors.border }]}>
+      <SmoothCollapsible expanded={expanded}>
+        <View style={[styles.expanded, isDark && { borderTopColor: colors.border }]}>
           <Text style={[styles.description, { color: colors.textMuted }]}>
             {report.description || 'No description provided.'}
           </Text>
@@ -68,20 +129,21 @@ export function ReportCard({ expanded, onResolve, onToggle, onView, report }: Re
                 <Text style={styles.resolveText}>Resolve Incident</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={[styles.viewButton, isDark && { backgroundColor: colors.surfaceMuted }]}
+            <TouchableOpacity style={[styles.viewButton, isDark && styles.viewButtonDark]}
               onPress={() => onView(report)}>
-              <Icon name="visibility" size={17} color={mobileTheme.purple} />
+              <Icon name="visibility" size={17} color={mobileTheme.blue} />
               <Text style={styles.viewText}>View</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
-      )}
-    </View>
+        </View>
+      </SmoothCollapsible>
+    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  card: { paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8, backgroundColor: mobileTheme.surface, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  card: { paddingHorizontal: 12, paddingVertical: 9, borderWidth: 0, borderRadius: 10, backgroundColor: mobileTheme.surface, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 10, elevation: 4 },
+  cardDark: { backgroundColor: '#101f38', shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.42, shadowRadius: 12, elevation: 5 },
   incident: { borderLeftWidth: 3, borderLeftColor: mobileTheme.danger },
   routine: { borderLeftWidth: 3, borderLeftColor: mobileTheme.blue },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -103,6 +165,7 @@ const styles = StyleSheet.create({
   actions: { marginTop: 7, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   resolveButton: { minHeight: 36, paddingHorizontal: 11, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, backgroundColor: mobileTheme.success },
   resolveText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
-  viewButton: { minHeight: 36, minWidth: 84, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.blue, borderRadius: 8, backgroundColor: mobileTheme.surface },
-  viewText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
+  viewButton: { minHeight: 36, minWidth: 84, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: '#b7d2ff', borderRadius: 8, backgroundColor: '#e8f1ff', shadowColor: '#1d4ed8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 5, elevation: 2 },
+  viewButtonDark: { borderColor: '#3568b8', backgroundColor: '#17315a', shadowColor: '#000000', shadowOpacity: 0.38 },
+  viewText: { color: mobileTheme.blue, fontSize: 11, fontWeight: '800' },
 });

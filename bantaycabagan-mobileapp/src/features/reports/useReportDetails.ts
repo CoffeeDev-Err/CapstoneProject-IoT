@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PoliceReport } from '../../types/operations';
 import { fetchPoliceReport } from '../../services/operationsApi';
 import { requestErrorMessage } from '../../utils/requestFeedback';
 
 export function useReportDetails(token: string | null, reports: PoliceReport[]) {
+  const reportsRef = useRef(reports);
+  reportsRef.current = reports;
   const [reportId, openReport] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<PoliceReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -12,7 +14,8 @@ export function useReportDetails(token: string | null, reports: PoliceReport[]) 
   const refresh = useCallback(() => setReload((value) => value + 1), []);
   useEffect(() => {
     let active = true;
-    setSelectedReport(null);
+    const cachedReport = reportsRef.current.find((report) => report.id === reportId) || null;
+    setSelectedReport(cachedReport);
     setError('');
     if (!reportId || !token) { setLoading(false); return; }
     setLoading(true);

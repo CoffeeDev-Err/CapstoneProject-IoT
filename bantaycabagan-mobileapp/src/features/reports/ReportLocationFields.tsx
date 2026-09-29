@@ -17,7 +17,7 @@ export function ReportLocationFields({
   form, onEditLocation, onOpenBarangays, onOpenMap, onUseCurrentGps,
 }: ReportLocationFieldsProps) {
   const { colors, isDark } = useMobileTheme();
-  const inputSurface = isDark ? { backgroundColor: colors.surfaceMuted, borderColor: colors.border } : null;
+  const inputSurface = isDark ? styles.floatingSurfaceDark : null;
   const locationSource = form.location_source === 'gps'
     ? "Officer's current GPS"
     : form.location_source === 'backup_request'
@@ -75,18 +75,19 @@ export function ReportLocationFields({
 
 const styles = StyleSheet.create({
   label: { marginTop: 14, marginBottom: 6, fontSize: 10, fontWeight: '800' },
-  select: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  select: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 7, elevation: 3 },
   fieldText: { flex: 1, fontSize: 13, lineHeight: 18 },
-  input: { minHeight: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface, fontSize: 13 },
+  input: { minHeight: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, fontSize: 13, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 7, elevation: 3 },
   assistRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   source: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
   sourceText: { flex: 1, fontSize: 10 },
-  gpsButton: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 18, backgroundColor: mobileTheme.surface },
+  gpsButton: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 18, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#312e81', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 2 },
   gpsText: { color: mobileTheme.purple, fontSize: 10, fontWeight: '800' },
-  mapButton: { minHeight: 70, marginTop: 10, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  mapButton: { minHeight: 70, marginTop: 10, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 8, elevation: 3 },
   mapIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: mobileTheme.purpleSoft },
   mapCopy: { flex: 1 },
   mapTitle: { fontSize: 12, fontWeight: '800' },
   mapMeta: { marginTop: 3, fontSize: 9, lineHeight: 14 },
   helper: { marginTop: 7, fontSize: 10, lineHeight: 15 },
+  floatingSurfaceDark: { borderColor: 'transparent', backgroundColor: '#101f38', shadowColor: '#000000', shadowOpacity: 0.36, elevation: 4 },
 });

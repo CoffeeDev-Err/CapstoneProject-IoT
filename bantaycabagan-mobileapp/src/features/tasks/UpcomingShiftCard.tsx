@@ -116,10 +116,10 @@ export function UpcomingShiftCard({
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 22, paddingBottom: 18 },
   card: {
-    padding: 15, borderWidth: 1, borderColor: mobileTheme.border, borderLeftWidth: 3,
-    borderLeftColor: mobileTheme.blue, borderRadius: 8, backgroundColor: mobileTheme.surface,
-    shadowColor: mobileTheme.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06,
-    shadowRadius: 6, elevation: 2,
+    padding: 15, borderWidth: 0, borderLeftWidth: 3,
+    borderLeftColor: mobileTheme.blue, borderRadius: 10, backgroundColor: mobileTheme.surface,
+    shadowColor: mobileTheme.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11,
+    shadowRadius: 10, elevation: 4,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center' },
   headerActions: { alignItems: 'center', gap: 3 },
@@ -134,15 +134,15 @@ const styles = StyleSheet.create({
   shiftDetailText: { flex: 1 },
   shiftDetailLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
   shiftDetailValue: { marginTop: 2, color: mobileTheme.text, fontSize: 12, fontWeight: '700' },
-  empty: { minHeight: 66, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8, backgroundColor: mobileTheme.surfaceMuted },
+  empty: { minHeight: 66, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 0, borderRadius: 10, backgroundColor: mobileTheme.surfaceMuted, shadowColor: mobileTheme.navy, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.09, shadowRadius: 8, elevation: 3 },
   emptyCopy: { flex: 1 },
   emptyTitle: { color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
   emptyText: { color: mobileTheme.textMuted, fontSize: 11 },
 });
 
 const darkStyles = StyleSheet.create({
-  card: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
-  surfaceMuted: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  card: { backgroundColor: '#101f38', shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.42, shadowRadius: 12, elevation: 5 },
+  surfaceMuted: { backgroundColor: '#101f38', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.36, shadowRadius: 10, elevation: 4 },
   blueSurface: { backgroundColor: '#132442' },
   text: { color: '#f8fafc' },
   muted: { color: '#9eabc0' },

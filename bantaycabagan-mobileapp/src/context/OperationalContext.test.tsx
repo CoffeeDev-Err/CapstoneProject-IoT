@@ -13,9 +13,17 @@ jest.mock('../features/reports/useReportPagination', () => {
   return { useReportPagination: () => state };
 });
 jest.mock('../features/tasks/useTaskHistoryPagination', () => {
-  const state = { resetTaskHistoryPagination: jest.fn() };
+  const state = { resetTaskHistoryPagination: jest.fn(), isTaskHistoryOffline: false };
   return { useTaskHistoryPagination: () => state };
 });
+jest.mock('../services/offlineOperationsCache', () => ({
+  loadCachedOperations: jest.fn(async () => null),
+  loadCachedReports: jest.fn(async () => null),
+  loadCachedTasks: jest.fn(async () => null),
+  saveCachedOperations: jest.fn(async () => undefined),
+  saveCachedReports: jest.fn(async () => undefined),
+  saveCachedTasks: jest.fn(async () => undefined),
+}));
 
 describe('mobile bootstrap recovery', () => {
   it('keeps the successful resource, shows the failure, and recovers on retry', async () => {

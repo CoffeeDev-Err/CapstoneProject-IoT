@@ -30,6 +30,7 @@ import type { OperationalTask } from '../types/operations';
 import { SheetFlatList } from '../components/SwipeDismissSheet';
 import { TaskCard } from '../features/tasks/TaskCard';
 import { UpcomingShiftCard } from '../features/tasks/UpcomingShiftCard';
+import { OfflineDataNotice } from '../components/OfflineDataNotice';
 
 const filters = ['Open', 'Accepted', 'History'] as const;
 
@@ -66,8 +67,11 @@ export default function TasksScreen({
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,
+    isOperationsOffline,
+    isTaskHistoryOffline,
     refreshTaskHistory,
     loadMoreTaskHistory,
+    refreshOperations,
   } = useOperationalContext();
   const [historyError, setHistoryError] = useState('');
   const [filter, setFilter] = useState<(typeof filters)[number]>('Open');
@@ -78,6 +82,8 @@ export default function TasksScreen({
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(() => new Set());
+  const showingOfflineData = isOperationsOffline
+    || (filter === 'History' && isTaskHistoryOffline);
   const filterAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: filterTranslateX.value }],
   }));
@@ -299,10 +305,14 @@ export default function TasksScreen({
                 <Text style={[styles.emptyTitle, isDark && darkStyles.text]}>
                   {(filter === 'History' ? isTaskHistoryLoading : isLoading)
                     ? 'Loading tasks...'
-                    : 'No tasks here'}
+                    : showingOfflineData
+                      ? filter === 'History' ? 'No saved task history' : 'No saved tasks'
+                      : 'No tasks here'}
                 </Text>
                 <Text style={[styles.emptyText, isDark && darkStyles.muted]}>
-                  {filter === 'History'
+                  {showingOfflineData
+                    ? 'Connect to the internet to retrieve the latest task records.'
+                    : filter === 'History'
                     ? 'Completed and cancelled tasks will appear here.'
                     : 'New backup and urgent requests will appear automatically.'}
                 </Text>
@@ -327,13 +337,23 @@ export default function TasksScreen({
                 </View>
                 <Icon name="event" size={22} color={mobileTheme.blue} />
               </View>
+              {showingOfflineData && !historyError ? (
+                <OfflineDataNotice
+                  message="Showing the last tasks and shift information saved on this device. Updates and task actions require internet access."
+                  onRetry={() => {
+                    if (filter === 'History') void reloadHistory();
+                    else void refreshOperations();
+                  }}
+                  retrying={isTaskHistoryLoading || isLoading}
+                />
+              ) : null}
               {filter === 'History' && historyError ? (
-                <View>
-                  <Text accessibilityRole="alert" style={{ color: mobileTheme.danger }}>{historyError}</Text>
-                  <TouchableOpacity onPress={() => { void reloadHistory(); }} disabled={isTaskHistoryLoading}>
-                    <Text style={styles.loadMoreText}>Try again</Text>
-                  </TouchableOpacity>
-                </View>
+                <OfflineDataNotice
+                  title="Tasks unavailable offline"
+                  message="No saved task history is available yet. Connect once to download it for offline viewing."
+                  onRetry={() => { void reloadHistory(); }}
+                  retrying={isTaskHistoryLoading}
+                />
               ) : null}
               <UpcomingShiftCard
                 expanded={upcomingExpanded}
@@ -345,7 +365,7 @@ export default function TasksScreen({
           )}
           ListFooterComponent={filter === 'History' && taskHistoryHasMore ? (
             <TouchableOpacity
-              style={[styles.loadMoreButton, isDark && darkStyles.surfaceMuted]}
+              style={[styles.loadMoreButton, isDark && darkStyles.floatingButton]}
               onPress={() => { setHistoryError(''); void loadMoreTaskHistory().catch((error) => setHistoryError(requestErrorMessage(error, { action: 'load earlier tasks' }))); }}
               disabled={isTaskHistoryLoadingMore}
             >
@@ -402,9 +422,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: mobileTheme.border,
-    borderRadius: 8,
-    backgroundColor: mobileTheme.surface,
+    borderColor: 'transparent',
+    borderRadius: 10,
+    backgroundColor: mobileTheme.surfaceMuted,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
   },
   filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#edf4ff' },
   filterText: { color: mobileTheme.navy, fontSize: 12, fontWeight: '700' },
@@ -434,10 +459,11 @@ const darkStyles = StyleSheet.create({
   screen: { backgroundColor: '#050b18' },
   surface: { borderColor: '#22314a', backgroundColor: '#0b1528' },
   surfaceMuted: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  floatingButton: { backgroundColor: '#0e1a30', shadowColor: '#000000', shadowOpacity: 0.28 },
   text: { color: '#f8fafc' },
   muted: { color: '#9eabc0' },
   border: { borderColor: '#22314a' },
-  filterButton: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  filterButton: { borderColor: 'transparent', backgroundColor: '#101f38', shadowColor: '#000000', shadowOpacity: 0.38, elevation: 3 },
   filterButtonActive: { borderColor: mobileTheme.blue, backgroundColor: '#132442' },
   regularStickyHeader: { backgroundColor: '#050b18' },
   regularStickyHeaderModal: { backgroundColor: '#0b1528' },

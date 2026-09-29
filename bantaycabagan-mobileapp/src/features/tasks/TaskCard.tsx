@@ -227,7 +227,7 @@ export function TaskCard({
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 22, padding: 16, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8, backgroundColor: mobileTheme.surface, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  card: { marginHorizontal: 22, padding: 16, borderWidth: 0, borderRadius: 10, backgroundColor: mobileTheme.surface, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 10, elevation: 4 },
   cardBackup: { borderLeftWidth: 3, borderLeftColor: mobileTheme.blue },
   cardUrgent: { borderLeftWidth: 3, borderLeftColor: mobileTheme.danger },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   responseRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   responseLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
   responseCount: { marginTop: 3, color: mobileTheme.text, fontSize: 11, fontWeight: '700' },
-  responderList: { marginTop: 10, padding: 9, gap: 7, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 8, backgroundColor: '#f8fafc' },
+  responderList: { marginTop: 10, padding: 9, gap: 7, borderWidth: 0, borderRadius: 8, backgroundColor: mobileTheme.surfaceMuted },
   responderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   responderIdentity: { minWidth: 0, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   responderName: { flex: 1, color: mobileTheme.text, fontSize: 11, fontWeight: '700' },
@@ -277,10 +277,10 @@ const styles = StyleSheet.create({
 });
 
 const darkStyles = StyleSheet.create({
-  surface: { borderColor: '#22314a', backgroundColor: '#0b1528' },
-  urgentSurface: { backgroundColor: '#0b1528' },
+  surface: { backgroundColor: '#101f38', shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.42, shadowRadius: 12, elevation: 5 },
+  urgentSurface: { backgroundColor: '#101f38' },
   text: { color: '#f8fafc' },
   muted: { color: '#9eabc0' },
   border: { borderColor: '#22314a' },
-  responderList: { borderColor: '#2a3a56', backgroundColor: '#0e1a30' },
+  responderList: { backgroundColor: '#132442' },
 });

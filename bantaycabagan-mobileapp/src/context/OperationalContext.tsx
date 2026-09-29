@@ -31,8 +31,16 @@ import { isActiveTask, mergeById, upsertById } from '../features/operations/oper
 import { useOperationalSocket } from '../features/operations/useOperationalSocket';
 import { useOfflineReportSync } from '../features/reports/useOfflineReportSync';
 import { useReportPagination } from '../features/reports/useReportPagination';
-import type { ReportDateRange } from '../features/reports/useReportPagination';
+import type { ReportDateRange, ReportRefreshOptions } from '../features/reports/useReportPagination';
 import { useTaskHistoryPagination } from '../features/tasks/useTaskHistoryPagination';
+import {
+  loadCachedOperations,
+  loadCachedReports,
+  loadCachedTasks,
+  saveCachedOperations,
+  saveCachedReports,
+  saveCachedTasks,
+} from '../services/offlineOperationsCache';
 
 type OperationalContextValue = {
   tasks: OperationalTask[];
@@ -43,14 +51,17 @@ type OperationalContextValue = {
   isConnected: boolean;
   isLoading: boolean;
   initialDataError: string;
+  isOperationsOffline: boolean;
   refreshOperations: () => Promise<void>;
   isReportsLoading: boolean;
   isReportsLoadingMore: boolean;
   reportsHasMore: boolean;
   reportsError: string;
+  isReportsOffline: boolean;
   isTaskHistoryLoading: boolean;
   isTaskHistoryLoadingMore: boolean;
   taskHistoryHasMore: boolean;
+  isTaskHistoryOffline: boolean;
   currentOfficer: LivePersonnel;
   currentPersonnelId: string;
   acceptTask: (taskId: string) => Promise<void>;
@@ -64,6 +75,7 @@ type OperationalContextValue = {
   refreshReports: (
     category: 'all' | 'incident' | 'routine',
     dateRange?: ReportDateRange,
+    options?: ReportRefreshOptions,
   ) => Promise<void>;
   loadMoreReports: () => Promise<void>;
   refreshTaskHistory: () => Promise<void>;
@@ -87,7 +99,9 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const [personnel, setPersonnel] = useState<LivePersonnel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [initialDataError, setInitialDataError] = useState('');
+  const [isOperationsOffline, setIsOperationsOffline] = useState(false);
   const bootstrapRequest = useRef(0);
+  const cacheOwner = useRef('');
 
   const currentOfficer = useMemo<LivePersonnel>(() => {
     const liveProfile = personnel.find((member) => member.id === currentPersonnelId);
@@ -128,7 +142,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setUpcomingDeployment,
     token,
   });
-  const { submitReport } = useOfflineReportSync({
+  const { submitReport: submitReportWithOfflineSync } = useOfflineReportSync({
     actor,
     currentPersonnelId,
     deployments,
@@ -141,14 +155,17 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     isReportsLoadingMore,
     reportsHasMore,
     reportsError,
+    isReportsOffline,
     refreshReports,
     loadMoreReports,
     resetReportPagination,
+    invalidateReportViews,
   } = useReportPagination({ currentPersonnelId, setReports, token });
   const {
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,
+    isTaskHistoryOffline,
     refreshTaskHistory,
     loadMoreTaskHistory,
     resetTaskHistoryPagination,
@@ -174,7 +191,11 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       });
       setDeployments(operationsPayload.deployments);
       setUpcomingDeployment(operationsPayload.upcomingDeployment);
-    } else unavailable.push('tasks and deployments');
+      setIsOperationsOffline(false);
+    } else {
+      unavailable.push('tasks and deployments');
+      setIsOperationsOffline(true);
+    }
     if (locations.status === 'fulfilled' && Array.isArray(locations.value?.data)) {
       setPersonnel(locations.value.data.map(resolvePersonnelPhoto));
     } else unavailable.push('personnel locations');
@@ -184,6 +205,10 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   }, [currentPersonnelId, token]);
 
   useEffect(() => {
+    let active = true;
+    cacheOwner.current = '';
+    setIsLoading(true);
+    setIsOperationsOffline(false);
     setReports([]);
     setTasks([]);
     setDeployments([]);
@@ -192,11 +217,47 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     resetReportPagination();
     resetTaskHistoryPagination();
     if (currentPersonnelId && token) {
-      refreshReports('all').catch(() => undefined); // Report pagination exposes its own error/retry UI.
-      void refreshOperations();
+      void (async () => {
+        const [cachedOperations, cachedTasks, cachedReports] = await Promise.all([
+          loadCachedOperations(currentPersonnelId).catch(() => null),
+          loadCachedTasks(currentPersonnelId).catch(() => null),
+          loadCachedReports(currentPersonnelId).catch(() => null),
+        ]);
+        if (!active) return;
+        if (cachedOperations) {
+          setDeployments(cachedOperations.data.deployments);
+          setUpcomingDeployment(cachedOperations.data.upcomingDeployment);
+        }
+        if (cachedTasks) setTasks(cachedTasks.data);
+        if (cachedReports) setReports(cachedReports.data);
+        cacheOwner.current = currentPersonnelId;
+        await Promise.allSettled([
+          refreshReports('all'),
+          refreshOperations(),
+        ]);
+      })();
     } else setIsLoading(false);
-    return () => { bootstrapRequest.current += 1; };
+    return () => {
+      active = false;
+      cacheOwner.current = '';
+      bootstrapRequest.current += 1;
+    };
   }, [currentPersonnelId, refreshOperations, refreshReports, resetReportPagination, resetTaskHistoryPagination, token]);
+
+  useEffect(() => {
+    if (cacheOwner.current !== currentPersonnelId) return;
+    void saveCachedTasks(currentPersonnelId, tasks).catch(() => undefined);
+  }, [currentPersonnelId, tasks]);
+
+  useEffect(() => {
+    if (cacheOwner.current !== currentPersonnelId) return;
+    void saveCachedReports(currentPersonnelId, reports).catch(() => undefined);
+  }, [currentPersonnelId, reports]);
+
+  useEffect(() => {
+    if (cacheOwner.current !== currentPersonnelId) return;
+    void saveCachedOperations(currentPersonnelId, { deployments, upcomingDeployment }).catch(() => undefined);
+  }, [currentPersonnelId, deployments, upcomingDeployment]);
 
   const acceptTask = useCallback(async (taskId: string) => {
     const response = await acceptOperationalTask(taskId, actor, token);
@@ -219,16 +280,24 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setTasks((items) => upsertById(items, response.task));
   }, [actor, deployments, token]);
 
+  const submitReport = useCallback(async (input: SubmitReportInput) => {
+    const result = await submitReportWithOfflineSync(input);
+    invalidateReportViews();
+    return result;
+  }, [invalidateReportViews, submitReportWithOfflineSync]);
+
   const resolveReport = useCallback(async (reportId: string, resolutionNotes: string) => {
     const response = await resolveIncidentReport(reportId, resolutionNotes, actor, token);
     setReports((items) => upsertById(items, response.report));
-  }, [actor, token]);
+    invalidateReportViews();
+  }, [actor, invalidateReportViews, token]);
 
   const editReport = useCallback(async (reportId: string, input: Parameters<typeof editPoliceReport>[1]) => {
     const response = await editPoliceReport(reportId, input, token);
     setReports((items) => upsertById(items, response.report));
+    invalidateReportViews();
     return response.report;
-  }, [token]);
+  }, [invalidateReportViews, token]);
 
   const acknowledgeDeployment = useCallback(async (assignmentId: string) => {
     const response = await acknowledgeDeploymentAssignment(assignmentId, token);
@@ -244,14 +313,17 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     isConnected,
     isLoading,
     initialDataError,
+    isOperationsOffline,
     refreshOperations,
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,
     reportsError,
+    isReportsOffline,
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,
+    isTaskHistoryOffline,
     currentOfficer,
     currentPersonnelId,
     acceptTask,
@@ -278,14 +350,17 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     isConnected,
     isLoading,
     initialDataError,
+    isOperationsOffline,
     refreshOperations,
     isReportsLoading,
     isReportsLoadingMore,
     reportsHasMore,
     reportsError,
+    isReportsOffline,
     isTaskHistoryLoading,
     isTaskHistoryLoadingMore,
     taskHistoryHasMore,
+    isTaskHistoryOffline,
     personnel,
     reports,
     resolveReport,

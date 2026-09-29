@@ -15,7 +15,7 @@ export function ReportEvidenceField({ evidence, onCapture, onRemove }: ReportEvi
   const { colors, isDark } = useMobileTheme();
   if (!evidence) {
     return (
-      <TouchableOpacity style={[styles.captureButton, isDark && { backgroundColor: colors.surfaceMuted }]}
+      <TouchableOpacity style={[styles.captureButton, isDark && styles.floatingSurfaceDark]}
         onPress={onCapture}>
         <View style={styles.captureIcon}><Icon name="photo-camera" size={22} color={mobileTheme.purple} /></View>
         <View style={styles.captureCopy}>
@@ -28,7 +28,7 @@ export function ReportEvidenceField({ evidence, onCapture, onRemove }: ReportEvi
   }
 
   return (
-    <View style={[styles.preview, isDark && { backgroundColor: colors.surfaceMuted }]}>
+    <View style={[styles.preview, isDark && styles.floatingSurfaceDark]}>
       <Image source={{ uri: evidence.uri }} style={styles.previewImage} />
       <View style={styles.previewInfo}>
         <View style={styles.previewCopy}>
@@ -37,7 +37,7 @@ export function ReportEvidenceField({ evidence, onCapture, onRemove }: ReportEvi
             {evidence.camera_facing === 'front' ? 'Front camera' : 'Back camera'}
           </Text>
         </View>
-        <TouchableOpacity style={[styles.removeButton, { borderColor: colors.border }]}
+        <TouchableOpacity style={[styles.removeButton, isDark && styles.removeButtonDark]}
           onPress={onRemove} accessibilityLabel="Remove photo evidence">
           <Icon name="delete-outline" size={20} color={mobileTheme.danger} />
         </TouchableOpacity>
@@ -51,18 +51,20 @@ export function ReportEvidenceField({ evidence, onCapture, onRemove }: ReportEvi
 }
 
 const styles = StyleSheet.create({
-  preview: { overflow: 'hidden', borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  preview: { overflow: 'hidden', borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 8, elevation: 4 },
   previewImage: { width: '100%', aspectRatio: 4 / 3, backgroundColor: mobileTheme.background },
   previewInfo: { padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   previewCopy: { flex: 1 },
   previewTitle: { fontSize: 13, fontWeight: '800' },
   previewMeta: { marginTop: 2, fontSize: 10 },
-  removeButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 8 },
-  retakeButton: { minHeight: 42, marginHorizontal: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: mobileTheme.purpleSoft },
+  removeButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent', borderRadius: 19, backgroundColor: '#fff0f0', shadowColor: '#7f1d1d', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 5, elevation: 2 },
+  removeButtonDark: { backgroundColor: '#301b2b', shadowColor: '#000000', shadowOpacity: 0.34 },
+  retakeButton: { minHeight: 42, marginHorizontal: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 21, backgroundColor: mobileTheme.purpleSoft, shadowColor: '#312e81', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 5, elevation: 2 },
   retakeText: { color: mobileTheme.purple, fontSize: 11, fontWeight: '800' },
-  captureButton: { minHeight: 76, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderColor: mobileTheme.border, borderRadius: 12, backgroundColor: mobileTheme.surface },
+  captureButton: { minHeight: 76, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 8, elevation: 4 },
   captureIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: mobileTheme.purpleSoft },
   captureCopy: { flex: 1 },
   captureTitle: { fontSize: 12, fontWeight: '800' },
   captureMeta: { marginTop: 3, fontSize: 9, lineHeight: 14 },
+  floatingSurfaceDark: { borderColor: 'transparent', backgroundColor: '#101f38', shadowColor: '#000000', shadowOpacity: 0.38, elevation: 5 },
 });
