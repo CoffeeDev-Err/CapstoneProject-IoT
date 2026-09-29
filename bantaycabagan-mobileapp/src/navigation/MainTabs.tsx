@@ -26,14 +26,31 @@ import { useNotifications } from '../context/NotificationContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { NotificationNavigationRequest } from '../types/notifications';
 import { SwipeDismissSheet } from '../components/SwipeDismissSheet';
-import { PolicePageHeader } from '../components/PolicePageHeader';
+import { PAGE_HEADER_CONTENT_HEIGHT, PolicePageHeader } from '../components/PolicePageHeader';
 import { useReportDraftReminder } from '../features/reports/useReportDraftReminder';
 import type { OperationalTask } from '../types/operations';
 
 const Tab = createBottomTabNavigator();
-const PAGE_HEADER_CONTENT_HEIGHT = 54;
 const TAB_BAR_MIN_BOTTOM_OFFSET = 8;
 const TAB_BAR_SYSTEM_GAP = 4;
+const PAGE_TRANSITION_DURATION_MS = 170;
+const PAGE_TRANSITION_DISTANCE_PX = 10;
+const forLightweightPageSlide = ({ current }: {
+  current: { progress: Animated.Value };
+}) => ({
+  sceneStyle: {
+    transform: [{
+      translateX: current.progress.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: [
+          -PAGE_TRANSITION_DISTANCE_PX,
+          0,
+          PAGE_TRANSITION_DISTANCE_PX,
+        ],
+      }),
+    }],
+  },
+});
 
 const tabIcons: Record<string, keyof typeof Icon.glyphMap> = {
   Map: 'map',
@@ -70,10 +87,23 @@ function FloatingTabBar({
 }: FloatingTabBarProps) {
   const { colors, isDark } = useMobileTheme();
   const insets = useSafeAreaInsets();
+  const [barWidth, setBarWidth] = useState(0);
+  const activeIndicatorX = useRef(new Animated.Value(0)).current;
   const bottomOffset = Math.max(
     TAB_BAR_MIN_BOTTOM_OFFSET,
     insets.bottom + TAB_BAR_SYSTEM_GAP,
   );
+
+  useEffect(() => {
+    if (!barWidth) return;
+    const segmentWidth = barWidth / state.routes.length;
+    Animated.timing(activeIndicatorX, {
+      toValue: (state.index * segmentWidth) + ((segmentWidth - 34) / 2),
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeIndicatorX, barWidth, state.index, state.routes.length]);
 
   useEffect(() => {
     if (!navigationRequest) return;
@@ -140,7 +170,14 @@ function FloatingTabBar({
         { bottom: bottomOffset },
         isDark && styles.floatingBarDark,
       ]}
+      onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
     >
+      {barWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.activeTabIndicator, { transform: [{ translateX: activeIndicatorX }] }]}
+        />
+      ) : null}
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const isTasks = route.name === 'Tasks';
@@ -194,7 +231,6 @@ function FloatingTabBar({
               ]}>
                 {label}
               </Text>
-              {focused ? <View style={styles.activeTabIndicator} /> : null}
             </View>
           </TouchableOpacity>
         );
@@ -210,6 +246,7 @@ export default function MainTabs() {
   const {
     currentPersonnelId,
     initialDataError,
+    isOperationsOffline,
     isLoading,
     refreshOperations,
   } = useOperationalContext();
@@ -270,7 +307,7 @@ export default function MainTabs() {
       <Animated.View
         style={[
           styles.headerOverlay,
-          isDark && styles.fixedHeaderAreaDark,
+          isDark && styles.headerOverlayDark,
           {
             height: insets.top + PAGE_HEADER_CONTENT_HEIGHT,
             opacity: headerVisibility,
@@ -287,7 +324,7 @@ export default function MainTabs() {
           </View>
         </SafeAreaView>
       </Animated.View>
-      {initialDataError ? (
+      {initialDataError && !isOperationsOffline ? (
         <View style={[styles.reliabilityBanner, { top: insets.top + PAGE_HEADER_CONTENT_HEIGHT }]}>
           <Text accessibilityRole="alert" style={styles.reliabilityMessage}>{initialDataError}</Text>
           <TouchableOpacity accessibilityRole="button" disabled={isLoading} onPress={() => void refreshOperations()}>
@@ -299,8 +336,19 @@ export default function MainTabs() {
       <Tab.Navigator
         detachInactiveScreens={false}
         screenOptions={({ route }) => ({
-          animation: 'none',
+          animation: route.name === 'Tasks' ? 'none' : 'shift',
+          sceneStyleInterpolator: route.name === 'Tasks'
+            ? undefined
+            : forLightweightPageSlide,
+          transitionSpec: {
+            animation: 'timing',
+            config: {
+              duration: PAGE_TRANSITION_DURATION_MS,
+              easing: Easing.out(Easing.cubic),
+            },
+          },
           headerShown: false,
+          freezeOnBlur: false,
           sceneStyle: {
             backgroundColor: isDark ? '#050b18' : '#ffffff',
             paddingTop: route.name === 'Map'
@@ -323,7 +371,7 @@ export default function MainTabs() {
         <Tab.Screen name="Map" options={{ lazy: false }}>
           {renderMapScreen}
         </Tab.Screen>
-        <Tab.Screen name="Tasks" component={TasksScreen} options={{ animation: 'none', lazy: true }} />
+        <Tab.Screen name="Tasks" component={TasksScreen} options={{ lazy: true }} />
         <Tab.Screen name="Reports" component={ReportsScreen} options={{ lazy: false }} />
         <Tab.Screen name="Profile" component={OfficerProfileScreen} options={{ lazy: false }} />
       </Tab.Navigator>
@@ -424,10 +472,18 @@ const styles = StyleSheet.create({
     left: 0,
     zIndex: 20,
     overflow: 'hidden',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#d7e0eb',
     backgroundColor: '#ffffff',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
   },
+  headerOverlayDark: { borderBottomColor: '#22314a', backgroundColor: '#0b1528' },
   fixedHeaderArea: { zIndex: 20, backgroundColor: '#ffffff' },
   fixedHeaderAreaDark: { backgroundColor: '#0b1528' },
   tabSceneArea: { flex: 1 },
@@ -476,7 +532,8 @@ const styles = StyleSheet.create({
   tabLabelActive: { fontWeight: '800' },
   activeTabIndicator: {
     position: 'absolute',
-    bottom: -4,
+    left: 0,
+    bottom: 0,
     width: 34,
     height: 3,
     borderTopLeftRadius: 3,

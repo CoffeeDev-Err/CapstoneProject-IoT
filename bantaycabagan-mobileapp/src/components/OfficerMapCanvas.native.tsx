@@ -369,7 +369,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         ref={mapRef}
         style={styles.map}
         mapStyle={mapStyle}
-        androidView="surface"
+        androidView="texture"
         preferredFramesPerSecond={60}
         dragPan
         touchZoom

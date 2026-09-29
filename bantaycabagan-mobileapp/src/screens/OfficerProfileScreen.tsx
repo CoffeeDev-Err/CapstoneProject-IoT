@@ -19,6 +19,7 @@ import { useMobileTheme } from '../context/ThemeContext';
 import { resolveApiAssetUrl } from '../services/operationsApi';
 import { cleanupOrphanedPickerEvidence } from '../services/offlineReportQueue';
 import { clearMapCache } from '../services/mapCache';
+import { clearCachedOperationalData } from '../services/offlineOperationsCache';
 
 const formatAccountDate = (value?: string, includeTime = false) => {
   if (!value) return 'Not available';
@@ -53,7 +54,7 @@ export default function OfficerProfileScreen() {
   const clearDownloadedCache = () => {
     Alert.alert(
       'Clear downloaded cache?',
-      'Cached maps and viewed images will be downloaded again. Pending offline reports and evidence will not be deleted.',
+      'Cached maps, viewed images, tasks, and submitted report history will be downloaded again. Pending offline reports and evidence will not be deleted.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -64,8 +65,9 @@ export default function OfficerProfileScreen() {
                 clearMapCache(),
                 Image.clearDiskCache(),
                 cleanupOrphanedPickerEvidence(),
+                clearCachedOperationalData(),
               ]);
-              Alert.alert('Cache cleared', 'Pending offline reports and evidence were preserved.');
+              Alert.alert('Cache cleared', 'Downloaded task/report history was removed. Pending offline reports and evidence were preserved.');
             } catch {
               Alert.alert('Unable to clear cache', 'Try again after closing the map and report viewer.');
             }

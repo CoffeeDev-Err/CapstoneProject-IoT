@@ -13,6 +13,7 @@ import {
   type FlatListProps,
   type LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   type ScrollViewProps,
@@ -27,6 +28,7 @@ import {
   GestureDetector,
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -42,8 +44,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useMobileTheme } from '../context/ThemeContext';
 
-const OPEN_DURATION = 400;
-const CLOSE_DURATION = 400;
+const CLOSE_DURATION = 260;
 const DISMISS_VELOCITY = 900;
 const EXPANDED_EPSILON = 6;
 const SCROLL_TOP_EPSILON = 1;
@@ -61,10 +62,10 @@ const VELOCITY_PROJECTION_SECONDS = 0.05;
 const OPEN_EASING = Easing.bezier(0.22, 1, 0.36, 1);
 const CLOSE_EASING = Easing.bezier(0.4, 0, 1, 1);
 const SNAP_SPRING = {
-  damping: 30,
-  stiffness: 170,
-  mass: 1.05,
-  overshootClamping: true,
+  damping: 24,
+  stiffness: 220,
+  mass: 0.8,
+  overshootClamping: false,
 };
 
 type SwipeDismissControls = {
@@ -76,6 +77,7 @@ type SwipeDismissSheetProps = {
   containerStyle?: StyleProp<ViewStyle>;
   handleColor?: string;
   initiallyExpanded?: boolean;
+  dismissible?: boolean;
   onClose: () => void;
   sheetStyle?: StyleProp<ViewStyle>;
   tapOutsideToClose?: boolean;
@@ -102,6 +104,7 @@ const AnimatedSheetFlatList = Animated.FlatList as unknown as typeof FlatList;
 export function SheetScrollView({
   alwaysBounceVertical,
   bounces,
+  decelerationRate,
   overScrollMode,
   scrollEnabled = true,
   ...props
@@ -121,6 +124,7 @@ export function SheetScrollView({
         {...props}
         alwaysBounceVertical={alwaysBounceVertical}
         bounces={bounces}
+        decelerationRate={decelerationRate}
         overScrollMode={overScrollMode}
         scrollEnabled={scrollEnabled}
       />
@@ -131,11 +135,12 @@ export function SheetScrollView({
     <GestureDetector gesture={sheet.nativeGesture}>
       <Animated.ScrollView
         {...props}
-        alwaysBounceVertical={alwaysBounceVertical ?? true}
-        bounces={bounces ?? true}
+        alwaysBounceVertical={alwaysBounceVertical ?? Platform.OS === 'ios'}
+        bounces={bounces ?? Platform.OS === 'ios'}
+        decelerationRate={decelerationRate ?? 'fast'}
         directionalLockEnabled
         nestedScrollEnabled
-        overScrollMode={overScrollMode ?? 'always'}
+        overScrollMode={overScrollMode ?? (Platform.OS === 'android' ? 'never' : 'always')}
         scrollEnabled={sheet.scrollEnabled && scrollEnabled}
         scrollEventThrottle={16}
         onScroll={scrollHandler}
@@ -147,6 +152,7 @@ export function SheetScrollView({
 export function SheetFlatList<ItemT>({
   alwaysBounceVertical,
   bounces,
+  decelerationRate,
   overScrollMode,
   scrollEnabled = true,
   ...props
@@ -166,6 +172,7 @@ export function SheetFlatList<ItemT>({
         {...props}
         alwaysBounceVertical={alwaysBounceVertical}
         bounces={bounces}
+        decelerationRate={decelerationRate}
         overScrollMode={overScrollMode}
         scrollEnabled={scrollEnabled}
       />
@@ -176,11 +183,12 @@ export function SheetFlatList<ItemT>({
     <GestureDetector gesture={sheet.nativeGesture}>
       <AnimatedSheetFlatList
         {...props}
-        alwaysBounceVertical={alwaysBounceVertical ?? true}
-        bounces={bounces ?? true}
+        alwaysBounceVertical={alwaysBounceVertical ?? Platform.OS === 'ios'}
+        bounces={bounces ?? Platform.OS === 'ios'}
+        decelerationRate={decelerationRate ?? 'fast'}
         directionalLockEnabled
         nestedScrollEnabled
-        overScrollMode={overScrollMode ?? 'always'}
+        overScrollMode={overScrollMode ?? (Platform.OS === 'android' ? 'never' : 'always')}
         scrollEnabled={sheet.scrollEnabled && scrollEnabled}
         scrollEventThrottle={16}
         onScroll={scrollHandler}
@@ -193,11 +201,13 @@ const useExpandableSheetMotion = ({
   active,
   dismissDistance,
   initiallyExpanded,
+  dismissible,
   onClose,
 }: {
   active: boolean;
   dismissDistance: number;
   initiallyExpanded: boolean;
+  dismissible: boolean;
   onClose: () => void;
 }) => {
   const translateY = useSharedValue(dismissDistance);
@@ -264,10 +274,7 @@ const useExpandableSheetMotion = ({
     entranceOpacity.value = 0;
     scrollLocked.value = !initiallyExpanded;
     updateScrollEnabled(initiallyExpanded);
-    translateY.value = withTiming(initiallyExpanded ? 0 : lowerSnap.value, {
-      duration: OPEN_DURATION,
-      easing: OPEN_EASING,
-    });
+    translateY.value = withSpring(initiallyExpanded ? 0 : lowerSnap.value, SNAP_SPRING);
     entranceOpacity.value = withTiming(1, {
       duration: 240,
       easing: Easing.out(Easing.cubic),
@@ -298,7 +305,8 @@ const useExpandableSheetMotion = ({
   }, [dismissDistance, entranceOpacity, finishClose, isClosing, scrollLocked, translateY]);
 
   const panGesture = Gesture.Pan()
-    .activeOffsetY([-3, 3])
+    .enabled(dismissible)
+    .activeOffsetY([-5, 5])
     .failOffsetX([-32, 32])
     .simultaneousWithExternalGesture(nativeGesture)
     .onTouchesDown(() => {
@@ -540,6 +548,7 @@ export function SwipeDismissSheet({
   containerStyle,
   handleColor = '#cbd5e1',
   initiallyExpanded = false,
+  dismissible = true,
   onClose,
   sheetStyle,
   tapOutsideToClose = true,
@@ -552,6 +561,7 @@ export function SwipeDismissSheet({
     active: visible,
     dismissDistance: screenHeight,
     initiallyExpanded,
+    dismissible,
     onClose,
   });
   const scrollContext = useMemo<SheetScrollContextValue>(() => ({
@@ -569,12 +579,12 @@ export function SwipeDismissSheet({
       animationType="none"
       statusBarTranslucent
       hardwareAccelerated
-      onRequestClose={() => motion.close()}
+      onRequestClose={() => { if (dismissible) motion.close(); }}
     >
       <GestureHandlerRootView style={styles.modalRoot}>
         <View style={[styles.modalRoot, { paddingTop: topInset }, containerStyle]}>
           <Animated.View style={[styles.backdrop, motion.backdropAnimatedStyle]}>
-            {tapOutsideToClose && (
+            {dismissible && tapOutsideToClose && (
               <Pressable
                 accessibilityLabel="Close panel"
                 accessibilityRole="button"
@@ -593,8 +603,22 @@ export function SwipeDismissSheet({
                 motion.sheetAnimatedStyle,
               ]}
             >
+              {dismissible ? (
+                <Pressable
+                  accessibilityLabel="Close panel"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => motion.close()}
+                  style={[
+                    styles.closeButton,
+                    { borderColor: colors.border, backgroundColor: colors.surface },
+                  ]}
+                >
+                  <Icon name="close" size={18} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
               <SheetScrollContext.Provider value={scrollContext}>
-                <DragHandle close={motion.close} color={handleColor} />
+                {dismissible ? <DragHandle close={motion.close} color={handleColor} /> : <View style={styles.handleTouchArea} />}
                 {typeof children === 'function' ? children({ close: motion.close }) : children}
               </SheetScrollContext.Provider>
             </Animated.View>
@@ -643,7 +667,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   handleTouchArea: {
-    height: 32,
+    height: 44,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
@@ -652,5 +676,17 @@ const styles = StyleSheet.create({
     width: 46,
     height: 5,
     borderRadius: 3,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 8,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
   },
 });

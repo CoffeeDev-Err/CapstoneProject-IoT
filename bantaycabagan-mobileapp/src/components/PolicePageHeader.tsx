@@ -5,6 +5,8 @@ import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
 import { NotificationBellButton } from './NotificationBellButton';
 
+export const PAGE_HEADER_CONTENT_HEIGHT = 46;
+
 export function PolicePageHeader({ onOpenNotifications }: { onOpenNotifications?: () => void }) {
   const { colors, isDark } = useMobileTheme();
 
@@ -26,7 +28,7 @@ export function PolicePageHeader({ onOpenNotifications }: { onOpenNotifications?
 
 const styles = StyleSheet.create({
   header: {
-    height: 54,
+    height: PAGE_HEADER_CONTENT_HEIGHT,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -42,9 +44,11 @@ const styles = StyleSheet.create({
   logo: {
     width: 24,
     height: 30,
+    transform: [{ translateY: -4 }],
   },
   identity: {
     flex: 1,
+    transform: [{ translateY: -4 }],
   },
   title: {
     color: mobileTheme.text,
