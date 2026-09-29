@@ -13,7 +13,6 @@ import {
   type FlatListProps,
   type LayoutChangeEvent,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   type ScrollViewProps,
@@ -135,12 +134,12 @@ export function SheetScrollView({
     <GestureDetector gesture={sheet.nativeGesture}>
       <Animated.ScrollView
         {...props}
-        alwaysBounceVertical={alwaysBounceVertical ?? Platform.OS === 'ios'}
-        bounces={bounces ?? Platform.OS === 'ios'}
+        alwaysBounceVertical={alwaysBounceVertical ?? true}
+        bounces={bounces ?? true}
         decelerationRate={decelerationRate ?? 'fast'}
         directionalLockEnabled
         nestedScrollEnabled
-        overScrollMode={overScrollMode ?? (Platform.OS === 'android' ? 'never' : 'always')}
+        overScrollMode={overScrollMode ?? 'always'}
         scrollEnabled={sheet.scrollEnabled && scrollEnabled}
         scrollEventThrottle={16}
         onScroll={scrollHandler}
@@ -183,12 +182,12 @@ export function SheetFlatList<ItemT>({
     <GestureDetector gesture={sheet.nativeGesture}>
       <AnimatedSheetFlatList
         {...props}
-        alwaysBounceVertical={alwaysBounceVertical ?? Platform.OS === 'ios'}
-        bounces={bounces ?? Platform.OS === 'ios'}
+        alwaysBounceVertical={alwaysBounceVertical ?? true}
+        bounces={bounces ?? true}
         decelerationRate={decelerationRate ?? 'fast'}
         directionalLockEnabled
         nestedScrollEnabled
-        overScrollMode={overScrollMode ?? (Platform.OS === 'android' ? 'never' : 'always')}
+        overScrollMode={overScrollMode ?? 'always'}
         scrollEnabled={sheet.scrollEnabled && scrollEnabled}
         scrollEventThrottle={16}
         onScroll={scrollHandler}
