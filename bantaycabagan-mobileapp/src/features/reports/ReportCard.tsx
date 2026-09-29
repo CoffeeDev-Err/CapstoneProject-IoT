@@ -4,9 +4,6 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, {
   cancelAnimation,
   Easing,
-  Extrapolation,
-  interpolate,
-  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -22,14 +19,10 @@ type ReportCardProps = {
   onToggle: (reportId: string) => void;
   onView: (report: PoliceReport) => void;
   report: PoliceReport;
-  transitionDirection?: SharedValue<number>;
-  transitionIndex?: number;
-  transitionProgress?: SharedValue<number>;
 };
 
 const EXPANSION_DURATION_MS = 230;
 const EXPANSION_EASING = Easing.bezier(0.2, 0, 0, 1);
-const CONTENT_REVEAL_DURATION_MS = 220;
 
 export const ReportCard = React.memo(function ReportCard({
   expanded,
@@ -37,30 +30,10 @@ export const ReportCard = React.memo(function ReportCard({
   onToggle,
   onView,
   report,
-  transitionDirection,
-  transitionIndex = 0,
-  transitionProgress,
 }: ReportCardProps) {
   const { colors, isDark } = useMobileTheme();
   const canResolve = report.is_incident && report.case_status !== 'resolved';
   const chevronProgress = useSharedValue(expanded ? 1 : 0);
-  const contentReveal = useSharedValue(0);
-  useEffect(() => {
-    cancelAnimation(contentReveal);
-    contentReveal.value = 0;
-    contentReveal.value = withTiming(1, {
-      duration: CONTENT_REVEAL_DURATION_MS,
-      easing: EXPANSION_EASING,
-    });
-  }, [
-    contentReveal,
-    report.case_status,
-    report.date_time,
-    report.id,
-    report.location,
-    report.title,
-    report.validation_status,
-  ]);
   useEffect(() => {
     cancelAnimation(chevronProgress);
     chevronProgress.value = withTiming(expanded ? 1 : 0, {
@@ -71,31 +44,12 @@ export const ReportCard = React.memo(function ReportCard({
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${chevronProgress.value * 180}deg` }],
   }));
-  const transitionStyle = useAnimatedStyle(() => {
-    const rawProgress = Math.min(transitionProgress?.value ?? 1, contentReveal.value);
-    const staggerStart = Math.min(transitionIndex, 6) * 0.035;
-    const itemProgress = interpolate(
-      rawProgress,
-      [staggerStart, Math.min(1, staggerStart + 0.72)],
-      [0, 1],
-      Extrapolation.CLAMP,
-    );
-    return {
-      opacity: 0.24 + (itemProgress * 0.76),
-      transform: [{
-        translateX: (1 - itemProgress) * (transitionDirection?.value ?? 1) * 14,
-      }, {
-        scale: 0.99 + (itemProgress * 0.01),
-      }],
-    };
-  });
   return (
     <View style={[
       styles.card,
       isDark && styles.cardDark,
       report.is_incident ? styles.incident : styles.routine,
     ]}>
-      <Animated.View style={transitionStyle}>
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded }}
         activeOpacity={0.76} onPress={() => onToggle(report.id)}>
         <View style={styles.topRow}>
@@ -147,7 +101,6 @@ export const ReportCard = React.memo(function ReportCard({
           </View>
         </View>
       </SmoothCollapsible>
-      </Animated.View>
     </View>
   );
 });

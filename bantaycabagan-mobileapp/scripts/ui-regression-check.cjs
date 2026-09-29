@@ -148,18 +148,13 @@ assert.match(
 );
 assert.match(
   reportsSource,
-  /transitionIndex=\{index\}[\s\S]*transitionProgress=\{reportListReveal\}[\s\S]*items=\{reportFilters\}[\s\S]*removeClippedSubviews=\{false\}/,
-  'Report filter changes must retain the list and pass the lightweight reveal to each card',
+  /reportDataSignature[\s\S]*useLayoutEffect\(\(\) => \{[\s\S]*reportListOffset\.value = reportListDirectionRef\.current \* 12[\s\S]*reportListAnimatedStyle[\s\S]*keyExtractor=\{\(item\) => item\.id\}[\s\S]*removeClippedSubviews=\{false\}/,
+  'Report filter changes must slide the retained list as one lightweight layer',
 );
-assert.match(
+assert.doesNotMatch(
   reportCardSource,
-  /CONTENT_REVEAL_DURATION_MS = 220[\s\S]*contentReveal\.value = withTiming\(1[\s\S]*Math\.min\(transitionProgress\?\.value \?\? 1, contentReveal\.value\)[\s\S]*opacity: 0\.24[\s\S]*translateX:[\s\S]*<Animated\.View style=\{transitionStyle\}>/,
-  'New report data must animate inside stable card surfaces when a filtered view arrives',
-);
-assert.match(
-  reportsSource,
-  /keyExtractor=\{\(item\) => `\$\{filter\}:\$\{datePreset\}:\$\{item\.id\}`\}[\s\S]*updateCellsBatchingPeriod=\{16\}/,
-  'Each report filter view must remount card content predictably without remounting the full list',
+  /contentReveal|transitionProgress|transitionIndex|opacity: 0\.24/,
+  'Report cards must not fade or stagger independently because that creates a shattered transition',
 );
 assert.doesNotMatch(
   reportsSource,

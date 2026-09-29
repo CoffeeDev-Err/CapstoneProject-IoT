@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -179,8 +180,8 @@ export default function ReportsScreen() {
   const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(() => new Set());
   const reportListRef = useRef<FlatList<PoliceReport>>(null);
-  const reportListReveal = useSharedValue(1);
-  const reportListDirection = useSharedValue(1);
+  const reportListOffset = useSharedValue(0);
+  const reportListDirectionRef = useRef(1);
   const createReportScale = useSharedValue(1);
   const submitReportScale = useSharedValue(1);
   const createReportPressStyle = useAnimatedStyle(() => ({
@@ -189,15 +190,23 @@ export default function ReportsScreen() {
   const submitReportPressStyle = useAnimatedStyle(() => ({
     transform: [{ scale: submitReportScale.value }],
   }));
-  const runReportListTransition = useCallback((direction: number) => {
-    reportListDirection.value = direction;
-    cancelAnimation(reportListReveal);
-    reportListReveal.value = 0;
-    reportListReveal.value = withTiming(1, {
+  const reportListAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: reportListOffset.value }],
+  }));
+  const reportDataSignature = reports.map((report) => (
+    `${report.id}:${report.validation_status}:${report.case_status}`
+  )).join('|');
+  useLayoutEffect(() => {
+    cancelAnimation(reportListOffset);
+    reportListOffset.value = reportListDirectionRef.current * 12;
+    reportListOffset.value = withTiming(0, {
       duration: REPORT_LIST_TRANSITION_MS,
       easing: REPORT_LIST_TRANSITION_EASING,
     });
-  }, [reportListDirection, reportListReveal]);
+  }, [datePreset, filter, reportDataSignature, reportListOffset]);
+  const runReportListTransition = useCallback((direction: number) => {
+    reportListDirectionRef.current = direction;
+  }, []);
   const toggleReport = useCallback((reportId: string) => {
     setExpandedReportIds((current) => {
       const next = new Set(current);
@@ -234,18 +243,15 @@ export default function ReportsScreen() {
     openReport(report.id);
     refreshDetail();
   }, [openReport, refreshDetail]);
-  const renderReport = useCallback(({ item, index }: { item: PoliceReport; index: number }) => (
+  const renderReport = useCallback(({ item }: { item: PoliceReport }) => (
     <ReportCard
       expanded={expandedReportIds.has(item.id)}
       onResolve={setResolveTarget}
       onToggle={toggleReport}
       onView={handleViewReport}
       report={item}
-      transitionDirection={reportListDirection}
-      transitionIndex={index}
-      transitionProgress={reportListReveal}
     />
-  ), [expandedReportIds, handleViewReport, reportListDirection, reportListReveal, setResolveTarget, toggleReport]);
+  ), [expandedReportIds, handleViewReport, setResolveTarget, toggleReport]);
 
   const isValidatedCorrection = editTarget?.validation_status === 'validated';
   const formSubmitLabel = isSaving
@@ -332,12 +338,12 @@ export default function ReportsScreen() {
         />
       ) : null}
 
-      <View style={styles.listTransition}>
+      <Animated.View style={[styles.listTransition, reportListAnimatedStyle]}>
         <FlatList
           ref={reportListRef}
           data={reports}
           extraData={[filter, datePreset, expandedReportIds]}
-          keyExtractor={(item) => `${filter}:${datePreset}:${item.id}`}
+          keyExtractor={(item) => item.id}
           renderItem={renderReport}
           style={styles.listViewport}
           contentContainerStyle={styles.list}
@@ -401,7 +407,7 @@ export default function ReportsScreen() {
             </View>
           )}
         />
-      </View>
+      </Animated.View>
 
       <SwipeDismissSheet
         visible={formVisible && !locationPickerVisible}
