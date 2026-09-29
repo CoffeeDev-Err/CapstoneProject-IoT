@@ -63,6 +63,10 @@ const tasksSource = readFileSync(
   resolve(projectRoot, 'src/screens/TasksScreen.tsx'),
   'utf8',
 );
+const notificationsSource = readFileSync(
+  resolve(projectRoot, 'src/screens/NotificationsScreen.tsx'),
+  'utf8',
+);
 const reportPaginationSource = readFileSync(
   resolve(projectRoot, 'src/features/reports/useReportPagination.ts'),
   'utf8',
@@ -139,8 +143,8 @@ assert.match(
 );
 assert.match(
   slidingTabsSource,
-  /INDICATOR_DURATION_MS = 190[\s\S]*withTiming\(selectedIndex \* tabWidth[\s\S]*translateX: indicatorX\.value/,
-  'All, Incident, and Routine must use the lightweight sliding underline',
+  /INDICATOR_DURATION_MS = 190[\s\S]*SlidingTabLabel[\s\S]*interpolateColor\(distance[\s\S]*translateX: indicatorX\.value[\s\S]*selectTab[\s\S]*withTiming\(index \* tabWidth/,
+  'All, Incident, and Routine must keep the active label synchronized with the sliding underline',
 );
 assert.match(
   reportsSource,
@@ -149,8 +153,13 @@ assert.match(
 );
 assert.match(
   reportCardSource,
-  /CONTENT_REVEAL_DURATION_MS = 180[\s\S]*contentReveal\.value = withTiming\(1[\s\S]*Math\.min\(transitionProgress\?\.value \?\? 1, contentReveal\.value\)[\s\S]*opacity: 0\.78[\s\S]*translateX:/,
-  'New report data must animate at card level when a cached or refreshed filter view arrives',
+  /CONTENT_REVEAL_DURATION_MS = 220[\s\S]*contentReveal\.value = withTiming\(1[\s\S]*Math\.min\(transitionProgress\?\.value \?\? 1, contentReveal\.value\)[\s\S]*opacity: 0\.24[\s\S]*translateX:[\s\S]*<Animated\.View style=\{transitionStyle\}>/,
+  'New report data must animate inside stable card surfaces when a filtered view arrives',
+);
+assert.match(
+  reportsSource,
+  /keyExtractor=\{\(item\) => `\$\{filter\}:\$\{datePreset\}:\$\{item\.id\}`\}[\s\S]*updateCellsBatchingPeriod=\{16\}/,
+  'Each report filter view must remount card content predictably without remounting the full list',
 );
 assert.doesNotMatch(
   reportsSource,
@@ -284,8 +293,23 @@ assert.doesNotMatch(
 );
 assert.match(
   swipeSheetSource,
-  /CLOSE_DURATION = 260[\s\S]*damping: 24[\s\S]*stiffness: 220[\s\S]*mass: 0\.8[\s\S]*overshootClamping: false[\s\S]*decelerationRate=\{decelerationRate \?\? 'fast'\}[\s\S]*Platform\.OS === 'android' \? 'never'/,
-  'Shared sheets must keep lightweight motion and Android scroll settings',
+  /CLOSE_DURATION = 260[\s\S]*damping: 24[\s\S]*stiffness: 220[\s\S]*mass: 0\.8[\s\S]*overshootClamping: false[\s\S]*alwaysBounceVertical=\{alwaysBounceVertical \?\? true\}[\s\S]*bounces=\{bounces \?\? true\}[\s\S]*decelerationRate=\{decelerationRate \?\? 'fast'\}[\s\S]*overScrollMode=\{overScrollMode \?\? 'always'\}/,
+  'Shared scrolling sheets must keep native elastic overscroll with lightweight deceleration',
+);
+assert.match(
+  tasksSource,
+  /<SheetFlatList<TaskListRow>/,
+  'My Tasks must use the shared elastic scrolling list',
+);
+assert.match(
+  notificationsSource,
+  /<SheetFlatList/,
+  'Notifications must use the shared elastic scrolling list',
+);
+assert.match(
+  reportsSource,
+  /<SheetScrollView[\s\S]*contentContainerStyle=\{styles\.form\}/,
+  'Submit Report fields must use the shared elastic scrolling container',
 );
 assert.match(
   swipeSheetSource,
