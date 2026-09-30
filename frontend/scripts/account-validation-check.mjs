@@ -68,8 +68,10 @@ assert.match(settingsStyles, /\.account-rank-dropdown\s*\{[\s\S]*?position:\s*ab
   'The rank dropdown must overlay without changing the surrounding form grid')
 assert.match(settingsStyles, /\.account-rank-options\s*\{[\s\S]*?overflow-y:\s*auto/,
   'The rank list must scroll inside its bounded dropdown')
-assert.match(settingsPage, /account\.isProtected \|\| account\.role === 'Supervisor'[\s\S]*Protected/,
-  'COP/admin accounts must not expose a deactivate action')
+assert.match(settingsPage, /account\.isProtected \? \([\s\S]*Protected[\s\S]*account\.role === 'Supervisor' && !canManageSupervisors[\s\S]*Primary supervisor only/,
+  'The primary supervisor must stay protected and delegated supervisors must only be manageable by the primary supervisor')
+assert.match(settingsPage, /account\.role !== 'Supervisor' \|\| canManageSupervisors/,
+  'Delegated supervisor edit actions must only be exposed to the primary supervisor')
 assert.match(topBar, /user\?\.fullName[\s\S]*user\?\.username/,
   'The top-bar identity must come from the authenticated account')
 assert.doesNotMatch(topBar, /Sgt\. Leo Gannad|name=Leo\+Gannad/,

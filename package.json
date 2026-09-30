@@ -33,6 +33,12 @@
     "mongoose": "^9.4.1"
   },
   "overrides": {
-    "exceljs": { "uuid": "11.1.1" }
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "minimatch@10.2.6": {
+      "brace-expansion": "5.0.12"
+    },
+    "engine.io": "6.6.11"
   }
 }

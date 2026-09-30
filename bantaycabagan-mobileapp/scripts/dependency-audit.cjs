@@ -28,11 +28,15 @@ for (const advisory of advisories) {
     failures.push(advisory.url);
   }
 }
-// This temporary exception relies on no inbound URL-to-navigation parsing.
-const app = fs.readFileSync(path.join(root, 'App.tsx'), 'utf8');
-if (!/<NavigationContainer\s+theme=\{navigationTheme\}>/.test(app)
-    || /\blink(?:ing)?\s*=|getStateFromPath|useLinking/.test(app)) {
-  failures.push('Navigation setup changed: reassess the untrusted URL decoding exception.');
+const hasUrlDecodingException = policy.exceptions.some(
+  (entry) => entry.url === 'https://github.com/advisories/GHSA-vcc3-ghjq-m6fr',
+);
+if (hasUrlDecodingException) {
+  const app = fs.readFileSync(path.join(root, 'App.tsx'), 'utf8');
+  if (!/<NavigationContainer\s+theme=\{navigationTheme\}>/.test(app)
+      || /\blink(?:ing)?\s*=|getStateFromPath|useLinking/.test(app)) {
+    failures.push('Navigation setup changed: reassess the untrusted URL decoding exception.');
+  }
 }
 const report = {
   generatedAt: new Date().toISOString(),
