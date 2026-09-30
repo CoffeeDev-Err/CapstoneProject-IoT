@@ -350,3 +350,34 @@
   transform: translateY(-3px);
   border-color: var(--color-primary-light);
 }
+.select-control {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.select-control > select {
+  width: 100%;
+  padding-right: 2.35rem !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.select-control__icon {
+  position: absolute;
+  top: 50%;
+  right: 0.8rem;
+  width: 17px;
+  height: 17px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.select-control:focus-within .select-control__icon {
+  color: var(--interactive-primary);
+}
+
+.select-control > select:disabled + .select-control__icon {
+  opacity: 0.45;
+}

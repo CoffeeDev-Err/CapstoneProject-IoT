@@ -26,6 +26,16 @@ export const ACCOUNT_FIELD_LIMITS = Object.freeze({
   password: 128,
 })
 
+export const meetsPasswordRequirements = (value) => {
+  const password = String(value || '')
+  return password.length >= 10
+    && password.length <= ACCOUNT_FIELD_LIMITS.password
+    && /[A-Z]/.test(password)
+    && /[a-z]/.test(password)
+    && /\d/.test(password)
+    && /[^A-Za-z0-9]/.test(password)
+}
+
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
 const FULL_NAME_PATTERN = /^[\p{L}\s.'’-]+$/u
 const BADGE_NUMBER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i

@@ -1,6 +1,7 @@
 import { requestErrorMessage } from '../utils/requestFeedback'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getManageableDeployments, replaceDeployments } from '../services/operations'
@@ -717,14 +718,14 @@ function AssignAreaPage({ view = 'form' }) {
               <div className="assignment-area-picker" ref={patrolAreaPickerRef}>
                 <button
                   type="button"
-                  className="settings-input w-100 assignment-area-trigger"
+                  className={`settings-input w-100 assignment-area-trigger${isPatrolAreaOpen ? ' is-open' : ''}`}
                   onClick={() => setIsPatrolAreaOpen((prev) => !prev)}
                   aria-label="Select patrol area"
                   aria-expanded={isPatrolAreaOpen}
                   aria-haspopup="listbox"
                 >
                   <span className="assignment-area-trigger__value">{assignmentForm.patrolArea}</span>
-                  <span className="assignment-area-trigger__icon">v</span>
+                  <ChevronDown className="assignment-area-trigger__icon" aria-hidden="true" />
                 </button>
 
                 {isPatrolAreaOpen && (

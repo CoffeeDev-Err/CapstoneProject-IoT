@@ -14,6 +14,7 @@ import {
   createSupervisorAccount,
   deactivateAccount,
   getAccounts,
+  reactivateAccount,
   updateAccount,
 } from '../services/accounts'
 import { getRegisteredFlespiDevices } from '../services/flespiDevices'
@@ -37,6 +38,7 @@ import AccountGpsSelector from '../features/accounts/AccountGpsSelector'
 import { useAccountForm } from '../features/accounts/useAccountForm'
 import AccountDialogs from '../features/accounts/AccountDialogs'
 import { useCachedPageData } from '../hooks/useCachedPageData'
+import SelectControl from '../components/SelectControl'
 
 function SettingsPage() {
   const { showFeedback } = useFeedback()
@@ -49,6 +51,7 @@ function SettingsPage() {
   const [activeAccountView, setActiveAccountView] = useState('create')
   const [accountType, setAccountType] = useState('officer')
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState(null)
+  const [pendingReactivateAccount, setPendingReactivateAccount] = useState(null)
   const [formMessage, setFormMessage] = useState('')
   const [formMessageKind, setFormMessageKind] = useState('success')
   const [flespiDevices, setFlespiDevices, hasDevices] = useCachedPageData('gps-devices', [])
@@ -263,6 +266,43 @@ function SettingsPage() {
     setPendingDeleteAccount(null)
   }
 
+  const handleReactivateAccount = (accountId) => {
+    const account = createdAccounts.find((item) => item.id === accountId)
+
+    if (!account || account.accountStatus !== 'Inactive' || account.isProtected
+      || (account.role === 'Supervisor' && !canManageSupervisors)) return
+
+    setPendingReactivateAccount(account)
+  }
+
+  const handleConfirmReactivateAccount = async (device) => {
+    if (!pendingReactivateAccount) return
+
+    const account = pendingReactivateAccount
+    const devicePayload = device
+      ? { imei: device.imei, flespiDeviceId: device.id }
+      : {}
+    setAccountRequestPending(true)
+
+    try {
+      const updatedAccount = await reactivateAccount(account.id, devicePayload)
+      accountsRequest.current += 1
+      setAccountsLoading(false)
+      setCreatedAccounts((current) => current.map((item) => (
+        item.id === account.id ? updatedAccount : item
+      )))
+      setPendingReactivateAccount(null)
+      setFormMessage(`${updatedAccount.fullName || updatedAccount.loginId} account reactivated successfully.`)
+      setFormMessageKind('success')
+      window.dispatchEvent(new Event('bantaycabagan:account-updated'))
+    } catch (error) {
+      setFormMessage(requestErrorMessage(error, { action: 'reactivate the account', write: true }))
+      setFormMessageKind('error')
+    } finally {
+      setAccountRequestPending(false)
+    }
+  }
+
   const handleSubmitAccount = async (event) => {
     event.preventDefault()
 
@@ -298,7 +338,7 @@ function SettingsPage() {
           loginId: normalizeLoginId(accountForm.loginId),
           officialEmail: normalizeEmail(accountForm.officialEmail),
           temporaryPassword: accountForm.temporaryPassword,
-          accountStatus: 'Active',
+          accountStatus: editingAccount?.accountStatus || 'Active',
         }
       : {
           fullName: normalizeHumanName(accountForm.fullName),
@@ -312,7 +352,7 @@ function SettingsPage() {
           officialEmail: normalizeEmail(accountForm.officialEmail),
           temporaryPassword: accountForm.temporaryPassword,
           mobileNumber: normalizeMobileNumber(accountForm.mobileNumber),
-          accountStatus: 'Active',
+          accountStatus: editingAccount?.accountStatus || 'Active',
           forcePasswordReset: true,
         }
 
@@ -407,7 +447,7 @@ function SettingsPage() {
               </button>
             </div>
             {canManageSupervisors && activeAccountView === 'create' && !editingAccountId && (
-              <select
+              <SelectControl
                 className="settings-input account-type-picker"
                 aria-label="Account type"
                 value={accountType}
@@ -419,7 +459,7 @@ function SettingsPage() {
               >
                 <option value="officer">Police Personnel</option>
                 <option value="supervisor">Supervisor</option>
-              </select>
+              </SelectControl>
             )}
             </div>
 
@@ -631,6 +671,7 @@ function SettingsPage() {
                 filteredAccounts={filteredAccounts}
                 onDeactivate={handleDeleteAccount}
                 onEdit={handleEditAccount}
+                onReactivate={handleReactivateAccount}
                 onSearchChange={setAccountSearch}
               />
               </>
@@ -644,7 +685,13 @@ function SettingsPage() {
         onCancelDeactivate={handleCancelDeleteAccount}
         onCloseActionNotice={() => setAccountActionNotice(null)}
         onConfirmDeactivate={handleConfirmDeleteAccount}
+        onCancelReactivate={() => setPendingReactivateAccount(null)}
+        onConfirmReactivate={handleConfirmReactivateAccount}
         pendingAccount={pendingDeleteAccount}
+        pendingReactivateAccount={pendingReactivateAccount}
+        accountRequestPending={accountRequestPending}
+        assignedImeiToAccount={assignedImeiToAccount}
+        devices={flespiDevices}
       />
     </div>
   )

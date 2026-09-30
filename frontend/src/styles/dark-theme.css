@@ -872,7 +872,7 @@
   color: var(--color-primary-light);
 }
 [data-theme="dark"] .assignment-area-trigger__icon {
-  border-color: #9eabc0;
+  color: #9eabc0;
 }
 [data-theme="dark"] .assignment-area-dropdown {
   border-color: #2a3a56;
@@ -1173,6 +1173,15 @@
 [data-theme="dark"] .account-view-tab:hover {
   background: rgba(37, 99, 235, 0.13);
   color: var(--color-primary-light);
+}
+[data-theme="dark"] .account-table-btn--reactivate {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: var(--text-on-accent);
+}
+[data-theme="dark"] .account-table-btn--reactivate:hover {
+  border-color: #15803d;
+  background: #15803d;
 }
 [data-theme="dark"] .account-view-tab--active {
   background: rgba(37, 99, 235, 0.18);

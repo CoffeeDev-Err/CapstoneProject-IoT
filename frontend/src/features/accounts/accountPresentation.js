@@ -1,19 +1,35 @@
-import { POLICE_RANKS } from '../../utils/accountValidation'
+import { meetsPasswordRequirements, POLICE_RANKS } from '../../utils/accountValidation'
 
 export const rankOptions = POLICE_RANKS
 export const createTempPassword = (length = 12) => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?'
-  let value = ''
+  const groups = [
+    'ABCDEFGHJKLMNPQRSTUVWXYZ',
+    'abcdefghijkmnopqrstuvwxyz',
+    '23456789',
+    '!@#$%&*?',
+  ]
+  const requestedLength = Math.max(10, Math.min(Number(length) || 12, 128))
   if (!globalThis.crypto?.getRandomValues) throw new Error('Secure password generation is unavailable in this browser.')
-  const upperBound = 256 - (256 % chars.length)
-  while (value.length < length) {
-    const bytes = new Uint8Array(Math.max(16, length - value.length))
-    globalThis.crypto.getRandomValues(bytes)
-    bytes.forEach((byte) => {
-      if (value.length < length && byte < upperBound) value += chars[byte % chars.length]
-    })
+
+  const secureIndex = (max) => {
+    const upperBound = 256 - (256 % max)
+    const byte = new Uint8Array(1)
+    do globalThis.crypto.getRandomValues(byte)
+    while (byte[0] >= upperBound)
+    return byte[0] % max
   }
-  return value
+  const allCharacters = groups.join('')
+  const characters = groups.map((group) => group[secureIndex(group.length)])
+  while (characters.length < requestedLength) {
+    characters.push(allCharacters[secureIndex(allCharacters.length)])
+  }
+  for (let index = characters.length - 1; index > 0; index -= 1) {
+    const swapIndex = secureIndex(index + 1)
+    ;[characters[index], characters[swapIndex]] = [characters[swapIndex], characters[index]]
+  }
+  const password = characters.join('')
+  if (!meetsPasswordRequirements(password)) throw new Error('Secure password generation failed validation.')
+  return password
 }
 export const createInitialAccountForm = () => ({
   fullName: '', badgeNumber: '', imei: '', flespiDeviceId: '', flespiDeviceName: '',

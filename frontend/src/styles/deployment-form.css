@@ -261,7 +261,7 @@
 }
 
 .assignment-area-trigger:hover .assignment-area-trigger__icon {
-  border-color: var(--deployment-blue-dark);
+  color: var(--deployment-blue-dark);
 }
 
 .assignment-form .settings-input:focus {
@@ -297,22 +297,16 @@
 }
 
 .assignment-area-trigger__icon {
-  position: relative;
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  margin: -3px 3px 0 0;
-  border-right: 1.5px solid var(--deployment-text-muted);
-  border-bottom: 1.5px solid var(--deployment-text-muted);
-  color: transparent;
-  font-size: 0;
-  transform: rotate(45deg);
-  transition: transform var(--transition-fast);
+  width: 18px;
+  height: 18px;
+  color: var(--deployment-text-muted);
+  transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
 .assignment-area-trigger[aria-expanded='true'] .assignment-area-trigger__icon {
-  margin-top: 3px;
-  transform: rotate(225deg);
+  color: var(--deployment-blue-dark);
+  transform: rotate(180deg);
 }
 
 .assignment-area-dropdown {

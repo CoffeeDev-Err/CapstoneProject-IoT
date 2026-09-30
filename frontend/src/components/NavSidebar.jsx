@@ -4,12 +4,13 @@
  * Fixed-position sidebar navigation. The visual palette stays in App.css;
  * this component only controls grouping and route links.
  */
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
   ClipboardList,
   FileText,
   LayoutDashboard,
+  LogOut,
   Map as MapIcon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -18,6 +19,9 @@ import {
   Users,
 } from 'lucide-react'
 import geosentriIcon from '../assets/geosentri-icon.png'
+import { useAuth } from '../context/useAuth'
+import { resolveApiAssetUrl } from '../services/apiAssets'
+import InitialsAvatar from './InitialsAvatar'
 
 const navSections = [
   {
@@ -83,11 +87,24 @@ const navSections = [
 ]
 
 function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
+  const navigate = useNavigate()
+  const { logout, user } = useAuth()
+  const profileName = user?.profile?.fullName || user?.fullName || user?.username || 'Signed-in user'
+  const roleLabel = user?.role === 'supervisor' ? 'Supervisor' : 'Officer'
+  const profileRank = user?.profile?.rank || user?.rank || roleLabel
+  const profilePhoto = resolveApiAssetUrl(user?.profile?.photoUrl || user?.photoUrl)
+
   const handleNavItemClick = (item) => {
     onNavigate?.()
     if (item.to === '/map' && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('focus-live-map'))
     }
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    onNavigate?.()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -105,7 +122,29 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
         )}
       </div>
 
-      <nav className="nav-sidebar__nav mt-4" aria-label="Main navigation">
+      <NavLink
+        to="/settings"
+        className="nav-sidebar__profile"
+        aria-label={`Open account management for ${profileName}`}
+        title={collapsed ? profileName : undefined}
+        onClick={onNavigate}
+      >
+        <InitialsAvatar
+          className="nav-sidebar__profile-avatar"
+          src={profilePhoto}
+          name={profileName}
+          alt=""
+        />
+        {!collapsed && (
+          <span className="nav-sidebar__profile-copy">
+            <strong>{profileName}</strong>
+            <span>{profileRank}</span>
+            <small>{roleLabel}</small>
+          </span>
+        )}
+      </NavLink>
+
+      <nav className="nav-sidebar__nav" aria-label="Main navigation">
         {navSections.map((section) => (
           <div className="nav-sidebar__section" key={section.title}>
             {!collapsed && <span className="nav-sidebar__section-title">{section.title}</span>}
@@ -137,6 +176,17 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
           </div>
         ))}
       </nav>
+
+      <button
+        type="button"
+        className="nav-sidebar__logout"
+        onClick={handleLogout}
+        aria-label="Log out"
+        title={collapsed ? 'Log out' : undefined}
+      >
+        <LogOut aria-hidden="true" />
+        {!collapsed && <span>Log Out</span>}
+      </button>
 
       {!mobile && <button
         type="button"

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { useState } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import MobileNavigation from './MobileNavigation'
+import { AuthContext } from '../context/AuthContextObject'
 
 let mediaListener
 beforeEach(() => {
@@ -15,8 +16,12 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 function Harness() {
   const [open, setOpen] = useState(false)
-  return <MemoryRouter><button onClick={() => setOpen(true)}>Open menu</button>
-    <MobileNavigation open={open} onClose={() => setOpen(false)} /></MemoryRouter>
+  const auth = {
+    user: { username: '00-0001', fullName: 'Test Supervisor', role: 'supervisor' },
+    logout: vi.fn().mockResolvedValue(undefined),
+  }
+  return <AuthContext.Provider value={auth}><MemoryRouter><button onClick={() => setOpen(true)}>Open menu</button>
+    <MobileNavigation open={open} onClose={() => setOpen(false)} /></MemoryRouter></AuthContext.Provider>
 }
 
 it('opens a modal navigation menu and restores scrolling after selecting a route', () => {
@@ -54,7 +59,7 @@ it('cycles keyboard focus between the first and last menu controls', () => {
   render(<Harness />)
   fireEvent.click(screen.getByText('Open menu'))
   const first = screen.getByRole('button', { name: 'Close navigation' })
-  const last = screen.getByRole('link', { name: 'Account Management' })
+  const last = screen.getByRole('button', { name: 'Log out' })
   first.focus()
   fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })
   expect(document.activeElement).toBe(last)

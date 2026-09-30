@@ -30,7 +30,9 @@
 .mobile-navigation .nav-sidebar__section-title,
 .mobile-navigation .nav-sidebar__label { display: block; }
 .mobile-navigation .nav-sidebar__label { white-space: normal; overflow-wrap: anywhere; }
-.mobile-navigation .nav-sidebar__nav { overflow-y: auto; padding: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.mobile-navigation .nav-sidebar__profile { margin-top: 1rem; }
+.mobile-navigation .nav-sidebar__nav { overflow-y: auto; padding: 1.5rem 1rem 1rem; }
+.mobile-navigation .nav-sidebar__logout { margin-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 .mobile-navigation .nav-sidebar__section + .nav-sidebar__section { margin-top: 1.25rem; }
 .mobile-navigation .nav-sidebar__link { justify-content: flex-start; gap: 0.8rem; padding: 0.8rem; min-height: 48px; }
 .mobile-navigation__close { position: absolute; top: 18px; right: 10px; z-index: 201; }

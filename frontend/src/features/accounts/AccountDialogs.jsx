@@ -1,12 +1,19 @@
 import ActionNoticeModal from '../../components/ActionNoticeModal'
 import ConfirmModal from '../../components/ConfirmModal'
+import ReactivateAccountModal from './ReactivateAccountModal'
 
 export default function AccountDialogs({
   actionNotice,
   onCancelDeactivate,
   onCloseActionNotice,
   onConfirmDeactivate,
+  onCancelReactivate,
+  onConfirmReactivate,
   pendingAccount,
+  pendingReactivateAccount,
+  accountRequestPending,
+  assignedImeiToAccount,
+  devices,
 }) {
   return (
     <>
@@ -23,6 +30,16 @@ export default function AccountDialogs({
         onConfirm={onConfirmDeactivate}
         onCancel={onCancelDeactivate}
       />
+      {pendingReactivateAccount && (
+        <ReactivateAccountModal
+          account={pendingReactivateAccount}
+          assignedImeiToAccount={assignedImeiToAccount}
+          devices={devices}
+          pending={accountRequestPending}
+          onConfirm={onConfirmReactivate}
+          onCancel={onCancelReactivate}
+        />
+      )}
       <ActionNoticeModal
         open={Boolean(actionNotice)}
         title={actionNotice?.title}

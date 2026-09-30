@@ -460,3 +460,13 @@
     padding-inline: 0.55rem;
   }
 }
+.assignment-group-menu-trigger__chevron {
+  width: 16px;
+  height: 16px;
+  margin-left: 0.35rem;
+  transition: transform var(--transition-fast);
+}
+
+.assignment-group-menu-trigger[aria-expanded='true'] .assignment-group-menu-trigger__chevron {
+  transform: rotate(180deg);
+}

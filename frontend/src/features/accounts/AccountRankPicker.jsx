@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronDown } from 'lucide-react'
 import { rankOptions } from './accountPresentation'
 import { matchesPrefixSearch } from '../../utils/searchMatching'
 
@@ -65,7 +66,7 @@ function AccountRankPicker({ value, onChange, invalid }) {
     >
       <button
         type="button"
-        className={`settings-input account-rank-trigger${invalid ? ' settings-input--error' : ''}`}
+        className={`settings-input account-rank-trigger${open ? ' is-open' : ''}${invalid ? ' settings-input--error' : ''}`}
         onClick={togglePicker}
         aria-labelledby="account-rank-label account-rank-value"
         aria-haspopup="listbox"
@@ -74,7 +75,7 @@ function AccountRankPicker({ value, onChange, invalid }) {
         aria-invalid={invalid}
       >
         <span id="account-rank-value">{value}</span>
-        <span className="account-rank-trigger__icon" aria-hidden="true">⌄</span>
+        <ChevronDown className="account-rank-trigger__icon" aria-hidden="true" />
       </button>
 
       {open && (
@@ -109,7 +110,7 @@ function AccountRankPicker({ value, onChange, invalid }) {
                 }}
               >
                 <span>{rank}</span>
-                {value === rank && <span aria-hidden="true">✓</span>}
+                {value === rank && <Check className="account-rank-option__check" aria-hidden="true" />}
               </button>
             ))}
           </div>

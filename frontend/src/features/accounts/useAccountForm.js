@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   ACCOUNT_FIELD_LIMITS,
+  meetsPasswordRequirements,
   normalizeEmail,
   validateBadgeNumber,
   validateFullName,
@@ -25,9 +26,10 @@ export function useAccountForm({
   const [formErrors, setFormErrors] = useState({})
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
-	const isEditingSupervisor = editingAccount?.role === 'Supervisor' || (!editingAccountId && accountType === 'supervisor')
+  const isEditingSupervisor = editingAccount?.role === 'Supervisor' || (!editingAccountId && accountType === 'supervisor')
   const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
-  const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount
+  const isEditingInactiveAccount = editingAccount?.accountStatus === 'Inactive'
+  const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount && !isEditingInactiveAccount
 
   const validateAccountForm = () => {
     const errors = {}
@@ -81,12 +83,7 @@ export function useAccountForm({
     }
 
     const passwordValue = accountForm.temporaryPassword
-    const passwordRulesPassed = passwordValue.length >= 10
-      && passwordValue.length <= ACCOUNT_FIELD_LIMITS.password
-      && /[A-Z]/.test(passwordValue)
-      && /[a-z]/.test(passwordValue)
-      && /\d/.test(passwordValue)
-      && /[^A-Za-z0-9]/.test(passwordValue)
+    const passwordRulesPassed = meetsPasswordRequirements(passwordValue)
     if ((!editingAccountId || passwordValue) && !passwordRulesPassed) {
       errors.temporaryPassword = `Use 10-${ACCOUNT_FIELD_LIMITS.password} characters, including an uppercase letter, lowercase letter, number, and symbol.`
     }
@@ -184,6 +181,7 @@ export function useAccountForm({
     handleProfilePhotoChange,
     handleGenerateTemporaryPassword: () => {
       setAccountForm((current) => ({ ...current, temporaryPassword: createTempPassword() }))
+      clearFieldError('temporaryPassword')
     },
     resetFormToCreate,
   }

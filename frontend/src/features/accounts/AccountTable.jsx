@@ -12,6 +12,7 @@ function AccountTable({
   filteredAccounts,
   onDeactivate,
   onEdit,
+  onReactivate,
   onSearchChange,
 }) {
   return (
@@ -115,12 +116,21 @@ function AccountTable({
                                   </span>
 								) : account.role === 'Supervisor' && !canManageSupervisors ? (
 								  <span className="account-protected-label" title="Only the primary supervisor can manage this account.">Primary supervisor only</span>
+                                ) : account.accountStatus === 'Inactive' ? (
+                                  <button
+                                    type="button"
+                                    className="account-table-btn account-table-btn--reactivate"
+                                    onClick={() => onReactivate(account.id)}
+                                    disabled={accountRequestPending}
+                                  >
+                                    Reactivate
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
                                     className="account-table-btn account-table-btn--delete"
                                     onClick={() => onDeactivate(account.id)}
-                                    disabled={accountRequestPending || account.accountStatus === 'Inactive'}
+                                    disabled={accountRequestPending}
                                   >
                                     Deactivate
                                   </button>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GeoSentri sidebar profile and reactivation sketch</title>
+  <style>
+    :root {
+      --canvas:#08101f; --shell:#0b1425; --sidebar:#0d1729; --surface:#111d32;
+      --surface-2:#15243c; --surface-3:#1b2c48; --border:#263a58; --text:#f4f7fb;
+      --muted:#9eb0ca; --muted-2:#7286a5; --blue:#3b82f6; --blue-soft:#172f55;
+      --green:#35d07f; --green-soft:#102f28; --red:#ff5a63; --red-soft:#361b28;
+      --amber:#f8c24e; --shadow:0 24px 70px rgba(0,0,0,.42);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--canvas); color:var(--text); font-family:Inter,"Segoe UI",Arial,sans-serif; }
+    button { font:inherit; }
+    .board { width:1600px; min-height:1000px; padding:28px 40px 42px; }
+    .board-head { display:flex; align-items:end; justify-content:space-between; margin:0 2px 18px; }
+    .board-head h1 { margin:0; font-size:24px; letter-spacing:-.02em; }
+    .board-head p { margin:6px 0 0; color:var(--muted); font-size:13px; }
+    .tag { border:1px solid #31558a; border-radius:999px; padding:8px 12px; background:#102443; color:#9fc7ff; font-size:12px; font-weight:800; }
+    .window { position:relative; height:875px; overflow:hidden; border:1px solid #263650; border-radius:18px; background:var(--shell); box-shadow:var(--shadow); }
+    .sidebar { position:absolute; inset:0 auto 0 0; width:278px; border-right:1px solid var(--border); background:linear-gradient(180deg,#0d1729,#0a1425); }
+    .brand { height:76px; display:flex; align-items:center; gap:11px; padding:0 20px; border-bottom:1px solid var(--border); }
+    .brand img { width:42px; height:42px; object-fit:contain; }
+    .brand strong { font-size:21px; letter-spacing:-.04em; }
+    .brand strong span { color:#62a0ff; }
+    .identity { margin:17px 14px 12px; padding:14px; border:1px solid #315077; border-radius:14px; background:linear-gradient(135deg,#172842,#112039); }
+    .identity-top { display:flex; align-items:center; gap:11px; }
+    .avatar { width:43px; height:43px; flex:0 0 auto; display:grid; place-items:center; border:2px solid #629bff; border-radius:50%; background:#243b60; color:#d7e7ff; font-size:12px; font-weight:900; }
+    .identity-copy { min-width:0; }
+    .identity-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+    .identity-copy span { display:block; margin-top:3px; color:#a9b9cf; font-size:11px; }
+    .identity-role { margin-top:11px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .role-pill { padding:5px 8px; border-radius:999px; background:var(--blue-soft); color:#9fc6ff; font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+    .identity-action { border:0; background:transparent; color:#9fc6ff; font-size:10px; font-weight:800; cursor:pointer; }
+    .nav-scroll { position:absolute; top:190px; right:0; bottom:126px; left:0; padding:2px 14px 14px; overflow:hidden; }
+    .nav-label { margin:14px 11px 7px; color:#647a9a; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+    .nav-item { height:42px; margin:3px 0; padding:0 12px; display:flex; align-items:center; gap:11px; border-radius:9px; color:#aab9cd; font-size:12px; font-weight:750; }
+    .nav-item.active { background:#18365f; color:#d8e8ff; box-shadow:inset 3px 0 #4d91ff; }
+    .nav-icon { width:18px; height:18px; display:grid; place-items:center; color:currentColor; }
+    .nav-icon svg,.icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .side-bottom { position:absolute; right:14px; bottom:15px; left:14px; display:grid; gap:8px; }
+    .password-link,.logout { height:40px; display:flex; align-items:center; gap:10px; padding:0 12px; border-radius:9px; font-size:11px; font-weight:800; cursor:pointer; }
+    .password-link { border:1px solid var(--border); background:#101d31; color:#bdc9d9; }
+    .logout { border:1px solid rgba(255,90,99,.48); background:rgba(255,90,99,.08); color:#ff8a91; }
+    .topbar { position:absolute; top:0; right:0; left:278px; height:76px; display:flex; align-items:center; justify-content:space-between; padding:0 25px; border-bottom:1px solid var(--border); background:#101b2e; }
+    .station { display:flex; align-items:center; gap:12px; }
+    .station img { width:38px; height:45px; object-fit:contain; }
+    .station h2 { margin:0; font-size:15px; }
+    .station p { margin:4px 0 0; color:var(--muted); font-size:10px; }
+    .top-actions { display:flex; align-items:center; gap:9px; }
+    .live { height:36px; display:flex; align-items:center; gap:7px; padding:0 12px; border:1px solid #30567c; border-radius:999px; background:#12243b; color:#c6d5e7; font-size:10px; font-weight:900; text-transform:uppercase; }
+    .live i { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px rgba(53,208,127,.1); }
+    .icon { position:relative; width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--border); border-radius:10px; background:#111f34; color:#becce0; }
+    .icon .dot { position:absolute; top:6px; right:6px; width:8px; height:8px; border:2px solid #111f34; border-radius:50%; background:#ff5a63; }
+    .content { position:absolute; top:76px; right:0; bottom:0; left:278px; padding:24px 26px; background:radial-gradient(circle at 82% 0,rgba(36,107,253,.07),transparent 34%),#0b1425; }
+    .page-head { display:flex; align-items:end; justify-content:space-between; margin-bottom:18px; }
+    .page-head h3 { margin:0; font-size:24px; letter-spacing:-.025em; }
+    .page-head p { margin:5px 0 0; color:var(--muted); font-size:11px; }
+    .primary { height:40px; padding:0 15px; border:1px solid #4f8df2; border-radius:9px; background:#276bea; color:white; font-size:11px; font-weight:850; }
+    .tabs { width:310px; height:40px; display:grid; grid-template-columns:1fr 1fr; padding:4px; border:1px solid var(--border); border-radius:10px; background:#0f1b2e; }
+    .tabs span { display:grid; place-items:center; border-radius:7px; color:var(--muted); font-size:10px; font-weight:850; }
+    .tabs .selected { background:#1d3a64; color:#dceaff; box-shadow:0 3px 12px rgba(0,0,0,.25); }
+    .toolbar { margin-top:14px; display:flex; align-items:center; justify-content:space-between; }
+    .search { width:350px; height:39px; display:flex; align-items:center; gap:10px; padding:0 12px; border:1px solid var(--border); border-radius:9px; background:#0f1b2e; color:#7488a7; font-size:11px; }
+    .count { color:var(--muted); font-size:10px; }
+    .card { margin-top:12px; overflow:hidden; border:1px solid var(--border); border-radius:13px; background:#101b2e; box-shadow:0 10px 30px rgba(0,0,0,.14); }
+    .table-row { display:grid; grid-template-columns:1.3fr .8fr .8fr .9fr .72fr 190px; align-items:center; gap:12px; min-height:72px; padding:0 16px; border-bottom:1px solid #223450; color:#bdc9d9; font-size:11px; }
+    .table-row.head { min-height:43px; background:#132138; color:#8295b1; font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .person { display:flex; align-items:center; gap:10px; }
+    .face { width:34px; height:34px; display:grid; place-items:center; border-radius:50%; background:#233a5e; color:#d7e7ff; font-size:10px; font-weight:900; }
+    .person strong { display:block; color:#eef4fc; font-size:11px; }
+    .person small { display:block; margin-top:3px; color:#758aa8; font-size:9px; }
+    .status { width:max-content; padding:5px 9px; border-radius:999px; font-size:9px; font-weight:900; text-transform:uppercase; }
+    .status.active { border:1px solid rgba(53,208,127,.36); background:var(--green-soft); color:#53e397; }
+    .status.inactive { border:1px solid #40516c; background:#172238; color:#8799b4; }
+    .actions { display:flex; justify-content:flex-end; gap:7px; }
+    .btn { min-width:76px; height:35px; padding:0 11px; border-radius:8px; background:transparent; font-size:9px; font-weight:900; text-transform:uppercase; }
+    .edit { border:1px solid #3f78c8; color:#9fc6ff; }
+    .deactivate { border:1px solid rgba(255,90,99,.64); background:var(--red-soft); color:#ff858c; }
+    .reactivate { border:1px solid rgba(53,208,127,.5); background:var(--green-soft); color:#63e8a2; }
+    .note { margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:12px 14px; border:1px solid #29466c; border-radius:10px; background:#101f36; }
+    .note strong { display:block; color:#d9e8fb; font-size:11px; }
+    .note span { display:block; margin-top:3px; color:#8094b1; font-size:9px; }
+    .legend { display:flex; gap:14px; color:#8fa2bd; font-size:9px; }
+    .legend i { display:inline-block; width:7px; height:7px; margin-right:5px; border-radius:50%; }
+    .legend .red { background:var(--red); }.legend .green { background:var(--green); }
+    .caption { position:absolute; right:20px; bottom:14px; color:#617492; font-size:9px; }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-head">
+      <div><h1>Proposed GeoSentri desktop shell</h1><p>Profile moved to the sidebar · clean header · explicit account reactivation</p></div>
+      <span class="tag">LOW-FIDELITY LAYOUT SKETCH</span>
+    </header>
+    <section class="window">
+      <aside class="sidebar">
+        <div class="brand"><img src="../../frontend/src/assets/geosentri-icon.png" alt="" /><strong><span>Geo</span>Sentri</strong></div>
+        <section class="identity">
+          <div class="identity-top"><div class="avatar">BM</div><div class="identity-copy"><strong>Bonifacio Malabad</strong><span>Police Major</span></div></div>
+          <div class="identity-role"><span class="role-pill">Primary Supervisor</span><button class="identity-action">View account</button></div>
+        </section>
+        <div class="nav-scroll">
+          <div class="nav-label">Overview</div>
+          <div class="nav-item"><span class="nav-icon">⌖</span>Live Map</div>
+          <div class="nav-item"><span class="nav-icon">▦</span>Dashboard</div>
+          <div class="nav-label">Operations</div>
+          <div class="nav-item"><span class="nav-icon">♙</span>Personnel</div>
+          <div class="nav-item"><span class="nav-icon">✎</span>Deployment Management</div>
+          <div class="nav-item"><span class="nav-icon">☷</span>Assigned Deployments</div>
+          <div class="nav-label">Analytics</div>
+          <div class="nav-item"><span class="nav-icon">▥</span>Analytics</div>
+          <div class="nav-item"><span class="nav-icon">▤</span>Reports</div>
+          <div class="nav-label">Admin</div>
+          <div class="nav-item active"><span class="nav-icon">⚙</span>Account Management</div>
+        </div>
+        <div class="side-bottom">
+          <button class="password-link"><span class="nav-icon">♢</span>Change password</button>
+          <button class="logout"><span class="nav-icon">↪</span>Log out</button>
+        </div>
+      </aside>
+
+      <header class="topbar">
+        <div class="station"><img src="../../frontend/src/assets/pnp-logo.png" alt="" /><div><h2>Philippine National Police</h2><p>Cabagan Police Station Operations Portal</p></div></div>
+        <div class="top-actions">
+          <span class="live"><i></i>Live</span>
+          <button class="icon" aria-label="Theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+          <button class="icon" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="dot"></span></button>
+        </div>
+      </header>
+
+      <section class="content">
+        <header class="page-head"><div><h3>Account Management</h3><p>Create, update, deactivate, and restore authorized GeoSentri accounts.</p></div><button class="primary">Create account</button></header>
+        <div class="tabs"><span>Create Account</span><span class="selected">Manage Accounts</span></div>
+        <div class="toolbar"><span class="count">4 provisioned accounts</span><div class="search">⌕&nbsp;&nbsp; Search name, badge, email, device, or login</div></div>
+        <div class="card">
+          <div class="table-row head"><span>Account</span><span>Rank</span><span>Login ID</span><span>Email</span><span>Status</span><span style="text-align:right">Actions</span></div>
+          <div class="table-row">
+            <div class="person"><span class="face">JM</span><div><strong>Jheric Mayubay</strong><small>No GPS device assigned</small></div></div><span>Police Lieutenant</span><span>01-0002</span><span>geosentri.system@gmail.com</span><span class="status inactive">Inactive</span><div class="actions"><button class="btn edit">Edit</button><button class="btn reactivate">Reactivate</button></div>
+          </div>
+          <div class="table-row">
+            <div class="person"><span class="face">MM</span><div><strong>Mon Maguas</strong><small>GPS-002 · Online</small></div></div><span>Patrolman</span><span>11-2004</span><span>aggabaogerryboy@gmail.com</span><span class="status active">Active</span><div class="actions"><button class="btn edit">Edit</button><button class="btn deactivate">Deactivate</button></div>
+          </div>
+          <div class="table-row">
+            <div class="person"><span class="face">LG</span><div><strong>Leo B Gannad</strong><small>GPS-001 · Online</small></div></div><span>Police Corporal</span><span>12-2004</span><span>leogannad18@gmail.com</span><span class="status active">Active</span><div class="actions"><button class="btn edit">Edit</button><button class="btn deactivate">Deactivate</button></div>
+          </div>
+          <div class="table-row" style="border-bottom:0">
+            <div class="person"><span class="face">BM</span><div><strong>Bonifacio Malabad</strong><small>Primary Supervisor</small></div></div><span>Police Major</span><span>00-0001</span><span>leo.b.gannad@isu.edu.ph</span><span class="status active">Active</span><div class="actions"><button class="btn edit">Edit</button><button class="btn" style="border:1px solid #40516c;color:#8295b1">Protected</button></div>
+          </div>
+        </div>
+        <div class="note"><div><strong>Reactivation is a deliberate recovery action</strong><span>Inactive officers must select an available GPS device before confirmation; supervisor accounts do not require a tracker.</span></div><div class="legend"><span><i class="red"></i>Destructive</span><span><i class="green"></i>Recovery</span></div></div>
+        <span class="caption">Concept only — production UI remains unchanged</span>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

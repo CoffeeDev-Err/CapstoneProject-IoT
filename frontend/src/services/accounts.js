@@ -43,3 +43,11 @@ export const updateAccount = async (accountId, account, profilePhoto) => {
 export const deactivateAccount = async (accountId) => (
   apiRequest(`/api/accounts/${accountId}`, { method: 'DELETE' })
 )
+
+export const reactivateAccount = async (accountId, device = {}) => {
+  const payload = await apiRequest(`/api/accounts/${accountId}/reactivate`, {
+    method: 'PATCH',
+    body: JSON.stringify(device),
+  })
+  return payload.account
+}

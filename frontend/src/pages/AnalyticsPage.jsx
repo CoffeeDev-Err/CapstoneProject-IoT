@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import BarangayOperationalAnalytics from '../components/BarangayOperationalAnalytics'
 import { AnalyticsContentSkeleton } from '../components/LoadingSkeleton'
 import { usePersonnelContext } from '../context/usePersonnelContext'
@@ -92,7 +93,10 @@ export default function AnalyticsPage() {
         </div>
         <div className="analytics-download">
           <button ref={menuButtonRef} type="button" className="report-generate-btn" aria-expanded={menu} aria-controls="analytics-download-options"
-            disabled={loading || Boolean(error) || exporting} onClick={() => setMenu(!menu)}>{exporting ? 'Generating...' : 'Generate Report ▾'}</button>
+            disabled={loading || Boolean(error) || exporting} onClick={() => setMenu(!menu)}>
+            <span>{exporting ? 'Generating...' : 'Generate Report'}</span>
+            {!exporting && <ChevronDown className="report-generate-btn__chevron" aria-hidden="true" />}
+          </button>
           {menu && <div ref={menuRef} className="analytics-download-menu" id="analytics-download-options" aria-label="Download format">
             <button onClick={() => generate('pdf')}>PDF Report</button><button onClick={() => generate('xlsx')}>Excel Data (.xlsx)</button>
           </div>}

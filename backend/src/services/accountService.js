@@ -318,18 +318,18 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 		if (!user) throw createHttpError('Account not found.', 404)
 		const isSupervisor = user.role === 'supervisor'
 		if (isSupervisor) assertCanManageSupervisor(actor)
+		const nextStatus = isSupervisor
+			? normalizeStatus(payload.accountStatus || user.status)
+			: normalizeStatus(payload.accountStatus)
 
 		validateAccountPayload(payload, {
 			requirePassword: false,
 			requirePersonnel: !isSupervisor,
-			requireDevice: !isSupervisor && !user.isMockAccount,
+			requireDevice: !isSupervisor && !user.isMockAccount && nextStatus === 'active',
 			existingLoginId: user.username,
 		})
 		const nextLoginId = normalizeLoginId(payload.loginId)
 		const nextEmail = normalizeEmail(payload.officialEmail)
-		const nextStatus = isSupervisor
-			? normalizeStatus(payload.accountStatus || user.status)
-			: normalizeStatus(payload.accountStatus)
 		const shouldRevokeSessions = (
 			user.username !== nextLoginId
 			|| user.email !== nextEmail
@@ -539,12 +539,106 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 		}
 	}
 
+	const reactivateAccount = async (accountId, payload = {}, { ipAddress, actor } = {}) => {
+		const user = await User.findById(accountId)
+		if (!user) throw createHttpError('Account not found.', 404)
+		if (user.role === 'supervisor') assertCanManageSupervisor(actor)
+		if (user.status === 'active') {
+			throw createHttpError('Account is already active.', 409, 'ACCOUNT_ALREADY_ACTIVE')
+		}
+
+		let profile = null
+		let assignment = null
+		if (user.role === 'officer') {
+			profile = await Personnel.findOne({ personnelId: user.personnelId })
+			if (!profile) throw createHttpError('Personnel profile not found.', 404)
+
+			if (!user.isMockAccount) {
+				if (!String(payload.imei || '').trim() || !String(payload.flespiDeviceId || '').trim()) {
+					throw createHttpError(
+						'Select an available GPS device before reactivating this account.',
+						400,
+						'GPS_DEVICE_REQUIRED',
+						'imei',
+					)
+				}
+				const device = await validateRegisteredDevice(payload)
+				const existingAssignment = await GpsDeviceAssignment.findOne({
+					status: 'active',
+					$or: [
+						{ imei: device.imei },
+						{ personnelId: user.personnelId },
+					],
+				})
+				if (existingAssignment) {
+					throw createHttpError(
+						'The selected GPS device is already assigned to an active account.',
+						409,
+						'GPS_DEVICE_ASSIGNED',
+						'imei',
+					)
+				}
+				assignment = await GpsDeviceAssignment.create({
+					assignmentId: `GPS-${randomUUID()}`,
+					personnelId: user.personnelId,
+					flespiDeviceId: device.id,
+					imei: device.imei,
+					deviceName: device.name,
+					assignedBy: actor?.username || 'supervisor',
+					assignedAt: new Date(),
+				})
+			}
+		}
+
+		try {
+			user.status = 'active'
+			if (profile) {
+				profile.status = 'active'
+				profile.dutyStatus = 'Off Duty'
+			}
+			await Promise.all([
+				user.save(),
+				...(profile ? [profile.save()] : []),
+			])
+		} catch (error) {
+			if (assignment?._id) await GpsDeviceAssignment.deleteOne({ _id: assignment._id }).catch(() => {})
+			throw error
+		}
+
+		await recordAudit({
+			actor,
+			action: 'account.reactivated',
+			entityType: 'user',
+			entityId: String(user._id),
+			changes: {
+				personnelId: user.personnelId,
+				gpsAssigned: Boolean(assignment),
+			},
+			ipAddress,
+		})
+		await broadcastAccountData({
+			personnelId: user.personnelId,
+			name: profile?.fullName,
+			badgeNumber: profile?.badgeNumber,
+			rank: profile?.rank || user.rank,
+			mobileNumber: profile?.mobileNumber,
+			photoUrl: toMediaAccessPath(profile?.photoUrl || user.photoUrl),
+			loginId: user.username,
+			officialEmail: user.email || '',
+			emailVerified: Boolean(user.emailVerifiedAt),
+			accountStatus: user.status,
+		})
+
+		return serializeAccount(user, profile, assignment)
+	}
+
 	return {
 		createAccount,
 		createSupervisorAccount,
 		deactivateAccount,
 		getAccountPhotoReference,
 		loadAccounts,
+		reactivateAccount,
 		updateAccount,
 	}
 }

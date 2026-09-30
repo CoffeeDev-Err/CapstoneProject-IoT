@@ -21,6 +21,7 @@ const createAccountRoutes = ({ authService, controller }) => {
 	router.get('/', asyncHandler(controller.getAccounts))
 	router.post('/', uploadProfilePhoto, asyncHandler(controller.createAccount))
 	router.post('/supervisors', uploadProfilePhoto, asyncHandler(controller.createSupervisorAccount))
+	router.patch('/:accountId/reactivate', asyncHandler(controller.reactivateAccount))
 	router.put('/:accountId', uploadProfilePhoto, asyncHandler(controller.updateAccount))
 	router.delete('/:accountId', asyncHandler(controller.deactivateAccount))
 

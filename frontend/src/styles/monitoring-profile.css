@@ -425,6 +425,22 @@
   box-shadow: none;
 }
 
+.confirm-btn--success {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: #ffffff;
+}
+
+.confirm-btn--success:hover:not(:disabled) {
+  border-color: #166534;
+  background: #166534;
+}
+
+.confirm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .modal-backdrop--above-profile {
   z-index: 10010;
 }

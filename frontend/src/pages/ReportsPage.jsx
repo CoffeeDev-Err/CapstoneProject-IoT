@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Search } from 'lucide-react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import ReportDetailDrawer from '../components/ReportDetailDrawer'
+import SelectControl from '../components/SelectControl'
 import { ReportListSkeleton } from '../components/LoadingSkeleton'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
@@ -84,9 +85,9 @@ function ReportsPage() {
         </div>
         <label className="report-filter report-date-filter">
           <span>Dates (Philippine time)</span>
-          <select value={filters.period} onChange={(event) => updateFilter('period', event.target.value)}>
+          <SelectControl value={filters.period} onChange={(event) => updateFilter('period', event.target.value)}>
             {REPORT_PERIODS.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
-          </select>
+          </SelectControl>
         </label>
       </header>
 
@@ -112,7 +113,7 @@ function ReportsPage() {
 
           <label className="report-filter">
             <span>Report type</span>
-            <select
+            <SelectControl
               value={reportTypeFilter}
               onChange={(event) => updateReportTypeFilter(event.target.value)}
             >
@@ -122,19 +123,19 @@ function ReportsPage() {
                   {reportType}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </label>
 
           <label className="report-filter">
             <span>Case status</span>
-            <select
+            <SelectControl
               value={caseStatusFilter}
               onChange={(event) => updateCaseStatusFilter(event.target.value)}
             >
               <option value="all">All statuses</option>
               <option value="open">Open incidents</option>
               <option value="resolved">Resolved incidents</option>
-            </select>
+            </SelectControl>
           </label>
         </div>
 

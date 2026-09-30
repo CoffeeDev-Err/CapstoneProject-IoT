@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { FileText } from 'lucide-react'
+import { ChevronDown, FileText } from 'lucide-react'
 import { TableSkeletonRows } from '../../components/LoadingSkeleton'
 import DeploymentInstructionsModal from './DeploymentInstructionsModal'
 import {
@@ -141,6 +141,7 @@ function DeploymentList({
                           aria-haspopup="menu"
                         >
                           Group Actions
+                          <ChevronDown className="assignment-group-menu-trigger__chevron" aria-hidden="true" />
                         </button>
 
                         {openGroupMenuId === group.groupId && (

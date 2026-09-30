@@ -214,8 +214,19 @@
 .account-rank-trigger__icon {
   flex: 0 0 auto;
   color: var(--text-tertiary);
-  font-size: var(--font-size-lg);
-  line-height: 1;
+  width: 18px;
+  height: 18px;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.account-rank-trigger.is-open .account-rank-trigger__icon {
+  color: var(--interactive-primary);
+  transform: rotate(180deg);
+}
+
+.account-rank-option__check {
+  width: 16px;
+  height: 16px;
 }
 
 .account-rank-dropdown {
@@ -555,6 +566,42 @@
   background: var(--color-danger-dark);
   color: var(--text-on-accent);
   box-shadow: none;
+}
+
+.account-table-btn--reactivate {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: var(--text-on-accent);
+}
+
+.account-table-btn--reactivate:hover {
+  border-color: #166534;
+  background: #166534;
+  color: var(--text-on-accent);
+}
+
+.account-reactivate-modal {
+  width: min(94vw, 520px);
+}
+
+.account-reactivate-modal__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 0.85rem;
+  border-radius: 12px;
+  background: var(--color-success-soft);
+  color: var(--color-success-strong);
+}
+
+.account-reactivate-modal__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.account-reactivate-modal__device {
+  margin-top: 1rem;
 }
 
 .account-protected-label {

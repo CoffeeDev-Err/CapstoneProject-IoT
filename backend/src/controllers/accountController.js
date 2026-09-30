@@ -86,6 +86,15 @@ const createAccountController = (accountService) => ({
 		)
 		res.json({ success: true, message: result.message })
 	},
+
+	reactivateAccount: async (req, res) => {
+		const account = await accountService.reactivateAccount(
+			req.params.accountId,
+			req.body,
+			{ ipAddress: req.ip, actor: req.auth.user },
+		)
+		res.json({ success: true, message: 'Account reactivated.', account })
+	},
 })
 
 module.exports = createAccountController

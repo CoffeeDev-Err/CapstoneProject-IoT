@@ -15,6 +15,7 @@ import { MapPin, Search, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { TableSkeletonRows } from '../components/LoadingSkeleton'
 import InitialsAvatar from '../components/InitialsAvatar'
+import SelectControl from '../components/SelectControl'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
 
@@ -119,7 +120,7 @@ function PersonnelPage() {
           </label>
           <label className="report-filter">
             <span>Status</span>
-            <select
+            <SelectControl
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
@@ -130,18 +131,18 @@ function PersonnelPage() {
               <option value="gps-stale">GPS stale</option>
               <option value="on-duty">On duty</option>
               <option value="off-duty">Off duty</option>
-            </select>
+            </SelectControl>
           </label>
           <label className="report-filter">
             <span>Sort by</span>
-            <select
+            <SelectControl
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
             >
               <option value="name">Name</option>
               <option value="rank">Rank</option>
               <option value="status">Status</option>
-            </select>
+            </SelectControl>
           </label>
         </div>
         <div className="report-list personnel-table-wrap record-scroll-container" tabIndex={0} role="region" aria-label="Personnel roster results">

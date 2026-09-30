@@ -57,8 +57,41 @@ test('delegated supervisors cannot edit or deactivate supervisor accounts', asyn
 		await assert.rejects(service.deactivateAccount('id', { actor: delegated }), {
 			code: 'PRIMARY_SUPERVISOR_REQUIRED',
 		})
+		await assert.rejects(service.reactivateAccount('id', {}, { actor: delegated }), {
+			code: 'PRIMARY_SUPERVISOR_REQUIRED',
+		})
 		assert.equal(isProtectedAccount(primary), true)
 		assert.equal(isProtectedAccount(delegated), false)
+	} finally {
+		models.User.findById = originalFindById
+	}
+})
+
+test('primary can reactivate a delegated supervisor', async () => {
+	const originalFindById = models.User.findById
+	const auditEvents = []
+	const account = {
+		_id: '507f1f77bcf86cd799439011',
+		role: 'supervisor',
+		supervisorAuthority: 'delegated',
+		status: 'inactive',
+		username: '12-2004',
+		email: 'maria.santos@pnp.gov.ph',
+		fullName: 'Maria Santos',
+		rank: 'Police Captain',
+		save: async () => {},
+	}
+	models.User.findById = async () => account
+	const service = createAccountService({
+		io: { emit: () => {} },
+		personnelService: null,
+		auditService: { recordAudit: async (event) => auditEvents.push(event) },
+	})
+	try {
+		const result = await service.reactivateAccount(account._id, {}, { actor: primary })
+		assert.equal(account.status, 'active')
+		assert.equal(result.accountStatus, 'Active')
+		assert.equal(auditEvents[0].action, 'account.reactivated')
 	} finally {
 		models.User.findById = originalFindById
 	}

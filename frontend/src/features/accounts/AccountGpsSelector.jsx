@@ -1,4 +1,5 @@
 import { SkeletonBlock } from '../../components/LoadingSkeleton'
+import SelectControl from '../../components/SelectControl'
 import { formatGpsOptionLabel } from './accountPresentation'
 
 function AccountGpsSelector({
@@ -26,7 +27,8 @@ function AccountGpsSelector({
         </div>
       ) : (
         <div className="account-password-row">
-          <select
+          <SelectControl
+            wrapperClassName="w-100"
             className={`settings-input w-100 ${validationError ? 'settings-input--error' : ''}`}
             value={selectedImei}
             onChange={onChange}
@@ -48,7 +50,7 @@ function AccountGpsSelector({
                 </option>
               )
             })}
-          </select>
+          </SelectControl>
           <button type="button" className="account-action-btn" onClick={onRefresh} disabled={loading}>
             Refresh
           </button>
