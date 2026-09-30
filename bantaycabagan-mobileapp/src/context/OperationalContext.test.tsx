@@ -1,12 +1,24 @@
-import { act, renderHook } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { OperationalProvider, useOperationalContext } from './OperationalContext';
 import { fetchOperations, fetchLivePersonnel } from '../services/operationsApi';
+
+let mockSocketConnected = false;
 
 jest.mock('./AuthContext', () => ({ useAuth: () => ({ token: 'test', user: { personnelId: 'officer' } }) }));
 jest.mock('../services/operationsApi', () => ({
   fetchOperations: jest.fn(), fetchLivePersonnel: jest.fn(), resolveApiAssetUrl: (value: string) => value,
 }));
-jest.mock('../features/operations/useOperationalSocket', () => ({ useOperationalSocket: () => false }));
+jest.mock('../features/operations/useOperationalSocket', () => ({
+  useOperationalSocket: ({ setPersonnel }: { setPersonnel: (value: unknown[]) => void }) => {
+    const ReactModule = require('react');
+    ReactModule.useEffect(() => {
+      if (!mockSocketConnected) return undefined;
+      const timer = setTimeout(() => setPersonnel([{ id: 'officer' }]), 0);
+      return () => clearTimeout(timer);
+    }, [setPersonnel]);
+    return mockSocketConnected;
+  },
+}));
 jest.mock('../features/reports/useOfflineReportSync', () => ({ useOfflineReportSync: () => ({ submitReport: jest.fn() }) }));
 jest.mock('../features/reports/useReportPagination', () => {
   const state = { refreshReports: jest.fn(async () => {}), resetReportPagination: jest.fn() };
@@ -26,6 +38,11 @@ jest.mock('../services/offlineOperationsCache', () => ({
 }));
 
 describe('mobile bootstrap recovery', () => {
+  beforeEach(() => {
+    mockSocketConnected = false;
+    jest.clearAllMocks();
+  });
+
   it('keeps the successful resource, shows the failure, and recovers on retry', async () => {
     jest.mocked(fetchOperations).mockRejectedValueOnce(new Error('Offline'));
     jest.mocked(fetchLivePersonnel).mockResolvedValue({ data: [{ id: 'officer' }] } as Awaited<ReturnType<typeof fetchLivePersonnel>>);
@@ -41,5 +58,20 @@ describe('mobile bootstrap recovery', () => {
     await act(async () => { await result.current.refreshOperations(); });
     expect(result.current.personnel[0].id).toBe('officer');
     expect(result.current.initialDataError).toContain('personnel locations');
+  });
+
+  it('clears a personnel refresh warning after the live socket supplies personnel', async () => {
+    mockSocketConnected = true;
+    jest.mocked(fetchOperations).mockResolvedValue({
+      tasks: [], reports: [], deployments: [], upcomingDeployment: null,
+    });
+    jest.mocked(fetchLivePersonnel).mockRejectedValue(new Error('Temporary refresh failure'));
+
+    const { result } = await renderHook(useOperationalContext, { wrapper: OperationalProvider });
+
+    await waitFor(() => {
+      expect(result.current.personnel[0].id).toBe('officer');
+      expect(result.current.initialDataError).toBe('');
+    });
   });
 });

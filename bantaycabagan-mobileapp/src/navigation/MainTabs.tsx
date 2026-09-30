@@ -31,8 +31,9 @@ import { useReportDraftReminder } from '../features/reports/useReportDraftRemind
 import type { OperationalTask } from '../types/operations';
 
 const Tab = createBottomTabNavigator();
-const TAB_BAR_MIN_BOTTOM_OFFSET = 8;
-const TAB_BAR_SYSTEM_GAP = 4;
+const TAB_BAR_MIN_BOTTOM_OFFSET = 12;
+const TAB_BAR_SYSTEM_GAP = 8;
+const RELIABILITY_BANNER_DURATION_MS = 6000;
 const PAGE_TRANSITION_DURATION_MS = 170;
 const PAGE_TRANSITION_DISTANCE_PX = 10;
 const forLightweightPageSlide = ({ current }: {
@@ -260,6 +261,7 @@ export default function MainTabs() {
   const [tasksVisible, setTasksVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [mapInteracting, setMapInteracting] = useState(false);
+  const [dismissedReliabilityError, setDismissedReliabilityError] = useState('');
   const headerVisibility = useRef(new Animated.Value(1)).current;
 	const openTaskCount = unreadTaskCount;
 	const openTaskModal = useCallback(() => {
@@ -279,6 +281,17 @@ export default function MainTabs() {
       useNativeDriver: true,
     }).start();
   }, [headerVisibility, mapInteracting]);
+
+  useEffect(() => {
+    if (!initialDataError) {
+      setDismissedReliabilityError('');
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setDismissedReliabilityError(initialDataError);
+    }, RELIABILITY_BANNER_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [initialDataError]);
 
   const handleMapInteractionChange = useCallback((isInteracting: boolean) => {
     setMapInteracting(isInteracting);
@@ -324,11 +337,20 @@ export default function MainTabs() {
           </View>
         </SafeAreaView>
       </Animated.View>
-      {initialDataError && !isOperationsOffline ? (
+      {initialDataError && !isOperationsOffline && dismissedReliabilityError !== initialDataError ? (
         <View style={[styles.reliabilityBanner, { top: insets.top + PAGE_HEADER_CONTENT_HEIGHT }]}>
           <Text accessibilityRole="alert" style={styles.reliabilityMessage}>{initialDataError}</Text>
           <TouchableOpacity accessibilityRole="button" disabled={isLoading} onPress={() => void refreshOperations()}>
             <Text style={styles.reliabilityRetry}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityLabel="Dismiss refresh warning"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => setDismissedReliabilityError(initialDataError)}
+            style={styles.reliabilityDismiss}
+          >
+            <Icon name="close" size={18} color="#991b1b" />
           </TouchableOpacity>
         </View>
       ) : null}
@@ -460,9 +482,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   draftLaterText: { fontSize: 9, fontWeight: '800' },
-  reliabilityBanner: { position: 'absolute', left: 12, right: 12, zIndex: 60, elevation: 12, borderWidth: 1, borderColor: '#fca5a5', borderRadius: 12, padding: 12, backgroundColor: '#fef2f2', flexDirection: 'row', alignItems: 'center', gap: 12 },
+  reliabilityBanner: { position: 'absolute', left: 12, right: 12, zIndex: 60, elevation: 12, borderWidth: 1, borderColor: '#fca5a5', borderRadius: 12, padding: 12, backgroundColor: '#fef2f2', flexDirection: 'row', alignItems: 'center', gap: 8 },
   reliabilityMessage: { flex: 1, color: '#991b1b', fontSize: 12 },
   reliabilityRetry: { color: '#1d4ed8', fontWeight: '700', padding: 8 },
+  reliabilityDismiss: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
   appRoot: { flex: 1, backgroundColor: '#ffffff' },
   appRootDark: { backgroundColor: '#050b18' },
   headerOverlay: {
@@ -500,14 +523,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: '#ffffff',
     shadowColor: mobileTheme.navy,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    elevation: 16,
   },
   floatingBarDark: {
     borderColor: '#22314a',
     backgroundColor: '#0b1528',
+    shadowColor: '#000000',
+    shadowOpacity: 0.42,
   },
   tabItem: {
     flex: 1,

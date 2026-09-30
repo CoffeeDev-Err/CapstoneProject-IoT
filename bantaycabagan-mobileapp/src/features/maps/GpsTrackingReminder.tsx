@@ -84,6 +84,7 @@ export function GpsTrackingReminder({
 
       <SwipeDismissSheet
         visible={modalVisible}
+        initiallyExpanded
         onClose={() => setModalVisible(false)}
         sheetStyle={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >

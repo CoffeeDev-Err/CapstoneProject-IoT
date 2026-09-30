@@ -268,8 +268,8 @@ assert.match(
 );
 assert.match(
   mainTabsSource,
-  /TAB_BAR_SYSTEM_GAP = 4[\s\S]*floatingBar:[\s\S]*height:\s*52[\s\S]*tabItem:[\s\S]*height:\s*52/,
-  'Bottom navigation must stay compact while retaining a touch target above the Android safe area',
+  /TAB_BAR_SYSTEM_GAP = 8[\s\S]*floatingBar:[\s\S]*height:\s*52[\s\S]*shadowOpacity: 0\.24[\s\S]*shadowRadius: 16[\s\S]*elevation: 16[\s\S]*tabItem:[\s\S]*height:\s*52/,
+  'Bottom navigation must stay compact, elevated, and above the Android safe area',
 );
 assert.match(
   mainTabsSource,

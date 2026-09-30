@@ -7,12 +7,17 @@ jest.mock('../../components/SwipeDismissSheet', () => {
   const ReactModule = require('react');
   const { View } = require('react-native');
   return {
-    SwipeDismissSheet: ({ children, onClose, visible }: {
+    SwipeDismissSheet: ({ children, initiallyExpanded, onClose, visible }: {
       children: React.ReactNode | ((controls: { close: () => void }) => React.ReactNode);
+      initiallyExpanded?: boolean;
       onClose: () => void;
       visible: boolean;
     }) => visible
-      ? ReactModule.createElement(View, {}, typeof children === 'function' ? children({ close: onClose }) : children)
+      ? ReactModule.createElement(
+        View,
+        { testID: initiallyExpanded ? 'expanded-gps-help' : 'collapsed-gps-help' },
+        typeof children === 'function' ? children({ close: onClose }) : children,
+      )
       : null,
   };
 });
@@ -49,6 +54,7 @@ describe('GpsTrackingReminder', () => {
     await fireEvent.press(view.getByLabelText('GPS tracking unavailable. View reminder'));
 
     expect(view.getByText('GPS Tracking Required')).toBeTruthy();
+    expect(view.getByTestId('expanded-gps-help')).toBeTruthy();
     expect(view.getByText('REMINDER')).toBeTruthy();
     expect(view.getByText(/Keep your assigned GPS tracker powered on, charged/)).toBeTruthy();
     expect(view.getByText('Check Again')).toBeTruthy();

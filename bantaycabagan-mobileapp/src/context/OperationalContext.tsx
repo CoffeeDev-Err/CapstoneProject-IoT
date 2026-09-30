@@ -142,6 +142,14 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     setUpcomingDeployment,
     token,
   });
+
+  useEffect(() => {
+    if (!isConnected || isOperationsOffline || personnel.length === 0) return;
+    setInitialDataError((current) => (
+      current.includes('personnel locations') ? '' : current
+    ));
+  }, [initialDataError, isConnected, isOperationsOffline, personnel.length]);
+
   const { submitReport: submitReportWithOfflineSync } = useOfflineReportSync({
     actor,
     currentPersonnelId,
