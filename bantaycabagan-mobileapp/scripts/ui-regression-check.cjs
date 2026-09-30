@@ -258,8 +258,13 @@ assert.match(
 );
 assert.match(
   loginSource,
-  /AnimatedTouchableOpacity[\s\S]*LOGIN_PRESS_OUT_SPRING[\s\S]*Animated\.spring\(scale[\s\S]*springTo\(0\.97[\s\S]*formPanel: \{[\s\S]*borderColor: 'transparent'[\s\S]*elevation: 10[\s\S]*input: \{[\s\S]*borderColor: 'transparent'[\s\S]*elevation: 3[\s\S]*submit: \{[\s\S]*elevation: 6/,
-  'The login panel, fields, and primary actions must retain floating depth and a subtle spring press',
+  /formPanel: \{[\s\S]*borderColor: '#22314a'[\s\S]*borderRadius: 8[\s\S]*input: \{[\s\S]*height: 54[\s\S]*borderColor: '#2a3a56'[\s\S]*submit: \{[\s\S]*minHeight: 52[\s\S]*borderRadius: 8/,
+  'The login screen must retain the original bordered panel, fields, and rectangular primary action',
+);
+assert.doesNotMatch(
+  loginSource,
+  /AnimatedTouchableOpacity|LOGIN_PRESS_IN_SPRING|LOGIN_PRESS_OUT_SPRING/,
+  'The restored login screen must not reintroduce the floating spring-button treatment',
 );
 assert.match(
   mainTabsSource,
@@ -268,8 +273,13 @@ assert.match(
 );
 assert.match(
   mainTabsSource,
-  /TAB_BAR_SYSTEM_GAP = 8[\s\S]*floatingBar:[\s\S]*height:\s*52[\s\S]*shadowOpacity: 0\.24[\s\S]*shadowRadius: 16[\s\S]*elevation: 16[\s\S]*tabItem:[\s\S]*height:\s*52/,
-  'Bottom navigation must stay compact, elevated, and above the Android safe area',
+  /TAB_BAR_SYSTEM_GAP = 8[\s\S]*floatingBar:\s*\{[\s\S]*height:\s*52[\s\S]*borderWidth: 0[\s\S]*borderColor: 'transparent'[\s\S]*shadowOpacity: 0\.24[\s\S]*shadowRadius: 16[\s\S]*elevation: 16/,
+  'Bottom navigation must stay compact, borderless, elevated, and above the Android safe area',
+);
+assert.match(
+  mainTabsSource,
+  /floatingBarDark:\s*\{[\s\S]*?borderColor: 'transparent'[\s\S]*?backgroundColor: '#0b1528'/,
+  'Dark-mode bottom navigation must remain borderless on its tonal floating surface',
 );
 assert.match(
   mainTabsSource,

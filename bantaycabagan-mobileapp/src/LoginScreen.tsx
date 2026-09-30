@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -37,9 +36,6 @@ import {
 
 type Mode = 'login' | 'verify' | 'forgot' | 'reset';
 type FieldErrors = Partial<Record<'loginId' | 'password' | 'identifier', string>>;
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
-const LOGIN_PRESS_IN_SPRING = { damping: 18, stiffness: 380, mass: 0.55 };
-const LOGIN_PRESS_OUT_SPRING = { damping: 12, stiffness: 260, mass: 0.55 };
 
 const isStrongPassword = (value: string) => (
   value.length >= 10
@@ -435,27 +431,16 @@ function SubmitButton({
   pendingLabel?: string;
   onPress: () => void;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const springTo = (toValue: number, config: typeof LOGIN_PRESS_IN_SPRING) => {
-    Animated.spring(scale, {
-      ...config,
-      toValue,
-      useNativeDriver: true,
-    }).start();
-  };
   return (
-    <AnimatedTouchableOpacity
-      activeOpacity={1}
-      style={[styles.submit, pending && styles.disabled, { transform: [{ scale }] }]}
-      onPressIn={() => springTo(0.97, LOGIN_PRESS_IN_SPRING)}
-      onPressOut={() => springTo(1, LOGIN_PRESS_OUT_SPRING)}
+    <TouchableOpacity
+      style={[styles.submit, pending && styles.disabled]}
       onPress={onPress}
       disabled={pending}
     >
       {pending
         ? <><ActivityIndicator color="#ffffff" /><Text style={styles.submitText} accessibilityLiveRegion="polite">{pendingLabel}</Text></>
         : <Text style={styles.submitText}>{label}</Text>}
-    </AnimatedTouchableOpacity>
+    </TouchableOpacity>
   );
 }
 
@@ -517,10 +502,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingVertical: 32,
   },
   brand: {
-    marginBottom: 20,
+    marginBottom: 26,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
@@ -533,35 +518,25 @@ const styles = StyleSheet.create({
   brandCaption: { marginTop: 3, color: '#93a4bd', fontSize: 12 },
   formPanel: {
     borderWidth: 1,
-    borderColor: 'transparent',
-    borderRadius: 16,
-    padding: 18,
-    backgroundColor: '#0d192d',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.42,
-    shadowRadius: 20,
-    elevation: 10,
+    borderColor: '#22314a',
+    borderRadius: 8,
+    padding: 20,
+    backgroundColor: '#0b1528',
   },
-  title: { color: '#f8fafc', fontSize: 25, fontWeight: '800' },
-  titleSpacing: { height: 18 },
-  subtitle: { marginTop: 6, marginBottom: 18, color: '#9eabc0', fontSize: 13, lineHeight: 19 },
-  field: { marginBottom: 12 },
-  label: { marginBottom: 6, color: '#aebbd0', fontSize: 12, fontWeight: '700' },
+  title: { color: '#f8fafc', fontSize: 28, fontWeight: '800' },
+  titleSpacing: { height: 24 },
+  subtitle: { marginTop: 7, marginBottom: 24, color: '#9eabc0', fontSize: 13, lineHeight: 20 },
+  field: { marginBottom: 14 },
+  label: { marginBottom: 7, color: '#aebbd0', fontSize: 12, fontWeight: '700' },
   input: {
-    height: 48,
+    height: 54,
     borderWidth: 1,
-    borderColor: 'transparent',
-    borderRadius: 12,
+    borderColor: '#2a3a56',
+    borderRadius: 8,
     paddingHorizontal: 14,
-    backgroundColor: '#13233d',
+    backgroundColor: '#0e1a30',
     color: '#f8fafc',
     fontSize: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.32,
-    shadowRadius: 7,
-    elevation: 3,
   },
   inputError: {
     borderColor: mobileTheme.danger,
@@ -580,14 +555,13 @@ const styles = StyleSheet.create({
   },
   passwordToggle: {
     position: 'absolute',
-    top: 5,
+    top: 8,
     right: 7,
     width: 38,
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 19,
-    backgroundColor: '#182a47',
   },
   passwordRequirements: {
     marginTop: -7,
@@ -596,22 +570,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
   },
-  textActionRight: { alignSelf: 'flex-end', marginTop: -2, marginBottom: 14 },
+  textActionRight: { alignSelf: 'flex-end', marginTop: -2, marginBottom: 18 },
   textButton: { alignSelf: 'center', padding: 9 },
   textAction: { color: '#72a7ff', fontSize: 13, fontWeight: '700' },
   submit: {
-    minHeight: 48,
+    minHeight: 52,
     marginTop: 4,
     marginBottom: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
+    borderRadius: 8,
     backgroundColor: '#2864e8',
-    shadowColor: '#1d4ed8',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.34,
-    shadowRadius: 9,
-    elevation: 6,
   },
   submitText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.65 },
