@@ -65,7 +65,8 @@ it('alerts the officer and supervisor once after the missing-GPS grace period', 
 	assert.equal(fixture.notifications.length, 2)
 	assert.equal(fixture.notifications[0].recipientId, 'supervisor')
 	assert.equal(fixture.notifications[1].recipientId, 'PNP-001')
-	assert.match(fixture.notifications[1].message, /powered on, charged, connected to mobile data/)
+	assert.match(fixture.notifications[1].message, /powered on, charged, and connected to mobile data/)
+	assert.equal(fixture.notifications[1].data.alertClass, 'gps-safety')
 
 	await fixture.service.evaluatePersonnelGpsAvailability({ now: new Date(afterGrace.getTime() + 15_000) })
 	assert.equal(fixture.notifications.length, 2)

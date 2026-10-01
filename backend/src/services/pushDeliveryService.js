@@ -9,6 +9,8 @@ const RETENTION_MS = 30 * DELIVERY_WINDOW_MS
 const LEASE_MS = 60_000
 const MAX_SEND_ATTEMPTS = 5
 const MAX_RECEIPT_CHECKS = 12
+const GENERAL_NOTIFICATION_CHANNEL_ID = 'officer-updates-v1'
+const GPS_SAFETY_NOTIFICATION_CHANNEL_ID = 'gps-safety-alerts-v1'
 const TRANSIENT_ERRORS = new Set([
 	'MessageRateExceeded', 'PUSH_TOO_MANY_REQUESTS', 'ExpoServerError',
 ])
@@ -155,6 +157,7 @@ const createPushDeliveryService = ({
 					: []
 				for (const device of activeDevices) {
 					try {
+						const isGpsSafetyAlert = notification.data?.alertClass === 'gps-safety'
 						await deliveries.updateOne({
 							notificationId: notification.notificationId, expoPushToken: device.expoPushToken,
 						}, { $setOnInsert: {
@@ -164,9 +167,14 @@ const createPushDeliveryService = ({
 							nextAttemptAt: new Date(clock()), expiresAt,
 							message: {
 								title: notification.title, body: notification.message,
-								sound: notification.priority === 'low' ? null : 'default',
+								sound: notification.priority === 'low'
+									|| (device.platform === 'ios' && !isGpsSafetyAlert)
+									? null
+									: 'default',
 								priority: ['critical', 'high'].includes(notification.priority) ? 'high' : 'default',
-								channelId: 'officer-alerts',
+								channelId: isGpsSafetyAlert
+									? GPS_SAFETY_NOTIFICATION_CHANNEL_ID
+									: GENERAL_NOTIFICATION_CHANNEL_ID,
 								data: {
 									...notification.data,
 									notificationId: notification.notificationId,

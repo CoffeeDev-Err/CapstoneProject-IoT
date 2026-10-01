@@ -86,7 +86,7 @@ it('persists tickets, resumes after a worker restart, and checks the final recei
 	assert.equal(f.jobs[0].status, 'awaiting_receipt')
 	assert.equal(f.jobs[0].ticketId, 'ticket-1')
 	assert.equal(f.calls[0].body[0].data.notificationId, 'NOT-1')
-	assert.equal(f.calls[0].body[0].channelId, 'officer-alerts')
+	assert.equal(f.calls[0].body[0].channelId, 'officer-updates-v1')
 	assert.equal(f.calls[0].body[0].priority, 'high')
 	assert.equal(f.calls[0].options.headers.Authorization, 'Bearer test-token')
 	assert.ok(f.calls[0].options.signal instanceof AbortSignal)
@@ -99,6 +99,14 @@ it('persists tickets, resumes after a worker restart, and checks the final recei
 	assert.ok(f.jobs[0].purgeAt > f.jobs[0].completedAt)
 	await f.worker().runOnce()
 	assert.equal(f.calls.length, 2)
+})
+
+it('routes only GPS safety alerts to the vibrating channel', async () => {
+	const f = fixture()
+	f.notes[0].data = { alertClass: 'gps-safety' }
+	await f.worker().runOnce()
+	assert.equal(f.calls[0].body[0].channelId, 'gps-safety-alerts-v1')
+	assert.equal(f.calls[0].body[0].sound, 'default')
 })
 
 for (const stage of ['ticket', 'receipt']) {

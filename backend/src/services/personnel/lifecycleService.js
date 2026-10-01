@@ -27,6 +27,18 @@ const createPersonnelLifecycleService = ({
 		30,
 		Number(process.env.GPS_UNAVAILABLE_ALERT_GRACE_SECONDS) || 120,
 	) * 1000
+	const batteryLowThreshold = Math.min(
+		100,
+		Math.max(1, Number(process.env.GPS_BATTERY_LOW_PERCENT) || 20),
+	)
+	const batteryCriticalThreshold = Math.min(
+		batteryLowThreshold,
+		Math.max(1, Number(process.env.GPS_BATTERY_CRITICAL_PERCENT) || 10),
+	)
+	const batteryResetThreshold = Math.min(
+		100,
+		Math.max(batteryLowThreshold + 1, Number(process.env.GPS_BATTERY_RESET_PERCENT) || 25),
+	)
 
 	const evaluatePersonnelGpsAvailability = async ({ io, now = new Date() } = {}) => {
 		const deployments = await Deployment.find(currentShiftFilter(now))
@@ -99,7 +111,7 @@ const createPersonnelLifecycleService = ({
 				|| deployment.personnelId
 			const outageStartedAt = Number.isFinite(recordedTime) ? new Date(recordedTime) : shiftStartedAt
 			const outageKey = outageStartedAt.toISOString()
-			const officerMessage = 'No recent location was received. Check that your assigned GPS tracker is powered on, charged, connected to mobile data, and with you during duty.'
+			const officerMessage = `No new location has been received for ${Math.round(gpsUnavailableGraceMs / 60_000)} minutes. Check that your assigned GPS tracker is powered on, charged, and connected to mobile data.`
 			try {
 				const [supervisorNotification] = await Promise.all([
 					deliverNotification({
@@ -123,7 +135,11 @@ const createPersonnelLifecycleService = ({
 						referenceType: 'deployment',
 						referenceId: deployment.assignmentId,
 						priority: 'high',
-						data: { destination: 'Map', assignmentId: deployment.assignmentId },
+						data: {
+							destination: 'Map',
+							assignmentId: deployment.assignmentId,
+							alertClass: 'gps-safety',
+						},
 						dedupeKey: `personnel:${deployment.personnelId}:gps-unavailable:${outageKey}`,
 					}),
 				])
@@ -140,6 +156,125 @@ const createPersonnelLifecycleService = ({
 				await Deployment.updateOne(
 					{ _id: deployment._id, gpsUnavailableAlertedAt: now },
 					{ $unset: { gpsUnavailableAlertedAt: '' } },
+				)
+				throw error
+			}
+		}
+
+		return alerts
+	}
+
+	const evaluatePersonnelBattery = async ({ io, now = new Date() } = {}) => {
+		const deployments = await Deployment.find(currentShiftFilter(now))
+			.select('assignmentId personnelId')
+			.lean()
+		if (deployments.length === 0) return []
+
+		const deploymentByPersonnel = new Map(
+			deployments.map((deployment) => [deployment.personnelId, deployment]),
+		)
+		const personnelIds = [...deploymentByPersonnel.keys()]
+		const [locations, profiles] = await Promise.all([
+			CurrentLocation.find({ personnelId: { $in: personnelIds }, source: 'gps' }),
+			Personnel.find({ personnelId: { $in: personnelIds }, status: 'active' })
+				.select('personnelId fullName')
+				.lean(),
+		])
+		const profilesById = new Map(profiles.map((profile) => [profile.personnelId, profile]))
+		const alerts = []
+
+		for (const location of locations) {
+			if (!Number.isFinite(location.batteryLevel)) continue
+			const batteryLevel = location.batteryLevel
+			if (getLocationFreshness({
+				recordedAt: location.recordedAt || location.updatedAt,
+				source: location.source,
+				now,
+			}).isLocationStale) continue
+
+			if (batteryLevel > batteryResetThreshold) {
+				if (location.batteryAlertLevel || location.batteryAlertedAt) {
+					await CurrentLocation.updateOne(
+						{ _id: location._id },
+						{ $unset: { batteryAlertLevel: '', batteryAlertedAt: '' } },
+					)
+				}
+				continue
+			}
+
+			const nextLevel = batteryLevel <= batteryCriticalThreshold
+				? 'critical'
+				: (batteryLevel <= batteryLowThreshold ? 'low' : null)
+			if (!nextLevel) continue
+			if (location.batteryAlertLevel === 'critical' || location.batteryAlertLevel === nextLevel) {
+				continue
+			}
+
+			const previousLevel = location.batteryAlertLevel
+			const previousAlertedAt = location.batteryAlertedAt
+			const stateFilter = previousLevel
+				? { batteryAlertLevel: previousLevel }
+				: { $or: [{ batteryAlertLevel: { $exists: false } }, { batteryAlertLevel: null }] }
+			const claimed = await CurrentLocation.updateOne(
+				{ _id: location._id, ...stateFilter },
+				{ $set: { batteryAlertLevel: nextLevel, batteryAlertedAt: now } },
+			)
+			if (claimed.modifiedCount === 0) continue
+
+			const deployment = deploymentByPersonnel.get(location.personnelId)
+			const officerName = profilesById.get(location.personnelId)?.fullName || location.personnelId
+			const roundedBatteryLevel = Math.round(batteryLevel)
+			const isCritical = nextLevel === 'critical'
+			const officerTitle = isCritical ? 'GPS Battery Critical' : 'GPS Battery Low'
+			const officerMessage = isCritical
+				? `Your assigned GPS tracker battery is at ${roundedBatteryLevel}%. Charge it immediately to prevent location tracking from stopping.`
+				: `Your assigned GPS tracker battery is at ${roundedBatteryLevel}%. Charge it as soon as possible to keep location tracking active.`
+			try {
+				const [supervisorNotification] = await Promise.all([
+					deliverNotification({
+						io,
+						recipientId: 'supervisor',
+						type: 'warning',
+						title: officerTitle,
+						message: `${officerName}'s assigned GPS tracker battery is ${isCritical ? 'critically low' : 'low'} at ${roundedBatteryLevel}%.`,
+						referenceType: 'personnel',
+						referenceId: location.personnelId,
+						priority: isCritical ? 'critical' : 'high',
+						data: { destination: 'Map', personnelId: location.personnelId, batteryLevel: roundedBatteryLevel },
+						dedupeKey: `personnel:${location.personnelId}:supervisor-battery-${nextLevel}:${now.toISOString()}`,
+					}),
+					deliverNotification({
+						io,
+						recipientId: location.personnelId,
+						type: 'warning',
+						title: officerTitle,
+						message: officerMessage,
+						referenceType: 'deployment',
+						referenceId: deployment.assignmentId,
+						priority: isCritical ? 'critical' : 'high',
+						data: {
+							destination: 'Map',
+							assignmentId: deployment.assignmentId,
+							batteryLevel: roundedBatteryLevel,
+							alertClass: 'gps-safety',
+						},
+						dedupeKey: `personnel:${location.personnelId}:battery-${nextLevel}:${now.toISOString()}`,
+					}),
+				])
+				alerts.push({
+					...supervisorNotification,
+					personnelId: location.personnelId,
+					personnelName: officerName,
+					batteryLevel: roundedBatteryLevel,
+					batteryAlertLevel: nextLevel,
+				})
+			} catch (error) {
+				const rollback = previousLevel
+					? { $set: { batteryAlertLevel: previousLevel, batteryAlertedAt: previousAlertedAt } }
+					: { $unset: { batteryAlertLevel: '', batteryAlertedAt: '' } }
+				await CurrentLocation.updateOne(
+					{ _id: location._id, batteryAlertLevel: nextLevel, batteryAlertedAt: now },
+					rollback,
 				)
 				throw error
 			}
@@ -199,7 +334,7 @@ const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 
 		const profile = profilesById.get(location.personnelId)
 		const officerName = profile?.fullName || location.personnelId
-		const message = `${officerName} has no detected movement for ${inactivityMinutes} minutes during an active shift.`
+		const message = `No movement has been detected from ${officerName} for ${inactivityMinutes} minutes while the assigned GPS tracker remains online.`
 		const [supervisorNotification] = await Promise.all([
 			deliverNotification({
 				io,
@@ -217,11 +352,15 @@ const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 				recipientId: location.personnelId,
 				type: 'warning',
 				title: 'Movement Check Required',
-				message: `No movement has been detected for ${inactivityMinutes} minutes. Please confirm your status or move if safe to do so.`,
+				message: `No movement has been detected for ${inactivityMinutes} minutes while your GPS tracker remains online. Move if safe, or contact your supervisor if you are stationed in place.`,
 				referenceType: 'deployment',
 				referenceId: deployment.assignmentId,
 				priority: 'high',
-				data: { destination: 'Map', assignmentId: deployment.assignmentId },
+				data: {
+					destination: 'Map',
+					assignmentId: deployment.assignmentId,
+					alertClass: 'gps-safety',
+				},
 				dedupeKey: `personnel:${location.personnelId}:inactivity:${now.toISOString()}`,
 			}),
 		])
@@ -243,13 +382,17 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 	if (deployments.length === 0) return []
 
 	const personnelIds = [...new Set(deployments.map((item) => item.personnelId))]
-	const [locations, assignments] = await Promise.all([
+	const [locations, assignments, profiles] = await Promise.all([
 		CurrentLocation.find({ personnelId: { $in: personnelIds } }),
 		GpsDeviceAssignment.find({ personnelId: { $in: personnelIds }, status: 'active' }).lean(),
+		Personnel.find({ personnelId: { $in: personnelIds }, status: 'active' })
+			.select('personnelId fullName')
+			.lean(),
 	])
 	const assignmentByPersonnel = new Map(
 		assignments.map((assignment) => [assignment.personnelId, assignment]),
 	)
+	const profilesById = new Map(profiles.map((profile) => [profile.personnelId, profile]))
 	const transitions = []
 
 	for (const location of locations) {
@@ -371,22 +514,43 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 			previousTransitionAt
 			&& now.getTime() - previousTransitionAt < geofenceAlertCooldownMs,
 		)
+		const officerName = profilesById.get(location.personnelId)?.fullName || location.personnelId
 		const notification = alertSuppressed
 			? null
-			: await deliverNotification({
-				io,
-				recipientId: location.personnelId,
-				type: isOutside ? 'geofence' : 'success',
-				title: isOutside ? 'Boundary Warning' : 'Back Inside Boundary',
-				message: isOutside
-					? 'Your assigned GPS device has moved outside the allowed Cabagan boundary.'
-					: 'Your assigned GPS device is back inside the allowed Cabagan boundary.',
-				referenceType: 'geofence',
-				referenceId: assignment.assignmentId,
-				priority: isOutside ? 'critical' : 'low',
-				data: { destination: 'Map', latitude, longitude, boundaryId: 'cabagan-municipal' },
-				dedupeKey: `geofence:${assignment.assignmentId}:${nextStatus}:${now.toISOString()}`,
-			})
+			: await Promise.all([
+				deliverNotification({
+					io,
+					recipientId: location.personnelId,
+					type: isOutside ? 'geofence' : 'success',
+					title: isOutside ? 'Outside Cabagan Boundary' : 'Back Inside Boundary',
+					message: isOutside
+						? 'Your assigned GPS tracker is outside the Cabagan boundary. Return to the authorized area or contact your supervisor if this is an approved assignment.'
+						: 'Your assigned GPS tracker is back inside the allowed Cabagan boundary.',
+					referenceType: 'geofence',
+					referenceId: assignment.assignmentId,
+					priority: isOutside ? 'critical' : 'low',
+					data: {
+						destination: 'Map',
+						latitude,
+						longitude,
+						boundaryId: 'cabagan-municipal',
+						...(isOutside && { alertClass: 'gps-safety' }),
+					},
+					dedupeKey: `geofence:${assignment.assignmentId}:${nextStatus}:${now.toISOString()}`,
+				}),
+				...(isOutside ? [deliverNotification({
+					io,
+					recipientId: 'supervisor',
+					type: 'geofence',
+					title: 'Personnel Outside Cabagan Boundary',
+					message: `${officerName} moved outside the Cabagan boundary${location.locationName ? ` near ${location.locationName}` : ''}.`,
+					referenceType: 'personnel',
+					referenceId: location.personnelId,
+					priority: 'critical',
+					data: { destination: 'Map', personnelId: location.personnelId, latitude, longitude },
+					dedupeKey: `geofence:${assignment.assignmentId}:supervisor-outside:${now.toISOString()}`,
+				})] : []),
+			]).then(([officerNotification]) => officerNotification)
 		const transition = {
 			...(notification || {}),
 			personnelId: location.personnelId,
@@ -403,6 +567,7 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 }
 
 	return {
+		evaluatePersonnelBattery,
 		evaluatePersonnelGeofences,
 		evaluatePersonnelGpsAvailability,
 		evaluatePersonnelInactivity,

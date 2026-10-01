@@ -29,7 +29,13 @@ it('requires distinct accurate GPS readings and cools down rapid geofence revers
 		GpsDeviceAssignment: {
 			find: () => ({ lean: async () => [{ assignmentId: 'GPS-001', personnelId: 'PNP-001' }] }),
 		},
-		Personnel: { find: async () => [] },
+		Personnel: {
+			find: () => ({
+				select: () => ({
+					lean: async () => [{ personnelId: 'PNP-001', fullName: 'Officer One' }],
+				}),
+			}),
+		},
 		CurrentLocation: {
 			find: async () => [location],
 			updateOne: async (filter, update) => {
@@ -75,7 +81,10 @@ it('requires distinct accurate GPS readings and cools down rapid geofence revers
 	})
 	assert.equal(result.length, 1)
 	assert.equal(location.geofenceStatus, 'outside')
-	assert.equal(notifications.length, 1)
+	assert.equal(notifications.length, 2)
+	assert.equal(notifications[0].recipientId, 'PNP-001')
+	assert.equal(notifications[0].data.alertClass, 'gps-safety')
+	assert.equal(notifications[1].recipientId, 'supervisor')
 
 	location.location.coordinates = [121.77, 17.42]
 	location.recordedAt = new Date(baseTime.getTime() + 20_000)
@@ -88,7 +97,7 @@ it('requires distinct accurate GPS readings and cools down rapid geofence revers
 	})
 	assert.equal(result.length, 1)
 	assert.equal(location.geofenceStatus, 'inside')
-	assert.equal(notifications.length, 1)
+	assert.equal(notifications.length, 2)
 	assert.equal(result[0].alertSuppressed, true)
 
 	location.location.coordinates = [0, 0]

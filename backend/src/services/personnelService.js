@@ -37,6 +37,7 @@ const { ingestLocation } = createLocationIngestionService({
 	serializePersonnel,
 })
 const {
+	evaluatePersonnelBattery,
 	evaluatePersonnelGeofences,
 	evaluatePersonnelGpsAvailability,
 	evaluatePersonnelInactivity,
@@ -52,6 +53,7 @@ const { updateMockLocations } = createMockMovementService({
 
 module.exports = {
 	emitPersonnelCollection,
+	evaluatePersonnelBattery,
 	evaluatePersonnelGeofences,
 	evaluatePersonnelGpsAvailability,
 	evaluatePersonnelInactivity,

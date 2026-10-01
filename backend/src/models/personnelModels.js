@@ -63,6 +63,8 @@ const currentLocationSchema = new mongoose.Schema({
 	receivedAt: { type: Date, required: true, default: Date.now },
 	lastMovedAt: { type: Date, default: Date.now },
 	inactivityAlertedAt: Date,
+	batteryAlertLevel: { type: String, enum: ['low', 'critical'] },
+	batteryAlertedAt: Date,
 	geofenceStatus: { type: String, enum: ['inside', 'outside'] },
 	geofenceBoundaryId: String,
 	geofenceTransitionAt: Date,

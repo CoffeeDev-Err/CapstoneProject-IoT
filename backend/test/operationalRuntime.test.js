@@ -17,6 +17,7 @@ describe('operational runtime', () => {
 			personnelService: {
 				emitPersonnelCollection: () => {},
 				evaluatePersonnelGpsAvailability: async () => calls.push('gps-availability'),
+				evaluatePersonnelBattery: async () => calls.push('battery'),
 				evaluatePersonnelInactivity: async () => calls.push('inactivity'),
 				evaluatePersonnelGeofences: async () => calls.push('geofences'),
 				getPersonnelWithLocations: async () => [],
@@ -32,7 +33,7 @@ describe('operational runtime', () => {
 		assert.deepEqual(calls, [])
 		ready = true
 		await runtime.runOperationalLifecycleCheck()
-		assert.deepEqual(calls, ['deployments', 'arrivals', 'gps-availability', 'inactivity', 'geofences', 'reports'])
+		assert.deepEqual(calls, ['deployments', 'arrivals', 'gps-availability', 'battery', 'inactivity', 'geofences', 'reports'])
 		runtime.stop()
 	})
 })
