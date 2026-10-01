@@ -12,10 +12,9 @@ from docx.shared import Inches, Pt, RGBColor
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
-BLUE = "1F5DAA"
-LIGHT_BLUE = "DCEAF8"
-PALE_BLUE = "EEF5FC"
-SLATE = "24364B"
+BLUE = "000000"
+PALE_BLUE = "F2F2F2"
+SLATE = "111111"
 WHITE = "FFFFFF"
 
 
@@ -188,9 +187,27 @@ def prevent_row_split(row) -> None:
     tr_pr.append(cant_split)
 
 
-def set_repeat_table_layout(table) -> None:
+def set_repeat_table_layout(table, widths: list[float] | None = None) -> None:
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
+    table_properties = table._tbl.tblPr
+    table_layout = table_properties.find(qn("w:tblLayout"))
+    if table_layout is None:
+        table_layout = OxmlElement("w:tblLayout")
+        table_properties.append(table_layout)
+    table_layout.set(qn("w:type"), "fixed")
+    if widths:
+        table_width = table_properties.find(qn("w:tblW"))
+        if table_width is None:
+            table_width = OxmlElement("w:tblW")
+            table_properties.append(table_width)
+        table_width.set(qn("w:type"), "dxa")
+        table_width.set(qn("w:w"), str(round(sum(widths) * 1440)))
+        grid_columns = table._tbl.tblGrid.gridCol_lst
+        for index, width in enumerate(widths):
+            table.columns[index].width = Inches(width)
+            if index < len(grid_columns):
+                grid_columns[index].set(qn("w:w"), str(round(width * 1440)))
     for row in table.rows:
         prevent_row_split(row)
 
@@ -223,9 +240,7 @@ def add_title(document: Document, platform_title: str, audience: str) -> None:
     run.font.color.rgb = RGBColor.from_string(SLATE)
 
     info = document.add_table(rows=2, cols=2)
-    info.autofit = False
-    info.columns[0].width = Inches(4.45)
-    info.columns[1].width = Inches(3.05)
+    set_repeat_table_layout(info, [4.45, 3.05])
     set_cell_text(info.cell(0, 0), "Respondent Code/Name (Optional): ______________________________", size=8)
     set_cell_text(info.cell(0, 1), "Date: ____________________", size=8)
     set_cell_text(info.cell(1, 0), f"Respondent Role: {audience}", size=8, bold=True)
@@ -273,7 +288,7 @@ def add_intro(document: Document, platform_name: str, audience: str) -> None:
 
     scale = document.add_table(rows=2, cols=5)
     scale.style = "Table Grid"
-    set_repeat_table_layout(scale)
+    set_repeat_table_layout(scale, [1.52, 1.52, 1.52, 1.52, 1.52])
     labels = [("5", "Strongly Agree"), ("4", "Agree"), ("3", "Neutral"), ("2", "Disagree"), ("1", "Strongly Disagree")]
     for index, (score, meaning) in enumerate(labels):
         set_cell_text(scale.cell(0, index), score, size=8.5, bold=True, color=WHITE, align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -304,11 +319,8 @@ def add_criterion(document: Document, title: str, coverage: str, items: list[str
 
     table = document.add_table(rows=2 + len(items), cols=7)
     table.style = "Table Grid"
-    set_repeat_table_layout(table)
     widths = [0.36, 5.39, 0.37, 0.37, 0.37, 0.37, 0.37]
-    for row in table.rows:
-        for index, width in enumerate(widths):
-            row.cells[index].width = Inches(width)
+    set_repeat_table_layout(table, widths)
 
     merged_no = table.cell(0, 0).merge(table.cell(1, 0))
     merged_statement = table.cell(0, 1).merge(table.cell(1, 1))
