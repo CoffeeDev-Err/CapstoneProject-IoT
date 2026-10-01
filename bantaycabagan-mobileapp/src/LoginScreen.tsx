@@ -250,7 +250,7 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <View style={styles.formPanel}>
+          <View testID="login-form-panel" style={styles.formPanel}>
             <Text style={styles.title}>{copy[0]}</Text>
             {copy[1] ? <Text style={styles.subtitle}>{copy[1]}</Text> : <View style={styles.titleSpacing} />}
 
@@ -298,24 +298,6 @@ export default function LoginScreen() {
                 </TouchableOpacity>
                 <Feedback error={error} message={message} />
                 <SubmitButton label="Sign In" pending={pending} pendingLabel={pendingAction} onPress={submitLogin} />
-                <View style={styles.privacyNotice} accessibilityRole="text">
-                  <Icon name="privacy-tip" size={18} color="#72a7ff" />
-                  <Text style={styles.privacyNoticeText}>
-                    <Text style={styles.privacyNoticeTitle}>Privacy Notice. </Text>
-                    GeoSentri processes your name, contact information, assigned GPS device data,
-                    and real-time location while you are on duty for personnel coordination,
-                    officer safety, emergency response, and authorized operational monitoring.{' '}
-                    <Text
-                      accessibilityRole="link"
-                      style={styles.privacyNoticeLink}
-                      onPress={() => setPrivacyNoticeOpen(true)}
-                    >
-                      View the Privacy Notice
-                    </Text>
-                    {' '}to learn how your information is used, protected, retained, and how you
-                    may exercise your data privacy rights.
-                  </Text>
-                </View>
               </>
             )}
 
@@ -387,6 +369,36 @@ export default function LoginScreen() {
               </>
             )}
           </View>
+
+          {mode === 'login' && (
+            <View
+              testID="login-privacy-notice"
+              style={styles.privacyNotice}
+              accessibilityRole="text"
+            >
+              <View style={styles.privacyNoticeIcon}>
+                <Icon name="privacy-tip" size={18} color={mobileTheme.danger} />
+              </View>
+              <Text style={styles.privacyNoticeText}>
+                <Text style={styles.privacyNoticeTitle}>Privacy Notice. </Text>
+                GeoSentri processes your{' '}
+                <Text style={styles.privacyNoticeEmphasis}>
+                  name, contact information, assigned GPS device data, and real-time location
+                </Text>{' '}
+                while you are on duty for personnel coordination, officer safety, emergency
+                response, and authorized operational monitoring.{' '}
+                <Text
+                  accessibilityRole="link"
+                  style={styles.privacyNoticeLink}
+                  onPress={() => setPrivacyNoticeOpen(true)}
+                >
+                  View the Privacy Notice
+                </Text>{' '}
+                to learn how your information is used, protected, retained, and how you may
+                exercise your data privacy rights.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
       <PrivacyNoticeModal
@@ -609,13 +621,22 @@ const styles = StyleSheet.create({
   },
   submitText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   privacyNotice: {
-    marginTop: 12,
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 9,
-    borderTopWidth: 1,
-    borderTopColor: '#22314a',
-    paddingTop: 14,
+    gap: 10,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: 'rgba(11, 21, 40, 0.88)',
+  },
+  privacyNoticeIcon: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: 'rgba(220, 38, 38, 0.14)',
   },
   privacyNoticeText: {
     flex: 1,
@@ -624,6 +645,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   privacyNoticeTitle: { color: '#dbeafe', fontWeight: '800' },
+  privacyNoticeEmphasis: { color: '#cbd5e1', fontWeight: '700', fontStyle: 'italic' },
   privacyNoticeLink: { color: '#72a7ff', fontWeight: '800', textDecorationLine: 'underline' },
   disabled: { opacity: 0.65 },
   disabledText: { opacity: 0.55 },

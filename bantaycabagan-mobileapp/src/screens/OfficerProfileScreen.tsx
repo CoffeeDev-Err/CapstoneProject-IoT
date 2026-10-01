@@ -157,7 +157,7 @@ export default function OfficerProfileScreen() {
             style={[styles.secondaryButton, isDark && styles.secondaryButtonDark]}
             onPress={() => setPrivacyNoticeOpen(true)}
           >
-            <Icon name="privacy-tip" size={20} color={mobileTheme.blue} />
+            <Icon name="privacy-tip" size={20} color={mobileTheme.danger} />
             <Text style={styles.secondaryButtonText}>View Privacy Notice</Text>
           </TouchableOpacity>
 
