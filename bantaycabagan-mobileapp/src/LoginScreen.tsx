@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import VerificationCodeInput from './components/VerificationCodeInput';
+import PrivacyNoticeModal from './components/PrivacyNoticeModal';
 import { verificationFeedback, type VerificationError } from './features/auth/verificationFeedback';
 import { useVerificationTiming } from './features/auth/useVerificationTiming';
 import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from './features/auth/authCopy';
@@ -51,6 +52,7 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
+  const [privacyNoticeOpen, setPrivacyNoticeOpen] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -296,6 +298,24 @@ export default function LoginScreen() {
                 </TouchableOpacity>
                 <Feedback error={error} message={message} />
                 <SubmitButton label="Sign In" pending={pending} pendingLabel={pendingAction} onPress={submitLogin} />
+                <View style={styles.privacyNotice} accessibilityRole="text">
+                  <Icon name="privacy-tip" size={18} color="#72a7ff" />
+                  <Text style={styles.privacyNoticeText}>
+                    <Text style={styles.privacyNoticeTitle}>Privacy Notice. </Text>
+                    GeoSentri processes your name, contact information, assigned GPS device data,
+                    and real-time location while you are on duty for personnel coordination,
+                    officer safety, emergency response, and authorized operational monitoring.{' '}
+                    <Text
+                      accessibilityRole="link"
+                      style={styles.privacyNoticeLink}
+                      onPress={() => setPrivacyNoticeOpen(true)}
+                    >
+                      View the Privacy Notice
+                    </Text>
+                    {' '}to learn how your information is used, protected, retained, and how you
+                    may exercise your data privacy rights.
+                  </Text>
+                </View>
               </>
             )}
 
@@ -369,6 +389,11 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <PrivacyNoticeModal
+        visible={privacyNoticeOpen}
+        dark
+        onClose={() => setPrivacyNoticeOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -583,6 +608,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#2864e8',
   },
   submitText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  privacyNotice: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    borderTopWidth: 1,
+    borderTopColor: '#22314a',
+    paddingTop: 14,
+  },
+  privacyNoticeText: {
+    flex: 1,
+    color: '#93a4bd',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  privacyNoticeTitle: { color: '#dbeafe', fontWeight: '800' },
+  privacyNoticeLink: { color: '#72a7ff', fontWeight: '800', textDecorationLine: 'underline' },
   disabled: { opacity: 0.65 },
   disabledText: { opacity: 0.55 },
   error: {

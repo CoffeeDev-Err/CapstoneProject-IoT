@@ -38,6 +38,18 @@ async function openVerification() {
 }
 
 describe('automatic login verification', () => {
+  it('shows the on-duty personal data notice before sign-in', async () => {
+    const view = await render(<LoginScreen />);
+    expect(view.getByText(/GeoSentri processes your name, contact information/)).toBeTruthy();
+    expect(view.getByText(/real-time location while you are on duty/)).toBeTruthy();
+    await fireEvent.press(view.getByText('View the Privacy Notice'));
+    expect(view.getByText('GeoSentri Privacy Notice')).toBeTruthy();
+    expect(view.getByText('On-duty location tracking')).toBeTruthy();
+    expect(view.getByText('Your data privacy rights')).toBeTruthy();
+    expect(view.getByText(/station administrative desk/)).toBeTruthy();
+    await fireEvent.press(view.getByText('Close Privacy Notice'));
+  });
+
   it('recovers the keyboard after consecutive wrong codes and accepts a correct retry', async () => {
     let nativeFocused = true;
     let keyboardVisible = false;
