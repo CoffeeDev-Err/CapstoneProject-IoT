@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileFontFamily, mobileTheme } from '../constants/mobileTheme';
 import ChangePasswordModal from '../components/ChangePasswordModal';
-import PrivacyNoticeModal from '../components/PrivacyNoticeModal';
 import { useAuth } from '../context/AuthContext';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
@@ -36,7 +35,6 @@ export default function OfficerProfileScreen() {
   const { clearSession, logout, token, user } = useAuth();
   const { isDark, toggleTheme } = useMobileTheme();
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
-  const [privacyNoticeOpen, setPrivacyNoticeOpen] = React.useState(false);
   const assignment = deployments.find((item) => item.isCurrentShift !== false);
   const profile = user?.profile;
   const officer = {
@@ -155,15 +153,6 @@ export default function OfficerProfileScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             style={[styles.secondaryButton, isDark && styles.secondaryButtonDark]}
-            onPress={() => setPrivacyNoticeOpen(true)}
-          >
-            <Icon name="privacy-tip" size={20} color={mobileTheme.danger} />
-            <Text style={styles.secondaryButtonText}>View Privacy Notice</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            style={[styles.secondaryButton, isDark && styles.secondaryButtonDark]}
             onPress={clearDownloadedCache}
           >
             <Icon name="cleaning-services" size={20} color={mobileTheme.blue} />
@@ -197,11 +186,6 @@ export default function OfficerProfileScreen() {
           }}
         />
       )}
-      <PrivacyNoticeModal
-        visible={privacyNoticeOpen}
-        dark={isDark}
-        onClose={() => setPrivacyNoticeOpen(false)}
-      />
     </SafeAreaView>
   );
 }

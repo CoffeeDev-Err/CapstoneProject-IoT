@@ -79,10 +79,6 @@ const profileSource = readFileSync(
   resolve(projectRoot, 'src/screens/OfficerProfileScreen.tsx'),
   'utf8',
 );
-const privacyNoticeSource = readFileSync(
-  resolve(projectRoot, 'src/components/PrivacyNoticeModal.tsx'),
-  'utf8',
-);
 
 assert.match(operationsApiSource, /import \{ File \} from 'expo-file-system'/);
 assert.match(operationsApiSource, /new File\(input\.evidence_photo\.uri\)/);
@@ -270,26 +266,10 @@ assert.doesNotMatch(
   /AnimatedTouchableOpacity|LOGIN_PRESS_IN_SPRING|LOGIN_PRESS_OUT_SPRING/,
   'The restored login screen must not reintroduce the floating spring-button treatment',
 );
-assert.match(
-  loginSource,
-  /<\/View>\s*\{mode === 'login' && \(\s*<>\s*<TouchableOpacity\s*testID="login-privacy-notice"/,
-  'The privacy notice must remain on the login page below and outside the bordered sign-in form',
-);
-assert.match(
-  loginSource,
-  /Show Privacy Notice summary[\s\S]*privacySummaryOpen &&[\s\S]*setPrivacyNoticeOpen\(true\)[\s\S]*View the full Privacy Notice/,
-  'The compact login privacy action must reveal a short disclosure before opening the full modal',
-);
-assert.match(
-  profileSource,
-  /name="privacy-tip" size=\{20\} color=\{mobileTheme\.danger\}/,
-  'The Account privacy action must use the red privacy icon',
-);
-assert.match(
-  privacyNoticeSource,
-  /transparent[\s\S]*animationType="fade"[\s\S]*styles\.dialog[\s\S]*borderRadius: 24[\s\S]*emphasis:[\s\S]*fontWeight: '700'[\s\S]*fontStyle: 'italic'/,
-  'The privacy notice must use a polished overlay dialog and emphasize personal-data categories',
-);
+assert.doesNotMatch(loginSource, /PrivacyNotice|Privacy Notice/,
+  'The sign-in screen must not render a privacy notice control');
+assert.doesNotMatch(profileSource, /PrivacyNotice|Privacy Notice|privacy-tip/,
+  'The Account screen must not render a privacy notice control');
 assert.match(
   mainTabsSource,
   /const bottomOffset = Math\.max\([\s\S]*insets\.bottom \+ TAB_BAR_SYSTEM_GAP/,

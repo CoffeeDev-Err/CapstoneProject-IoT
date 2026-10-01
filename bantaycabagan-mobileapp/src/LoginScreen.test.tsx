@@ -38,23 +38,10 @@ async function openVerification() {
 }
 
 describe('automatic login verification', () => {
-  it('shows the on-duty personal data notice before sign-in', async () => {
+  it('keeps privacy notice controls off the sign-in screen', async () => {
     const view = await render(<LoginScreen />);
-    expect(view.getByTestId('login-privacy-notice').parent).not.toBe(
-      view.getByTestId('login-form-panel'),
-    );
-    expect(view.getByText('Privacy Notice')).toBeTruthy();
-    expect(view.getByText(/Tap to view a short data-use notice/)).toBeTruthy();
-    expect(view.queryByText(/GeoSentri processes your name/)).toBeNull();
-    await fireEvent.press(view.getByLabelText('Show Privacy Notice summary'));
-    expect(view.getByText(/GeoSentri processes your name, contact information/)).toBeTruthy();
-    expect(view.queryByText('Your information, clearly explained')).toBeNull();
-    await fireEvent.press(view.getByText('View the full Privacy Notice'));
-    expect(view.getByText('Your information, clearly explained')).toBeTruthy();
-    expect(view.getByText('On-duty location tracking')).toBeTruthy();
-    expect(view.getByText('Your data privacy rights')).toBeTruthy();
-    expect(view.getByText(/station administrative desk/)).toBeTruthy();
-    await fireEvent.press(view.getByText('Done'));
+    expect(view.queryByText('Privacy Notice')).toBeNull();
+    expect(view.queryByLabelText(/Privacy Notice/)).toBeNull();
   });
 
   it('recovers the keyboard after consecutive wrong codes and accepts a correct retry', async () => {
