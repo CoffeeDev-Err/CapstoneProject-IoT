@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
 BLUE = "000000"
-PALE_BLUE = "F2F2F2"
+HEADER_FILL = "D9D9D9"
+PALE_BLUE = "F5F5F5"
 SLATE = "111111"
 WHITE = "FFFFFF"
 
@@ -291,8 +292,8 @@ def add_intro(document: Document, platform_name: str, audience: str) -> None:
     set_repeat_table_layout(scale, [1.52, 1.52, 1.52, 1.52, 1.52])
     labels = [("5", "Strongly Agree"), ("4", "Agree"), ("3", "Neutral"), ("2", "Disagree"), ("1", "Strongly Disagree")]
     for index, (score, meaning) in enumerate(labels):
-        set_cell_text(scale.cell(0, index), score, size=8.5, bold=True, color=WHITE, align=WD_ALIGN_PARAGRAPH.CENTER)
-        shade(scale.cell(0, index), BLUE)
+        set_cell_text(scale.cell(0, index), score, size=8.5, bold=True, color=SLATE, align=WD_ALIGN_PARAGRAPH.CENTER)
+        shade(scale.cell(0, index), HEADER_FILL)
         set_cell_text(scale.cell(1, index), meaning, size=7.5, align=WD_ALIGN_PARAGRAPH.CENTER)
     document.add_paragraph().paragraph_format.space_after = Pt(0)
 
@@ -325,19 +326,25 @@ def add_criterion(document: Document, title: str, coverage: str, items: list[str
     merged_no = table.cell(0, 0).merge(table.cell(1, 0))
     merged_statement = table.cell(0, 1).merge(table.cell(1, 1))
     merged_rating = table.cell(0, 2).merge(table.cell(0, 6))
-    set_cell_text(merged_no, "NO.", size=7.5, bold=True, color=WHITE, align=WD_ALIGN_PARAGRAPH.CENTER)
-    set_cell_text(merged_statement, "STATEMENTS", size=7.5, bold=True, color=WHITE, align=WD_ALIGN_PARAGRAPH.CENTER)
-    set_cell_text(merged_rating, "LEVEL OF AGREEMENT", size=7.5, bold=True, color=WHITE, align=WD_ALIGN_PARAGRAPH.CENTER)
+    merged_no.width = Inches(widths[0])
+    merged_statement.width = Inches(widths[1])
+    merged_rating.width = Inches(sum(widths[2:]))
+    set_cell_text(merged_no, "NO.", size=7.5, bold=True, color=SLATE, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_text(merged_statement, "STATEMENTS", size=7.5, bold=True, color=SLATE, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_text(merged_rating, "LEVEL OF AGREEMENT", size=7.5, bold=True, color=SLATE, align=WD_ALIGN_PARAGRAPH.CENTER)
     for cell in [merged_no, merged_statement, merged_rating]:
-        shade(cell, BLUE)
+        shade(cell, HEADER_FILL)
     for index, score in enumerate(["5", "4", "3", "2", "1"], start=2):
-        set_cell_text(table.cell(1, index), score, size=7.5, bold=True, color=WHITE, align=WD_ALIGN_PARAGRAPH.CENTER)
-        shade(table.cell(1, index), BLUE)
+        table.cell(1, index).width = Inches(widths[index])
+        set_cell_text(table.cell(1, index), score, size=7.5, bold=True, color=SLATE, align=WD_ALIGN_PARAGRAPH.CENTER)
+        shade(table.cell(1, index), HEADER_FILL)
     repeat_table_header(table.rows[0])
     repeat_table_header(table.rows[1])
 
     for item_number, statement in enumerate(items, start=1):
         row_index = item_number + 1
+        for column, width in enumerate(widths):
+            table.cell(row_index, column).width = Inches(width)
         if item_number % 2 == 0:
             for cell in table.rows[row_index].cells:
                 shade(cell, PALE_BLUE)
