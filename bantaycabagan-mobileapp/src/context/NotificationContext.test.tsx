@@ -1,5 +1,5 @@
-import { act, renderHook } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { Alert, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NotificationProvider, useNotifications } from './NotificationContext';
 import { fetchMyNotifications, markAllMyNotificationsRead, markMyNotificationRead, markMyTaskInboxRead } from '../services/notificationsApi';
@@ -9,6 +9,8 @@ jest.mock('../services/notificationsApi', () => ({ fetchMyNotifications: jest.fn
 jest.mock('expo-device', () => ({ isDevice: false }));
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(), setBadgeCountAsync: jest.fn(async () => {}),
+  setNotificationChannelAsync: jest.fn(async () => null),
+  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
   addNotificationReceivedListener: () => ({ remove() {} }),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove() {} })),
   getLastNotificationResponseAsync: jest.fn(async () => null),
@@ -21,6 +23,21 @@ beforeEach(() => {
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 afterEach(() => jest.restoreAllMocks());
+it('separates non-vibrating updates from brief GPS safety vibrations on Android', async () => {
+  const originalPlatform = Platform.OS;
+  Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+  try {
+    const view = await renderHook(useNotifications, { wrapper: NotificationProvider });
+    await waitFor(() => expect(Notifications.setNotificationChannelAsync).toHaveBeenCalledTimes(2));
+    expect(Notifications.setNotificationChannelAsync).toHaveBeenNthCalledWith(1, 'officer-updates-v1',
+      expect.objectContaining({ enableVibrate: false }));
+    expect(Notifications.setNotificationChannelAsync).toHaveBeenNthCalledWith(2, 'gps-safety-alerts-v1',
+      expect.objectContaining({ enableVibrate: true, vibrationPattern: [0, 250, 250, 250] }));
+    view.unmount();
+  } finally {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: originalPlatform });
+  }
+});
 it('keeps unread state on failure and reconciles it after retry', async () => {
   jest.mocked(markAllMyNotificationsRead).mockRejectedValueOnce({ status: 408 }).mockResolvedValueOnce({ updated: 1 });
   const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });

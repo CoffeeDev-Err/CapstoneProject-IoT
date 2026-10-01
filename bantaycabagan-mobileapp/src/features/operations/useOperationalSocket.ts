@@ -110,12 +110,6 @@ export function useOperationalSocket({
         setDeployments((items) => upsertById(items, assignment));
       }
     };
-    const onPersonnelInactivity = (payload: { personnelId?: string; inactivityMinutes?: number }) => {
-      if (payload.personnelId !== currentPersonnelId) return;
-      Alert.alert('Movement check required',
-        `No movement has been detected for ${payload.inactivityMinutes || 5} minutes. Please confirm your status or move if safe to do so.`);
-    };
-
     operationsSocket.on('connect', onConnect);
     operationsSocket.on('disconnect', onDisconnect);
     operationsSocket.on('personnel:bootstrap', onPersonnel);
@@ -131,7 +125,6 @@ export function useOperationalSocket({
     operationsSocket.on('deployments:bootstrap', onDeploymentsBootstrap);
     operationsSocket.on('deployments:updated', onDeploymentsUpdated);
     operationsSocket.on('deployment:acknowledged', onDeploymentAcknowledged);
-    operationsSocket.on('personnel:inactivity', onPersonnelInactivity);
     setIsConnected(operationsSocket.connected);
     if (!operationsSocket.connected) operationsSocket.connect();
 
@@ -152,7 +145,6 @@ export function useOperationalSocket({
       operationsSocket.off('deployments:bootstrap', onDeploymentsBootstrap);
       operationsSocket.off('deployments:updated', onDeploymentsUpdated);
       operationsSocket.off('deployment:acknowledged', onDeploymentAcknowledged);
-      operationsSocket.off('personnel:inactivity', onPersonnelInactivity);
       operationsSocket.disconnect();
     };
   }, [applyIdentityUpdate, clearSession, currentPersonnelId, setDeployments, setPersonnel,

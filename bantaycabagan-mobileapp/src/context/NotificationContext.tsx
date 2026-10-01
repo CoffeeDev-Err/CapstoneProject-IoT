@@ -26,6 +26,11 @@ import type {
   NotificationNavigationRequest,
   OfficerNotification,
 } from '../types/notifications';
+import {
+  GENERAL_NOTIFICATION_CHANNEL_ID,
+  GPS_SAFETY_NOTIFICATION_CHANNEL_ID,
+  GPS_SAFETY_VIBRATION_PATTERN,
+} from '../constants/notificationChannels';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -247,10 +252,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
 
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('officer-alerts', {
-          name: 'Officer alerts',
+        await Notifications.setNotificationChannelAsync(GENERAL_NOTIFICATION_CHANNEL_ID, {
+          name: 'GeoSentri updates',
+          description: 'Deployments, backup requests, reports, and general updates',
+          importance: Notifications.AndroidImportance.DEFAULT,
+          enableVibrate: false,
+          sound: 'default',
+        });
+        await Notifications.setNotificationChannelAsync(GPS_SAFETY_NOTIFICATION_CHANNEL_ID, {
+          name: 'GPS safety alerts',
+          description: 'Boundary, stationary, unavailable GPS, and tracker battery warnings',
           importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 250, 250, 250],
+          enableVibrate: true,
+          vibrationPattern: GPS_SAFETY_VIBRATION_PATTERN,
+          sound: 'default',
         });
       }
       if (!Device.isDevice) return;

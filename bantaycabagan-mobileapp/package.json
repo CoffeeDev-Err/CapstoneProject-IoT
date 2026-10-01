@@ -1,6 +1,6 @@
 {
   "name": "bantaycabagan-mobileapp",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "main": "index.ts",
   "scripts": {
     "audit:dependencies": "node scripts/dependency-audit.cjs",
