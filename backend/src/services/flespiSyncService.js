@@ -1,4 +1,4 @@
-const { GpsDeviceAssignment } = require('../models')
+const { Deployment, GpsDeviceAssignment } = require('../models')
 const { getLocationFreshness } = require('../utils/locationFreshness')
 const { resolveLocationName } = require('./reverseGeocodingService')
 
@@ -8,15 +8,33 @@ const toRecordedAt = (value) => {
 	return new Date(timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000)
 }
 
-const createFlespiSyncService = ({ flespiService, personnelService }) => {
+const createFlespiSyncService = ({
+	flespiService,
+	personnelService,
+	assignmentModel = GpsDeviceAssignment,
+	deploymentModel = Deployment,
+	clock = () => new Date(),
+	resolveLocation = resolveLocationName,
+}) => {
 	const syncAssignedLocations = async ({ deviceIds = [] } = {}) => {
 		const selectedDeviceIds = [...new Set(deviceIds.map(String).filter(Boolean))]
-		const query = { status: 'active' }
+		const now = clock()
+		const onDutyPersonnelIds = await deploymentModel.distinct('personnelId', {
+			status: 'active',
+			$and: [
+				{ $or: [{ shiftStart: { $exists: false } }, { shiftStart: null }, { shiftStart: { $lte: now } }] },
+				{ $or: [{ shiftEnd: { $exists: false } }, { shiftEnd: null }, { shiftEnd: { $gt: now } }] },
+			],
+		})
+		if (onDutyPersonnelIds.length === 0) {
+			return { assignments: 0, accepted: 0, skipped: 0 }
+		}
+		const query = { status: 'active', personnelId: { $in: onDutyPersonnelIds } }
 		if (selectedDeviceIds.length > 0) {
 			query.flespiDeviceId = { $in: selectedDeviceIds }
 		}
 
-		const assignments = await GpsDeviceAssignment.find(query).lean()
+		const assignments = await assignmentModel.find(query).lean()
 		if (assignments.length === 0) {
 			return { assignments: 0, accepted: 0, skipped: 0 }
 		}
@@ -53,7 +71,7 @@ const createFlespiSyncService = ({ flespiService, personnelService }) => {
 				imei: assignment.imei,
 				latitude: telemetry.latitude,
 				longitude: telemetry.longitude,
-				location_name: await resolveLocationName(
+				location_name: await resolveLocation(
 					telemetry.latitude,
 					telemetry.longitude,
 				),

@@ -115,6 +115,14 @@ const ingestLocation = async (payload = {}) => {
 		allowNewlines: false,
 	})
 	const current = await CurrentLocation.findOne({ personnelId })
+	if (source === 'gps' && !activeDeployment) {
+		return {
+			personnel: serializePersonnel(profile, current, { isOnDuty: false }),
+			accepted: false,
+			reason: 'off_duty',
+			historySampled: false,
+		}
+	}
 	if (
 		current?.recordedAt
 		&& current.source === source
