@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.bantaycabagan.mobileapp",
-      "versionCode": 49,
+      "versionCode": 50,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "icon": "./assets/geosentri-app-icon.png",
