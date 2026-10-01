@@ -272,13 +272,13 @@ assert.doesNotMatch(
 );
 assert.match(
   loginSource,
-  /<\/View>\s*\{mode === 'login' && \(\s*<TouchableOpacity\s*testID="login-privacy-notice"/,
+  /<\/View>\s*\{mode === 'login' && \(\s*<>\s*<TouchableOpacity\s*testID="login-privacy-notice"/,
   'The privacy notice must remain on the login page below and outside the bordered sign-in form',
 );
 assert.match(
   loginSource,
-  /accessibilityLabel="Open Privacy Notice"[\s\S]*See how GeoSentri uses and protects your information\.[\s\S]*name="chevron-right"/,
-  'The login page must use a compact privacy action instead of displaying the full notice',
+  /Show Privacy Notice summary[\s\S]*privacySummaryOpen &&[\s\S]*setPrivacyNoticeOpen\(true\)[\s\S]*View the full Privacy Notice/,
+  'The compact login privacy action must reveal a short disclosure before opening the full modal',
 );
 assert.match(
   profileSource,

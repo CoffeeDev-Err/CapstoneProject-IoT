@@ -52,6 +52,7 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
+  const [privacySummaryOpen, setPrivacySummaryOpen] = useState(false);
   const [privacyNoticeOpen, setPrivacyNoticeOpen] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [code, setCode] = useState('');
@@ -115,6 +116,7 @@ export default function LoginScreen() {
       setChallenge(response);
       setResendRetry(null);
       setCode('');
+      setPrivacySummaryOpen(false);
       setMode('verify');
       setMessage(`A verification code was sent to ${response.maskedEmail}.`);
     }, 'Sending verification code...');
@@ -205,6 +207,7 @@ export default function LoginScreen() {
     setError('');
     setMessage('');
     setFieldErrors({});
+    setPrivacySummaryOpen(false);
   };
 
   const handleVerificationCodeChange = (nextCode: string) => {
@@ -371,25 +374,54 @@ export default function LoginScreen() {
           </View>
 
           {mode === 'login' && (
-            <TouchableOpacity
-              testID="login-privacy-notice"
-              style={styles.privacyNotice}
-              accessibilityRole="button"
-              accessibilityLabel="Open Privacy Notice"
-              activeOpacity={0.78}
-              onPress={() => setPrivacyNoticeOpen(true)}
-            >
-              <View style={styles.privacyNoticeIcon}>
-                <Icon name="privacy-tip" size={18} color={mobileTheme.danger} />
-              </View>
-              <View style={styles.privacyNoticeCopy}>
-                <Text style={styles.privacyNoticeTitle}>Privacy Notice</Text>
-                <Text style={styles.privacyNoticeText}>
-                  See how GeoSentri uses and protects your information.
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={21} color="#72a7ff" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                testID="login-privacy-notice"
+                style={styles.privacyNotice}
+                accessibilityRole="button"
+                accessibilityLabel={privacySummaryOpen
+                  ? 'Hide Privacy Notice summary'
+                  : 'Show Privacy Notice summary'}
+                activeOpacity={0.78}
+                onPress={() => setPrivacySummaryOpen((current) => !current)}
+              >
+                <View style={styles.privacyNoticeIcon}>
+                  <Icon name="privacy-tip" size={18} color={mobileTheme.danger} />
+                </View>
+                <View style={styles.privacyNoticeCopy}>
+                  <Text style={styles.privacyNoticeTitle}>Privacy Notice</Text>
+                  <Text style={styles.privacyNoticeText}>
+                    Tap to view a short data-use notice.
+                  </Text>
+                </View>
+                <Icon
+                  name={privacySummaryOpen ? 'expand-less' : 'expand-more'}
+                  size={22}
+                  color="#72a7ff"
+                />
+              </TouchableOpacity>
+
+              {privacySummaryOpen && (
+                <View testID="login-privacy-summary" style={styles.privacySummary}>
+                  <Text style={styles.privacySummaryText}>
+                    GeoSentri processes your{' '}
+                    <Text style={styles.privacyNoticeEmphasis}>
+                      name, contact information, assigned GPS device data, and real-time location
+                    </Text>{' '}
+                    while you are on duty for personnel coordination, officer safety, emergency
+                    response, and authorized operational monitoring.{' '}
+                    <Text
+                      accessibilityRole="link"
+                      style={styles.privacyNoticeLink}
+                      onPress={() => setPrivacyNoticeOpen(true)}
+                    >
+                      View the full Privacy Notice
+                    </Text>{' '}
+                    to learn how your information is used, protected, and retained.
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -639,6 +671,18 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   privacyNoticeTitle: { color: '#dbeafe', fontWeight: '800' },
+  privacySummary: {
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: mobileTheme.danger,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(11, 21, 40, 0.94)',
+  },
+  privacySummaryText: { color: '#93a4bd', fontSize: 12, lineHeight: 18 },
+  privacyNoticeEmphasis: { color: '#cbd5e1', fontWeight: '700', fontStyle: 'italic' },
+  privacyNoticeLink: { color: '#72a7ff', fontWeight: '800', textDecorationLine: 'underline' },
   disabled: { opacity: 0.65 },
   disabledText: { opacity: 0.55 },
   error: {

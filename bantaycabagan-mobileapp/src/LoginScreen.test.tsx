@@ -44,9 +44,12 @@ describe('automatic login verification', () => {
       view.getByTestId('login-form-panel'),
     );
     expect(view.getByText('Privacy Notice')).toBeTruthy();
-    expect(view.getByText(/See how GeoSentri uses and protects/)).toBeTruthy();
+    expect(view.getByText(/Tap to view a short data-use notice/)).toBeTruthy();
     expect(view.queryByText(/GeoSentri processes your name/)).toBeNull();
-    await fireEvent.press(view.getByLabelText('Open Privacy Notice'));
+    await fireEvent.press(view.getByLabelText('Show Privacy Notice summary'));
+    expect(view.getByText(/GeoSentri processes your name, contact information/)).toBeTruthy();
+    expect(view.queryByText('Your information, clearly explained')).toBeNull();
+    await fireEvent.press(view.getByText('View the full Privacy Notice'));
     expect(view.getByText('Your information, clearly explained')).toBeTruthy();
     expect(view.getByText('On-duty location tracking')).toBeTruthy();
     expect(view.getByText('Your data privacy rights')).toBeTruthy();
