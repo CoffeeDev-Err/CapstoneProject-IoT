@@ -127,8 +127,13 @@ export default function PrivacyNoticeModal({
                 </Text>
               </View>
               <Text style={[styles.summaryText, dark && styles.mutedDark]}>
-                This notice explains how GeoSentri collects, uses, protects, and retains personal
-                information during authorized police operations.
+                GeoSentri processes your{' '}
+                <Text style={[styles.emphasis, dark && styles.emphasisDark]}>
+                  name, contact information, assigned GPS device data, and on-duty real-time
+                  location
+                </Text>{' '}
+                for personnel coordination, officer safety, emergency response, and authorized
+                operational monitoring.
               </Text>
             </View>
 

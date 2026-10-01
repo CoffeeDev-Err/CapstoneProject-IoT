@@ -371,33 +371,25 @@ export default function LoginScreen() {
           </View>
 
           {mode === 'login' && (
-            <View
+            <TouchableOpacity
               testID="login-privacy-notice"
               style={styles.privacyNotice}
-              accessibilityRole="text"
+              accessibilityRole="button"
+              accessibilityLabel="Open Privacy Notice"
+              activeOpacity={0.78}
+              onPress={() => setPrivacyNoticeOpen(true)}
             >
               <View style={styles.privacyNoticeIcon}>
                 <Icon name="privacy-tip" size={18} color={mobileTheme.danger} />
               </View>
-              <Text style={styles.privacyNoticeText}>
-                <Text style={styles.privacyNoticeTitle}>Privacy Notice. </Text>
-                GeoSentri processes your{' '}
-                <Text style={styles.privacyNoticeEmphasis}>
-                  name, contact information, assigned GPS device data, and real-time location
-                </Text>{' '}
-                while you are on duty for personnel coordination, officer safety, emergency
-                response, and authorized operational monitoring.{' '}
-                <Text
-                  accessibilityRole="link"
-                  style={styles.privacyNoticeLink}
-                  onPress={() => setPrivacyNoticeOpen(true)}
-                >
-                  View the Privacy Notice
-                </Text>{' '}
-                to learn how your information is used, protected, retained, and how you may
-                exercise your data privacy rights.
-              </Text>
-            </View>
+              <View style={styles.privacyNoticeCopy}>
+                <Text style={styles.privacyNoticeTitle}>Privacy Notice</Text>
+                <Text style={styles.privacyNoticeText}>
+                  See how GeoSentri uses and protects your information.
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={21} color="#72a7ff" />
+            </TouchableOpacity>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -622,8 +614,9 @@ const styles = StyleSheet.create({
   submitText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   privacyNotice: {
     marginTop: 14,
+    minHeight: 58,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 10,
     borderRadius: 8,
     paddingHorizontal: 14,
@@ -638,15 +631,14 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: 'rgba(220, 38, 38, 0.14)',
   },
+  privacyNoticeCopy: { flex: 1 },
   privacyNoticeText: {
-    flex: 1,
+    marginTop: 2,
     color: '#93a4bd',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
   },
   privacyNoticeTitle: { color: '#dbeafe', fontWeight: '800' },
-  privacyNoticeEmphasis: { color: '#cbd5e1', fontWeight: '700', fontStyle: 'italic' },
-  privacyNoticeLink: { color: '#72a7ff', fontWeight: '800', textDecorationLine: 'underline' },
   disabled: { opacity: 0.65 },
   disabledText: { opacity: 0.55 },
   error: {
