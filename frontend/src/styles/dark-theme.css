@@ -815,31 +815,46 @@
   background: #0e1a30;
   color: #f8fafc;
 }
-[data-theme="dark"] .assignment-form .settings-input:hover:not(:disabled) {
+[data-theme="dark"] .assignment-form .settings-input:hover:not(:disabled):not(:focus):not([aria-expanded='true']) {
   border-color: #475569;
   box-shadow: none;
 }
-[data-theme="dark"] .assignment-form .assignment-area-trigger:hover:not(:disabled) {
+[data-theme="dark"] .assignment-form .assignment-area-trigger:hover:not(:disabled):not([aria-expanded='true']) {
   border-color: var(--border-strong);
   background: #0e1a30;
   color: #f8fafc;
 }
 [data-theme="dark"] .assignment-form .settings-input:focus {
-  border-color: #2563eb;
-  background: rgba(37, 99, 235, 0.18);
-  color: var(--color-primary-light);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
-}
-[data-theme="dark"] .assignment-form .assignment-area-picker .settings-input:focus,
-[data-theme="dark"] .assignment-area-trigger[aria-expanded='true'] {
-  border-color: var(--text-secondary);
+  border-color: #3b82f6;
   background: #0e1a30;
   color: #f8fafc;
   box-shadow: none;
   outline: none;
 }
-[data-theme="dark"] .assignment-form input[type='datetime-local'] {
-  color-scheme: dark;
+[data-theme="dark"] .assignment-form .assignment-area-picker .settings-input:focus,
+[data-theme="dark"] .assignment-area-trigger[aria-expanded='true'] {
+  border-color: #3b82f6;
+  background: #0e1a30;
+  color: #f8fafc;
+  box-shadow: none;
+  outline: none;
+}
+[data-theme="dark"] .assignment-datetime-popover,
+[data-theme="dark"] .assignment-time-controls select {
+  border-color: #2a3a56;
+  background: #0e1a30;
+  color: #f8fafc;
+}
+[data-theme="dark"] .assignment-calendar-header button:hover:not(:disabled),
+[data-theme="dark"] .assignment-calendar-day:hover:not(:disabled):not(.is-selected),
+[data-theme="dark"] .assignment-datetime-actions button:hover:not(:disabled) {
+  border-color: #475569;
+  background: #17243a;
+  color: #f8fafc;
+}
+[data-theme="dark"] .assignment-time-controls,
+[data-theme="dark"] .assignment-datetime-actions {
+  border-color: #2a3a56;
 }
 [data-theme="dark"] .assignment-checklist {
   border-color: #2a3a56;
@@ -891,9 +906,9 @@
   color: #e2e8f0;
 }
 [data-theme="dark"] .assignment-area-option:hover {
-  border-color: var(--color-primary);
-  background: rgba(37, 99, 235, 0.13);
-  color: var(--color-primary-light);
+  border-color: #475569;
+  background: #17243a;
+  color: #f8fafc;
 }
 [data-theme="dark"] .assignment-area-option.is-active {
   border-color: #2563eb;

@@ -305,6 +305,14 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+:root:not([data-theme="dark"]) .assignment-form .settings-input:focus {
+  border-color: var(--color-primary);
+  background: #ffffff;
+  color: var(--text-primary);
+  box-shadow: none;
+  outline: none;
+}
+
 :root:not([data-theme="dark"]) ::placeholder {
   color: #98a6b8;
 }
@@ -316,15 +324,21 @@
 :root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input:hover:not(:disabled),
 :root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input:focus,
 :root:not([data-theme="dark"]) .assignment-form .assignment-area-trigger[aria-expanded='true'] {
-  border-color: var(--border-strong);
+  border-color: var(--color-primary);
   background: #ffffff;
   color: var(--text-primary);
   box-shadow: none;
 }
 
 :root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input:focus {
-  border-color: var(--text-secondary);
+  border-color: var(--color-primary);
   outline: none;
+}
+
+:root:not([data-theme="dark"]) .assignment-area-option:hover {
+  border-color: #cbd5e1;
+  background: #eef2f7;
+  color: var(--text-primary);
 }
 
 /* Tables and list separators use quiet neutral dividers rather than outlines. */

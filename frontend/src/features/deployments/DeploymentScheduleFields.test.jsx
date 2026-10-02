@@ -19,9 +19,9 @@ describe('deployment schedule controls', () => {
     expect(screen.getByText(/becomes on duty immediately/i)).toBeInTheDocument()
   })
 
-  it('preserves field-level validation and emits named updates', () => {
+  it('uses a custom picker without native datetime segments and emits named updates', () => {
     const onChange = vi.fn()
-    render(
+    const { container } = render(
       <DeploymentScheduleFields
         maximumShiftEnd="2026-08-29T08:00"
         minimumShiftEnd="2026-08-28T10:00"
@@ -39,7 +39,21 @@ describe('deployment schedule controls', () => {
 
     const start = screen.getByLabelText('Scheduled deployment start date and time')
     expect(start).toHaveAttribute('aria-invalid', 'true')
-    fireEvent.change(start, { target: { value: '2026-08-28T11:00' } })
+    expect(start).toHaveTextContent('28/08/2026 9:00 AM')
+    expect(container.querySelector('input[type="datetime-local"]')).not.toBeInTheDocument()
+
+    fireEvent.click(start)
+    expect(screen.getByRole('dialog', { name: 'Scheduled deployment start date and time' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose August 29, 2026' }))
+    expect(onChange).toHaveBeenCalledWith('shiftStart', '2026-08-29T09:00')
+
+    fireEvent.change(screen.getByLabelText('Scheduled deployment start date and time hour'), {
+      target: { value: '11' },
+    })
     expect(onChange).toHaveBeenCalledWith('shiftStart', '2026-08-28T11:00')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Scheduled deployment start date and time' })).not.toBeInTheDocument()
+    expect(start).toHaveFocus()
   })
 })

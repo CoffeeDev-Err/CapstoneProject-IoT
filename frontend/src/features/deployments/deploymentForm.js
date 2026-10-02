@@ -99,8 +99,3 @@ export const getDeploymentMode = (assignment) => assignment.status === 'schedule
   ? DEPLOYMENT_MODES.SCHEDULE_LATER : DEPLOYMENT_MODES.START_NOW
 export const formatDeploymentStatus = (status) => status
   ? `${status.charAt(0).toUpperCase()}${status.slice(1)}` : 'Active'
-export const openDateTimePicker = (event) => {
-  const input = event.currentTarget
-  if (typeof input.showPicker !== 'function') return
-  try { input.showPicker() } catch { input.focus() }
-}

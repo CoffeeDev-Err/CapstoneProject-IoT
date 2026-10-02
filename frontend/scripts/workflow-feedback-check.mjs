@@ -64,12 +64,18 @@ const navigationSource = read('src/components/NavSidebar.jsx')
 const feedbackSource = read('src/context/FeedbackContext.jsx')
 const feedbackStyles = read('src/styles/feedback.css')
 
-assert.match(assignmentSource, /minimumShiftStart=\{minimumSelectableShiftStart\}[\s\S]*min=\{minimumShiftStart\}/,
+assert.match(assignmentSource, /minimumShiftStart=\{minimumSelectableShiftStart\}[\s\S]*minimum=\{minimumShiftStart\}/,
   'Past shift dates must be unavailable for both deployment modes')
-assert.match(assignmentSource, /maximumShiftEnd=\{deploymentFormState\.maximumShiftEnd\}[\s\S]*max=\{maximumShiftEnd\}/,
+assert.match(assignmentSource, /minimumDateKey && key < minimumDateKey/,
+  'The custom calendar must disable dates before the minimum')
+assert.match(assignmentSource, /maximumShiftEnd=\{deploymentFormState\.maximumShiftEnd\}[\s\S]*maximum=\{maximumShiftEnd\}/,
   'The shift-end picker must enforce the 24-hour maximum')
-assert.match(assignmentSource, /onClick=\{openDateTimePicker\}/,
+assert.match(assignmentSource, /maximumDateKey && key > maximumDateKey/,
+  'The custom calendar must disable dates after the maximum')
+assert.match(assignmentSource, /aria-haspopup="dialog"[\s\S]*onClick=\{openPicker\}/,
   'Clicking anywhere in each date-time field must open its picker')
+assert.doesNotMatch(assignmentSource, /type="datetime-local"/,
+  'Assignment date-time controls must avoid native segmented selection highlights')
 assert.match(assignmentSource, /personnelIds:\s*requestedAssignment[\s\S]*\[requestedAssignment\.personnelId\]/,
   'The deployment form initializer must preselect the current assignment personnel')
 assert.match(assignmentSource, /requestedGroupAssignments\.map\(\((?:assignment|item)\) => (?:assignment|item)\.personnelId\)/,
