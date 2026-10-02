@@ -34,15 +34,24 @@ function DeploymentPointModal({ area, initialPoint, onClose, onConfirm, visible 
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const closeButtonRef = useRef(null)
+  const onCloseRef = useRef(onClose)
   const isDark = useDocumentTheme()
+  const areaLatitude = area.referenceCenter.latitude
+  const areaLongitude = area.referenceCenter.longitude
+  const initialLatitude = initialPoint?.latitude
+  const initialLongitude = initialPoint?.longitude
   const [point, setPoint] = useState(initialPoint || null)
   const [label, setLabel] = useState(initialPoint?.label || '')
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!visible) return undefined
     const previousOverflow = document.body.style.overflow
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
     }
     document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', handleKeyDown)
@@ -51,12 +60,18 @@ function DeploymentPointModal({ area, initialPoint, onClose, onConfirm, visible 
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onClose, visible])
+  }, [visible])
 
   useEffect(() => {
     if (!visible || !mapContainerRef.current || !hasMapTilerWebApiKey) return undefined
-    const startingPoint = initialPoint || null
-    const center = startingPoint || area.referenceCenter
+    const startingPoint = initialLatitude !== undefined
+      && initialLongitude !== undefined
+      ? {
+          latitude: Number(initialLatitude),
+          longitude: Number(initialLongitude),
+        }
+      : null
+    const center = startingPoint || { latitude: areaLatitude, longitude: areaLongitude }
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: getMapTilerWebStyleUrl('street', isDark),
@@ -101,8 +116,10 @@ function DeploymentPointModal({ area, initialPoint, onClose, onConfirm, visible 
       mapRef.current = null
     }
   }, [
-    area.referenceCenter,
-    initialPoint,
+    areaLatitude,
+    areaLongitude,
+    initialLatitude,
+    initialLongitude,
     isDark,
     visible,
   ])
