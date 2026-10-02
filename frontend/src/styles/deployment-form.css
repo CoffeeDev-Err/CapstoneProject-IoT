@@ -223,6 +223,7 @@
 
 .assignment-field--area {
   grid-area: area;
+  min-width: 0;
 }
 
 .assignment-field--start {
@@ -255,13 +256,13 @@
 }
 
 .assignment-form .assignment-area-trigger:hover:not(:disabled) {
-  border-color: var(--deployment-blue);
-  background: color-mix(in srgb, var(--deployment-blue) 12%, transparent);
-  color: var(--deployment-blue-dark);
+  border-color: var(--border-strong);
+  background: var(--surface-card);
+  color: var(--deployment-navy);
 }
 
 .assignment-area-trigger:hover .assignment-area-trigger__icon {
-  color: var(--deployment-blue-dark);
+  color: var(--deployment-text-muted);
 }
 
 .assignment-form .settings-input:focus {
@@ -284,10 +285,18 @@
 }
 
 .assignment-area-trigger[aria-expanded='true'] {
-  border-color: var(--deployment-blue);
-  background: color-mix(in srgb, var(--deployment-blue) 12%, transparent);
-  color: var(--deployment-blue-dark);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  border-color: var(--border-strong);
+  background: var(--surface-card);
+  color: var(--deployment-navy);
+  box-shadow: none;
+}
+
+.assignment-form .assignment-area-picker .settings-input:focus {
+  border-color: var(--text-secondary);
+  background: var(--surface-card);
+  color: var(--deployment-navy);
+  box-shadow: none;
+  outline: none;
 }
 
 .assignment-area-trigger__value {
@@ -305,11 +314,13 @@
 }
 
 .assignment-area-trigger[aria-expanded='true'] .assignment-area-trigger__icon {
-  color: var(--deployment-blue-dark);
+  color: var(--deployment-text-muted);
   transform: rotate(180deg);
 }
 
 .assignment-area-dropdown {
+  display: grid;
+  gap: 0.75rem;
   position: absolute;
   left: 0;
   right: 0;
@@ -318,19 +329,29 @@
   border: 1px solid var(--deployment-border);
   border-radius: 8px;
   background: var(--surface-card);
-  padding: 0.5rem;
+  padding: 0.75rem;
   box-shadow: 0 16px 32px -18px rgba(15, 23, 42, 0.32);
+}
+
+.assignment-area-dropdown .assignment-search-input {
+  margin: 0;
 }
 
 .assignment-area-options {
   display: grid;
-  gap: 0.35rem;
-  max-height: 180px;
+  align-content: start;
+  gap: 0.75rem;
+  min-height: 0;
+  max-height: min(280px, 40vh);
   overflow-y: auto;
-  padding-right: 0.1rem;
+  padding-right: 0.25rem;
 }
 
 .assignment-area-option {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--deployment-surface-muted);
@@ -338,7 +359,10 @@
   text-align: left;
   font-size: var(--font-size-sm);
   font-weight: 600;
-  padding: 0.5rem 0.65rem;
+  padding: 0.65rem 0.75rem;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 }
@@ -363,15 +387,21 @@
   color: var(--deployment-blue-dark);
 }
 
+.assignment-area-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.375rem;
+  min-width: 0;
+}
+
 .assignment-area-group + .assignment-area-group {
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--border-color);
 }
 
 .assignment-area-group__label {
   display: block;
-  padding: 0.2rem 0.75rem 0.35rem;
+  padding: 0.25rem 0.75rem;
   color: var(--text-tertiary);
   font-size: var(--font-size-xs);
   font-weight: 800;

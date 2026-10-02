@@ -286,9 +286,9 @@ assert.match(headers['Content-Security-Policy'], /default-src 'self'/)
 assert.equal(headers['Strict-Transport-Security'], 'max-age=31536000; includeSubDomains')
 assert.equal(headers['Cache-Control'], 'no-store')
 
-// --- Password reset must reject unknown accounts before OTP (product requirement) ---
-// The client must never receive a synthetic challenge that advances an unknown Login ID
-// or email to the verification-code screen. Route-level throttling still limits probing.
+// --- Password reset must conceal account existence for valid identifiers ---
+// Unknown Login IDs and emails receive the same public recovery response.
+// Invalid identifier formats must still fail before any account lookup.
 ;(async () => {
 	const authService = require('../src/services/authService')
 	const models = require('../src/models')
@@ -300,20 +300,20 @@ assert.equal(headers['Cache-Control'], 'no-store')
 			(error) => error.status === 400 && error.code === 'INVALID_LOGIN_ID_FORMAT',
 		)
 		models.User.findOne = async () => null
-		await assert.rejects(
-			() => authService.requestPasswordReset(
-				{ identifier: 'ghost@cabagan.gov.ph' },
+		for (const identifier of ['ghost@cabagan.gov.ph', '99-9999']) {
+			const response = await authService.requestPasswordReset(
+				{ identifier },
 				{ requestIp: '203.0.113.10' },
-			),
-			(error) => error.status === 404 && error.code === 'ACCOUNT_NOT_FOUND',
-		)
-		await assert.rejects(
-			() => authService.requestPasswordReset(
-				{ identifier: '99-9999' },
-				{ requestIp: '203.0.113.10' },
-			),
-			(error) => error.status === 404 && error.code === 'ACCOUNT_NOT_FOUND',
-		)
+			)
+			assert.equal(response.accepted, true)
+			assert.equal(response.message, authService.PASSWORD_RESET_GENERIC_MESSAGE)
+			assert.equal(response.maskedEmail, 'your registered email')
+			assert.match(response.challengeId, /^[a-f0-9]{24}$/)
+			const serverTime = Date.parse(response.serverTime)
+			assert.ok(Number.isFinite(serverTime))
+			assert.ok(Date.parse(response.expiresAt) > serverTime)
+			assert.equal(Date.parse(response.resendAvailableAt) - serverTime, 60_000)
+		}
 		await assert.rejects(
 			() => authService.requestPasswordReset(
 				{ identifier: 'letters-are-not-a-login-id' },

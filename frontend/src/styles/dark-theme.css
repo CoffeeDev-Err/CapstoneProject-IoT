@@ -820,16 +820,23 @@
   box-shadow: none;
 }
 [data-theme="dark"] .assignment-form .assignment-area-trigger:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  background: rgba(37, 99, 235, 0.13);
-  color: var(--color-primary-light);
+  border-color: var(--border-strong);
+  background: #0e1a30;
+  color: #f8fafc;
 }
-[data-theme="dark"] .assignment-form .settings-input:focus,
-[data-theme="dark"] .assignment-area-trigger[aria-expanded='true'] {
+[data-theme="dark"] .assignment-form .settings-input:focus {
   border-color: #2563eb;
   background: rgba(37, 99, 235, 0.18);
   color: var(--color-primary-light);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+[data-theme="dark"] .assignment-form .assignment-area-picker .settings-input:focus,
+[data-theme="dark"] .assignment-area-trigger[aria-expanded='true'] {
+  border-color: var(--text-secondary);
+  background: #0e1a30;
+  color: #f8fafc;
+  box-shadow: none;
+  outline: none;
 }
 [data-theme="dark"] .assignment-form input[type='datetime-local'] {
   color-scheme: dark;

@@ -781,6 +781,7 @@ function AssignAreaPage({ view = 'form' }) {
                   aria-label="Select patrol area"
                   aria-expanded={isPatrolAreaOpen}
                   aria-haspopup="listbox"
+                  aria-controls={isPatrolAreaOpen ? 'assignment-patrol-area-options' : undefined}
                 >
                   <span className="assignment-area-trigger__value">{assignmentForm.patrolArea}</span>
                   <ChevronDown className="assignment-area-trigger__icon" aria-hidden="true" />
@@ -795,6 +796,7 @@ function AssignAreaPage({ view = 'form' }) {
                       value={patrolAreaSearch}
                       onChange={(event) => setPatrolAreaSearch(event.target.value)}
                       placeholder="Search barangay, street, or highway"
+                      aria-label="Search patrol areas"
                       onKeyDown={(event) => {
                         if (event.key === 'Escape') {
                           setIsPatrolAreaOpen(false)
@@ -803,7 +805,7 @@ function AssignAreaPage({ view = 'form' }) {
                       }}
                     />
 
-                    <div className="assignment-area-options no-scrollbar" role="listbox">
+                    <div id="assignment-patrol-area-options" className="assignment-area-options" role="listbox" aria-label="Patrol areas">
                       {filteredPatrolAreas.length === 0 ? (
                         <small className="assignment-field__hint">No matching patrol area.</small>
                       ) : (
@@ -815,10 +817,12 @@ function AssignAreaPage({ view = 'form' }) {
                                 key={area.id}
                                 type="button"
                                 className={`assignment-area-option${assignmentForm.patrolAreaId === area.id ? ' is-active' : ''}`}
+                                role="option"
+                                aria-selected={assignmentForm.patrolAreaId === area.id}
                                 onClick={() => handleSelectPatrolArea(area)}
                               >
                                 <strong>{area.name}</strong>
-                                <small>{coverageLabelFor(area)}</small>
+                                {area.category !== 'barangay' && <small>{coverageLabelFor(area)}</small>}
                               </button>
                             ))}
                           </div>

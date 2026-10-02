@@ -309,6 +309,24 @@
   color: #98a6b8;
 }
 
+:root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input {
+  box-shadow: none;
+}
+
+:root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input:hover:not(:disabled),
+:root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input:focus,
+:root:not([data-theme="dark"]) .assignment-form .assignment-area-trigger[aria-expanded='true'] {
+  border-color: var(--border-strong);
+  background: #ffffff;
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+:root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input:focus {
+  border-color: var(--text-secondary);
+  outline: none;
+}
+
 /* Tables and list separators use quiet neutral dividers rather than outlines. */
 :root:not([data-theme="dark"]) .personnel-table.table {
   --bs-table-bg: #ffffff;

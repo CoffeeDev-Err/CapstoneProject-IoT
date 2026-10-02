@@ -50,8 +50,10 @@ assert.match(loginSource, /error=\{fieldErrors\.loginId\}/,
 	'Mobile Login ID validation must render beside the Login ID field')
 assert.match(loginSource, /error=\{fieldErrors\.identifier\}/,
 	'Mobile recovery errors must render beside the recovery identifier field')
-assert.match(loginSource, /requestError instanceof AuthApiError[\s\S]*ACCOUNT_NOT_FOUND[\s\S]*setFieldErrors\(\{ identifier:/,
-	'A nonexistent recovery account must render as an identifier field error')
+assert.match(loginSource, /requestError instanceof AuthApiError[\s\S]*INVALID_LOGIN_ID_FORMAT[\s\S]*INVALID_RESET_INPUT[\s\S]*setFieldErrors\(\{ identifier:/,
+	'Invalid recovery input must render as an identifier field error')
+assert.doesNotMatch(loginSource, /ACCOUNT_NOT_FOUND/,
+	'Password recovery must not expose whether an account exists')
 assert.doesNotMatch(authContextSource, /expo-secure-store/)
 assert.match(authContextSource, /mobileNumber: identity\.mobileNumber \?\? current\.profile\.mobileNumber/,
 	'The signed-in officer phone number must update without requiring a new login')
