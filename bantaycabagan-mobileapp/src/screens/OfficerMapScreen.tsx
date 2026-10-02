@@ -529,7 +529,7 @@ export default function OfficerMapScreen({
                 ]}
               >
                 <View style={[styles.deploymentIcon, { backgroundColor: colors.blueSoft }]}>
-                  <Icon name="location-on" size={20} color={colors.blue} />
+                  <Icon name="location-on" size={18} color={colors.blue} />
                 </View>
                 <View style={styles.deploymentText}>
                   <Text style={[styles.deploymentLabel, { color: colors.textMuted }]}>CURRENT DEPLOYMENT</Text>
@@ -540,7 +540,7 @@ export default function OfficerMapScreen({
                     {deploymentStyleLabel}
                   </Text>
                 </View>
-                <Icon name="chevron-right" size={22} color={colors.textMuted} />
+                <Icon name="chevron-right" size={19} color={colors.textMuted} />
               </TouchableOpacity>
             )}
           </View>
@@ -718,9 +718,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deploymentPill: {
-    minHeight: 52,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    height: 46,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -733,11 +733,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  deploymentIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+  deploymentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   deploymentText: { flex: 1 },
-  deploymentLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
-  deploymentArea: { marginTop: 2, marginBottom: 1, color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
-  deploymentType: { color: mobileTheme.blue, fontSize: 9, fontWeight: '800' },
+  deploymentLabel: { color: mobileTheme.textMuted, fontSize: 8, lineHeight: 9, fontWeight: '800' },
+  deploymentArea: { color: mobileTheme.text, fontSize: 11, lineHeight: 13, fontWeight: '800' },
+  deploymentType: { color: mobileTheme.blue, fontSize: 8, lineHeight: 9, fontWeight: '800' },
   gpsStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
   gpsStatusText: { fontSize: 9, fontWeight: '800' },
   followBanner: {
