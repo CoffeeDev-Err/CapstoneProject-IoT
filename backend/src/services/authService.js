@@ -27,8 +27,26 @@ const {
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const OTP_DURATION_MS = 10 * 60 * 1000
+const PASSWORD_RESET_PUBLIC_RESEND_MS = 60 * 1000
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000
+const PASSWORD_RESET_GENERIC_MESSAGE = 'If an account with that Login ID or official email exists, we sent a verification code to its registered email.'
+const PASSWORD_CHANGE_CODE_MESSAGE = 'A verification code was sent to your registered email.'
 const hashToken = (token) => createHash('sha256').update(token).digest('hex')
+
+const genericPasswordResetChallenge = (challenge = {}) => {
+	const now = new Date(Date.now())
+	return {
+		accepted: true,
+		message: PASSWORD_RESET_GENERIC_MESSAGE,
+		// A syntactically valid decoy keeps the client flow identical without
+		// creating a database record for an unknown identifier.
+		challengeId: challenge.challengeId || randomBytes(12).toString('hex'),
+		maskedEmail: 'your registered email',
+		expiresAt: challenge.expiresAt || new Date(now.getTime() + OTP_DURATION_MS).toISOString(),
+		serverTime: challenge.serverTime || now.toISOString(),
+		resendAvailableAt: new Date(now.getTime() + PASSWORD_RESET_PUBLIC_RESEND_MS).toISOString(),
+	}
+}
 
 const serializeUser = (user, profile) => ({
 	id: String(user._id),
@@ -379,22 +397,26 @@ const requestPasswordReset = async (
 			{ email: normalizedIdentifier },
 		],
 	})
-	if (!user) {
-		throw createAuthError(
-			'No account was found for that Login ID or official email.',
-			404,
-			'ACCOUNT_NOT_FOUND',
-		)
-	}
+	if (!user) return genericPasswordResetChallenge()
 
-	const challenge = await createVerificationChallenge(user, 'reset_password', {
-		deviceName,
-		requestIp,
-	})
-	return {
-		accepted: true,
-		message: `A verification code was sent to ${challenge.maskedEmail}.`,
-		...challenge,
+	try {
+		const challenge = await createVerificationChallenge(user, 'reset_password', {
+			deviceName,
+			requestIp,
+		})
+		return genericPasswordResetChallenge(challenge)
+	} catch (error) {
+		// Recovery requests must not reveal whether an account exists through
+		// email configuration, delivery, or per-account OTP-limit errors.
+		const expectedConcealedError = [
+			'EMAIL_NOT_CONFIGURED',
+			'INVALID_ACCOUNT_EMAIL',
+			'OTP_RATE_LIMITED',
+		].includes(error.code)
+		if (!expectedConcealedError && process.env.NODE_ENV !== 'test') {
+			console.warn(`Password reset code delivery was not completed (${error.code || error.name || 'unknown'}).`)
+		}
+		return genericPasswordResetChallenge()
 	}
 }
 
@@ -410,23 +432,36 @@ const resetPassword = async (
 	}
 	let user
 	let passwordHash
-	const challenge = await consumeChallenge(challengeId, code, {
-		purposes: ['reset_password'],
-		beforeConsume: async (verifiedChallenge) => {
-			user = await User.findById(verifiedChallenge.userId).select('+passwordHash')
-			if (!user || user.status !== 'active') {
-				throw createAuthError('Account is inactive or unavailable.')
-			}
-			if (await verifyPassword(newPassword, user.passwordHash)) {
-				throw createAuthError(
-					'Your new password must be different from your current password.',
-					400,
-					'PASSWORD_REUSED',
-				)
-			}
-			passwordHash = await hashPassword(newPassword)
-		},
-	})
+	let challenge
+	try {
+		challenge = await consumeChallenge(challengeId, code, {
+			purposes: ['reset_password'],
+			beforeConsume: async (verifiedChallenge) => {
+				user = await User.findById(verifiedChallenge.userId).select('+passwordHash')
+				if (!user || user.status !== 'active') {
+					throw createAuthError('Account is inactive or unavailable.')
+				}
+				if (await verifyPassword(newPassword, user.passwordHash)) {
+					throw createAuthError(
+						'Your new password must be different from your current password.',
+						400,
+						'PASSWORD_REUSED',
+					)
+				}
+				passwordHash = await hashPassword(newPassword)
+			},
+		})
+	} catch (error) {
+		if (['INVALID_OTP', 'EXPIRED_OTP', 'INCORRECT_OTP', 'OTP_ATTEMPTS_EXCEEDED']
+			.includes(error.code)) {
+			throw createAuthError(
+				'The verification code is incorrect or expired. Request a new code if needed.',
+				400,
+				'INVALID_RESET_CODE',
+			)
+		}
+		throw error
+	}
 	user.passwordHash = passwordHash
 	user.forcePasswordReset = false
 	if (!user.emailVerifiedAt) user.emailVerifiedAt = new Date()
@@ -508,10 +543,15 @@ const requestPasswordChange = async (
 	if (!securedUser || !(await verifyPassword(currentPasswordValue, securedUser.passwordHash))) {
 		throw createAuthError('The current password is incorrect. Try again.')
 	}
-	return createVerificationChallenge(securedUser, 'change_password', {
+	const challenge = await createVerificationChallenge(securedUser, 'change_password', {
 		deviceName,
 		requestIp,
 	})
+	return {
+		...challenge,
+		maskedEmail: 'your registered email',
+		message: PASSWORD_CHANGE_CODE_MESSAGE,
+	}
 }
 
 const changePassword = async (user, payload = {}, { requestIp } = {}) => {
@@ -557,6 +597,8 @@ const changePassword = async (user, payload = {}, { requestIp } = {}) => {
 }
 
 module.exports = {
+	PASSWORD_CHANGE_CODE_MESSAGE,
+	PASSWORD_RESET_GENERIC_MESSAGE,
 	authenticate,
 	changePassword,
 	getCurrentUser,

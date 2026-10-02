@@ -17,7 +17,11 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import VerificationCodeInput from './components/VerificationCodeInput';
 import { verificationFeedback, type VerificationError } from './features/auth/verificationFeedback';
 import { useVerificationTiming } from './features/auth/useVerificationTiming';
-import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from './features/auth/authCopy';
+import {
+  COMPLETE_CODE_MESSAGE,
+  PASSWORD_REQUIREMENTS,
+  RECOVERY_REQUEST_MESSAGE,
+} from './features/auth/authCopy';
 import { mobileTheme } from './constants/mobileTheme';
 import { useAuth } from './context/AuthContext';
 import {
@@ -139,13 +143,14 @@ export default function LoginScreen() {
           setResendRetry(null);
           setCode('');
           setMode('reset');
+          setMessage(response.message || RECOVERY_REQUEST_MESSAGE);
           return;
         }
-        setMessage(response.message || 'A verification code was sent.');
+        setMessage(response.message || RECOVERY_REQUEST_MESSAGE);
       } catch (requestError) {
         if (
           requestError instanceof AuthApiError
-          && ['ACCOUNT_NOT_FOUND', 'INVALID_LOGIN_ID_FORMAT', 'INVALID_RESET_INPUT']
+          && ['INVALID_LOGIN_ID_FORMAT', 'INVALID_RESET_INPUT']
             .includes(requestError.code)
         ) {
           setFieldErrors({ identifier: requestError.message });
@@ -183,7 +188,7 @@ export default function LoginScreen() {
       setChallenge(response);
       setResendRetry(null);
       setCode('');
-      setMessage(response.message || 'A new verification code was sent.');
+      setMessage(response.message || RECOVERY_REQUEST_MESSAGE);
     } else {
       if (!challenge) return;
       const response = await resendVerificationCode(challenge.challengeId);
@@ -219,7 +224,7 @@ export default function LoginScreen() {
     login: ['Officer Sign In', 'Use your assigned Login ID and password.'],
     verify: ['Verify Your Login', ''],
     forgot: ['Reset Password', 'Enter your Login ID or official email.'],
-    reset: ['Create New Password', `Enter the code sent to ${challenge?.maskedEmail || 'your official email'}.`],
+    reset: ['Create New Password', 'Enter the code sent to the account\'s registered email.'],
   }[mode];
 
   return (

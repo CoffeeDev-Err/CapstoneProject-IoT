@@ -11,6 +11,9 @@ export const deadlineRemaining = (deadline, timing, now = Date.now()) => {
 
 export const verificationFeedback = (error) => {
   const code = error?.code
+  if (code === 'INVALID_RESET_CODE') {
+    return { message: 'The verification code is incorrect or expired. Request a new code if needed.', clearCode: true }
+  }
   const incorrect = code === 'INCORRECT_OTP'
     || (code === 'INVALID_OTP' && /incorrect/i.test(error?.message || ''))
   if (incorrect) return { message: 'Incorrect code. Check your email and enter the code again.', clearCode: true }

@@ -4,7 +4,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { confirmPasswordChange, requestPasswordChange, resendVerificationCode } from '../services/auth'
 import VerificationCodeInput from './VerificationCodeInput'
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
-import { PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
+import { PASSWORD_CHANGE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
 
 const strongPassword = (value) => (
   value.length >= 10
@@ -59,6 +59,7 @@ function PasswordChangeModal({ open, onClose, onChanged, onSignOut, required = f
       const nextChallenge = await requestPasswordChange(currentPassword)
       setChallenge(nextChallenge)
       setStep('verify')
+      setMessage(nextChallenge.message || PASSWORD_CHANGE_CODE_MESSAGE)
     } catch (requestError) {
       setError(requestErrorMessage(requestError, { action: 'send a verification code', write: true, recovery: 'Check your connection and your email for the latest code before requesting another one.' }))
     } finally {
@@ -115,7 +116,7 @@ function PasswordChangeModal({ open, onClose, onChanged, onSignOut, required = f
       const nextChallenge = await resendVerificationCode(challenge.challengeId)
       setChallenge(nextChallenge)
       setCode('')
-      setMessage(`A new code was sent to ${nextChallenge.maskedEmail}.`)
+      setMessage(PASSWORD_CHANGE_CODE_MESSAGE)
     } catch (requestError) {
       setError(requestErrorMessage(requestError, { action: 'resend the verification code', write: true, recovery: 'Check your connection and your email for the latest code before requesting another one.' }))
     } finally {
@@ -134,7 +135,7 @@ function PasswordChangeModal({ open, onClose, onChanged, onSignOut, required = f
 				{required && <span>Your temporary password must be changed before you can access GeoSentri. </span>}
 				{step === 'password'
                 ? 'Confirm your current password first.'
-                : `Enter the code sent to ${challenge?.maskedEmail}.`}
+				: 'Enter the code sent to your registered email.'}
             </p>
           </div>
 			{!required && <button type="button" className="auth-modal__close" onClick={resetAndClose} aria-label="Close">&times;</button>}

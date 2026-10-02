@@ -204,17 +204,17 @@ describe('automatic login verification', () => {
     expect(screen.getByRole('button', { name: 'Reset Password' })).toBeInTheDocument()
   })
 
-  it('shows a nonexistent recovery account error beside the identifier field', async () => {
-    requestPasswordReset.mockRejectedValueOnce(Object.assign(
-      new Error('No account was found for that Login ID or official email.'),
-      { code: 'ACCOUNT_NOT_FOUND' },
-    ))
+  it('uses the same recovery flow and message for an unknown account', async () => {
+    requestPasswordReset.mockResolvedValueOnce({
+      challengeId: 'decoy-challenge',
+      maskedEmail: 'your registered email',
+      message: 'If an account with that Login ID or official email exists, we sent a verification code to its registered email.',
+    })
     renderLogin()
     fireEvent.click(screen.getByText('Forgot password?'))
     fireEvent.change(screen.getByLabelText('Login ID or Official Email'), { target: { value: '99-9999' } })
     fireEvent.click(screen.getByText('Send Reset Code'))
-    expect(await screen.findByText('No account was found for that Login ID or official email.')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('e.g., 01-2002 or example@gmail.com'))
-      .toHaveAttribute('aria-invalid', 'true')
+    expect(await screen.findByText('If an account with that Login ID or official email exists, we sent a verification code to its registered email.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset Password' })).toBeInTheDocument()
   })
 })

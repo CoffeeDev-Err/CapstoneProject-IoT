@@ -205,4 +205,19 @@ describe('automatic login verification', () => {
     expect(resetPassword).not.toHaveBeenCalled();
     expect(view.getByText('Reset Password')).toBeTruthy();
   });
+
+  it('uses the same recovery flow and message for an unknown account', async () => {
+    jest.mocked(requestPasswordReset).mockResolvedValueOnce({
+      challengeId: 'decoy-challenge',
+      maskedEmail: 'your registered email',
+      expiresAt: '2030-01-01',
+      message: 'If an account with that Login ID or official email exists, we sent a verification code to its registered email.',
+    });
+    const view = await render(<LoginScreen />);
+    await fireEvent.press(view.getByText('Forgot password?'));
+    await fireEvent.changeText(view.getByPlaceholderText('e.g., 01-2002 or example@gmail.com'), '99-9999');
+    await fireEvent.press(view.getByText('Send Reset Code'));
+    expect(view.getByText('If an account with that Login ID or official email exists, we sent a verification code to its registered email.')).toBeTruthy();
+    expect(view.getByText('Reset Password')).toBeTruthy();
+  });
 });

@@ -29,17 +29,55 @@ describe('verification feedback and server deadlines', () => {
   it('returns the real expiry and allows resend while below the existing quota', async () => {
     const response = await auth.requestPasswordReset({ identifier: '01-2002' })
     assert.equal(response.expiresAt, new Date(now + 600_000).toISOString())
-    assert.equal(response.resendAvailableAt, new Date(now).toISOString())
+    assert.equal(response.resendAvailableAt, new Date(now + 60_000).toISOString())
+    assert.equal(response.maskedEmail, 'your registered email')
+    assert.equal(response.message, auth.PASSWORD_RESET_GENERIC_MESSAGE)
     assert.ok(response.serverTime)
   })
 
-  it('does not send verification codes to a stored email with a known mistyped domain', async (t) => {
+  it('returns the generic response without sending to a stored mistyped email', async (t) => {
     t.mock.method(User, 'findOne', async () => ({ _id: 'user', email: 'officer@ggmail.com' }))
-    await assert.rejects(
-      auth.requestPasswordReset({ identifier: '01-2002' }),
-      { code: 'INVALID_ACCOUNT_EMAIL' },
-    )
+    const response = await auth.requestPasswordReset({ identifier: '01-2002' })
+    assert.equal(response.message, auth.PASSWORD_RESET_GENERIC_MESSAGE)
+    assert.match(response.challengeId, /^[a-f0-9]{24}$/)
     assert.equal(EmailVerification.create.mock.callCount(), 0)
+  })
+
+  it('returns the same recovery shape for an unknown account', async (t) => {
+    t.mock.method(User, 'findOne', async () => null)
+    const response = await auth.requestPasswordReset({ identifier: '99-9999' })
+    assert.equal(response.accepted, true)
+    assert.equal(response.message, auth.PASSWORD_RESET_GENERIC_MESSAGE)
+    assert.equal(response.maskedEmail, 'your registered email')
+    assert.match(response.challengeId, /^[a-f0-9]{24}$/)
+    assert.ok(response.expiresAt)
+    assert.equal(EmailVerification.create.mock.callCount(), 0)
+  })
+
+  it('uses the same reset-code error for a decoy and a wrong real code', async (t) => {
+		let storedChallenge = null
+		t.mock.method(EmailVerification, 'findById', () => ({ select: async () => storedChallenge }))
+    await assert.rejects(
+      auth.resetPassword({
+        challenge_id: '0123456789abcdef01234567',
+        code: '123456',
+        new_password: 'NewStrong2!',
+      }),
+      { code: 'INVALID_RESET_CODE' },
+    )
+
+		storedChallenge = {
+      userId: 'user', purpose: 'reset_password', expiresAt: new Date('2099-01-01'),
+      attempts: 0, maxAttempts: 5, otpHash: hashCode('654321'), save: async () => {},
+    }
+    await assert.rejects(
+      auth.resetPassword({
+        challenge_id: 'real-challenge',
+        code: '123456',
+        new_password: 'NewStrong2!',
+      }),
+      { code: 'INVALID_RESET_CODE' },
+    )
   })
 
   it('rejects reusing the current password during password recovery', async (t) => {
@@ -88,19 +126,16 @@ describe('verification feedback and server deadlines', () => {
 	assert.deepEqual(audits[0].changes, { sessionsRevoked: true })
   })
 
-  it('returns the remaining account window after the third code', async (t) => {
+  it('keeps the public resend deadline generic after the third account request', async (t) => {
     t.mock.method(otpRequestLimit, 'reserve', async () => ({ id: 'third', resendAvailableAt: new Date(oldest.getTime() + 900_000).toISOString() }))
     const response = await auth.requestPasswordReset({ identifier: '01-2002' })
-    assert.equal(response.resendAvailableAt, new Date(oldest.getTime() + 900_000).toISOString())
+    assert.equal(response.resendAvailableAt, new Date(now + 60_000).toISOString())
   })
 
-  it('rejects a fourth request with its retry deadline before creating or invalidating codes', async (t) => {
+  it('does not reveal the per-account OTP limit through password recovery', async (t) => {
     t.mock.method(otpRequestLimit, 'reserve', async () => { throw Object.assign(new Error('Limit'), { code: 'OTP_RATE_LIMITED', retryAt: new Date(oldest.getTime() + 900_000).toISOString() }) })
-    await assert.rejects(auth.requestPasswordReset({ identifier: '01-2002' }), (error) => {
-      assert.equal(error.code, 'OTP_RATE_LIMITED')
-      assert.equal(error.retryAt, new Date(oldest.getTime() + 900_000).toISOString())
-      return true
-    })
+    const response = await auth.requestPasswordReset({ identifier: '01-2002' })
+    assert.equal(response.message, auth.PASSWORD_RESET_GENERIC_MESSAGE)
     assert.equal(EmailVerification.create.mock.callCount(), 0)
     assert.equal(EmailVerification.updateMany.mock.callCount(), 0)
   })

@@ -13,7 +13,7 @@ import { mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
 import { SwipeDismissSheet } from './SwipeDismissSheet';
 import VerificationCodeInput from './VerificationCodeInput';
-import { PASSWORD_REQUIREMENTS } from '../features/auth/authCopy';
+import { PASSWORD_CHANGE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy';
 import {
   confirmPasswordChange,
   requestPasswordChange,
@@ -85,6 +85,7 @@ export default function ChangePasswordModal({
       const response = await requestPasswordChange(token, currentPassword);
       setChallenge(response);
       setStep('verify');
+      setMessage(response.message || PASSWORD_CHANGE_CODE_MESSAGE);
     } catch (requestError) {
       setError(requestErrorMessage(requestError, { action: 'send a verification code', write: true, recovery: 'Check your connection and your email for the latest code before requesting another one.' }));
     } finally {
@@ -141,7 +142,7 @@ export default function ChangePasswordModal({
       const response = await resendVerificationCode(challenge.challengeId);
       setChallenge(response);
       setCode('');
-      setMessage(`A new code was sent to ${response.maskedEmail}.`);
+      setMessage(PASSWORD_CHANGE_CODE_MESSAGE);
     } catch (requestError) {
       setError(requestErrorMessage(requestError, { action: 'resend the verification code', write: true, recovery: 'Check your connection and your email for the latest code before requesting another one.' }));
     } finally {
@@ -173,7 +174,7 @@ export default function ChangePasswordModal({
               <Text style={[styles.subtitle, isDark && darkStyles.muted]}>
                 {step === 'password'
                   ? 'Confirm your current password.'
-                  : `Enter the code sent to ${challenge?.maskedEmail}. Never share this code.`}
+                  : 'Enter the code sent to your registered email. Never share this code.'}
               </Text>
             </View>
           </View>

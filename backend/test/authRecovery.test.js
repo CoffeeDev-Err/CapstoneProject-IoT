@@ -53,7 +53,7 @@ it('allows the same correct OTP with a different password after PASSWORD_REUSED,
 	assert.equal(await verifyPassword('NewStrong2!', f.user.passwordHash), true)
 	assert.equal(f.user.forcePasswordReset, false)
 	assert.equal(AuthSession.updateMany.mock.callCount(), 1)
-	await assert.rejects(f.reset('AnotherStrong3!'), { code: 'INVALID_OTP' })
+	await assert.rejects(f.reset('AnotherStrong3!'), { code: 'INVALID_RESET_CODE' })
 	assert.equal(f.saves(), 1)
 })
 
@@ -61,7 +61,7 @@ it('only one simultaneous reset can consume a correct code and save a password',
 	const f = await fixture(t)
 	const results = await Promise.allSettled([f.reset(), f.reset('AnotherStrong3!')])
 	assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1)
-	assert.equal(results.find((result) => result.status === 'rejected').reason.code, 'INVALID_OTP')
+	assert.equal(results.find((result) => result.status === 'rejected').reason.code, 'INVALID_RESET_CODE')
 	assert.equal(f.saves(), 1)
 	assert.equal(AuthSession.updateMany.mock.callCount(), 1)
 })
@@ -70,24 +70,24 @@ it('checks incorrect codes before password reuse and retains the attempt limit',
 	const f = await fixture(t)
 	for (let index = 0; index < 5; index += 1) {
 		await assert.rejects(f.reset('OldStrong1!', '654321'), {
-			code: index === 4 ? 'OTP_ATTEMPTS_EXCEEDED' : 'INCORRECT_OTP',
+			code: 'INVALID_RESET_CODE',
 		})
 	}
 	assert.equal(f.challenge.attempts, 5)
 	assert.equal(User.findById.mock.callCount(), 0)
-	await assert.rejects(f.reset(), { code: 'INVALID_OTP' })
+	await assert.rejects(f.reset(), { code: 'INVALID_RESET_CODE' })
 })
 
-for (const [field, value, code] of [
-	['purpose', 'login', 'INVALID_OTP'],
-	['expiresAt', new Date('2000-01-01'), 'EXPIRED_OTP'],
-	['consumedAt', new Date(), 'INVALID_OTP'],
-	['attempts', 5, 'OTP_ATTEMPTS_EXCEEDED'],
+for (const [field, value] of [
+	['purpose', 'login'],
+	['expiresAt', new Date('2000-01-01')],
+	['consumedAt', new Date()],
+	['attempts', 5],
 ]) {
 	it(`rejects an invalid recovery challenge (${field}) without updating the password`, async (t) => {
 		const f = await fixture(t)
 		f.challenge[field] = value
-		await assert.rejects(f.reset(), { code })
+		await assert.rejects(f.reset(), { code: 'INVALID_RESET_CODE' })
 		assert.equal(f.saves(), 0)
 		assert.equal(User.findById.mock.callCount(), 0)
 	})
@@ -105,7 +105,7 @@ it('does not consume the OTP when the new password is weak or the account is ina
 it('rechecks challenge validity after password validation before writing credentials', async (t) => {
 	const f = await fixture(t)
 	t.mock.method(EmailVerification, 'updateOne', async () => ({ modifiedCount: 0 }))
-	await assert.rejects(f.reset(), { code: 'INVALID_OTP' })
+	await assert.rejects(f.reset(), { code: 'INVALID_RESET_CODE' })
 	assert.equal(f.saves(), 0)
 	assert.equal(AuthSession.updateMany.mock.callCount(), 0)
 })

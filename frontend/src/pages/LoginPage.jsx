@@ -5,7 +5,11 @@ import pnpLogo from '../assets/pnp-logo.png'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import { formatCountdown, verificationFeedback } from '../features/auth/verificationFeedback'
 import { useVerificationTiming } from '../features/auth/useVerificationTiming'
-import { COMPLETE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy'
+import {
+  COMPLETE_CODE_MESSAGE,
+  PASSWORD_REQUIREMENTS,
+  RECOVERY_REQUEST_MESSAGE,
+} from '../features/auth/authCopy'
 import { useAuth } from '../context/useAuth'
 import {
   LOGIN_ID_PATTERN,
@@ -186,11 +190,12 @@ function LoginPage() {
         setResendRetry(null)
         setCode('')
         setMode('reset')
+        setMessage(nextChallenge.message || RECOVERY_REQUEST_MESSAGE)
       } else {
-        setMessage(nextChallenge.message)
+        setMessage(nextChallenge.message || RECOVERY_REQUEST_MESSAGE)
       }
     } catch (requestError) {
-      if (['ACCOUNT_NOT_FOUND', 'INVALID_LOGIN_ID_FORMAT', 'INVALID_RESET_INPUT']
+      if (['INVALID_LOGIN_ID_FORMAT', 'INVALID_RESET_INPUT']
         .includes(requestError?.code)) {
         setFieldErrors({ identifier: requestError.message })
         return
@@ -252,7 +257,7 @@ function LoginPage() {
         setChallenge(nextChallenge)
         setResendRetry(null)
         setCode('')
-        setMessage(nextChallenge.message || 'A new verification code was sent.')
+        setMessage(nextChallenge.message || RECOVERY_REQUEST_MESSAGE)
       } else {
         const nextChallenge = await resendVerificationCode(challenge.challengeId)
         setChallenge(nextChallenge)
@@ -297,7 +302,7 @@ function LoginPage() {
     reset: {
       badge: 'Secure Password Reset',
       title: <>Create a new <span>password.</span></>,
-      subtitle: `Enter the code sent to ${challenge?.maskedEmail || 'your official email'}.`,
+      subtitle: 'Enter the code sent to the account\'s registered email.',
     },
   }[mode]
 
