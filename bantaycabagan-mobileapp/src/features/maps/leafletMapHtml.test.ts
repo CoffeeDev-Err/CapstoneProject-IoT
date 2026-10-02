@@ -34,7 +34,10 @@ describe('Leaflet map document', () => {
     expect(html).toContain('PNP-001');
     expect(html).toContain('setView([17.42,121.76],15)');
     expect(html).toContain('class="deployment-pin"');
+    expect(html).toContain('class="deployment-symbol"');
     expect(html).toContain('Main entrance');
+    expect(html).toContain('window.focusDeployment');
+    expect(html).toContain("command.type==='focus-deployment'");
     expect(html.indexOf('const escapeHtml')).toBeLessThan(html.indexOf('if(deploymentPoint.hasPoint)'));
   });
 });

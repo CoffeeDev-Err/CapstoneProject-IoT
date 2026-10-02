@@ -91,6 +91,7 @@ export function useOperationalSocket({
       fetchOperations(currentPersonnelId, token)
         .then((operationsPayload) => {
           if (!effectActive) return;
+          setDeployments(operationsPayload.deployments);
           setUpcomingDeployment(operationsPayload.upcomingDeployment);
           setTasks((items) => mergeById(
             operationsPayload.tasks,

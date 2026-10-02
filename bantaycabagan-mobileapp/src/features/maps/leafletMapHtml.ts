@@ -98,9 +98,12 @@ export const createLeafletMapHtml = ({
             .officer-arrow.backup{border-top-color:#ff2f3d}
             .officer-cue{position:absolute;top:-6px;right:-2px;min-width:18px;height:18px;padding:0 3px;display:grid;place-items:center;border:2px solid #fff;border-radius:12px;background:#2563eb;color:#fff;font:900 7px/1 Arial,sans-serif;box-sizing:border-box}
             .officer-cue.operation{background:#7c3aed}.officer-cue.boundary{background:#d97706;font-size:11px}.officer-cue.backup{background:#dc2626}
-            .deployment-pin{position:relative;width:42px;height:55px;display:flex;flex-direction:column;align-items:center}
-            .deployment-dot{width:34px;height:34px;display:grid;place-items:center;border:3px solid #fff;border-radius:50%;background:#2563eb;color:#fff;font:900 8px/1 Arial,sans-serif;box-shadow:0 4px 12px rgba(15,23,42,.34)}
-            .deployment-arrow{width:0;height:0;margin-top:-2px;border-left:8px solid transparent;border-right:8px solid transparent;border-top:13px solid #2563eb}
+            .deployment-pin{position:relative;width:64px;height:64px;display:flex;flex-direction:column;align-items:center}
+            .deployment-badge{min-width:54px;height:46px;padding:3px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid #fff;border-radius:15px;background:linear-gradient(145deg,#2f73ff,#1d4ed8);color:#fff;box-sizing:border-box;box-shadow:0 6px 16px rgba(15,23,42,.38)}
+            .deployment-symbol{width:20px;height:20px;display:block;color:#fff}
+            .deployment-symbol svg{width:20px;height:20px;display:block}
+            .deployment-tag{margin-top:-1px;font:900 8px/1 Arial,sans-serif;letter-spacing:.5px}
+            .deployment-arrow{width:0;height:0;margin-top:-1px;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #1d4ed8;filter:drop-shadow(0 3px 2px rgba(15,23,42,.2))}
             @keyframes emergency-ring{
               0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.72),0 4px 10px rgba(15,23,42,.28)}
               50%{box-shadow:0 0 0 7px rgba(220,38,38,0),0 4px 10px rgba(15,23,42,.28)}
@@ -165,16 +168,17 @@ export const createLeafletMapHtml = ({
               .replace(/"/g,'&quot;')
               .replace(/'/g,'&#039;');
 
+            let deploymentMarker=null;
             if(deploymentPoint.hasPoint){
               const deploymentIcon=L.divIcon({
                 className:'',
-                html:'<div class="deployment-pin"><div class="deployment-dot">'+(deploymentPoint.type==='route'?'START':'POST')+'</div><div class="deployment-arrow"></div></div>',
-                iconSize:[42,55],
-                iconAnchor:[21,55]
+                html:'<div class="deployment-pin"><div class="deployment-badge"><span class="deployment-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/></svg></span><span class="deployment-tag">'+(deploymentPoint.type==='route'?'START':'POST')+'</span></div><div class="deployment-arrow"></div></div>',
+                iconSize:[64,64],
+                iconAnchor:[32,64]
               });
-              L.marker([deploymentPoint.latitude,deploymentPoint.longitude],{icon:deploymentIcon,zIndexOffset:-250})
+              deploymentMarker=L.marker([deploymentPoint.latitude,deploymentPoint.longitude],{icon:deploymentIcon,zIndexOffset:150})
                 .addTo(map)
-                .bindTooltip(escapeHtml(deploymentPoint.label),{direction:'top',offset:[0,-45]});
+                .bindTooltip(escapeHtml(deploymentPoint.label),{direction:'top',offset:[0,-54]});
             }
 
             const emit=(payload)=>{
@@ -246,6 +250,12 @@ export const createLeafletMapHtml = ({
               map.flyTo([Number(member.latitude),Number(member.longitude)],followZoom,{duration:.8});
             };
 
+            window.focusDeployment=()=>{
+              const focusZoom=currentMapMode==='satellite'?15:16;
+              map.flyTo([Number(deploymentPoint.latitude),Number(deploymentPoint.longitude)],focusZoom,{duration:.8});
+              if(deploymentMarker)setTimeout(()=>deploymentMarker.openTooltip(),700);
+            };
+
             map.on('movestart',()=>emit({type:'map-interaction-start'}));
             map.on('moveend',()=>emit({type:'map-interaction-end'}));
 
@@ -271,6 +281,7 @@ export const createLeafletMapHtml = ({
             window.handleMapCommand=(command)=>{
               if(!command)return;
               if(command.type==='update-personnel')window.updatePersonnel(command.personnel);
+              if(command.type==='focus-deployment')window.focusDeployment();
               if(command.type==='focus-officer')window.focusOfficer(command.officerId);
               if(command.type==='set-followed-officer')window.setFollowedOfficer(command.officerId);
               if(command.type==='set-map-mode')window.setMapMode(command.mode);

@@ -9,6 +9,7 @@ import type { MapMode } from './MapControls';
 
 type MapCommand =
   | { type: 'update-personnel'; personnel: OfficerMapPerson[] }
+  | { type: 'focus-deployment' }
   | { type: 'focus-officer'; officerId: string }
   | { type: 'set-followed-officer'; officerId: string | null }
   | { type: 'set-map-mode'; mode: MapMode };
@@ -117,6 +118,16 @@ export function useMapSelectionController({
     nativeMapRef.current?.focusOfficer(officerId);
   }, [sendMapCommand]);
 
+  const focusDeployment = useCallback(() => {
+    setFollowedOfficerId(null);
+    setSelectedOfficerId(null);
+    if (Platform.OS === 'web') {
+      sendMapCommand({ type: 'focus-deployment' });
+      return;
+    }
+    nativeMapRef.current?.focusDeployment();
+  }, [sendMapCommand]);
+
   const handleSearch = useCallback(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return;
@@ -156,6 +167,7 @@ export function useMapSelectionController({
   return {
     activeFollowedOfficerId,
     followedOfficer,
+    focusDeployment,
     handleCloseOfficer,
     handleLocateOfficer,
     handleMapLoad,

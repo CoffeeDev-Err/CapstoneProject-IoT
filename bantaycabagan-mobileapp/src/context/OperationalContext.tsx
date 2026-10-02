@@ -71,7 +71,7 @@ type OperationalContextValue = {
   submitReport: (input: SubmitReportInput) => Promise<'submitted' | 'queued'>;
   resolveReport: (reportId: string, resolutionNotes: string) => Promise<void>;
   editReport: (reportId: string, input: Parameters<typeof editPoliceReport>[1]) => Promise<PoliceReport>;
-  acknowledgeDeployment: (assignmentId: string) => Promise<void>;
+  acknowledgeDeployment: (assignmentId: string) => Promise<DeploymentAssignment>;
   refreshReports: (
     category: 'all' | 'incident' | 'routine',
     dateRange?: ReportDateRange,
@@ -310,6 +310,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
   const acknowledgeDeployment = useCallback(async (assignmentId: string) => {
     const response = await acknowledgeDeploymentAssignment(assignmentId, token);
     setDeployments((items) => upsertById(items, response.deployment));
+    return response.deployment;
   }, [token]);
 
   const value = useMemo(() => ({

@@ -28,6 +28,7 @@ import {
   type StyleSpecification,
 } from '@maplibre/maplibre-react-native';
 import { SvgUri } from 'react-native-svg';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { CABAGAN_BOUNDARY_FEATURE } from '../constants/cabaganGeofence';
 import {
   hasMapTilerApiKey,
@@ -228,7 +229,8 @@ function DeploymentPointMarker({
         accessibilityLabel={`${type === 'route' ? 'Route start point' : 'Deployment point'}: ${label}`}
         style={styles.deploymentMarkerRoot}
       >
-        <View style={styles.deploymentMarkerDot}>
+        <View style={styles.deploymentMarkerBadge}>
+          <Icon name={type === 'route' ? 'directions-walk' : 'location-on'} size={20} color="#FFFFFF" />
           <Text style={styles.deploymentMarkerText}>{type === 'route' ? 'START' : 'POST'}</Text>
         </View>
         <View style={styles.deploymentMarkerArrow} />
@@ -324,6 +326,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   }, [enable3D, fitInitialPersonnel, followedOfficerId, mapMode, personnel]);
 
   useImperativeHandle(ref, () => ({
+    focusDeployment: () => {
+      cameraRef.current?.flyTo({
+        center: deploymentCenter,
+        zoom: mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
+        pitch: enable3D ? 52 : 0,
+        duration: 720,
+      });
+    },
     fitPersonnel: () => {
       initialFitDone.current = false;
       fitInitialPersonnel();
@@ -340,7 +350,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         duration: 720,
       });
     },
-  }), [enable3D, fitInitialPersonnel, mapMode, personnel]);
+  }), [deploymentCenter, enable3D, fitInitialPersonnel, mapMode, personnel]);
 
   useEffect(() => {
     if (!followedOfficerId) return;
@@ -573,22 +583,25 @@ const styles = StyleSheet.create({
   mapFallbackText: { marginTop: 6, color: '#64748b', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   mapFallbackTextDark: { color: '#9eabc0' },
   markerRoot: { width: 54, height: 63, alignItems: 'center', justifyContent: 'flex-start' },
-  deploymentMarkerRoot: { width: 46, height: 57, alignItems: 'center', justifyContent: 'flex-start' },
-  deploymentMarkerDot: {
-    width: 38,
-    height: 38,
+  deploymentMarkerRoot: { width: 64, height: 64, alignItems: 'center', justifyContent: 'flex-start' },
+  deploymentMarkerBadge: {
+    minWidth: 54,
+    height: 46,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: '#FFFFFF',
-    borderRadius: 19,
+    borderRadius: 15,
     backgroundColor: '#2563EB',
     shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.32,
     shadowRadius: 8,
-    elevation: 7,
+    elevation: 9,
   },
-  deploymentMarkerText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900' },
+  deploymentMarkerText: { marginTop: -1, color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   deploymentMarkerArrow: {
     width: 0,
     height: 0,

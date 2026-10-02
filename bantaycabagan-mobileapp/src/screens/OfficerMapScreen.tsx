@@ -45,6 +45,7 @@ import {
   type MapMode,
 } from '../features/maps/MapControls';
 import { OfficerDetailSheet } from '../features/maps/OfficerDetailSheet';
+import { DeploymentDetailSheet } from '../features/maps/DeploymentDetailSheet';
 
 const BACKUP_EMERGENCY_OVERLAY_MS = 2 * 60 * 1000;
 import { GpsReadingAge } from '../features/maps/GpsReadingAge';
@@ -97,11 +98,13 @@ export default function OfficerMapScreen({
   const emergencyPulse = useRef(new Animated.Value(0)).current;
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDeploymentFocus = useRef(false);
   const [backupActionPending, setBackupActionPending] = useState(false);
   const [showOwnEmergencyOverlay, setShowOwnEmergencyOverlay] = useState(false);
   const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(false);
+  const [deploymentDetailsOpen, setDeploymentDetailsOpen] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
@@ -112,18 +115,6 @@ export default function OfficerMapScreen({
     ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
     : assignment?.deploymentType === 'route' ? 'Route patrol' : 'Area patrol';
   const canRequestBackup = Boolean(assignment);
-  const recordedAt = Date.parse(currentOfficer.locationRecordedAt || '');
-  const shiftStartedAt = Date.parse(assignment?.shiftStart || '');
-  const hasShiftGpsReading = Number.isFinite(recordedAt)
-    && (!Number.isFinite(shiftStartedAt) || recordedAt >= shiftStartedAt);
-  const hasCurrentGpsFix = hasShiftGpsReading
-    && Number.isFinite(currentOfficer.latitude)
-    && Number.isFinite(currentOfficer.longitude)
-    && currentOfficer.isLocationStale !== true
-    && currentOfficer.isVisibleOnMap !== false;
-  const gpsStatusLabel = !isConnected ? 'OFFLINE'
-    : hasCurrentGpsFix ? 'LIVE'
-      : hasShiftGpsReading ? 'GPS STALE' : 'NO GPS';
   const deploymentPromptVisible = Boolean(assignment && !assignment.acknowledged);
   const overlayTranslateY = headerVisibility?.interpolate({
     inputRange: [0, 1],
@@ -146,11 +137,18 @@ export default function OfficerMapScreen({
   }, [clockNow, deployments]);
 
   useEffect(() => {
+    if (!assignment) setDeploymentDetailsOpen(false);
+  }, [assignment]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setClockNow(Date.now());
+      if (state === 'active') {
+        setClockNow(Date.now());
+        void refreshOperations();
+      }
     });
     return () => subscription.remove();
-  }, []);
+  }, [refreshOperations]);
 
   useEffect(() => {
     if (!headerVisibility) {
@@ -193,12 +191,13 @@ export default function OfficerMapScreen({
   useFocusEffect(useCallback(() => {
     setClockNow(Date.now());
     onMapInteractionChange?.(false);
+    void refreshOperations();
     return () => {
       if (mapInteractionIdleTimer.current) clearTimeout(mapInteractionIdleTimer.current);
       mapInteractionIdleTimer.current = null;
       onMapInteractionChange?.(false);
     };
-  }, [onMapInteractionChange]));
+  }, [onMapInteractionChange, refreshOperations]));
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => (
     assignment ? selectVisiblePersonnel(personnel, currentPersonnelId, currentOfficer) : []
@@ -236,9 +235,10 @@ export default function OfficerMapScreen({
   const {
     activeFollowedOfficerId,
     followedOfficer,
+    focusDeployment,
     handleCloseOfficer,
     handleLocateOfficer,
-    handleMapLoad,
+    handleMapLoad: handleBaseMapLoad,
     handleSearch,
     isFollowingSelectedOfficer,
     nativeMapRef,
@@ -258,6 +258,12 @@ export default function OfficerMapScreen({
     onMapInteractionStart: handleMapInteractionStart,
     visiblePersonnel: selectablePersonnel,
   });
+  const handleMapLoad = useCallback(() => {
+    handleBaseMapLoad();
+    if (!pendingDeploymentFocus.current) return;
+    pendingDeploymentFocus.current = false;
+    setTimeout(() => focusDeployment(), 120);
+  }, [focusDeployment, handleBaseMapLoad]);
   useEffect(() => {
     if (preview.enabled) nativeMapRef.current?.fitPersonnel();
   }, [preview.enabled, nativeMapRef]);
@@ -312,6 +318,9 @@ export default function OfficerMapScreen({
     setAssignmentAcknowledgementPending(true);
     try {
       await acknowledgeDeployment(assignment.id);
+      setDeploymentDetailsOpen(false);
+      pendingDeploymentFocus.current = Platform.OS === 'web';
+      setTimeout(() => focusDeployment(), 80);
     } catch (error) {
       Alert.alert('Unable to confirm assignment', requestErrorMessage(error, { action: 'confirm your deployment', write: true }));
     } finally {
@@ -509,41 +518,30 @@ export default function OfficerMapScreen({
                 </TouchableOpacity>
               </View>
             )}
-            {deploymentPromptVisible && (
-              <View style={[
+            {assignment && !followedOfficer && !selectedOfficer && (
+              <TouchableOpacity
+                accessibilityLabel={`View current deployment details for ${assignment.patrolArea}`}
+                activeOpacity={0.82}
+                onPress={() => setDeploymentDetailsOpen(true)}
+                style={[
                 styles.deploymentPill,
                 { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}>
+                ]}
+              >
                 <View style={[styles.deploymentIcon, { backgroundColor: colors.blueSoft }]}>
-                  <Icon name="place" size={17} color={colors.blue} />
+                  <Icon name="location-on" size={20} color={colors.blue} />
                 </View>
                 <View style={styles.deploymentText}>
                   <Text style={[styles.deploymentLabel, { color: colors.textMuted }]}>CURRENT DEPLOYMENT</Text>
                   <Text style={[styles.deploymentArea, { color: colors.text }]} numberOfLines={1}>
                     {assignment?.patrolArea || 'No active assignment'}
                   </Text>
-                  {assignment && (
-                    <Text style={[styles.deploymentLabel, { color: colors.textMuted }]} numberOfLines={1}>
-                      {deploymentStyleLabel}
-                    </Text>
-                  )}
-                  <GpsReadingAge
-                    recordedAt={currentOfficer.locationRecordedAt}
-                    shiftStart={assignment?.shiftStart}
-                    color={colors.textMuted}
-                    compact
-                  />
+                  <Text style={[styles.deploymentType, { color: colors.blue }]} numberOfLines={1}>
+                    {deploymentStyleLabel}
+                  </Text>
                 </View>
-                <View style={[
-                  styles.gpsStatusBadge,
-                  { backgroundColor: hasCurrentGpsFix ? colors.successSoft : colors.warningSoft },
-                ]}>
-                  <Text style={[
-                    styles.gpsStatusText,
-                    { color: hasCurrentGpsFix ? colors.success : colors.warning },
-                  ]}>{gpsStatusLabel}</Text>
-                </View>
-              </View>
+                <Icon name="chevron-right" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
             )}
           </View>
 
@@ -593,7 +591,7 @@ export default function OfficerMapScreen({
             </Text>
           </View>
           <TouchableOpacity
-            accessibilityLabel="Confirm deployment assignment"
+            accessibilityLabel="Start deployment"
             accessibilityState={{ disabled: assignmentAcknowledgementPending }}
             style={[
               styles.assignmentConfirmButton,
@@ -607,7 +605,7 @@ export default function OfficerMapScreen({
         </View>
       )}
 
-      {!selectedOfficer && (
+      {!selectedOfficer && !deploymentDetailsOpen && (
         <TouchableOpacity
           accessibilityLabel={activeOwnBackupRequest ? 'Cancel backup request' : 'Request backup'}
           accessibilityState={{
@@ -648,6 +646,13 @@ export default function OfficerMapScreen({
           onLocate={handleLocateOfficer}
           pulseOpacity={profilePulseOpacity}
           pulseScale={profilePulseScale}
+        />
+      )}
+      {assignment && deploymentDetailsOpen && !selectedOfficer && (
+        <DeploymentDetailSheet
+          assignment={assignment}
+          onClose={() => setDeploymentDetailsOpen(false)}
+          onViewMap={focusDeployment}
         />
       )}
       </View>
@@ -713,9 +718,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deploymentPill: {
-    minHeight: 60,
-    paddingHorizontal: 9,
-    paddingVertical: 8,
+    minHeight: 52,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -728,10 +733,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  deploymentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  deploymentIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   deploymentText: { flex: 1 },
   deploymentLabel: { color: mobileTheme.textMuted, fontSize: 9, fontWeight: '800' },
   deploymentArea: { marginTop: 2, marginBottom: 1, color: mobileTheme.text, fontSize: 12, fontWeight: '800' },
+  deploymentType: { color: mobileTheme.blue, fontSize: 9, fontWeight: '800' },
   gpsStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
   gpsStatusText: { fontSize: 9, fontWeight: '800' },
   followBanner: {
