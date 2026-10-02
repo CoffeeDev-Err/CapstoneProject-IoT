@@ -35,11 +35,13 @@ const toCsvValue = (value) => {
 const getReportCsvRows = (report) => [
   ['Report ID', report.id], ['Personnel ID', report.personnel_id], ['Officer', report.officer],
   ['Submitted At', report.date_time], ['Occurred At', report.occurred_at],
-  ['Assigned Area', report.assigned_area], ['Barangay', report.barangay],
+  ['Duty Patrol Area', report.assigned_area],
+  ['Duty Coverage Barangays', report.assigned_barangays?.join(', ') || ''],
+  ['Incident Barangay', report.barangay],
   ['Report Type', report.report_type], ['Severity', report.severity],
   ['Validation Status', report.validation_status], ['Case Status', report.case_status || 'not_applicable'],
   ['Resolved At', report.resolved_at || ''], ['Resolution Notes', report.resolution_notes || ''],
-  ['Title', report.title], ['Description', report.description], ['Location', report.location],
+  ['Title', report.title], ['Description', report.description], ['Exact Incident Place', report.location],
 ]
 
 export const downloadReportCsv = (report) => {

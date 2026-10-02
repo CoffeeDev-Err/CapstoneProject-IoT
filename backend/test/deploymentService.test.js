@@ -1,7 +1,75 @@
 const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 const createDeploymentService = require('../src/services/operations/deploymentService')
-const { formatDeploymentNotificationMessage } = createDeploymentService
+const { deploymentNoticeSignature } = require('../src/services/operations/domain')
+const { formatDeploymentNotificationMessage, normalizeDeploymentConfiguration } = createDeploymentService
+
+describe('deployment configuration', () => {
+	it('allows a barangay-wide patrol without an exact point', () => {
+		assert.deepEqual(
+			normalizeDeploymentConfiguration({
+				patrolAreaId: 'barangay-magassi',
+				deploymentType: 'area',
+			}),
+			{
+				patrolAreaId: 'barangay-magassi',
+				patrolArea: 'Barangay Magassi',
+				deploymentType: 'area',
+				coverageBarangayCodes: ['MAGASSI'],
+				deploymentPointLabel: '',
+				latitude: null,
+				longitude: null,
+			},
+		)
+		assert.throws(() => normalizeDeploymentConfiguration({
+			patrolAreaId: 'barangay-magassi',
+			deploymentType: 'area',
+			latitude: 17.4239,
+			longitude: 121.7681,
+		}), /does not use an exact deployment point/i)
+	})
+
+	it('requires a named Cabagan point for a fixed post', () => {
+		assert.throws(() => normalizeDeploymentConfiguration({
+			patrolAreaId: 'cabagan-public-market-zone',
+			deploymentType: 'point',
+		}), /fixed deployment point/i)
+		assert.throws(() => normalizeDeploymentConfiguration({
+			patrolAreaId: 'cabagan-public-market-zone',
+			deploymentType: 'point',
+			latitude: 0,
+			longitude: 0,
+			deploymentPointLabel: 'Outside point',
+		}), /inside Cabagan/i)
+
+		const configuration = normalizeDeploymentConfiguration({
+			patrolAreaId: 'cabagan-public-market-zone',
+			deploymentType: 'point',
+			latitude: 17.4239,
+			longitude: 121.7681,
+			deploymentPointLabel: 'Main entrance',
+		})
+		assert.equal(configuration.deploymentPointLabel, 'Main entrance')
+		assert.equal(configuration.latitude, 17.4239)
+	})
+
+	it('accepts route patrol only for catalogued road or route areas', () => {
+		assert.throws(() => normalizeDeploymentConfiguration({
+			patrolAreaId: 'barangay-magassi',
+			deploymentType: 'route',
+		}), /requires a road or route/i)
+		assert.equal(normalizeDeploymentConfiguration({
+			patrolAreaId: 'cabagan-santa-maria-road',
+			deploymentType: 'route',
+		}).deploymentType, 'route')
+		assert.throws(() => normalizeDeploymentConfiguration({
+			patrolAreaId: 'cabagan-santa-maria-road',
+			deploymentType: 'route',
+			latitude: 17.4239,
+			longitude: 121.7681,
+		}), /deployment point label/i)
+	})
+})
 
 const createService = ({ Deployment, Personnel, published = [], audits = [] }) => createDeploymentService({
 	io: { emit: () => {}, to: () => ({ emit: () => {} }) },
@@ -119,6 +187,28 @@ describe('deployment reconciliation', () => {
 })
 
 describe('deployment notifications', () => {
+	it('treats a changed deployment type or point as a notification-worthy update', () => {
+		const base = {
+			personnelId: 'PNP-001',
+			patrolAreaId: 'cabagan-public-market-zone',
+			patrolArea: 'Cabagan Public Market Zone',
+			deploymentType: 'point',
+			coverageBarangayCodes: ['CENTRO'],
+			deploymentPointLabel: 'Main entrance',
+			latitude: 17.4239,
+			longitude: 121.7681,
+			status: 'active',
+		}
+		assert.notEqual(
+			deploymentNoticeSignature(base),
+			deploymentNoticeSignature({ ...base, deploymentPointLabel: 'North entrance' }),
+		)
+		assert.notEqual(
+			deploymentNoticeSignature(base),
+			deploymentNoticeSignature({ ...base, longitude: 121.769 }),
+		)
+	})
+
 	it('includes provided instructions in active and scheduled assignment messages', () => {
 		const assignment = { patrolArea: 'Barangay Centro', notes: 'Use the eastern checkpoint' }
 
@@ -140,6 +230,21 @@ describe('deployment notifications', () => {
 				scheduleText: '',
 			}),
 			'You are assigned to Barangay Centro. Open Map to confirm your deployment.',
+		)
+	})
+
+	it('includes the exact post label for a fixed-post deployment', () => {
+		assert.equal(
+			formatDeploymentNotificationMessage({
+				assignment: {
+					patrolArea: 'Cabagan Public Market Zone',
+					deploymentType: 'point',
+					deploymentPointLabel: 'Main entrance',
+				},
+				scheduled: false,
+				scheduleText: '',
+			}),
+			'You are assigned to Cabagan Public Market Zone (Main entrance). Open Map to confirm your deployment.',
 		)
 	})
 })

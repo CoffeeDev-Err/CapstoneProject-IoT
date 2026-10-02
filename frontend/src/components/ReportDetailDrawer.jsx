@@ -199,14 +199,6 @@ function ReportDrawerContent({
                 <dd>{formatDateTime(occurredAt)}</dd>
               </div>
               <div>
-                <dt>Assigned area</dt>
-                <dd>{report.assigned_area}</dd>
-              </div>
-              <div>
-                <dt>Barangay</dt>
-                <dd>{report.barangay}</dd>
-              </div>
-              <div>
                 <dt>Severity</dt>
                 <dd>{report.severity}/5</dd>
               </div>
@@ -226,21 +218,39 @@ function ReportDrawerContent({
                   <dd>{formatDateTime(report.resolved_at)}</dd>
                 </div>
               )}
-              <div>
-                <dt>{report.is_incident ? 'Incident location' : 'Activity location'}</dt>
-                <dd>{report.location}</dd>
-              </div>
-              <div>
-                <dt>GPS coordinates</dt>
-                <dd>{formatCoordinates(report.latitude, report.longitude)}</dd>
-              </div>
+              {report.submitted_from && <div><dt>Officer GPS at submission</dt><dd>{formatCoordinates(report.submitted_from.latitude, report.submitted_from.longitude)}</dd></div>}
+              {report.reviewed_at && <div><dt>Reviewed</dt><dd>{formatDateTime(report.reviewed_at)} · {report.reviewed_by}</dd></div>}
+            </dl>
+          </section>
+
+          <section className="report-detail-section">
+            <h4>Duty assignment</h4>
+            <dl className="report-detail-list">
+              <div><dt>Deployment style</dt><dd>{report.assigned_area === 'No deployment recorded'
+                ? 'No deployment recorded'
+                : report.assigned_area_type === 'point' ? 'Fixed post'
+                  : report.assigned_area_type === 'route' ? 'Route patrol' : 'Area patrol'}</dd></div>
+              <div><dt>Patrol area</dt><dd>{report.assigned_area}</dd></div>
+              <div><dt>Coverage barangay</dt><dd>{report.assigned_barangays?.length
+                ? report.assigned_barangays.join(', ')
+                : 'No deployment coverage recorded'}</dd></div>
+              {report.assigned_location_label && (
+                <div><dt>Deployment point</dt><dd>{report.assigned_location_label}</dd></div>
+              )}
+            </dl>
+          </section>
+
+          <section className="report-detail-section">
+            <h4>{report.is_incident ? 'Incident location' : 'Activity location'}</h4>
+            <dl className="report-detail-list">
+              <div><dt>Barangay</dt><dd>{report.barangay}</dd></div>
+              <div><dt>Exact place</dt><dd>{report.location}</dd></div>
+              <div><dt>GPS coordinates</dt><dd>{formatCoordinates(report.latitude, report.longitude)}</dd></div>
               <div><dt>Location source</dt><dd>{report.location_source === 'gps'
                 ? 'Officer current GPS'
                 : report.location_source === 'backup_request'
                   ? 'GPS recorded with backup request'
                   : 'Manually entered / map pin'}</dd></div>
-              {report.submitted_from && <div><dt>Officer GPS at submission</dt><dd>{formatCoordinates(report.submitted_from.latitude, report.submitted_from.longitude)}</dd></div>}
-              {report.reviewed_at && <div><dt>Reviewed</dt><dd>{formatDateTime(report.reviewed_at)} · {report.reviewed_by}</dd></div>}
             </dl>
           </section>
 
@@ -308,7 +318,7 @@ function ReportDrawerContent({
 
           <section className="report-detail-section">
             <div className="report-detail-section__header">
-              <h4>Reported location and route</h4>
+              <h4>{report.is_incident ? 'Incident map' : 'Activity map'}</h4>
               {openStreetMapUrl && (
                 <a href={openStreetMapUrl} target="_blank" rel="noreferrer">
                   Open full map

@@ -206,6 +206,37 @@ function PersonnelMarker({
   );
 }
 
+function DeploymentPointMarker({
+  label,
+  longitude,
+  latitude,
+  type,
+}: {
+  label: string;
+  longitude: number;
+  latitude: number;
+  type: 'area' | 'point' | 'route';
+}) {
+  return (
+    <Marker
+      id="deployment-point"
+      lngLat={[longitude, latitude]}
+      anchor="bottom"
+    >
+      <View
+        accessible
+        accessibilityLabel={`${type === 'route' ? 'Route start point' : 'Deployment point'}: ${label}`}
+        style={styles.deploymentMarkerRoot}
+      >
+        <View style={styles.deploymentMarkerDot}>
+          <Text style={styles.deploymentMarkerText}>{type === 'route' ? 'START' : 'POST'}</Text>
+        </View>
+        <View style={styles.deploymentMarkerArrow} />
+      </View>
+    </Marker>
+  );
+}
+
 const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProps>(({
   assignment,
   compassTop = 150,
@@ -242,6 +273,17 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     Number.isFinite(assignment?.longitude) ? Number(assignment?.longitude) : CABAGAN_CENTER[0],
     Number.isFinite(assignment?.latitude) ? Number(assignment?.latitude) : CABAGAN_CENTER[1],
   ]), [assignment?.latitude, assignment?.longitude]);
+  const deploymentPoint = Number.isFinite(assignment?.longitude)
+    && Number.isFinite(assignment?.latitude)
+    && assignment?.hasDeploymentPoint !== false
+    ? {
+        longitude: Number(assignment?.longitude),
+        latitude: Number(assignment?.latitude),
+        label: assignment?.deploymentPointLabel
+          || (assignment?.deploymentType === 'route' ? 'Route start point' : 'Deployment point'),
+        type: assignment?.deploymentType || 'point' as const,
+      }
+    : null;
 
   const fitInitialPersonnel = useCallback(() => {
     if (initialFitDone.current) return;
@@ -428,6 +470,15 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
           />
         </GeoJSONSource>
 
+        {deploymentPoint && (
+          <DeploymentPointMarker
+            latitude={deploymentPoint.latitude}
+            longitude={deploymentPoint.longitude}
+            label={deploymentPoint.label}
+            type={deploymentPoint.type}
+          />
+        )}
+
         {followedPersonnel && (
           <PersonnelMarker
             member={followedPersonnel}
@@ -522,6 +573,33 @@ const styles = StyleSheet.create({
   mapFallbackText: { marginTop: 6, color: '#64748b', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   mapFallbackTextDark: { color: '#9eabc0' },
   markerRoot: { width: 54, height: 63, alignItems: 'center', justifyContent: 'flex-start' },
+  deploymentMarkerRoot: { width: 46, height: 57, alignItems: 'center', justifyContent: 'flex-start' },
+  deploymentMarkerDot: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    borderRadius: 19,
+    backgroundColor: '#2563EB',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    elevation: 7,
+  },
+  deploymentMarkerText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900' },
+  deploymentMarkerArrow: {
+    width: 0,
+    height: 0,
+    marginTop: -2,
+    borderLeftWidth: 9,
+    borderRightWidth: 9,
+    borderTopWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#2563EB',
+  },
   markerPhotoWrap: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   markerCurrentRing: { padding: 2, borderWidth: 2, borderColor: 'transparent', borderRadius: 25 },
   markerCurrentRingVisible: { borderColor: '#FFFFFF' },

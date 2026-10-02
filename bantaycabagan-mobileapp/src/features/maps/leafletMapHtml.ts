@@ -3,6 +3,9 @@ import type { OfficerMapPerson } from '../../components/OfficerMapCanvas';
 type LeafletMapHtmlOptions = {
   latitude?: number;
   longitude?: number;
+  deploymentPointLabel?: string;
+  deploymentType?: 'area' | 'point' | 'route';
+  hasDeploymentPoint?: boolean;
   currentPersonnelId: string;
   isDark: boolean;
   mapPersonnel: OfficerMapPerson[];
@@ -32,12 +35,22 @@ const MAP_FRAME_CSP = [
 export const createLeafletMapHtml = ({
   latitude = 17.4239,
   longitude = 121.7681,
+  deploymentPointLabel = '',
+  deploymentType = 'area',
+  hasDeploymentPoint = false,
   currentPersonnelId,
   isDark,
   mapPersonnel,
 }: LeafletMapHtmlOptions) => {
     const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
+    const deploymentPoint = JSON.stringify({
+      hasPoint: hasDeploymentPoint,
+      label: deploymentPointLabel || (deploymentType === 'route' ? 'Route start point' : 'Deployment point'),
+      latitude,
+      longitude,
+      type: deploymentType,
+    });
     // Addressed explicitly so personnel positions are delivered only to this
     // app's origin rather than to whatever window happens to embed the frame.
     // This memo also runs on native (hooks are unconditional) even though the
@@ -85,6 +98,9 @@ export const createLeafletMapHtml = ({
             .officer-arrow.backup{border-top-color:#ff2f3d}
             .officer-cue{position:absolute;top:-6px;right:-2px;min-width:18px;height:18px;padding:0 3px;display:grid;place-items:center;border:2px solid #fff;border-radius:12px;background:#2563eb;color:#fff;font:900 7px/1 Arial,sans-serif;box-sizing:border-box}
             .officer-cue.operation{background:#7c3aed}.officer-cue.boundary{background:#d97706;font-size:11px}.officer-cue.backup{background:#dc2626}
+            .deployment-pin{position:relative;width:42px;height:55px;display:flex;flex-direction:column;align-items:center}
+            .deployment-dot{width:34px;height:34px;display:grid;place-items:center;border:3px solid #fff;border-radius:50%;background:#2563eb;color:#fff;font:900 8px/1 Arial,sans-serif;box-shadow:0 4px 12px rgba(15,23,42,.34)}
+            .deployment-arrow{width:0;height:0;margin-top:-2px;border-left:8px solid transparent;border-right:8px solid transparent;border-top:13px solid #2563eb}
             @keyframes emergency-ring{
               0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.72),0 4px 10px rgba(15,23,42,.28)}
               50%{box-shadow:0 0 0 7px rgba(220,38,38,0),0 4px 10px rgba(15,23,42,.28)}
@@ -100,6 +116,7 @@ export const createLeafletMapHtml = ({
           <div id="map"></div>
           <script>
             const currentOfficerId=${currentOfficerId};
+            const deploymentPoint=${deploymentPoint};
             const map=L.map('map',{
               zoomControl:false,
               touchZoom:true,
@@ -147,6 +164,18 @@ export const createLeafletMapHtml = ({
               .replace(/>/g,'&gt;')
               .replace(/"/g,'&quot;')
               .replace(/'/g,'&#039;');
+
+            if(deploymentPoint.hasPoint){
+              const deploymentIcon=L.divIcon({
+                className:'',
+                html:'<div class="deployment-pin"><div class="deployment-dot">'+(deploymentPoint.type==='route'?'START':'POST')+'</div><div class="deployment-arrow"></div></div>',
+                iconSize:[42,55],
+                iconAnchor:[21,55]
+              });
+              L.marker([deploymentPoint.latitude,deploymentPoint.longitude],{icon:deploymentIcon,zIndexOffset:-250})
+                .addTo(map)
+                .bindTooltip(escapeHtml(deploymentPoint.label),{direction:'top',offset:[0,-45]});
+            }
 
             const emit=(payload)=>{
               window.parent.postMessage({source:'bantay-map',...payload},${hostOrigin} || '*');

@@ -5,9 +5,9 @@ import {
   addHoursToLocalValue,
   addMinutesToLocalValue,
   createEmptyAssignmentForm,
+  deploymentDetailsFrom,
   getCurrentDateTimeLocalValue,
   getDeploymentMode,
-  patrolAreas,
   toDateTimeLocalValue,
   toEditableShiftStart,
 } from './deploymentForm'
@@ -24,7 +24,7 @@ const createInitialForm = ({
     personnelIds: requestedAssignment
       ? [requestedAssignment.personnelId]
       : requestedGroupAssignments.map((item) => item.personnelId),
-    patrolArea: source.patrolArea || patrolAreas[0],
+    ...deploymentDetailsFrom(source),
     shiftStart: toEditableShiftStart(source.shiftStart),
     shiftEnd: toDateTimeLocalValue(source.shiftEnd),
     notes: source.notes || '',
@@ -80,6 +80,12 @@ export function useDeploymentForm({
     && formShiftEnd.getTime() - formShiftStart.getTime() <= 24 * 60 * 60 * 1000
   const hasSelectedPersonnel = selectedPersonnelMembers.length > 0
   const hasPatrolArea = Boolean(assignmentForm.patrolArea.trim())
+  const hasDeploymentPoint = assignmentForm.latitude !== null
+    && assignmentForm.longitude !== null
+    && Number.isFinite(Number(assignmentForm.latitude))
+    && Number.isFinite(Number(assignmentForm.longitude))
+  const hasValidDeploymentPoint = assignmentForm.deploymentType !== 'point'
+    || (hasDeploymentPoint && Boolean(assignmentForm.deploymentPointLabel.trim()))
   const hasValidNotes = assignmentForm.notes.trim().length <= DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH
   const hasValidPersonnelSelection = hasSelectedPersonnel
     && (!editingAssignmentId || selectedPersonnelMembers.length === 1)
@@ -88,6 +94,7 @@ export function useDeploymentForm({
     canSubmit: !isDeploymentsLoading
       && hasValidPersonnelSelection
       && hasPatrolArea
+      && hasValidDeploymentPoint
       && hasValidShiftStart
       && hasValidShiftEnd
       && isWithinMaximumDuration
@@ -132,6 +139,10 @@ export function useDeploymentForm({
     editingAssignmentId && hasSelectedPersonnel && selectedPersonnelMembers.length !== 1
       ? 'Select exactly one personnel member when editing an individual deployment.' : '',
     !hasPatrolArea ? 'Select a patrol area.' : '',
+    assignmentForm.deploymentType === 'point' && !hasDeploymentPoint
+      ? 'Set the fixed deployment point on the map.' : '',
+    assignmentForm.deploymentType === 'point' && !assignmentForm.deploymentPointLabel.trim()
+      ? 'Add a short label for the fixed deployment point.' : '',
     !hasValidNotes ? `Limit deployment instructions to ${DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH} characters.` : '',
     !assignmentForm.shiftStart ? 'Choose a shift start date and time.'
       : !hasValidShiftStart

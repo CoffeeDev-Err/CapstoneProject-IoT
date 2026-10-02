@@ -409,12 +409,15 @@ const createReportService = ({
 			throw createValidationError('Severity must be a whole number from 1 to 5.', 'severity')
 		}
 
-		const [activeDeployment, currentLocation] = await Promise.all([
+		const [matchedDeployment, currentLocation] = await Promise.all([
 			Deployment.findOne({
 				personnelId: officer.id,
-				status: 'active',
-				$and: activeShiftConditions(now),
-			}).select('patrolArea').lean(),
+				status: { $in: ['active', 'completed'] },
+				$and: activeShiftConditions(occurredAt),
+			}).select([
+				'patrolAreaId', 'patrolArea', 'deploymentType', 'coverageBarangayCodes',
+				'deploymentPointLabel', 'location',
+			].join(' ')).lean(),
 			CurrentLocation.findOne({ personnelId: officer.id }).lean(),
 		])
 		const currentCoordinates = currentLocation?.location?.coordinates
@@ -517,7 +520,14 @@ const createReportService = ({
 				officerName: officer.name,
 				submittedAt: now,
 				incidentAt: occurredAt,
-				assignedArea: backupTask?.assignedArea || activeDeployment?.patrolArea || 'Unassigned area',
+				assignedArea: matchedDeployment?.patrolArea || backupTask?.assignedArea || 'No deployment recorded',
+				...(matchedDeployment && {
+					assignedAreaId: matchedDeployment.patrolAreaId,
+					assignedAreaType: matchedDeployment.deploymentType || 'area',
+					assignedBarangayCodes: matchedDeployment.coverageBarangayCodes || [],
+					assignedLocationLabel: matchedDeployment.deploymentPointLabel || '',
+					...(matchedDeployment.location && { assignedLocation: matchedDeployment.location }),
+				}),
 				barangayCode: selectedBarangay.code,
 				reportType,
 				isIncident,

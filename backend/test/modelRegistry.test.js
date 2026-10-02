@@ -12,7 +12,7 @@ const EXPECTED_MODEL_CONTRACTS = {
 	CurrentLocation: ['current_locations', 3],
 	LocationHistory: ['location_history', 2],
 	Barangay: ['barangays', 3],
-	Deployment: ['deployments', 7],
+	Deployment: ['deployments', 8],
 	Report: ['reports', 12],
 	Task: ['tasks', 5],
 	Notification: ['notifications', 6],

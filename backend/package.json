@@ -12,6 +12,7 @@
     "test:security": "node scripts/operational-security-check.js",
     "test:s3": "node scripts/s3-smoke-check.js",
     "migrate:supervisor-login": "node scripts/reconcile-supervisor-login.js",
+    "migrate:deployment-areas": "node scripts/backfill-deployment-areas.js",
     "check": "npm run lint && npm test && npm run test:validation && npm run test:deployments && npm run test:security"
   },
   "keywords": [],

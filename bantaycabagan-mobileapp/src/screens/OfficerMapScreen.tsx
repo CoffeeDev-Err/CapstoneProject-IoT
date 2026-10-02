@@ -108,6 +108,9 @@ export default function OfficerMapScreen({
   const [clockNow, setClockNow] = useState(Date.now);
   const assignment = currentOfficer.isOnDuty === false
     ? undefined : selectCurrentDeployment(deployments, clockNow);
+  const deploymentStyleLabel = assignment?.deploymentType === 'point'
+    ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
+    : assignment?.deploymentType === 'route' ? 'Route patrol' : 'Area patrol';
   const canRequestBackup = Boolean(assignment);
   const recordedAt = Date.parse(currentOfficer.locationRecordedAt || '');
   const shiftStartedAt = Date.parse(assignment?.shiftStart || '');
@@ -295,8 +298,11 @@ export default function OfficerMapScreen({
   }, [emergencyPulse, hasCriticalPersonnel]);
 
   const mapHtml = useMemo(() => createLeafletMapHtml({
-    latitude: assignment?.latitude,
-    longitude: assignment?.longitude,
+    latitude: assignment?.latitude ?? undefined,
+    longitude: assignment?.longitude ?? undefined,
+    deploymentPointLabel: assignment?.deploymentPointLabel,
+    deploymentType: assignment?.deploymentType,
+    hasDeploymentPoint: assignment?.hasDeploymentPoint,
     currentPersonnelId,
     isDark,
     mapPersonnel,
@@ -516,6 +522,11 @@ export default function OfficerMapScreen({
                   <Text style={[styles.deploymentArea, { color: colors.text }]} numberOfLines={1}>
                     {assignment?.patrolArea || 'No active assignment'}
                   </Text>
+                  {assignment && (
+                    <Text style={[styles.deploymentLabel, { color: colors.textMuted }]} numberOfLines={1}>
+                      {deploymentStyleLabel}
+                    </Text>
+                  )}
                   <GpsReadingAge
                     recordedAt={currentOfficer.locationRecordedAt}
                     shiftStart={assignment?.shiftStart}
@@ -574,6 +585,9 @@ export default function OfficerMapScreen({
           </View>
           <View style={styles.assignmentBody}>
             <Text style={[styles.assignmentTitle, { color: colors.text }]}>Assigned to {assignment?.patrolArea}</Text>
+            <Text style={[styles.assignmentNotes, { color: colors.blue }]} numberOfLines={1}>
+              {deploymentStyleLabel}
+            </Text>
             <Text style={[styles.assignmentNotes, { color: colors.textMuted }]} numberOfLines={2}>
               {assignment?.notes || 'Maintain visibility within the assigned area.'}
             </Text>

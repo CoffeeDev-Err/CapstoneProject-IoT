@@ -177,7 +177,14 @@ function DeploymentList({
                         <strong className="d-block assignment-personnel-name">{assignment.personnelName}</strong>
                         <small className="assignment-personnel-rank">{assignment.rank}</small>
                       </td>
-                      <td data-label="Patrol Area">{assignment.patrolArea}</td>
+                      <td data-label="Patrol Area">
+                        <strong className="d-block assignment-personnel-name">{assignment.patrolArea}</strong>
+                        <small className="assignment-personnel-rank">
+                          {assignment.deploymentType === 'point'
+                            ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
+                            : assignment.deploymentType === 'route' ? 'Route patrol' : 'Area patrol'}
+                        </small>
+                      </td>
                       <td data-label="Instructions" className="assignment-instructions-cell">
                         <button
                           type="button"

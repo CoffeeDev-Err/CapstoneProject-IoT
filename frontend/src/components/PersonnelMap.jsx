@@ -23,7 +23,6 @@ import {
   applyThreeDimensionalTerrain,
   cabaganBoundaryFeature,
   cabaganBoundaryLngLat,
-  createCircleFeature,
   featureCollection,
   setGeoJsonSourceData,
 } from '../utils/mapLibreLayers'
@@ -180,23 +179,16 @@ const addOperationalLayers = (map, deploymentData) => {
   } else {
     setGeoJsonSourceData(map, 'geosentri-deployments', deploymentData)
   }
-  if (!map.getLayer('geosentri-deployments-fill')) {
+  if (!map.getLayer('geosentri-deployments-point')) {
     map.addLayer({
-      id: 'geosentri-deployments-fill',
-      type: 'fill',
-      source: 'geosentri-deployments',
-      paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.1 },
-    }, firstSymbolLayerId)
-  }
-  if (!map.getLayer('geosentri-deployments-line')) {
-    map.addLayer({
-      id: 'geosentri-deployments-line',
-      type: 'line',
+      id: 'geosentri-deployments-point',
+      type: 'circle',
       source: 'geosentri-deployments',
       paint: {
-        'line-color': '#2563eb',
-        'line-width': 2,
-        'line-dasharray': [3.5, 3],
+        'circle-color': '#2563eb',
+        'circle-radius': 9,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 3,
       },
     }, firstSymbolLayerId)
   }
@@ -242,15 +234,22 @@ function PersonnelMap({
     deployments
       .filter((assignment) => assignment.isCurrentShift !== false)
       .forEach((assignment) => {
+        if (!assignment.hasDeploymentPoint) return
         const latitude = Number(assignment.latitude)
         const longitude = Number(assignment.longitude)
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
         const key = assignment.groupId || assignment.patrolArea
         if (!groups.has(key)) {
-          groups.set(key, createCircleFeature(longitude, latitude, 320, {
-            id: key,
-            patrolArea: assignment.patrolArea,
-          }))
+          groups.set(key, {
+            type: 'Feature',
+            properties: {
+              id: key,
+              patrolArea: assignment.patrolArea,
+              deploymentPointLabel: assignment.deploymentPointLabel || '',
+              deploymentType: assignment.deploymentType || 'point',
+            },
+            geometry: { type: 'Point', coordinates: [longitude, latitude] },
+          })
         }
       })
     return featureCollection([...groups.values()])

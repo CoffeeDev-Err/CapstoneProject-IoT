@@ -1,17 +1,10 @@
-import { CABAGAN_BARANGAYS } from '../../constants/cabaganBarangays'
+import { findPatrolArea, patrolAreaCatalog, patrolAreas } from './patrolAreaCatalog'
+
+export { patrolAreaCatalog, patrolAreas } from './patrolAreaCatalog'
 
 export const DEPLOYMENT_MODES = Object.freeze({ START_NOW: 'start_now', SCHEDULE_LATER: 'schedule_later' })
 export const DEPLOYMENT_LIST_VIEWS = Object.freeze({ ACTIVE_NOW: 'active_now', SCHEDULED_LATER: 'scheduled_later' })
 export const DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH = 1000
-
-export const patrolAreas = [
-  ...CABAGAN_BARANGAYS.map((barangay) => `Barangay ${barangay}`),
-  'Cabagan Public Market Zone', 'Municipal Hall Perimeter', 'Barangay Centro Route',
-  'Cabagan-Santa Maria Road', 'Cabagan-Tumauini Road', 'Maharlika Highway Northbound',
-  'Maharlika Highway Southbound', 'National Highway Checkpoint North',
-  'National Highway Checkpoint South', 'Highway Checkpoint North', 'Highway Checkpoint South',
-  'School Safety Patrol Route', 'Bridge Approach Patrol Zone',
-]
 
 export const formatDateTime = (isoValue) => {
   if (!isoValue) return '-'
@@ -35,9 +28,37 @@ export const toDateTimeLocalValue = (value) => {
 
 export const getCurrentDateTimeLocalValue = () => toDateTimeLocalValue(new Date().toISOString())
 export const createEmptyAssignmentForm = () => ({
-  mode: DEPLOYMENT_MODES.START_NOW, personnelIds: [], patrolArea: patrolAreas[0],
-  shiftStart: getCurrentDateTimeLocalValue(), shiftEnd: '', notes: '',
+  mode: DEPLOYMENT_MODES.START_NOW,
+  personnelIds: [],
+  patrolAreaId: patrolAreaCatalog[0].id,
+  patrolArea: patrolAreas[0],
+  deploymentType: patrolAreaCatalog[0].defaultDeploymentType,
+  coverageBarangays: patrolAreaCatalog[0].coverageBarangays,
+  deploymentPointLabel: '',
+  latitude: null,
+  longitude: null,
+  shiftStart: getCurrentDateTimeLocalValue(),
+  shiftEnd: '',
+  notes: '',
 })
+
+export const deploymentDetailsFrom = (source = {}) => {
+  const area = findPatrolArea(source.patrolAreaId || source.patrolArea) || patrolAreaCatalog[0]
+  const latitude = Number(source.latitude)
+  const longitude = Number(source.longitude)
+  const hasPoint = source.hasDeploymentPoint !== false
+    && Number.isFinite(latitude)
+    && Number.isFinite(longitude)
+  return {
+    patrolAreaId: area.id,
+    patrolArea: area.name,
+    deploymentType: source.deploymentType || area.defaultDeploymentType,
+    coverageBarangays: source.coverageBarangays || area.coverageBarangays,
+    deploymentPointLabel: source.deploymentPointLabel || '',
+    latitude: hasPoint ? latitude : null,
+    longitude: hasPoint ? longitude : null,
+  }
+}
 
 export const formatDateTimePreview = (localValue) => {
   if (!localValue) return 'No date and time selected'

@@ -10,6 +10,10 @@ const DEPLOYMENT_STATUSES = Object.freeze([
 	'cancelled',
 ])
 
+const barangayNamesFromCodes = (codes = []) => codes
+	.map((code) => barangayNameFromCode(code))
+	.filter(Boolean)
+
 const asDate = (value, fallback = new Date()) => {
 	const date = value ? new Date(value) : fallback
 	return Number.isNaN(date.getTime()) ? fallback : date
@@ -29,7 +33,11 @@ const isDeploymentCurrent = (deployment, now = new Date()) => (
 const deploymentSignature = (deployment) => createHash('sha256')
 	.update(JSON.stringify({
 		personnelId: deployment.personnelId,
+		patrolAreaId: deployment.patrolAreaId,
 		patrolArea: deployment.patrolArea,
+		deploymentType: deployment.deploymentType || 'area',
+		coverageBarangayCodes: deployment.coverageBarangayCodes || [],
+		deploymentPointLabel: deployment.deploymentPointLabel || '',
 		shiftStart: deployment.shiftStart ? new Date(deployment.shiftStart).toISOString() : null,
 		shiftEnd: deployment.shiftEnd ? new Date(deployment.shiftEnd).toISOString() : null,
 		instructions: deployment.instructions || '',
@@ -40,10 +48,18 @@ const deploymentSignature = (deployment) => createHash('sha256')
 const deploymentNoticeSignature = (deployment) => createHash('sha256')
 	.update(JSON.stringify({
 		personnelId: deployment.personnelId,
+		patrolAreaId: deployment.patrolAreaId,
 		patrolArea: deployment.patrolArea,
+		deploymentType: deployment.deploymentType || 'area',
+		coverageBarangayCodes: deployment.coverageBarangayCodes || [],
+		deploymentPointLabel: deployment.deploymentPointLabel || '',
 		shiftStart: deployment.shiftStart ? new Date(deployment.shiftStart).toISOString() : null,
 		shiftEnd: deployment.shiftEnd ? new Date(deployment.shiftEnd).toISOString() : null,
 		instructions: deployment.instructions ?? deployment.notes ?? '',
+		location: deployment.location?.coordinates
+			|| (Number.isFinite(deployment.longitude) && Number.isFinite(deployment.latitude)
+				? [deployment.longitude, deployment.latitude]
+				: []),
 		status: deployment.status,
 	}))
 	.digest('hex')
@@ -99,7 +115,16 @@ const serializeReport = (report, personnelById = new Map()) => ({
 	badge_number: personnelById.get(report.submittedBy)?.badgeNumber || '',
 	date_time: report.submittedAt?.toISOString(),
 	occurred_at: report.incidentAt?.toISOString(),
-	assigned_area: report.assignedArea,
+	assigned_area: report.assignedArea === 'Unassigned area'
+		? 'No deployment recorded'
+		: report.assignedArea,
+	assigned_area_id: report.assignedAreaId,
+	assigned_area_type: report.assignedAreaType || 'area',
+	assigned_barangays: barangayNamesFromCodes(report.assignedBarangayCodes),
+	assigned_location_label: report.assignedLocationLabel || '',
+	...(report.assignedLocation?.coordinates?.length === 2
+		? { assigned_latitude: report.assignedLocation.coordinates[1], assigned_longitude: report.assignedLocation.coordinates[0] }
+		: { assigned_latitude: null, assigned_longitude: null }),
 	barangay: barangayNameFromCode(report.barangayCode),
 	report_type: report.reportType,
 	is_incident: report.isIncident,
@@ -176,6 +201,9 @@ const serializeReport = (report, personnelById = new Map()) => ({
 
 const serializeDeployment = (deployment, personnelById = new Map()) => {
 	const signature = deploymentSignature(deployment)
+	const coverageBarangayCodes = deployment.coverageBarangayCodes?.length
+		? deployment.coverageBarangayCodes
+		: isCabaganBarangayCode(deployment.barangayCode) ? [deployment.barangayCode] : []
 	const acknowledged = Boolean(
 		deployment.acknowledgedAt && deployment.acknowledgedSignature === signature,
 	)
@@ -185,8 +213,14 @@ const serializeDeployment = (deployment, personnelById = new Map()) => {
 		personnelId: deployment.personnelId,
 		personnelName: personnelById.get(deployment.personnelId)?.fullName || deployment.personnelName,
 		rank: personnelById.get(deployment.personnelId)?.rank || deployment.rank,
-		barangay: barangayNameFromCode(deployment.barangayCode),
+		barangay: coverageBarangayCodes.length === 1
+			? barangayNameFromCode(coverageBarangayCodes[0])
+			: coverageBarangayCodes.length > 1 ? 'Multiple barangays' : 'Route coverage',
+		coverageBarangays: barangayNamesFromCodes(coverageBarangayCodes),
+		patrolAreaId: deployment.patrolAreaId,
 		patrolArea: deployment.patrolArea,
+		deploymentType: deployment.deploymentType || 'area',
+		deploymentPointLabel: deployment.deploymentPointLabel || '',
 		shiftStart: deployment.shiftStart?.toISOString(),
 		shiftEnd: deployment.shiftEnd?.toISOString(),
 		notes: deployment.instructions,
@@ -195,7 +229,10 @@ const serializeDeployment = (deployment, personnelById = new Map()) => {
 		isCurrentShift: isDeploymentCurrent(deployment),
 		acknowledged,
 		acknowledgedAt: acknowledged ? deployment.acknowledgedAt?.toISOString() : undefined,
-		...readCoordinates(deployment.location),
+		hasDeploymentPoint: Boolean(deployment.location?.coordinates?.length === 2),
+		...(deployment.location?.coordinates?.length === 2
+			? readCoordinates(deployment.location)
+			: { latitude: null, longitude: null }),
 	}
 }
 

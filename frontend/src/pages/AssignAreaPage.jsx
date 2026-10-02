@@ -1,7 +1,7 @@
 import { requestErrorMessage } from '../utils/requestFeedback'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, MapPin, Route, ShieldCheck } from 'lucide-react'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getManageableDeployments, replaceDeployments } from '../services/operations'
@@ -18,14 +18,21 @@ import PersonnelSelector from '../features/deployments/PersonnelSelector'
 import { useDeploymentForm } from '../features/deployments/useDeploymentForm'
 import { useCachedPageData } from '../hooks/useCachedPageData'
 import DeploymentDialogs from '../features/deployments/DeploymentDialogs'
+import DeploymentPointModal from '../features/deployments/DeploymentPointModal'
+import {
+  coverageLabelFor,
+  findPatrolArea,
+  patrolAreaCatalog,
+  patrolAreaGroups,
+} from '../features/deployments/patrolAreaCatalog'
 
 const {
   DEPLOYMENT_LIST_VIEWS,
   DEPLOYMENT_MODES,
   DEPLOYMENT_INSTRUCTIONS_MAX_LENGTH,
   createDeploymentId,
+  deploymentDetailsFrom,
   getDeploymentMode,
-  patrolAreas,
   resolveGroupId,
   toDateTimeLocalValue,
   toEditableShiftStart,
@@ -62,6 +69,7 @@ function AssignAreaPage({ view = 'form' }) {
   const deferredPersonnelSearch = useDeferredValue(personnelSearch)
   const deferredPatrolAreaSearch = useDeferredValue(patrolAreaSearch)
   const [isPatrolAreaOpen, setIsPatrolAreaOpen] = useState(false)
+  const [deploymentPointModalOpen, setDeploymentPointModalOpen] = useState(false)
   const [assignments, setAssignments, hasAssignments] = useCachedPageData('deployments', [])
   const [editingAssignmentId, setEditingAssignmentId] = useState(requestedAssignment?.id || null)
   const [editingGroupId, setEditingGroupId] = useState(
@@ -225,11 +233,21 @@ function AssignAreaPage({ view = 'form' }) {
   const filteredPatrolAreas = useMemo(() => {
     const searchQuery = deferredPatrolAreaSearch.trim().toLowerCase()
     if (!searchQuery) {
-      return patrolAreas
+      return patrolAreaCatalog
     }
 
-    return patrolAreas.filter((area) => matchesPrefixSearch(searchQuery, [area]))
+    return patrolAreaCatalog.filter((area) => matchesPrefixSearch(searchQuery, [
+      area.name,
+      coverageLabelFor(area),
+    ]))
   }, [deferredPatrolAreaSearch])
+  const selectedPatrolArea = useMemo(() => (
+    findPatrolArea(assignmentForm.patrolAreaId || assignmentForm.patrolArea) || patrolAreaCatalog[0]
+  ), [assignmentForm.patrolArea, assignmentForm.patrolAreaId])
+  const groupedPatrolAreas = useMemo(() => patrolAreaGroups.map((group) => ({
+    ...group,
+    areas: filteredPatrolAreas.filter((area) => area.category === group.id),
+  })).filter((group) => group.areas.length > 0), [filteredPatrolAreas])
 
   const deploymentViewCounts = useMemo(() => assignments.reduce((counts, assignment) => {
     if (assignment.status === 'scheduled') {
@@ -394,6 +412,18 @@ function AssignAreaPage({ view = 'form' }) {
     const deploymentStatus = assignmentForm.mode === DEPLOYMENT_MODES.SCHEDULE_LATER
       ? 'scheduled'
       : 'active'
+    const includesDeploymentPoint = assignmentForm.deploymentType !== 'area'
+      && assignmentForm.latitude !== null
+      && assignmentForm.longitude !== null
+    const deploymentDetails = {
+      patrolAreaId: selectedPatrolArea.id,
+      patrolArea: selectedPatrolArea.name,
+      deploymentType: assignmentForm.deploymentType,
+      coverageBarangays: selectedPatrolArea.coverageBarangays,
+      deploymentPointLabel: includesDeploymentPoint ? assignmentForm.deploymentPointLabel.trim() : '',
+      latitude: includesDeploymentPoint ? Number(assignmentForm.latitude) : null,
+      longitude: includesDeploymentPoint ? Number(assignmentForm.longitude) : null,
+    }
 
     if (deploymentStatus === 'scheduled' && new Date(shiftStart) <= new Date()) {
       showFeedback('A scheduled deployment must start in the future.', { type: 'error' })
@@ -416,7 +446,7 @@ function AssignAreaPage({ view = 'form' }) {
         if (existingAssignment) {
           return {
             ...existingAssignment,
-            patrolArea: assignmentForm.patrolArea.trim(),
+            ...deploymentDetails,
             shiftStart,
             shiftEnd,
             notes: assignmentForm.notes.trim(),
@@ -430,7 +460,7 @@ function AssignAreaPage({ view = 'form' }) {
           personnelId: member.id,
           personnelName: member.name,
           rank: member.rank,
-          patrolArea: assignmentForm.patrolArea.trim(),
+          ...deploymentDetails,
           shiftStart,
           shiftEnd,
           notes: assignmentForm.notes.trim(),
@@ -474,7 +504,7 @@ function AssignAreaPage({ view = 'form' }) {
           personnelId: selectedMember.id,
           personnelName: selectedMember.name,
           rank: selectedMember.rank,
-          patrolArea: assignmentForm.patrolArea.trim(),
+          ...deploymentDetails,
           shiftStart,
           shiftEnd,
           notes: assignmentForm.notes.trim(),
@@ -505,7 +535,7 @@ function AssignAreaPage({ view = 'form' }) {
       personnelId: member.id,
       personnelName: member.name,
       rank: member.rank,
-      patrolArea: assignmentForm.patrolArea.trim(),
+      ...deploymentDetails,
       shiftStart,
       shiftEnd,
       notes: assignmentForm.notes.trim(),
@@ -529,10 +559,38 @@ function AssignAreaPage({ view = 'form' }) {
   const handleSelectPatrolArea = (area) => {
     setAssignmentForm((prev) => ({
       ...prev,
-      patrolArea: area,
+      patrolAreaId: area.id,
+      patrolArea: area.name,
+      deploymentType: area.defaultDeploymentType,
+      coverageBarangays: area.coverageBarangays,
+      deploymentPointLabel: '',
+      latitude: null,
+      longitude: null,
     }))
     setPatrolAreaSearch('')
     setIsPatrolAreaOpen(false)
+  }
+
+  const handleDeploymentTypeChange = (deploymentType) => {
+    setAssignmentForm((previous) => ({
+      ...previous,
+      deploymentType,
+      ...(deploymentType === 'area' && {
+        deploymentPointLabel: '',
+        latitude: null,
+        longitude: null,
+      }),
+    }))
+  }
+
+  const handleConfirmDeploymentPoint = (point) => {
+    setAssignmentForm((previous) => ({
+      ...previous,
+      deploymentPointLabel: point.label,
+      latitude: point.latitude,
+      longitude: point.longitude,
+    }))
+    setDeploymentPointModalOpen(false)
   }
 
   const handleEditAssignment = (assignment) => {
@@ -545,7 +603,7 @@ function AssignAreaPage({ view = 'form' }) {
     setAssignmentForm({
       mode: getDeploymentMode(assignment),
       personnelIds: [assignment.personnelId],
-      patrolArea: assignment.patrolArea || patrolAreas[0],
+      ...deploymentDetailsFrom(assignment),
       shiftStart: toEditableShiftStart(assignment.shiftStart),
       shiftEnd: toDateTimeLocalValue(assignment.shiftEnd),
       notes: assignment.notes || '',
@@ -573,7 +631,7 @@ function AssignAreaPage({ view = 'form' }) {
     setAssignmentForm({
       mode: getDeploymentMode(firstAssignment),
       personnelIds: groupAssignments.map((assignment) => assignment.personnelId),
-      patrolArea: firstAssignment.patrolArea || patrolAreas[0],
+      ...deploymentDetailsFrom(firstAssignment),
       shiftStart: toEditableShiftStart(firstAssignment.shiftStart),
       shiftEnd: toDateTimeLocalValue(firstAssignment.shiftEnd),
       notes: firstAssignment.notes || '',
@@ -749,22 +807,91 @@ function AssignAreaPage({ view = 'form' }) {
                       {filteredPatrolAreas.length === 0 ? (
                         <small className="assignment-field__hint">No matching patrol area.</small>
                       ) : (
-                        filteredPatrolAreas.map((area) => (
-                          <button
-                            key={area}
-                            type="button"
-                            className={`assignment-area-option${assignmentForm.patrolArea === area ? ' is-active' : ''}`}
-                            onClick={() => handleSelectPatrolArea(area)}
-                          >
-                            {area}
-                          </button>
+                        groupedPatrolAreas.map((group) => (
+                          <div className="assignment-area-group" key={group.id}>
+                            <span className="assignment-area-group__label">{group.label}</span>
+                            {group.areas.map((area) => (
+                              <button
+                                key={area.id}
+                                type="button"
+                                className={`assignment-area-option${assignmentForm.patrolAreaId === area.id ? ' is-active' : ''}`}
+                                onClick={() => handleSelectPatrolArea(area)}
+                              >
+                                <strong>{area.name}</strong>
+                                <small>{coverageLabelFor(area)}</small>
+                              </button>
+                            ))}
+                          </div>
                         ))
                       )}
                     </div>
                   </div>
                 )}
               </div>
+              <div className="assignment-area-summary">
+                <strong>{selectedPatrolArea.category === 'barangay' ? 'Barangay-wide coverage' : coverageLabelFor(selectedPatrolArea)}</strong>
+                <span>{selectedPatrolArea.category === 'route'
+                  ? 'Road or route assignment'
+                  : coverageLabelFor(selectedPatrolArea)}</span>
+              </div>
             </div>
+
+            <fieldset className="assignment-deployment-style assignment-field--full">
+              <legend>Deployment style</legend>
+              <div className="assignment-deployment-style__options">
+                <button
+                  type="button"
+                  className={assignmentForm.deploymentType === 'area' ? 'is-active' : ''}
+                  onClick={() => handleDeploymentTypeChange('area')}
+                >
+                  <ShieldCheck aria-hidden="true" />
+                  <span><strong>Area patrol</strong><small>Patrol throughout the selected coverage</small></span>
+                </button>
+                <button
+                  type="button"
+                  className={assignmentForm.deploymentType === 'point' ? 'is-active' : ''}
+                  onClick={() => handleDeploymentTypeChange('point')}
+                >
+                  <MapPin aria-hidden="true" />
+                  <span><strong>Fixed post</strong><small>Assign an exact point on the map</small></span>
+                </button>
+                <button
+                  type="button"
+                  className={assignmentForm.deploymentType === 'route' ? 'is-active' : ''}
+                  disabled={selectedPatrolArea.category !== 'route'}
+                  onClick={() => handleDeploymentTypeChange('route')}
+                >
+                  <Route aria-hidden="true" />
+                  <span><strong>Route patrol</strong><small>Patrol the selected road or route</small></span>
+                </button>
+              </div>
+
+              {assignmentForm.deploymentType === 'area' ? (
+                <div className="assignment-style-summary">
+                  No exact point is required. The officer patrols throughout {selectedPatrolArea.name}.
+                </div>
+              ) : (
+                <div className="assignment-point-summary">
+                  <div>
+                    <strong>{assignmentForm.deploymentType === 'point' ? 'Deployment point' : 'Optional starting point'}</strong>
+                    {assignmentForm.latitude !== null && assignmentForm.longitude !== null ? (
+                      <span>
+                        {assignmentForm.deploymentPointLabel || 'Selected point'} ·{' '}
+                        {Number(assignmentForm.latitude).toFixed(6)}, {Number(assignmentForm.longitude).toFixed(6)}
+                      </span>
+                    ) : (
+                      <span>{assignmentForm.deploymentType === 'point'
+                        ? 'Set the exact post before saving.'
+                        : 'Add a starting point only when the route needs one.'}</span>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => setDeploymentPointModalOpen(true)}>
+                    <MapPin aria-hidden="true" />
+                    {assignmentForm.latitude !== null ? 'View or change point' : 'Set point on map'}
+                  </button>
+                </div>
+              )}
+            </fieldset>
 
             <DeploymentScheduleFields
               maximumShiftEnd={deploymentFormState.maximumShiftEnd}
@@ -823,6 +950,20 @@ function AssignAreaPage({ view = 'form' }) {
           </div>
         </form>
       </div>
+      )}
+
+      {!listOnly && deploymentPointModalOpen && (
+        <DeploymentPointModal
+          area={selectedPatrolArea}
+          initialPoint={assignmentForm.latitude !== null && assignmentForm.longitude !== null ? {
+            latitude: Number(assignmentForm.latitude),
+            longitude: Number(assignmentForm.longitude),
+            label: assignmentForm.deploymentPointLabel,
+          } : null}
+          onClose={() => setDeploymentPointModalOpen(false)}
+          onConfirm={handleConfirmDeploymentPoint}
+          visible={deploymentPointModalOpen}
+        />
       )}
 
       {listOnly && (

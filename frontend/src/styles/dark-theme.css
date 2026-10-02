@@ -898,6 +898,53 @@
   background: rgba(37, 99, 235, 0.22);
   color: var(--color-primary-light);
 }
+
+[data-theme="dark"] .assignment-area-group + .assignment-area-group,
+[data-theme="dark"] .deployment-point-modal__header,
+[data-theme="dark"] .deployment-point-modal__details,
+[data-theme="dark"] .deployment-point-modal__footer {
+  border-color: #263650;
+}
+
+[data-theme="dark"] .assignment-area-summary strong,
+[data-theme="dark"] .assignment-deployment-style legend,
+[data-theme="dark"] .assignment-point-summary strong,
+[data-theme="dark"] .deployment-point-modal__details label span {
+  color: #d7e2f3;
+}
+
+[data-theme="dark"] .assignment-deployment-style__options > button,
+[data-theme="dark"] .assignment-style-summary,
+[data-theme="dark"] .assignment-point-summary,
+[data-theme="dark"] .deployment-point-modal {
+  border-color: #263650;
+  background: #101b2f;
+  color: #c3d0e2;
+}
+
+[data-theme="dark"] .assignment-deployment-style__options > button.is-active {
+  border-color: #60a5fa;
+  background: #122b52;
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .assignment-point-summary > button {
+  background: #0c1729;
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .deployment-point-modal__header h3 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .deployment-point-modal__header > button {
+  border-color: #33445f;
+  color: #d7e2f3;
+}
+
+[data-theme="dark"] .deployment-point-map--empty {
+  background: #0b1424;
+}
 [data-theme="dark"] .report-feedback {
   color: var(--text-secondary);
 }

@@ -5,6 +5,9 @@ describe('Leaflet map document', () => {
     const html = createLeafletMapHtml({
       latitude: 17.42,
       longitude: 121.76,
+      deploymentPointLabel: 'Main entrance',
+      deploymentType: 'point',
+      hasDeploymentPoint: true,
       currentPersonnelId: 'PNP-001',
       isDark: true,
       mapPersonnel: [{
@@ -30,5 +33,8 @@ describe('Leaflet map document', () => {
     expect(html).toContain('satelliteLayer');
     expect(html).toContain('PNP-001');
     expect(html).toContain('setView([17.42,121.76],15)');
+    expect(html).toContain('class="deployment-pin"');
+    expect(html).toContain('Main entrance');
+    expect(html.indexOf('const escapeHtml')).toBeLessThan(html.indexOf('if(deploymentPoint.hasPoint)'));
   });
 });

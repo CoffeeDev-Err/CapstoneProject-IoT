@@ -1,4 +1,6 @@
-const { getAreaCoordinates, normalizeBarangayCode, point } = require('../../utils/geo')
+const { isValidCoordinates, normalizeBarangayCode, point } = require('../../utils/geo')
+const { isInsideCabagan } = require('../../utils/cabaganGeofence')
+const { findPatrolArea } = require('../../constants/patrolAreas')
 const {
 	buildPrefixSearchConditions,
 	createPaginationMeta,
@@ -36,9 +38,64 @@ const formatDeploymentInstructionsText = (assignment) => {
 
 const formatDeploymentNotificationMessage = ({ assignment, scheduled, scheduleText }) => {
 	const instructionsText = formatDeploymentInstructionsText(assignment)
+	const pointLabel = String(assignment.deploymentPointLabel || '').trim()
+	const destination = assignment.deploymentType === 'point' && pointLabel
+		? `${assignment.patrolArea} (${pointLabel})`
+		: assignment.patrolArea
 	return scheduled
-		? `You are scheduled at ${assignment.patrolArea} on ${scheduleText}.${instructionsText}`
-		: `You are assigned to ${assignment.patrolArea}.${instructionsText} Open Map to confirm your deployment.`
+		? `You are scheduled at ${destination} on ${scheduleText}.${instructionsText}`
+		: `You are assigned to ${destination}.${instructionsText} Open Map to confirm your deployment.`
+}
+
+const normalizeDeploymentConfiguration = (assignment) => {
+	const patrolArea = findPatrolArea(assignment.patrolAreaId || assignment.patrolArea)
+	if (!patrolArea) {
+		validatePatrolArea(assignment.patrolArea)
+		throw createValidationError('Select a patrol area from the approved Cabagan deployment list.', 'patrolArea')
+	}
+	const deploymentType = String(
+		assignment.deploymentType || patrolArea.defaultDeploymentType,
+	).trim().toLowerCase()
+	if (!['area', 'point', 'route'].includes(deploymentType)) {
+		throw createValidationError('Deployment style must be area, point, or route.', 'deploymentType')
+	}
+	if (deploymentType === 'route' && patrolArea.category !== 'route') {
+		throw createValidationError('Route patrol requires a road or route patrol area.', 'deploymentType')
+	}
+	const hasLatitude = assignment.latitude !== null
+		&& assignment.latitude !== undefined && assignment.latitude !== ''
+	const hasLongitude = assignment.longitude !== null
+		&& assignment.longitude !== undefined && assignment.longitude !== ''
+	if (hasLatitude !== hasLongitude) {
+		throw createValidationError('Provide both deployment latitude and longitude.', 'deploymentPoint')
+	}
+	const latitude = hasLatitude ? Number(assignment.latitude) : null
+	const longitude = hasLongitude ? Number(assignment.longitude) : null
+	if (hasLatitude && (!isValidCoordinates(latitude, longitude) || !isInsideCabagan(latitude, longitude))) {
+		throw createValidationError('The deployment point must be inside Cabagan.', 'deploymentPoint')
+	}
+	if (deploymentType === 'area' && (hasLatitude || String(assignment.deploymentPointLabel || '').trim())) {
+		throw createValidationError('Area patrol does not use an exact deployment point.', 'deploymentPoint')
+	}
+	if (deploymentType === 'point' && !hasLatitude) {
+		throw createValidationError('Set the fixed deployment point on the map.', 'deploymentPoint')
+	}
+	const deploymentPointLabel = validateText(assignment.deploymentPointLabel, {
+		field: 'deploymentPointLabel',
+		label: 'Deployment point label',
+		maxLength: OPERATIONAL_LIMITS.locationName,
+		required: deploymentType === 'point' || hasLatitude,
+		allowNewlines: false,
+	})
+	return {
+		patrolAreaId: patrolArea.id,
+		patrolArea: patrolArea.name,
+		deploymentType,
+		coverageBarangayCodes: patrolArea.coverageBarangayCodes,
+		deploymentPointLabel,
+		latitude,
+		longitude,
+	}
 }
 
 const createDeploymentService = ({
@@ -412,11 +469,12 @@ const createDeploymentService = ({
 			if (!/^[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])?$/i.test(personnelId)) {
 				throw createValidationError('Select a valid personnel account.', 'personnelId')
 			}
+			const deploymentConfiguration = normalizeDeploymentConfiguration(assignment)
 			return {
 				id: validateDeploymentId(assignment.id),
 				groupId: validateDeploymentId(assignment.groupId || assignment.id, 'groupId'),
 				personnelId,
-				patrolArea: validatePatrolArea(assignment.patrolArea),
+				...deploymentConfiguration,
 				shiftStart: validateDate(assignment.shiftStart, {
 					field: 'shiftStart',
 					label: 'Shift start',
@@ -542,30 +600,36 @@ const createDeploymentService = ({
 
 		if (normalizedAssignments.length > 0) {
 			await Deployment.bulkWrite(normalizedAssignments.map((assignment) => {
-				const fallback = getAreaCoordinates(assignment.patrolArea)
 				const previous = previousById.get(assignment.id)
+				const hasDeploymentPoint = Number.isFinite(assignment.latitude)
+					&& Number.isFinite(assignment.longitude)
+				const deploymentValues = {
+					groupId: String(assignment.groupId || assignment.id),
+					personnelId: assignment.personnelId,
+					personnelName: assignment.personnelName,
+					rank: assignment.rank,
+					barangayCode: assignment.coverageBarangayCodes[0] || 'UNSPECIFIED',
+					coverageBarangayCodes: assignment.coverageBarangayCodes,
+					patrolAreaId: assignment.patrolAreaId,
+					patrolArea: assignment.patrolArea,
+					deploymentType: assignment.deploymentType,
+					deploymentPointLabel: assignment.deploymentPointLabel,
+					shiftStart: assignment.shiftStart,
+					shiftEnd: assignment.shiftEnd,
+					instructions: assignment.notes || '',
+					assignedBy: assignment.assignedBy || 'supervisor',
+					assignedAt: previous?.assignedAt || now,
+					status: assignment.status,
+					...(hasDeploymentPoint && {
+						location: point(assignment.longitude, assignment.latitude),
+					}),
+				}
 				return {
 					updateOne: {
 						filter: { assignmentId: String(assignment.id) },
 						update: {
-							$set: {
-								groupId: String(assignment.groupId || assignment.id),
-								personnelId: assignment.personnelId,
-								personnelName: assignment.personnelName,
-								rank: assignment.rank,
-								barangayCode: normalizeBarangayCode(assignment.patrolArea),
-								patrolArea: assignment.patrolArea,
-								shiftStart: assignment.shiftStart,
-								shiftEnd: assignment.shiftEnd,
-								instructions: assignment.notes || '',
-								assignedBy: assignment.assignedBy || 'supervisor',
-								assignedAt: previous?.assignedAt || now,
-								location: point(
-									assignment.longitude ?? fallback.longitude,
-									assignment.latitude ?? fallback.latitude,
-								),
-								status: assignment.status,
-							},
+							$set: deploymentValues,
+							...(!hasDeploymentPoint && { $unset: { location: 1 } }),
 							$setOnInsert: { assignmentId: String(assignment.id) },
 						},
 						upsert: true,
@@ -676,3 +740,4 @@ const createDeploymentService = ({
 
 module.exports = createDeploymentService
 module.exports.formatDeploymentNotificationMessage = formatDeploymentNotificationMessage
+module.exports.normalizeDeploymentConfiguration = normalizeDeploymentConfiguration

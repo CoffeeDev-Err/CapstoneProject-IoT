@@ -10,13 +10,17 @@ const deploymentSchema = new mongoose.Schema({
 	personnelName: { type: String, required: true, maxlength: 100 },
 	rank: { type: String, required: true, maxlength: 80 },
 	barangayCode: { type: String, trim: true, uppercase: true },
+	coverageBarangayCodes: { type: [String], default: [] },
+	patrolAreaId: { type: String, trim: true, lowercase: true, maxlength: OPERATIONAL_LIMITS.deploymentArea },
 	patrolArea: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.deploymentArea },
+	deploymentType: { type: String, enum: ['area', 'point', 'route'], default: 'area' },
+	deploymentPointLabel: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.locationName },
 	shiftStart: Date,
 	shiftEnd: Date,
 	instructions: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.deploymentInstructions },
 	assignedBy: { type: String, default: 'supervisor' },
 	assignedAt: { type: Date, default: Date.now },
-	location: { type: pointSchema, required: true },
+	location: pointSchema,
 	status: { type: String, enum: ['scheduled', 'active', 'completed', 'cancelled'], default: 'active' },
 	acknowledgedAt: Date,
 	acknowledgedSignature: String,
@@ -29,6 +33,7 @@ const deploymentSchema = new mongoose.Schema({
 deploymentSchema.index({ assignmentId: 1 }, { unique: true })
 deploymentSchema.index({ personnelId: 1, status: 1 })
 deploymentSchema.index({ barangayCode: 1, status: 1 })
+deploymentSchema.index({ coverageBarangayCodes: 1, status: 1 })
 deploymentSchema.index({ shiftStart: -1 })
 deploymentSchema.index({ status: 1, shiftStart: 1, shiftEnd: 1 })
 deploymentSchema.index({ personnelId: 1, shiftStart: 1, shiftEnd: 1 })
@@ -91,7 +96,12 @@ const reportSchema = new mongoose.Schema({
 	clientSubmissionId: { type: String, trim: true, maxlength: 100 },
 	submittedBy: { type: String, required: true },
 	officerName: { type: String, required: true },
-	assignedArea: { type: String, default: 'Unassigned area', maxlength: OPERATIONAL_LIMITS.deploymentArea },
+	assignedArea: { type: String, default: 'No deployment recorded', maxlength: OPERATIONAL_LIMITS.deploymentArea },
+	assignedAreaId: { type: String, trim: true, lowercase: true, maxlength: OPERATIONAL_LIMITS.deploymentArea },
+	assignedAreaType: { type: String, enum: ['area', 'point', 'route'] },
+	assignedBarangayCodes: { type: [String], default: [] },
+	assignedLocation: pointSchema,
+	assignedLocationLabel: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.locationName },
 	barangayCode: { type: String, trim: true, uppercase: true, default: 'UNSPECIFIED' },
 	reportType: { type: String, required: true, lowercase: true, enum: REPORT_TYPES },
 	isIncident: { type: Boolean, required: true },

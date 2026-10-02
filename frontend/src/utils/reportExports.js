@@ -21,7 +21,13 @@ export const reportExportRows = (report) => [
   ['Case status', report.case_status || (report.is_incident ? 'open' : 'Not applicable')],
   ['Officer', report.officer], ['Rank', report.officer_rank], ['Badge number', report.badge_number],
   ['Incident / activity date', exportDateTime(report.occurred_at)], ['Submitted', exportDateTime(report.date_time)],
-  ['Assigned area', report.assigned_area], ['Barangay', report.barangay], ['Exact place', report.location],
+  ['Duty patrol area', report.assigned_area],
+  ['Deployment style', report.assigned_area === 'No deployment recorded' ? 'No deployment recorded'
+    : report.assigned_area_type === 'point' ? 'Fixed post'
+      : report.assigned_area_type === 'route' ? 'Route patrol' : 'Area patrol'],
+  ['Duty coverage barangay', report.assigned_barangays?.join(', ') || 'No deployment coverage recorded'],
+  ['Deployment point', report.assigned_location_label || 'Not applicable'],
+  ['Incident barangay', report.barangay], ['Exact incident place', report.location],
   ['Location source', ({ gps: 'Officer current GPS', backup_request: 'GPS recorded with backup request', manual: 'Manually entered / map pin' })[report.location_source] || report.location_source],
   ['GPS coordinates', report.latitude != null && report.longitude != null
     && report.latitude !== '' && report.longitude !== '' && Number.isFinite(Number(report.latitude)) && Number.isFinite(Number(report.longitude))

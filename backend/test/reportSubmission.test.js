@@ -70,6 +70,58 @@ describe('report submission validation', () => {
 	}
 })
 
+describe('report duty assignment snapshot', () => {
+	it('uses the deployment covering the incident time and keeps incident barangay separate', async () => {
+		let deploymentQuery
+		let createdReport
+		const deployment = {
+			patrolAreaId: 'cabagan-public-market-zone',
+			patrolArea: 'Cabagan Public Market Zone',
+			deploymentType: 'point',
+			coverageBarangayCodes: ['CENTRO'],
+			deploymentPointLabel: 'Main entrance',
+			location: { type: 'Point', coordinates: [121.7658, 17.4272] },
+		}
+		const service = createReportService({
+			io: { emit: () => {}, to: () => ({ emit: () => {} }) },
+			models: {
+				CurrentLocation: { findOne: () => ({ lean: async () => null }) },
+				Deployment: { findOne: (query) => {
+					deploymentQuery = query
+					return { select: () => ({ lean: async () => deployment }) }
+				} },
+				Report: {
+					create: async (payload) => {
+						createdReport = { ...payload, _id: 'report-id', __v: 0 }
+						return createdReport
+					},
+					deleteOne: async () => {},
+				},
+			},
+			loadPersonnelMap: async () => new Map(),
+			personnelService: {
+				getPersonnelMember: async () => ({ id: 'PNP-001', name: 'Officer One' }),
+			},
+			notificationService: { deliverNotification: async () => {} },
+			reportRouteService: { captureSnapshot: async () => {} },
+			publish: { emitToSupervisorAndPersonnel: () => {} },
+			clock: () => now,
+			idGenerator: () => 'assignment-snapshot',
+		})
+
+		const report = await service.submitReport(basePayload)
+
+		assert.deepEqual(deploymentQuery.status, { $in: ['active', 'completed'] })
+		assert.equal(deploymentQuery.$and[0].$or[2].shiftStart.$lte.toISOString(), basePayload.occurred_at)
+		assert.equal(createdReport.assignedArea, 'Cabagan Public Market Zone')
+		assert.equal(createdReport.assignedAreaType, 'point')
+		assert.deepEqual(createdReport.assignedBarangayCodes, ['CENTRO'])
+		assert.equal(createdReport.barangayCode, 'CATABAYUNGAN')
+		assert.equal(report.assigned_location_label, 'Main entrance')
+		assert.deepEqual(report.assigned_barangays, ['Centro'])
+	})
+})
+
 describe('backup response report linking', () => {
 	const createLinkedBackupFixture = ({ requesterId = 'PNP-001', existingReport = null, duplicateOnCreate = false } = {}) => {
 		let createdReport

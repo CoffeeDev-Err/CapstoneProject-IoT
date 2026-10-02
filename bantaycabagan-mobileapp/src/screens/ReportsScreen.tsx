@@ -697,7 +697,21 @@ export default function ReportsScreen() {
             <Detail label="Submitted by" value={selectedReport.officer} />
             <Detail label="Submitted at" value={formatReportDate(selectedReport.date_time)} />
             <Detail label="Incident / activity time" value={formatReportDate(selectedReport.occurred_at)} />
-            <Detail label="Assigned area" value={selectedReport.assigned_area} />
+            <Detail label="Duty patrol area" value={selectedReport.assigned_area} />
+            <Detail
+              label="Deployment style"
+              value={selectedReport.assigned_area === 'No deployment recorded'
+                ? 'No deployment recorded'
+                : selectedReport.assigned_area_type === 'point' ? 'Fixed post'
+                  : selectedReport.assigned_area_type === 'route' ? 'Route patrol' : 'Area patrol'}
+            />
+            <Detail
+              label="Duty coverage"
+              value={selectedReport.assigned_barangays?.join(', ') || 'No deployment coverage recorded'}
+            />
+            {selectedReport.assigned_location_label ? (
+              <Detail label="Deployment point" value={selectedReport.assigned_location_label} />
+            ) : null}
             {selectedReport.is_incident && <>
               <Detail label="Severity" value={`${selectedReport.severity}/5`} />
               <Detail label="Case status" value={selectedReport.case_status} />

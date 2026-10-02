@@ -1,4 +1,4 @@
-const { CABAGAN_BARANGAYS } = require('../constants/cabaganBarangays')
+const { PATROL_AREAS: PATROL_AREA_CATALOG } = require('../constants/patrolAreas')
 
 const OPERATIONAL_LIMITS = Object.freeze({
 	reportTitle: 150,
@@ -18,25 +18,7 @@ const OPERATIONAL_LIMITS = Object.freeze({
 
 const REPORT_TYPES = Object.freeze(['incident', 'patrol', 'checkpoint', 'others'])
 const DEPLOYMENT_ID_PATTERN = /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/i
-const EXTRA_PATROL_AREAS = [
-	'Cabagan Public Market Zone',
-	'Municipal Hall Perimeter',
-	'Barangay Centro Route',
-	'Cabagan-Santa Maria Road',
-	'Cabagan-Tumauini Road',
-	'Maharlika Highway Northbound',
-	'Maharlika Highway Southbound',
-	'National Highway Checkpoint North',
-	'National Highway Checkpoint South',
-	'Highway Checkpoint North',
-	'Highway Checkpoint South',
-	'School Safety Patrol Route',
-	'Bridge Approach Patrol Zone',
-]
-const PATROL_AREAS = Object.freeze([
-	...CABAGAN_BARANGAYS.map((barangay) => `Barangay ${barangay.name}`),
-	...EXTRA_PATROL_AREAS,
-])
+const PATROL_AREAS = Object.freeze(PATROL_AREA_CATALOG.map((area) => area.name))
 const patrolAreaByName = new Map(
 	PATROL_AREAS.map((area) => [area.toLocaleLowerCase('en-PH'), area]),
 )
