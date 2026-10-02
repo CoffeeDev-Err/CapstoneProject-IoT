@@ -19,6 +19,11 @@ type IdentityUpdate = {
   emailVerified?: boolean; accountStatus?: string;
 };
 
+type OperationalNotification = {
+  referenceType?: string;
+  data?: { assignmentId?: string; [key: string]: unknown };
+};
+
 type OperationalSocketOptions = {
   applyIdentityUpdate: (payload: IdentityUpdate) => void;
   clearSession: () => Promise<unknown>;
@@ -111,6 +116,11 @@ export function useOperationalSocket({
         setDeployments((items) => upsertById(items, assignment));
       }
     };
+    const onNotificationCreated = (notification: OperationalNotification) => {
+      if (notification.referenceType === 'deployment' || notification.data?.assignmentId) {
+        refreshAuthorizedOperations();
+      }
+    };
     operationsSocket.on('connect', onConnect);
     operationsSocket.on('disconnect', onDisconnect);
     operationsSocket.on('personnel:bootstrap', onPersonnel);
@@ -126,6 +136,7 @@ export function useOperationalSocket({
     operationsSocket.on('deployments:bootstrap', onDeploymentsBootstrap);
     operationsSocket.on('deployments:updated', onDeploymentsUpdated);
     operationsSocket.on('deployment:acknowledged', onDeploymentAcknowledged);
+    operationsSocket.on('notification:created', onNotificationCreated);
     setIsConnected(operationsSocket.connected);
     if (!operationsSocket.connected) operationsSocket.connect();
 
@@ -146,6 +157,7 @@ export function useOperationalSocket({
       operationsSocket.off('deployments:bootstrap', onDeploymentsBootstrap);
       operationsSocket.off('deployments:updated', onDeploymentsUpdated);
       operationsSocket.off('deployment:acknowledged', onDeploymentAcknowledged);
+      operationsSocket.off('notification:created', onNotificationCreated);
       operationsSocket.disconnect();
     };
   }, [applyIdentityUpdate, clearSession, currentPersonnelId, setDeployments, setPersonnel,
