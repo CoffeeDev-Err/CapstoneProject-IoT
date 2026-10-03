@@ -1,6 +1,6 @@
 export const GPS_UPDATE_INTERVAL_MS = 10_000
-export const WALKING_MARKER_ANIMATION_DURATION_MS = 500
-export const VEHICLE_MARKER_ANIMATION_DURATION_MS = 250
+export const WALKING_MARKER_ANIMATION_DURATION_MS = 1600
+export const VEHICLE_MARKER_ANIMATION_DURATION_MS = 900
 export const STATIONARY_JITTER_DISTANCE_METERS = 5
 export const STATIONARY_SPEED_MAX_KMH = 2
 export const VEHICLE_SPEED_MIN_KMH = 10
@@ -101,6 +101,18 @@ export const markerMotionForFixes = (from, target) => {
     speedKmh,
     suppressJitter,
   }
+}
+
+export const effectiveMarkerTarget = (renderedTarget, confirmedTarget, suppressSingleFixJitter) => {
+  const rawTarget = [Number(confirmedTarget?.latitude), Number(confirmedTarget?.longitude)]
+  if (!renderedTarget || !suppressSingleFixJitter) return rawTarget
+  const accumulatedDistance = distanceMetersBetweenFixes({
+    latitude: Number(renderedTarget[0]),
+    longitude: Number(renderedTarget[1]),
+  }, confirmedTarget)
+  return accumulatedDistance !== null && accumulatedDistance <= STATIONARY_JITTER_DISTANCE_METERS
+    ? renderedTarget
+    : rawTarget
 }
 
 export const easeOutCubic = (progress) => {

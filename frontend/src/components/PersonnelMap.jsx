@@ -3,7 +3,7 @@
  * MapLibre owns the long-lived map instance while React updates its data,
  * controls, and accessible DOM markers without remounting the screen.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
@@ -23,8 +23,6 @@ import {
   applyThreeDimensionalTerrain,
   cabaganBoundaryFeature,
   cabaganBoundaryLngLat,
-  featureCollection,
-  setGeoJsonSourceData,
 } from '../utils/mapLibreLayers'
 import { addMobileLikeNavigationControls } from '../utils/mapNavigation'
 import { createPersonnelClusterCache, isValidMapPosition } from '../utils/personnelClusters'
@@ -32,6 +30,7 @@ import { MAP_STATUS_LEGEND } from '../utils/mapStatusLegend'
 import {
   MARKER_ANIMATION_DURATION_MS,
   confirmedFixFromMember,
+  effectiveMarkerTarget,
   interpolateLatLng,
   markerMotionForFixes,
 } from '../utils/mapMotion'
@@ -143,7 +142,7 @@ const createPersonnelMarkerElement = (member, onSelect) => {
   return { button, photo, initials, pin, statusCue }
 }
 
-const addOperationalLayers = (map, deploymentData) => {
+const addOperationalLayers = (map) => {
   const firstSymbolLayerId = map.getStyle()?.layers?.find((layer) => layer.type === 'symbol')?.id
 
   if (!map.getSource('geosentri-outside-mask')) {
@@ -174,29 +173,10 @@ const addOperationalLayers = (map, deploymentData) => {
     }, firstSymbolLayerId)
   }
 
-  if (!map.getSource('geosentri-deployments')) {
-    map.addSource('geosentri-deployments', { type: 'geojson', data: deploymentData })
-  } else {
-    setGeoJsonSourceData(map, 'geosentri-deployments', deploymentData)
-  }
-  if (!map.getLayer('geosentri-deployments-point')) {
-    map.addLayer({
-      id: 'geosentri-deployments-point',
-      type: 'circle',
-      source: 'geosentri-deployments',
-      paint: {
-        'circle-color': '#2563eb',
-        'circle-radius': 9,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 3,
-      },
-    }, firstSymbolLayerId)
-  }
 }
 
 function PersonnelMap({
   personnel,
-  deployments = [],
   onSelectPersonnel,
   followedPersonnelId,
   onStopFollowing,
@@ -216,7 +196,6 @@ function PersonnelMap({
   const clusterCacheRef = useRef(null)
   const personnelRef = useRef(personnel)
   const followedPersonnelIdRef = useRef(followedPersonnelId)
-  const deploymentDataRef = useRef(featureCollection())
   const threeDRef = useRef(false)
   const styleSignatureRef = useRef(`street:${initialIsDark ? 'dark' : 'light'}`)
   const [mapMode, setMapMode] = useState('street')
@@ -228,32 +207,6 @@ function PersonnelMap({
   useEffect(() => {
     followedPersonnelIdRef.current = followedPersonnelId
   }, [followedPersonnelId])
-
-  const deploymentData = useMemo(() => {
-    const groups = new Map()
-    deployments
-      .filter((assignment) => assignment.isCurrentShift !== false)
-      .forEach((assignment) => {
-        if (!assignment.hasDeploymentPoint) return
-        const latitude = Number(assignment.latitude)
-        const longitude = Number(assignment.longitude)
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
-        const key = assignment.groupId || assignment.patrolArea
-        if (!groups.has(key)) {
-          groups.set(key, {
-            type: 'Feature',
-            properties: {
-              id: key,
-              patrolArea: assignment.patrolArea,
-              deploymentPointLabel: assignment.deploymentPointLabel || '',
-              deploymentType: assignment.deploymentType || 'point',
-            },
-            geometry: { type: 'Point', coordinates: [longitude, latitude] },
-          })
-        }
-      })
-    return featureCollection([...groups.values()])
-  }, [deployments])
 
   const clearClusterMarkers = useCallback(() => {
     clusterMarkerStatesRef.current.forEach((state) => {
@@ -452,7 +405,7 @@ function PersonnelMap({
     const removeNavigationListeners = addMobileLikeNavigationControls(map)
 
     const handleStyleLoad = () => {
-      addOperationalLayers(map, deploymentDataRef.current)
+      addOperationalLayers(map)
       applyThreeDimensionalTerrain(map, threeDRef.current)
       setMapReady(true)
       map.once('idle', rebuildClusterIndex)
@@ -557,7 +510,6 @@ function PersonnelMap({
       }
 
       const confirmedFix = confirmedFixFromMember(member)
-      const rawTarget = [confirmedFix.latitude, confirmedFix.longitude]
       const sameConfirmedFix = state.confirmedFix
         && state.confirmedFix.latitude === confirmedFix.latitude
         && state.confirmedFix.longitude === confirmedFix.longitude
@@ -566,7 +518,11 @@ function PersonnelMap({
 
       const motion = markerMotionForFixes(state.confirmedFix, confirmedFix)
       const from = [...state.currentPosition]
-      const target = motion.suppressJitter ? [...state.targetPosition] : rawTarget
+      const target = effectiveMarkerTarget(
+        state.targetPosition,
+        confirmedFix,
+        motion.suppressJitter,
+      )
       state.confirmedFix = confirmedFix
       state.targetPosition = target
       state.motionDuration = motion.durationMs
@@ -607,12 +563,6 @@ function PersonnelMap({
     rebuildClusterIndex()
     return undefined
   }, [followedPersonnelId, onSelectPersonnel, personnel, rebuildClusterIndex])
-
-  useEffect(() => {
-    deploymentDataRef.current = deploymentData
-    const map = mapRef.current
-    if (map?.isStyleLoaded()) setGeoJsonSourceData(map, 'geosentri-deployments', deploymentData)
-  }, [deploymentData])
 
   useEffect(() => {
     const map = mapRef.current

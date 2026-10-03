@@ -9,6 +9,7 @@ import {
   WALKING_MARKER_ANIMATION_DURATION_MS,
   calculatedSpeedKmhBetweenFixes,
   easeOutCubic,
+  effectiveMarkerTarget,
   interpolateLatLng,
   markerMotionForFixes,
   resolveMotionSpeedKmh,
@@ -59,9 +60,9 @@ const monitoringStyles = fs.readFileSync(
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
 
 assert.equal(GPS_UPDATE_INTERVAL_MS, 10_000, 'Web GPS cadence must match the tracker upload interval')
-assert.equal(MARKER_ANIMATION_DURATION_MS, 500, 'Web default motion must catch up in half a second')
-assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 500, 'Walking fixes must retain smooth half-second motion')
-assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 250, 'Vehicle fixes must catch up in a quarter second')
+assert.equal(MARKER_ANIMATION_DURATION_MS, 1_600, 'Web default motion must remain visibly smooth')
+assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 1_600, 'Walking fixes must retain visible smooth motion')
+assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 900, 'Vehicle fixes must catch up promptly')
 assert.equal(easeOutCubic(0), 0, 'Interpolation must begin at the old GPS position')
 assert.equal(easeOutCubic(1), 1, 'Interpolation must finish at the new GPS position')
 assert.equal(easeOutCubic(-1), 0, 'Interpolation progress must be clamped below zero')
@@ -119,6 +120,24 @@ assert.deepEqual(
   [17.45, 121.75],
   'Web GPS interpolation must move linearly at a constant visual speed',
 )
+assert.deepEqual(
+  effectiveMarkerTarget(
+    [17.4269, 121.7653],
+    { latitude: 17.42691, longitude: 121.7653 },
+    true,
+  ),
+  [17.4269, 121.7653],
+  'A single sub-five-meter GPS drift must keep the rendered marker stable',
+)
+assert.deepEqual(
+  effectiveMarkerTarget(
+    [17.4269, 121.7653],
+    { latitude: 17.4270, longitude: 121.7653 },
+    true,
+  ),
+  [17.4270, 121.7653],
+  'Cumulative walking movement beyond five meters must move the rendered marker',
+)
 
 assert.ok(packageJson.dependencies['maplibre-gl'], 'MapLibre GL JS dependency is required')
 assert.ok(packageJson.dependencies.supercluster, 'MapLibre personnel clustering dependency is required')
@@ -126,6 +145,11 @@ assert.equal(packageJson.dependencies.leaflet, undefined, 'Leaflet must be remov
 assert.match(personnelMapSource, /new maplibregl\.Map\(/, 'Personnel map must use MapLibre GL JS')
 assert.match(reportMapSource, /new maplibregl\.Map\(/, 'Report route map must use MapLibre GL JS')
 assert.match(personnelMapSource, /new Supercluster\(/, 'Personnel map must create a Supercluster index')
+assert.doesNotMatch(
+  personnelMapSource,
+  /geosentri-deployments|deploymentPointLabel|hasDeploymentPoint/,
+  'Supervisor live map must not render officer deployment points or areas',
+)
 assert.match(
   personnelMapSource,
   /getClusterDetails\(feature\.properties\.cluster_id\)[\s\S]*clusterKey = details\.key/,

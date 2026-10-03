@@ -41,7 +41,6 @@ function MonitoringPage() {
     operationalAlert,
     outOfBoundaryPersonnel,
     stalePersonnel,
-    deployments,
     tasks,
     isInitialDataLoading,
     initialDataError,
@@ -238,7 +237,6 @@ function MonitoringPage() {
         <Suspense fallback={<div className="map-panel map-chunk-loading h-100" role="status">Loading live map...</div>}>
           <PersonnelMap
             personnel={mapPersonnel}
-            deployments={deployments}
             onSelectPersonnel={handleSelectPersonnel}
             followedPersonnelId={activeFollowedPersonnelId}
             onStopFollowing={() => setFollowedPersonnelId(null)}
