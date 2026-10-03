@@ -1,6 +1,6 @@
 const { Deployment, GpsDeviceAssignment } = require('../models')
 const { getLocationFreshness } = require('../utils/locationFreshness')
-const { resolveLocationName } = require('./reverseGeocodingService')
+const { formatCoordinates, resolveLocationName } = require('./reverseGeocodingService')
 
 const toRecordedAt = (value) => {
 	const timestamp = Number(value)
@@ -15,7 +15,22 @@ const createFlespiSyncService = ({
 	deploymentModel = Deployment,
 	clock = () => new Date(),
 	resolveLocation = resolveLocationName,
+	locationNameBudgetMs = 500,
 }) => {
+	const resolveLocationForLiveFix = async (latitude, longitude) => {
+		let timeout
+		try {
+			return await Promise.race([
+				Promise.resolve().then(() => resolveLocation(latitude, longitude))
+					.catch(() => formatCoordinates(latitude, longitude)),
+				new Promise((resolve) => {
+					timeout = setTimeout(() => resolve(formatCoordinates(latitude, longitude)), locationNameBudgetMs)
+				}),
+			])
+		} finally {
+			clearTimeout(timeout)
+		}
+	}
 	const syncAssignedLocations = async ({ deviceIds = [] } = {}) => {
 		const selectedDeviceIds = [...new Set(deviceIds.map(String).filter(Boolean))]
 		const now = clock()
@@ -71,7 +86,9 @@ const createFlespiSyncService = ({
 				imei: assignment.imei,
 				latitude: telemetry.latitude,
 				longitude: telemetry.longitude,
-				location_name: await resolveLocation(
+				// Place-name lookup must not hold live coordinates behind a geocoder queue.
+				// The resolver continues populating its cache for later refreshes.
+				location_name: await resolveLocationForLiveFix(
 					telemetry.latitude,
 					telemetry.longitude,
 				),

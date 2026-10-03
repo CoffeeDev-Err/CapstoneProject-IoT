@@ -61,7 +61,7 @@ const PORT = process.env.PORT || 4000
 const GPS_UPDATE_INTERVAL_MS = 2500
 const FLESPI_SYNC_INTERVAL_MS = Math.max(
 	2000,
-	Number(process.env.FLESPI_SYNC_INTERVAL_MS) || 3000,
+	Math.min(10_000, Number(process.env.FLESPI_SYNC_INTERVAL_MS) || 3000),
 )
 const HISTORY_SAMPLE_INTERVAL_MS = 30_000
 const DEPLOYMENT_STATUS_INTERVAL_MS = Math.max(

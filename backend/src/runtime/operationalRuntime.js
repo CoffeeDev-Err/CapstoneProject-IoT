@@ -7,6 +7,7 @@ const createOperationalRuntime = ({
 	createFlespiMqttService,
 	intervals,
 	flespiToken,
+	clock = Date.now,
 	logger = console,
 }) => {
 	const {
@@ -22,6 +23,7 @@ const createOperationalRuntime = ({
 	let lastHistorySampleAt = 0
 	let flespiSyncRunning = false
 	let flespiSyncAllPending = false
+	let lastFlespiFullSyncAt = null
 	const pendingFlespiDeviceIds = new Set()
 	let flespiMqttService = null
 	let lifecycleCheckRunning = false
@@ -54,12 +56,13 @@ const createOperationalRuntime = ({
 				flespiSyncAllPending = false
 				const selectedDeviceIds = syncAll ? [] : [...pendingFlespiDeviceIds]
 				pendingFlespiDeviceIds.clear()
+				if (syncAll) lastFlespiFullSyncAt = clock()
 				const result = await flespiSyncService.syncAssignedLocations({
 					deviceIds: selectedDeviceIds,
 				})
 				if (result.accepted > 0) {
-					await operationalService.reconcileTaskArrivals()
 					emitPersonnelCollection(io, 'personnel:update', await getPersonnelWithLocations())
+					await operationalService.reconcileTaskArrivals()
 				}
 			}
 		} catch (error) {
@@ -70,7 +73,14 @@ const createOperationalRuntime = ({
 	}
 
 	const runFlespiFallbackSync = () => {
-		if (!flespiMqttService?.isConnected()) void broadcastFlespiLocations()
+		// A connected broker does not prove telemetry subscriptions are delivering.
+		// Reconcile all on-duty trackers at least every ten seconds even with MQTT.
+		const watchdogInterval = Math.max(intervals.flespiSync,
+			Math.floor(10_000 / intervals.flespiSync) * intervals.flespiSync)
+		if (flespiMqttService?.isConnected()
+			&& lastFlespiFullSyncAt !== null
+			&& clock() - lastFlespiFullSyncAt < watchdogInterval) return
+		return broadcastFlespiLocations()
 	}
 
 	const runOperationalLifecycleCheck = async () => {
@@ -130,6 +140,7 @@ const createOperationalRuntime = ({
 	return {
 		broadcastFlespiLocations,
 		broadcastMockLocations,
+		runFlespiFallbackSync,
 		runOperationalLifecycleCheck,
 		start,
 		stop,
