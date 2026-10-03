@@ -12,6 +12,7 @@ import type {
   PoliceReport,
 } from '../../types/operations';
 import { isActiveTask, mergeById, upsertById } from './operationalState';
+import { subscribeDeploymentRefresh } from '../../services/deploymentRefreshEvents';
 
 type IdentityUpdate = {
   personnelId?: string; name?: string; badgeNumber?: string; rank?: string;
@@ -56,8 +57,12 @@ export function useOperationalSocket({
 
   useEffect(() => {
     let effectActive = true;
+    const refreshTimers = new Set<ReturnType<typeof setTimeout>>();
     operationsSocket.auth = token ? { token } : {};
-    const onConnect = () => setIsConnected(true);
+    const onConnect = () => {
+      setIsConnected(true);
+      scheduleAuthorizedOperationsRefresh();
+    };
     const onDisconnect = () => setIsConnected(false);
     const onPersonnel = (payload: LivePersonnel[]) => setPersonnel(payload.map(resolvePersonnelPhoto));
     const onPersonnelIdentityUpdated = (payload: IdentityUpdate) => {
@@ -105,6 +110,16 @@ export function useOperationalSocket({
         })
         .catch(() => undefined);
     };
+    function scheduleAuthorizedOperationsRefresh() {
+      refreshAuthorizedOperations();
+      [500, 1800].forEach((delay) => {
+        const timer = setTimeout(() => {
+          refreshTimers.delete(timer);
+          if (effectActive) refreshAuthorizedOperations();
+        }, delay);
+        refreshTimers.add(timer);
+      });
+    }
     const onDeploymentsBootstrap = (payload: DeploymentAssignment[]) => {
       setDeployments(payload.filter((assignment) => assignment.personnelId === currentPersonnelId
         && assignment.isCurrentShift !== false));
@@ -118,9 +133,10 @@ export function useOperationalSocket({
     };
     const onNotificationCreated = (notification: OperationalNotification) => {
       if (notification.referenceType === 'deployment' || notification.data?.assignmentId) {
-        refreshAuthorizedOperations();
+        scheduleAuthorizedOperationsRefresh();
       }
     };
+    const unsubscribeDeploymentRefresh = subscribeDeploymentRefresh(scheduleAuthorizedOperationsRefresh);
     operationsSocket.on('connect', onConnect);
     operationsSocket.on('disconnect', onDisconnect);
     operationsSocket.on('personnel:bootstrap', onPersonnel);
@@ -142,6 +158,9 @@ export function useOperationalSocket({
 
     return () => {
       effectActive = false;
+      refreshTimers.forEach(clearTimeout);
+      refreshTimers.clear();
+      unsubscribeDeploymentRefresh();
       operationsSocket.off('connect', onConnect);
       operationsSocket.off('disconnect', onDisconnect);
       operationsSocket.off('personnel:bootstrap', onPersonnel);

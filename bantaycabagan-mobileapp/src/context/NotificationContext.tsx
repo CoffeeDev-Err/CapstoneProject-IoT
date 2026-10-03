@@ -31,6 +31,10 @@ import {
   GPS_SAFETY_NOTIFICATION_CHANNEL_ID,
   GPS_SAFETY_VIBRATION_PATTERN,
 } from '../constants/notificationChannels';
+import {
+  isDeploymentNotificationData,
+  requestDeploymentRefresh,
+} from '../services/deploymentRefreshEvents';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -202,16 +206,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    const receivedSubscription = Notifications.addNotificationReceivedListener(() => {
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data as Record<string, unknown> | undefined;
+      if (isDeploymentNotificationData(data)) requestDeploymentRefresh();
       refreshNotifications().catch(() => undefined);
     });
     const handleResponse = (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data as {
         destination?: NotificationNavigationRequest['destination'];
+        referenceType?: string;
+        assignmentId?: string;
         referenceId?: string;
         reportId?: string;
         notificationId?: string;
       };
+      if (isDeploymentNotificationData(data)) requestDeploymentRefresh();
       if (data.notificationId && token) void updateReadState(data.notificationId);
       setNavigationRequest({
         destination: data.destination || 'Map',

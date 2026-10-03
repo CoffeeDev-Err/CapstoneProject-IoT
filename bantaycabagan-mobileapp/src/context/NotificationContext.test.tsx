@@ -3,6 +3,7 @@ import { Alert, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NotificationProvider, useNotifications } from './NotificationContext';
 import { fetchMyNotifications, markAllMyNotificationsRead, markMyNotificationRead, markMyTaskInboxRead } from '../services/notificationsApi';
+import { subscribeDeploymentRefresh } from '../services/deploymentRefreshEvents';
 jest.mock('./AuthContext', () => ({ useAuth: () => ({ token: 'test' }) }));
 jest.mock('../services/operationsApi', () => ({ operationsSocket: { on: jest.fn(), off: jest.fn() } }));
 jest.mock('../services/notificationsApi', () => ({ fetchMyNotifications: jest.fn(), markAllMyNotificationsRead: jest.fn(), markMyNotificationRead: jest.fn(), markMyTaskInboxRead: jest.fn() }));
@@ -11,7 +12,7 @@ jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(), setBadgeCountAsync: jest.fn(async () => {}),
   setNotificationChannelAsync: jest.fn(async () => null),
   AndroidImportance: { DEFAULT: 3, HIGH: 4 },
-  addNotificationReceivedListener: () => ({ remove() {} }),
+  addNotificationReceivedListener: jest.fn(() => ({ remove() {} })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove() {} })),
   getLastNotificationResponseAsync: jest.fn(async () => null),
 }));
@@ -69,6 +70,19 @@ it('opens a push report reference when the payload uses reportId', async () => {
   // Only the routing payload is consumed here; native display fields are omitted.
   await act(() => listener({ actionIdentifier: 'default', notification: { request: { content: { data: { destination: 'Reports', reportId: 'RPT-OLDER' } } } } } as unknown as Notifications.NotificationResponse));
   expect(result.current.navigationRequest).toMatchObject({ destination: 'Reports', referenceId: 'RPT-OLDER' });
+});
+
+it('requests deployment data immediately when a deployment push arrives in the foreground', async () => {
+  const deploymentRefresh = jest.fn();
+  const unsubscribe = subscribeDeploymentRefresh(deploymentRefresh);
+  const view = await renderHook(useNotifications, { wrapper: NotificationProvider });
+  const listener = jest.mocked(Notifications.addNotificationReceivedListener).mock.calls[0][0];
+  await act(() => listener({ request: { content: { data: {
+    referenceType: 'deployment', assignmentId: 'DEP-001',
+  } } } } as unknown as Notifications.Notification));
+  expect(deploymentRefresh).toHaveBeenCalledTimes(1);
+  unsubscribe();
+  view.unmount();
 });
 
 it('clears the task badge through the persistent task inbox endpoint', async () => {
