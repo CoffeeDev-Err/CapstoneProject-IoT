@@ -236,7 +236,7 @@ function DeploymentPointMarker({
         accessibilityLabel={`${type === 'route' ? 'Route start point' : 'Deployment point'}: ${label}`}
         style={styles.deploymentMarkerRoot}
       >
-        <Svg width={58} height={70} viewBox="0 0 58 70" style={styles.deploymentMarkerShape}>
+        <Svg width={42} height={52} viewBox="0 0 58 70" style={styles.deploymentMarkerShape}>
           <Path
             d="M29 2C14.1 2 4 12.7 4 26.2 4 43.1 29 68 29 68s25-24.9 25-41.8C54 12.7 43.9 2 29 2Z"
             fill="#2563EB"
@@ -245,7 +245,7 @@ function DeploymentPointMarker({
           />
         </Svg>
         <View style={styles.deploymentMarkerContent}>
-          <Icon name={type === 'route' ? 'directions-walk' : 'place'} size={20} color="#FFFFFF" />
+          <Icon name={type === 'route' ? 'directions-walk' : 'place'} size={14} color="#FFFFFF" />
           <Text style={styles.deploymentMarkerText}>{type === 'route' ? 'START' : 'POST'}</Text>
         </View>
       </View>
@@ -600,19 +600,19 @@ const styles = StyleSheet.create({
   mapFallbackTextDark: { color: '#9eabc0' },
   markerRoot: { width: 54, height: 63, alignItems: 'center', justifyContent: 'flex-start' },
   deploymentMarkerRoot: {
-    width: 64,
-    height: 72,
+    width: 44,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'flex-start',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.32,
-    shadowRadius: 8,
-    elevation: 9,
+    shadowRadius: 5,
+    elevation: 6,
   },
   deploymentMarkerShape: { position: 'absolute', top: 0 },
-  deploymentMarkerContent: { position: 'absolute', top: 12, alignItems: 'center' },
-  deploymentMarkerText: { marginTop: -1, color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  deploymentMarkerContent: { position: 'absolute', top: 9, alignItems: 'center' },
+  deploymentMarkerText: { color: '#FFFFFF', fontSize: 7, lineHeight: 9, fontWeight: '900', letterSpacing: 0.3 },
   markerPhotoWrap: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   markerCurrentRing: { padding: 2, borderWidth: 2, borderColor: 'transparent', borderRadius: 25 },
   markerCurrentRingVisible: { borderColor: '#FFFFFF' },

@@ -29,6 +29,7 @@ import type {
 } from '../types/operations';
 import { isActiveTask, mergeById, upsertById } from '../features/operations/operationalState';
 import { useOperationalSocket } from '../features/operations/useOperationalSocket';
+import { mergePersonnelLocations } from '../features/operations/mergePersonnelLocations';
 import { useOfflineReportSync } from '../features/reports/useOfflineReportSync';
 import { useReportPagination } from '../features/reports/useReportPagination';
 import type { ReportDateRange, ReportRefreshOptions } from '../features/reports/useReportPagination';
@@ -131,10 +132,15 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     station: 'Cabagan Police Station',
   }), [currentOfficer.name, currentPersonnelId]);
 
+  const invalidateOperationsBootstrap = useCallback(() => {
+    bootstrapRequest.current += 1;
+    setIsLoading(false);
+  }, []);
   const isConnected = useOperationalSocket({
     applyIdentityUpdate,
     clearSession,
     currentPersonnelId,
+    onOperationsUpdated: invalidateOperationsBootstrap,
     setDeployments,
     setPersonnel,
     setReports,
@@ -205,7 +211,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       setIsOperationsOffline(true);
     }
     if (locations.status === 'fulfilled' && Array.isArray(locations.value?.data)) {
-      setPersonnel(locations.value.data.map(resolvePersonnelPhoto));
+      setPersonnel((items) => mergePersonnelLocations(items, locations.value.data.map(resolvePersonnelPhoto)));
     } else unavailable.push('personnel locations');
     setInitialDataError(unavailable.length
       ? `Could not refresh ${unavailable.join(' and ')}. Previously loaded data may be outdated. Check your connection and retry.` : '');

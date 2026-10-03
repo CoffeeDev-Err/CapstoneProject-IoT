@@ -101,11 +101,11 @@ export const createLeafletMapHtml = ({
             .officer-arrow.backup{border-top-color:#ff2f3d}
             .officer-cue{position:absolute;top:-6px;right:-2px;min-width:18px;height:18px;padding:0 3px;display:grid;place-items:center;border:2px solid #fff;border-radius:12px;background:#2563eb;color:#fff;font:900 7px/1 Arial,sans-serif;box-sizing:border-box}
             .officer-cue.operation{background:#7c3aed}.officer-cue.boundary{background:#d97706;font-size:11px}.officer-cue.backup{background:#dc2626}
-            .deployment-pin{position:relative;width:64px;height:76px;filter:drop-shadow(0 6px 6px rgba(15,23,42,.35))}
-            .deployment-pin-shape{position:absolute;inset:0;width:64px;height:76px;display:block}
-            .deployment-symbol{position:absolute;top:14px;left:22px;width:20px;height:20px;color:#fff}
-            .deployment-symbol svg{width:20px;height:20px;display:block}
-            .deployment-tag{position:absolute;top:37px;left:0;width:64px;color:#fff;text-align:center;font:900 8px/1 Arial,sans-serif;letter-spacing:.5px}
+            .deployment-pin{position:relative;width:44px;height:54px;filter:drop-shadow(0 3px 4px rgba(15,23,42,.35))}
+            .deployment-pin-shape{position:absolute;inset:0;width:44px;height:54px;display:block}
+            .deployment-symbol{position:absolute;top:10px;left:15px;width:14px;height:14px;color:#fff}
+            .deployment-symbol svg{width:14px;height:14px;display:block}
+            .deployment-tag{position:absolute;top:27px;left:0;width:44px;color:#fff;text-align:center;font:900 7px/1 Arial,sans-serif;letter-spacing:.3px}
             @keyframes emergency-ring{
               0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.72),0 4px 10px rgba(15,23,42,.28)}
               50%{box-shadow:0 0 0 7px rgba(220,38,38,0),0 4px 10px rgba(15,23,42,.28)}
@@ -175,12 +175,12 @@ export const createLeafletMapHtml = ({
               const deploymentIcon=L.divIcon({
                 className:'',
                 html:'<div class="deployment-pin"><svg class="deployment-pin-shape" viewBox="0 0 64 76" aria-hidden="true"><path fill="#ffffff" d="M32 1C14.9 1 1 14.9 1 32c0 22.7 31 43 31 43s31-20.3 31-43C63 14.9 49.1 1 32 1Z"/><path fill="#2563eb" d="M32 5C17.1 5 5 17.1 5 32c0 18.4 20.8 35.8 27 40.5C38.2 67.8 59 50.4 59 32 59 17.1 46.9 5 32 5Z"/></svg><span class="deployment-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/></svg></span><span class="deployment-tag">'+(deploymentPoint.type==='route'?'START':'POST')+'</span></div>',
-                iconSize:[64,76],
-                iconAnchor:[32,76]
+                iconSize:[44,54],
+                iconAnchor:[22,54]
               });
               deploymentMarker=L.marker([deploymentPoint.latitude,deploymentPoint.longitude],{icon:deploymentIcon,zIndexOffset:150})
                 .addTo(map)
-                .bindTooltip(escapeHtml(deploymentPoint.label),{direction:'top',offset:[0,-66]});
+                .bindTooltip(escapeHtml(deploymentPoint.label),{direction:'top',offset:[0,-48]});
             }
 
             const emit=(payload)=>{

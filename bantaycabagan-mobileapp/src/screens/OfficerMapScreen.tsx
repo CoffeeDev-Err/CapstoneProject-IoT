@@ -28,7 +28,7 @@ import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { LivePersonnel } from '../types/operations';
-import { selectCurrentDeployment } from '../features/operations/operationalState';
+import { useCurrentDeployment } from '../features/maps/useCurrentDeployment';
 import { WebMapFrame } from '../components/WebMapFrame';
 import {
   createMapPersonnel,
@@ -114,8 +114,7 @@ export default function OfficerMapScreen({
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
-  const [clockNow, setClockNow] = useState(Date.now);
-  const assignment = selectCurrentDeployment(deployments, clockNow);
+  const { assignment, refreshClock } = useCurrentDeployment(deployments);
   const deploymentStyleLabel = assignment?.deploymentType === 'point'
     ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
     : assignment?.deploymentType === 'route' ? 'Route patrol' : 'Area patrol';
@@ -132,19 +131,8 @@ export default function OfficerMapScreen({
   );
 
   useEffect(() => {
-    const nextShiftEnd = Math.min(...deployments
-      .map((deployment) => Date.parse(deployment.shiftEnd || ''))
-      .filter((end) => Number.isFinite(end) && end > clockNow));
-    if (!Number.isFinite(nextShiftEnd)) return undefined;
-    const timer = setTimeout(() => setClockNow(Date.now()),
-      Math.min(2_147_483_647, Math.max(0, nextShiftEnd - Date.now() + 50)));
-    return () => clearTimeout(timer);
-  }, [clockNow, deployments]);
-
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        setClockNow(Date.now());
         void refreshOperations();
       }
     });
@@ -190,7 +178,7 @@ export default function OfficerMapScreen({
   }, [onMapInteractionChange]);
 
   useFocusEffect(useCallback(() => {
-    setClockNow(Date.now());
+    refreshClock();
     onMapInteractionChange?.(false);
     void refreshOperations();
     return () => {
@@ -198,7 +186,7 @@ export default function OfficerMapScreen({
       mapInteractionIdleTimer.current = null;
       onMapInteractionChange?.(false);
     };
-  }, [onMapInteractionChange, refreshOperations]));
+  }, [onMapInteractionChange, refreshClock, refreshOperations]));
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => (
     assignment ? selectVisiblePersonnel(personnel, currentPersonnelId, currentOfficer) : []

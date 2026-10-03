@@ -75,9 +75,9 @@ assert.deepEqual(
 	'Animation must land on the exact GPS destination',
 )
 assert.equal(GPS_UPDATE_INTERVAL_MS, 10_000, 'Mobile GPS cadence must match the tracker upload interval')
-assert.equal(MARKER_ANIMATION_DURATION_MS, 1600, 'Mobile default motion must remain visible instead of appearing to jump')
-assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 1600, 'Walking fixes must use a visible smooth transition')
-assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 900, 'Vehicle fixes must catch up smoothly without excessive lag')
+assert.equal(MARKER_ANIMATION_DURATION_MS, 500, 'Mobile default motion must use the original half-second transition')
+assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 500, 'Walking fixes must catch up within half a second')
+assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 250, 'Vehicle fixes must catch up within a quarter second')
 const displayedTarget = [121.7653, 17.4269]
 assert.equal(
 	effectiveMarkerTarget(displayedTarget, { latitude: 17.4269, longitude: 121.76532 }, true),

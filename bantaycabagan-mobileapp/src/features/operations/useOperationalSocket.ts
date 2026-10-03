@@ -13,6 +13,7 @@ import type {
 } from '../../types/operations';
 import { isActiveTask, mergeById, upsertById } from './operationalState';
 import { subscribeDeploymentRefresh } from '../../services/deploymentRefreshEvents';
+import { mergePersonnelLocations } from './mergePersonnelLocations';
 
 type IdentityUpdate = {
   personnelId?: string; name?: string; badgeNumber?: string; rank?: string;
@@ -29,6 +30,7 @@ type OperationalSocketOptions = {
   applyIdentityUpdate: (payload: IdentityUpdate) => void;
   clearSession: () => Promise<unknown>;
   currentPersonnelId: string;
+  onOperationsUpdated?: () => void;
   setDeployments: Dispatch<SetStateAction<DeploymentAssignment[]>>;
   setPersonnel: Dispatch<SetStateAction<LivePersonnel[]>>;
   setReports: Dispatch<SetStateAction<PoliceReport[]>>;
@@ -46,6 +48,7 @@ export function useOperationalSocket({
   applyIdentityUpdate,
   clearSession,
   currentPersonnelId,
+  onOperationsUpdated,
   setDeployments,
   setPersonnel,
   setReports,
@@ -57,6 +60,7 @@ export function useOperationalSocket({
 
   useEffect(() => {
     let effectActive = true;
+    let operationsRevision = 0;
     const refreshTimers = new Set<ReturnType<typeof setTimeout>>();
     operationsSocket.auth = token ? { token } : {};
     const onConnect = () => {
@@ -64,7 +68,9 @@ export function useOperationalSocket({
       scheduleAuthorizedOperationsRefresh();
     };
     const onDisconnect = () => setIsConnected(false);
-    const onPersonnel = (payload: LivePersonnel[]) => setPersonnel(payload.map(resolvePersonnelPhoto));
+    const onPersonnel = (payload: LivePersonnel[]) => setPersonnel((items) => (
+      mergePersonnelLocations(items, payload.map(resolvePersonnelPhoto))
+    ));
     const onPersonnelIdentityUpdated = (payload: IdentityUpdate) => {
       if (!payload.personnelId) return;
       if (payload.accountStatus?.toLowerCase() === 'inactive') {
@@ -98,9 +104,11 @@ export function useOperationalSocket({
     const onReportResolved = onReportUpdate;
     const onReportUpdated = onReportUpdate;
     const refreshAuthorizedOperations = () => {
+      const request = ++operationsRevision;
       fetchOperations(currentPersonnelId, token)
         .then((operationsPayload) => {
-          if (!effectActive) return;
+          if (!effectActive || request !== operationsRevision) return;
+          onOperationsUpdated?.();
           setDeployments(operationsPayload.deployments);
           setUpcomingDeployment(operationsPayload.upcomingDeployment);
           setTasks((items) => mergeById(
@@ -111,6 +119,8 @@ export function useOperationalSocket({
         .catch(() => undefined);
     };
     function scheduleAuthorizedOperationsRefresh() {
+      refreshTimers.forEach(clearTimeout);
+      refreshTimers.clear();
       refreshAuthorizedOperations();
       [500, 1800].forEach((delay) => {
         const timer = setTimeout(() => {
@@ -121,6 +131,7 @@ export function useOperationalSocket({
       });
     }
     const onDeploymentsBootstrap = (payload: DeploymentAssignment[]) => {
+      onOperationsUpdated?.();
       setDeployments(payload.filter((assignment) => assignment.personnelId === currentPersonnelId
         && assignment.isCurrentShift !== false));
       refreshAuthorizedOperations();
@@ -128,6 +139,8 @@ export function useOperationalSocket({
     const onDeploymentsUpdated = onDeploymentsBootstrap;
     const onDeploymentAcknowledged = (assignment: DeploymentAssignment) => {
       if (assignment.personnelId === currentPersonnelId) {
+        operationsRevision += 1;
+        onOperationsUpdated?.();
         setDeployments((items) => upsertById(items, assignment));
       }
     };
@@ -179,7 +192,7 @@ export function useOperationalSocket({
       operationsSocket.off('notification:created', onNotificationCreated);
       operationsSocket.disconnect();
     };
-  }, [applyIdentityUpdate, clearSession, currentPersonnelId, setDeployments, setPersonnel,
+  }, [applyIdentityUpdate, clearSession, currentPersonnelId, onOperationsUpdated, setDeployments, setPersonnel,
     setReports, setTasks, setUpcomingDeployment, token]);
 
   return isConnected;

@@ -11,6 +11,10 @@
 
 Assignment arrival does not depend on an older personnel snapshot already showing `isOnDuty: true`; the active deployment and shift dates determine the confirmation card.
 
+Incoming assignments are evaluated using the current time rather than the time the Map screen opened. The screen also reevaluates at shift start/end and when the app resumes. Older in-flight HTTP deployment snapshots cannot replace newer socket state.
+
+The POST/START location pin is now about 44 by 54 logical pixels, smaller than the officer marker. Walking transitions use 500 ms and vehicle transitions use 250 ms on web and mobile. Cumulative movement beyond the five-meter jitter radius still moves the marker and follow camera.
+
 ## GPS update path
 
 Tracker fix/upload → Flespi → MQTT-triggered sync or bounded REST reconciliation → current location → personnel socket update → web/mobile marker animation.
@@ -21,6 +25,8 @@ Tracker fix/upload → Flespi → MQTT-triggered sync or bounded REST reconcilia
 - A place-name lookup has a 500 ms budget for live ingestion. On timeout, coordinates are saved immediately with a coordinate label while the resolver continues filling its cache. A later refresh can supply the cached place name.
 - Coordinates are broadcast before backup-arrival reconciliation.
 - Only personnel with a current active deployment are ingested. Stored readings are not made artificially fresh while off duty or disconnected.
+- Both clients retain the latest actual GPS fix if an older snapshot arrives later. A new timestamp with unchanged coordinates is accepted for stationary trackers. Membership and on-duty visibility still follow the authorized incoming snapshot.
+- A conflicting scheduled deployment remains a valid reservation. Conflict feedback identifies the overlapping areas, statuses, and shift times in Philippine time; supervisors must adjust the times or explicitly edit/cancel the conflicting deployment.
 
 ## Acceptance checks on real devices
 
@@ -29,5 +35,7 @@ Tracker fix/upload → Flespi → MQTT-triggered sync or bounded REST reconcilia
 3. Walk outdoors with the assigned tracker powered on and cellular data working. Compare Flespi measurement/receipt times with the web and mobile GPS reading times for several uploads.
 4. Confirm fresh fixes appear on both maps with interpolation. A ten-second tracker upload interval does not guarantee an exact ten-second device-to-screen interval; network and database processing add latency.
 5. Disconnect the tracker. Verify reading age increases rather than resetting to zero from repeated polling.
+6. Leave the Map screen open across a shift boundary. Verify future shifts do not show early, and ended shifts stop displaying.
+7. Switch Map/Satellite while following an officer. Verify the officer marker remains visible and the compact POST/START pin appears only in the assigned officer's mobile map.
 
 Read-only inspection on October 3, 2026 found both registered trackers disconnected and no active deployments at inspection time. One stored measurement matched its latest Flespi timestamp and was received by GeoSentri approximately 2.6 seconds later. This does not identify the cause of the earlier screenshot's one-minute age. Historical Flespi message access returned HTTP 403 with the configured token, so a moving-tracker end-to-end cadence test is still required.

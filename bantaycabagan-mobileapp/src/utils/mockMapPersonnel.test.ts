@@ -29,8 +29,8 @@ it('exercises walking and vehicle animation with timestamped ten-second fixes', 
   const second = createDevelopmentMapPersonnel({ tick: 1, recordedAt: '2026-09-07T00:00:10.000Z' });
   expect(second.map((member) => member.id)).toEqual(first.map((member) => member.id));
   expect(second[0].latitude).not.toBe(first[0].latitude);
-  expect(markerMotionForFixes(confirmedFixFromMember(first[0]), confirmedFixFromMember(second[0])).durationMs).toBe(1600);
-  expect(markerMotionForFixes(confirmedFixFromMember(first[1]), confirmedFixFromMember(second[1])).durationMs).toBe(900);
+  expect(markerMotionForFixes(confirmedFixFromMember(first[0]), confirmedFixFromMember(second[0])).durationMs).toBe(500);
+  expect(markerMotionForFixes(confirmedFixFromMember(first[1]), confirmedFixFromMember(second[1])).durationMs).toBe(250);
   expect(second.some((member) => member.emergencyActive)).toBe(true);
   expect(second.some((member) => member.outsideBoundary)).toBe(true);
   expect(second.some((member) => member.operationActive)).toBe(true);
