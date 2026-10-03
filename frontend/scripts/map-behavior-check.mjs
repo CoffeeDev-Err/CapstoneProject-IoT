@@ -60,9 +60,9 @@ const monitoringStyles = fs.readFileSync(
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
 
 assert.equal(GPS_UPDATE_INTERVAL_MS, 10_000, 'Web GPS cadence must match the tracker upload interval')
-assert.equal(MARKER_ANIMATION_DURATION_MS, 1_600, 'Web default motion must remain visibly smooth')
-assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 1_600, 'Walking fixes must retain visible smooth motion')
-assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 900, 'Vehicle fixes must catch up promptly')
+assert.equal(MARKER_ANIMATION_DURATION_MS, 500, 'Web default motion must use the original half-second transition')
+assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 500, 'Walking fixes must catch up within half a second')
+assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 250, 'Vehicle fixes must catch up within a quarter second')
 assert.equal(easeOutCubic(0), 0, 'Interpolation must begin at the old GPS position')
 assert.equal(easeOutCubic(1), 1, 'Interpolation must finish at the new GPS position')
 assert.equal(easeOutCubic(-1), 0, 'Interpolation progress must be clamped below zero')

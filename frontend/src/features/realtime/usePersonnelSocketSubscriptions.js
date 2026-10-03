@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import policePersonnel1 from '../../assets/policepersonnel1.jpg'
 import policePersonnel2 from '../../assets/policepersonnel2.png'
 import { getDeployments, getReports, getTasks } from '../../services/operations'
@@ -6,6 +6,7 @@ import { getPersonnel } from '../../services/personnel'
 import { socket } from '../../services/socket'
 import { resolveApiAssetUrl } from '../../services/apiAssets'
 import { isInsideCabagan } from '../../utils/cabaganGeofence'
+import { mergePersonnelLocations } from '../../utils/mergePersonnelLocations'
 import {
   evaluateGeofenceTransition,
   mergeReports,
@@ -53,11 +54,15 @@ export const usePersonnelSocketSubscriptions = ({
   setTasks,
 }) => {
   const [isConnected, setIsConnected] = useState(socket.connected)
+  const latestPersonnelRef = useRef([])
 
   useEffect(() => {
     let isCurrent = true
+    let personnelRevision = 0
+    let deploymentRevision = 0
 
     if (!isAuthenticated) {
+      latestPersonnelRef.current = []
       queueMicrotask(() => setIsInitialDataLoading(false))
       socket.disconnect()
       return undefined
@@ -101,8 +106,10 @@ export const usePersonnelSocketSubscriptions = ({
 
     const onBootstrap = (payload) => {
       if (!Array.isArray(payload)) return
-      const normalized = payload.map(normalizeAndTagPersonnel)
-      setPersonnel(normalized)
+      personnelRevision += 1
+      const normalized = mergePersonnelLocations(latestPersonnelRef.current, payload.map(normalizeAndTagPersonnel))
+      latestPersonnelRef.current = normalized
+      setPersonnel((items) => mergePersonnelLocations(items, normalized))
       setLastPersonnelSyncAt(new Date().toISOString())
 
       const { outsidePersonnel } = evaluateGeofence(normalized)
@@ -134,8 +141,10 @@ export const usePersonnelSocketSubscriptions = ({
 
     const onUpdate = (payload) => {
       if (!Array.isArray(payload)) return
-      const normalized = payload.map(normalizeAndTagPersonnel)
-      setPersonnel(normalized)
+      personnelRevision += 1
+      const normalized = mergePersonnelLocations(latestPersonnelRef.current, payload.map(normalizeAndTagPersonnel))
+      latestPersonnelRef.current = normalized
+      setPersonnel((items) => mergePersonnelLocations(items, normalized))
       setLastPersonnelSyncAt(new Date().toISOString())
       setInitialDataError('')
 
@@ -209,10 +218,14 @@ export const usePersonnelSocketSubscriptions = ({
     }
 
     const onDeploymentsBootstrap = (payload) => {
-      if (Array.isArray(payload)) setDeployments(payload)
+      if (Array.isArray(payload)) {
+        deploymentRevision += 1
+        setDeployments(payload)
+      }
     }
     const onDeploymentsUpdated = (payload) => {
       if (!Array.isArray(payload)) return
+      deploymentRevision += 1
       setDeployments(payload)
     }
 
@@ -297,16 +310,22 @@ export const usePersonnelSocketSubscriptions = ({
     socket.on('personnel:inactivity', onPersonnelInactivity)
     socket.on('notification:created', onNotificationCreated)
 
+    const initialPersonnelRevision = personnelRevision
+    const initialDeploymentRevision = deploymentRevision
     Promise.allSettled([getPersonnel(), getReports(), getDeployments(), getTasks()])
       .then(([personnelResult, reportResult, deploymentResult, taskResult]) => {
         if (!isCurrent) return
         const unavailable = []
-        if (personnelResult.status === 'fulfilled') onBootstrap(personnelResult.value)
-        else unavailable.push('live personnel')
+        if (personnelRevision === initialPersonnelRevision) {
+          if (personnelResult.status === 'fulfilled') onBootstrap(personnelResult.value)
+          else unavailable.push('live personnel')
+        }
         if (reportResult.status === 'fulfilled') onReportsBootstrap(reportResult.value)
         else unavailable.push('reports')
-        if (deploymentResult.status === 'fulfilled') onDeploymentsBootstrap(deploymentResult.value)
-        else unavailable.push('deployments')
+        if (deploymentRevision === initialDeploymentRevision) {
+          if (deploymentResult.status === 'fulfilled') onDeploymentsBootstrap(deploymentResult.value)
+          else unavailable.push('deployments')
+        }
         if (taskResult.status === 'fulfilled') onTasksBootstrap(taskResult.value)
         else unavailable.push('active operations')
 
