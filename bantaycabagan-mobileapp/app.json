@@ -2,7 +2,7 @@
   "expo": {
     "name": "GeoSentri",
     "slug": "bantaycabagan-system",
-    "version": "2.2.11",
+    "version": "2.2.12",
     "orientation": "portrait",
     "icon": "./assets/geosentri-app-icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.bantaycabagan.mobileapp",
-      "versionCode": 58,
+      "versionCode": 59,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "icon": "./assets/geosentri-app-icon.png",
