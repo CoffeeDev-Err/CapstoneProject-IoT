@@ -83,6 +83,21 @@ const getMarkerClass = (member) => {
   return getMarkerStatusClass(member.status)
 }
 
+const getSecondaryMarkerTone = (member) => {
+  const primaryClass = getMarkerClass(member)
+  if (primaryClass.includes('backup') || primaryClass.includes('critical')) {
+    if (member.isInsideCabagan === false) return 'boundary'
+    if (member.operationActive) return 'operation'
+    return 'duty'
+  }
+  if (primaryClass.includes('boundary')) return member.operationActive ? 'operation' : 'duty'
+  return 'duty'
+}
+
+const updateMarkerSecondaryTone = (pin, member) => {
+  pin.style.setProperty('--marker-secondary-color', `var(--map-status-${getSecondaryMarkerTone(member)})`)
+}
+
 const updateMarkerCue = (element, member) => {
   const markerClass = getMarkerClass(member)
   const tone = markerClass.includes('backup') || markerClass.includes('critical') ? 'backup'
@@ -113,6 +128,7 @@ const createPersonnelMarkerElement = (member, onSelect) => {
 
   const pin = document.createElement('span')
   pin.className = `police-marker ${getMarkerClass(member)}`
+  updateMarkerSecondaryTone(pin, member)
   const photoFrame = document.createElement('span')
   photoFrame.className = 'police-marker__photo-frame'
   const photo = document.createElement('img')
@@ -499,6 +515,7 @@ function PersonnelMap({
       state.element.classList.toggle('is-followed', member.id === followedPersonnelId)
       state.element.setAttribute('aria-label', `View ${member.name} on live map`)
       state.pin.className = `police-marker ${getMarkerClass(member)}`
+      updateMarkerSecondaryTone(state.pin, member)
       updateMarkerCue(state.statusCue, member)
       const nextPhoto = member.photoUrl || ''
       if (state.photo.dataset.intendedSource !== nextPhoto) {

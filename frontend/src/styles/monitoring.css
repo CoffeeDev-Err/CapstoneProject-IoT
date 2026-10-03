@@ -379,7 +379,7 @@
 }
 
 .maplibre-personnel-marker.is-followed .police-marker__photo-frame {
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2), 0 0 0 4px #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2), 0 0 0 4px var(--marker-secondary-color, var(--map-status-duty));
 }
 
 .map-style-control {

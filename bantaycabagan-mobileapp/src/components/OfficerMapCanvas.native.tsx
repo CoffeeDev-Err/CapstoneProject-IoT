@@ -40,6 +40,7 @@ import {
   effectiveMarkerTarget,
   interpolatePosition,
   markerMotionForFixes,
+  markerSecondaryTone,
   markerTone,
   markerToneColor,
   type ConfirmedGpsFix,
@@ -165,6 +166,7 @@ function PersonnelMarker({
   const isFollowed = isSamePersonnelId(member.id, followedOfficerId);
   const tone = markerTone(member);
   const borderColor = markerToneColor(tone);
+  const secondaryBorderColor = markerToneColor(markerSecondaryTone(member));
   const pulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
   const pulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
   const statusCue = tone === 'backup' ? 'SOS' : (tone === 'boundary' ? '!' : (tone === 'operation' ? 'OP' : '✓'));
@@ -190,8 +192,8 @@ function PersonnelMarker({
           <View style={[
             styles.markerCurrentRing,
             isCurrent && styles.markerCurrentRingVisible,
-            isCurrent && { borderColor },
             isFollowed && styles.markerFollowedRing,
+            isCurrent && { borderColor: secondaryBorderColor },
           ]}>
             {member.photoUrl ? <Image
               source={{ uri: member.photoUrl }}

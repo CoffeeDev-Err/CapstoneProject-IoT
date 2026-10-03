@@ -150,6 +150,16 @@ export const markerTone = (member: OfficerMapPerson): MarkerTone => {
   return 'duty';
 };
 
+export const markerSecondaryTone = (member: OfficerMapPerson): MarkerTone => {
+  if (member.emergencyActive) {
+    if (member.outsideBoundary) return 'boundary';
+    if (member.operationActive) return 'operation';
+    return 'duty';
+  }
+  if (member.outsideBoundary) return member.operationActive ? 'operation' : 'duty';
+  return 'duty';
+};
+
 export const markerToneColor = (tone: MarkerTone) => ({
   duty: '#2563EB',
   operation: '#7C3AED',

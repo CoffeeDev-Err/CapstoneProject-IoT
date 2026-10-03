@@ -50,6 +50,7 @@ const {
 	easeOutCubic,
 	interpolatePosition,
 	markerMotionForFixes,
+	markerSecondaryTone,
 	resolveMotionSpeedKmh,
 } = loadedModule.exports
 
@@ -131,6 +132,16 @@ assert.equal(
 	}).durationMs,
 	WALKING_MARKER_ANIMATION_DURATION_MS,
 	'Slow confirmed movement must retain the smooth walking duration',
+)
+assert.equal(
+	markerSecondaryTone({ id: 'boundary-duty', name: 'Boundary Duty', latitude: 17.4, longitude: 121.7, outsideBoundary: true }),
+	'duty',
+	'An outside on-duty officer must retain a blue secondary ring beneath the orange boundary ring',
+)
+assert.equal(
+	markerSecondaryTone({ id: 'backup-boundary', name: 'Backup Boundary', latitude: 17.4, longitude: 121.7, emergencyActive: true, outsideBoundary: true }),
+	'boundary',
+	'A backup request outside Cabagan must retain an orange secondary ring beneath the red backup ring',
 )
 assert.match(nativeMapSource, /markerMotionForFixes/, 'Native markers and follow camera must share adaptive motion timing')
 assert.match(nativeMapSource, /cancelAnimationFrame\(animationFrame\.current\)/, 'A newer GPS update must cancel the previous animation')

@@ -175,6 +175,16 @@ assert.match(
   /\.maplibre-personnel-marker\.is-followed\s*\{[\s\S]*?z-index:\s*10/,
   'The followed officer must render above overlapping cluster markers',
 )
+assert.match(
+  personnelMapSource,
+  /getSecondaryMarkerTone[\s\S]*?--marker-secondary-color/,
+  'Web followed markers must preserve the next active duty, operation, or boundary ring',
+)
+assert.match(
+  monitoringStyles,
+  /is-followed \.police-marker__photo-frame[\s\S]*?var\(--marker-secondary-color, var\(--map-status-duty\)\)/,
+  'Web followed markers must render the secondary operational ring instead of a fixed blue ring',
+)
 assert.match(personnelMapSource, /cancelAnimationFrame/, 'Superseded marker animations must be cancelled')
 assert.match(personnelMapSource, /markerMotionForFixes/, 'Web markers must use adaptive confirmed-fix motion')
 assert.match(personnelMapSource, /motionDuration/, 'Web cluster centroids must inherit adaptive motion timing')

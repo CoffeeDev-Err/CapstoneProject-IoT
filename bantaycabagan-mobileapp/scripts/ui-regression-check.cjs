@@ -103,7 +103,7 @@ assert.match(
 );
 assert.match(
   nativeMapSource,
-  /isCurrent\s*&&\s*styles\.markerCurrentRingVisible,[\s\S]*?isCurrent\s*&&\s*\{\s*borderColor\s*\}/,
+  /secondaryBorderColor\s*=\s*markerToneColor\(markerSecondaryTone\(member\)\)[\s\S]*?isCurrent\s*&&\s*\{\s*borderColor:\s*secondaryBorderColor\s*\}/,
   'The current officer marker secondary ring must inherit its duty, operation, boundary, or backup tone',
 );
 assert.match(
