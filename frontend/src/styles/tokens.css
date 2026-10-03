@@ -155,10 +155,10 @@
   --color-operation-soft: rgba(124, 58, 237, 0.2);
   --color-operation-strong: #c4b5fd;
   --color-operation-border: rgba(167, 139, 250, 0.42);
-  --map-status-duty: #60a5fa;
-  --map-status-operation: #a78bfa;
-  --map-status-boundary: #fbbf24;
-  --map-status-backup: #f87171;
+  --map-status-duty: #2563eb;
+  --map-status-operation: #7c3aed;
+  --map-status-boundary: #d97706;
+  --map-status-backup: #dc2626;
   --priority-low-bg: var(--color-success-soft);
   --priority-low-fg: var(--color-success-strong);
   --priority-moderate-bg: var(--color-operation-soft);

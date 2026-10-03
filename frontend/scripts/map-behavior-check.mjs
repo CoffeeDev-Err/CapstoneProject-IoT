@@ -57,6 +57,10 @@ const monitoringStyles = fs.readFileSync(
   path.join(projectRoot, 'src', 'styles', 'monitoring.css'),
   'utf8',
 )
+const themeTokensSource = fs.readFileSync(
+  path.join(projectRoot, 'src', 'styles', 'tokens.css'),
+  'utf8',
+)
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
 
 assert.equal(GPS_UPDATE_INTERVAL_MS, 10_000, 'Web GPS cadence must match the tracker upload interval')
@@ -218,6 +222,11 @@ assert.match(darkThemeSource, /report-location-map__canvas/, 'Route map canvas m
 assert.match(darkThemeSource, /maplibregl-ctrl-group/, 'Native map controls must support dark mode')
 assert.match(darkThemeSource, /maptiler-credit/, 'Map attribution must remain readable in dark mode')
 assert.match(darkThemeSource, /personnel-table thead/, 'Personnel table header must support dark mode')
+assert.match(
+  themeTokensSource,
+  /:root\[data-theme="dark"\][\s\S]*?--map-status-duty:\s*#2563eb;[\s\S]*?--map-status-operation:\s*#7c3aed;[\s\S]*?--map-status-boundary:\s*#d97706;[\s\S]*?--map-status-backup:\s*#dc2626/,
+  'Dark-mode markers and badges must retain the same operational colors as mobile and light mode',
+)
 assert.match(mapLayersSource, /setTerrain/, '3D terrain must be applied through MapLibre')
 assert.match(mapLayersSource, /fill-extrusion/, '3D building extrusion must remain configured')
 assert.match(mapLayersSource, /maxzoom:\s*12/, '3D terrain must cap source detail for responsive rendering')

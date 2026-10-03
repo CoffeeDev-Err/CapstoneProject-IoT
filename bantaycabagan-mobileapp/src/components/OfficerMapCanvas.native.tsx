@@ -190,6 +190,7 @@ function PersonnelMarker({
           <View style={[
             styles.markerCurrentRing,
             isCurrent && styles.markerCurrentRingVisible,
+            isCurrent && { borderColor },
             isFollowed && styles.markerFollowedRing,
           ]}>
             {member.photoUrl ? <Image
@@ -631,7 +632,7 @@ const styles = StyleSheet.create({
   deploymentMarkerText: { color: '#FFFFFF', fontSize: 7, lineHeight: 9, fontWeight: '900', letterSpacing: 0.3 },
   markerPhotoWrap: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   markerCurrentRing: { padding: 2, borderWidth: 2, borderColor: 'transparent', borderRadius: 25 },
-  markerCurrentRingVisible: { borderColor: '#FFFFFF' },
+  markerCurrentRingVisible: { borderColor: '#2563EB' },
   markerFollowedRing: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.2)' },
   markerPhoto: { width: 42, height: 42, borderWidth: 3, borderRadius: 21, backgroundColor: '#ffffff' },
   markerPlaceholder: { alignItems: 'center', justifyContent: 'center' },

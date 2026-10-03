@@ -102,6 +102,11 @@ assert.match(
   'The Android map must use a composited TextureView so tab slides do not expose a SurfaceView blink',
 );
 assert.match(
+  nativeMapSource,
+  /isCurrent\s*&&\s*styles\.markerCurrentRingVisible,[\s\S]*?isCurrent\s*&&\s*\{\s*borderColor\s*\}/,
+  'The current officer marker secondary ring must inherit its duty, operation, boundary, or backup tone',
+);
+assert.match(
   officerMapSource,
   /styles\.assignmentCard,\s*\{ backgroundColor: colors\.surface, borderColor: colors\.border \}/s,
 );
