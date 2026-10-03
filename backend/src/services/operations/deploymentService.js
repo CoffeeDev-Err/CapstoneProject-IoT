@@ -36,6 +36,15 @@ const formatDeploymentInstructionsText = (assignment) => {
 	return instructionsText
 }
 
+const describeDeploymentShift = (assignment) => {
+	const formatter = new Intl.DateTimeFormat('en-PH', {
+		timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric',
+		hour: 'numeric', minute: '2-digit',
+	})
+	const status = assignment.status === 'scheduled' ? 'Scheduled' : 'Active'
+	return `${status} at ${assignment.patrolArea} (${formatter.format(assignment.shiftStart)} to ${formatter.format(assignment.shiftEnd)}, PHT)`
+}
+
 const formatDeploymentNotificationMessage = ({ assignment, scheduled, scheduleText }) => {
 	const instructionsText = formatDeploymentInstructionsText(assignment)
 	const pointLabel = String(assignment.deploymentPointLabel || '').trim()
@@ -580,7 +589,7 @@ const createDeploymentService = ({
 				if (current.shiftStart < previous.shiftEnd) {
 					const personnelName = current.personnelName || previous.personnelName || personnelId
 					const error = new Error(
-						`${personnelName} already has a deployment that overlaps this shift.`,
+						`${personnelName} has overlapping shifts: ${describeDeploymentShift(previous)} and ${describeDeploymentShift(current)}. Adjust the shift times or edit/cancel the conflicting deployment in Assigned Deployments.`,
 					)
 					error.status = 409
 					error.code = 'DEPLOYMENT_SHIFT_CONFLICT'

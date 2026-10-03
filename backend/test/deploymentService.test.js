@@ -92,6 +92,30 @@ const createService = ({ Deployment, Personnel, published = [], audits = [] }) =
 	clock: () => new Date(),
 })
 
+it('identifies a conflicting scheduled shift without cancelling or saving either deployment', async () => {
+	let writes = 0
+	const service = createService({
+		Deployment: { updateMany: async () => { writes += 1 } },
+		Personnel: { find: () => ({ select: () => ({ lean: async () => [
+			{ personnelId: 'PNP-001', fullName: 'Officer One', rank: 'Patrolman' },
+		] }) }) },
+	})
+	const now = Date.now()
+	const base = { personnelId: 'PNP-001', patrolAreaId: 'barangay-anao', deploymentType: 'area' }
+	await assert.rejects(service.replaceDeployments([
+		{ ...base, id: 'DEP-001', status: 'active', shiftStart: new Date(now - 60_000), shiftEnd: new Date(now + 7_200_000) },
+		{ ...base, id: 'DEP-002', status: 'scheduled', shiftStart: new Date(now + 3_600_000), shiftEnd: new Date(now + 10_800_000) },
+	]), (error) => {
+		assert.equal(error.code, 'DEPLOYMENT_SHIFT_CONFLICT')
+		assert.match(error.message, /Active at Barangay Anao/)
+		assert.match(error.message, /Scheduled at Barangay Anao/)
+		assert.match(error.message, /PHT/)
+		assert.match(error.message, /Assigned Deployments/)
+		return true
+	})
+	assert.equal(writes, 0)
+})
+
 describe('deployment acknowledgement', () => {
 	it('stores a content signature and publishes a scoped acknowledgement', async () => {
 		const now = Date.now()

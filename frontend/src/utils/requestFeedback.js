@@ -21,6 +21,7 @@ export function requestErrorMessage(error, { action = 'complete this request', w
   if (connection) return `Could not ${action}. Check your internet connection and try again.`
   if (detail.status >= 500) return `Could not ${action} because the service is temporarily unavailable. Try again shortly. If it continues, contact your administrator.`
   if (detail.status === 404) return `The requested item is no longer available. Refresh the page or list and select it again.`
+  if (detail.code === 'DEPLOYMENT_SHIFT_CONFLICT' && !generic && !technical) return message
   if (detail.status === 409 && !detail.field && detail.code !== 'DUPLICATE_VALUE') {
     return `${generic || technical ? 'This action conflicts with the latest record.' : message} Refresh the record before trying again.`
   }

@@ -22,6 +22,10 @@ describe('actionable request feedback', () => {
     expect(requestErrorMessage({ status: 429 })).toMatch(/Wait a moment/)
     expect(requestErrorMessage({ status: 404 })).toMatch(/select it again/)
   })
+  it('keeps the specific deployment conflict recovery instead of suggesting a refresh', () => {
+    const message = 'Scheduled at Barangay Anao. Adjust the shift times or edit/cancel the conflicting deployment in Assigned Deployments.'
+    expect(requestErrorMessage({ status: 409, code: 'DEPLOYMENT_SHIFT_CONFLICT', message })).toBe(message)
+  })
   it('handles absent errors and avoids displaying technical server failures', () => {
     expect(requestErrorMessage(undefined, { action: 'load accounts' })).toMatch(/Could not load accounts/)
     expect(requestErrorMessage({ message: 'MongoServerError: private details' })).not.toContain('private details')
