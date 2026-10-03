@@ -27,7 +27,7 @@ import {
   type MapRef,
   type StyleSpecification,
 } from '@maplibre/maplibre-react-native';
-import { SvgUri } from 'react-native-svg';
+import Svg, { Path, SvgUri } from 'react-native-svg';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { CABAGAN_BOUNDARY_FEATURE } from '../constants/cabaganGeofence';
 import {
@@ -44,13 +44,14 @@ import {
   type ConfirmedGpsFix,
 } from '../utils/officerMapMath';
 import { usePersonnelClusters } from '../features/maps/usePersonnelClusters';
+import { resolveDeploymentMapTarget } from '../features/maps/deploymentMapTarget';
+import { isSamePersonnelId } from '../features/maps/officerMapState';
 import type {
   OfficerMapCanvasHandle,
   OfficerMapCanvasProps,
   OfficerMapPerson,
 } from './OfficerMapCanvas';
 
-const CABAGAN_CENTER: [number, number] = [121.7653, 17.4269];
 const STREET_FOCUS_ZOOM = 16;
 const SATELLITE_FOCUS_ZOOM = 15;
 const ANIMATION_FRAME_INTERVAL = 1000 / 30;
@@ -154,8 +155,8 @@ function PersonnelMarker({
   member: OfficerMapPerson;
   onPress: () => void;
 }) {
-  const isCurrent = member.id === currentPersonnelId;
-  const isFollowed = member.id === followedOfficerId;
+  const isCurrent = isSamePersonnelId(member.id, currentPersonnelId);
+  const isFollowed = isSamePersonnelId(member.id, followedOfficerId);
   const tone = markerTone(member);
   const borderColor = markerToneColor(tone);
   const pulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
@@ -229,11 +230,18 @@ function DeploymentPointMarker({
         accessibilityLabel={`${type === 'route' ? 'Route start point' : 'Deployment point'}: ${label}`}
         style={styles.deploymentMarkerRoot}
       >
-        <View style={styles.deploymentMarkerBadge}>
-          <Icon name={type === 'route' ? 'directions-walk' : 'location-on'} size={20} color="#FFFFFF" />
+        <Svg width={58} height={70} viewBox="0 0 58 70" style={styles.deploymentMarkerShape}>
+          <Path
+            d="M29 2C14.1 2 4 12.7 4 26.2 4 43.1 29 68 29 68s25-24.9 25-41.8C54 12.7 43.9 2 29 2Z"
+            fill="#2563EB"
+            stroke="#FFFFFF"
+            strokeWidth={3}
+          />
+        </Svg>
+        <View style={styles.deploymentMarkerContent}>
+          <Icon name={type === 'route' ? 'directions-walk' : 'place'} size={20} color="#FFFFFF" />
           <Text style={styles.deploymentMarkerText}>{type === 'route' ? 'START' : 'POST'}</Text>
         </View>
-        <View style={styles.deploymentMarkerArrow} />
       </View>
     </Marker>
   );
@@ -264,23 +272,22 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   const [mapZoom, setMapZoom] = useState(14.5);
   const { interpolated: interpolatedPersonnel, motionByOfficer } = useInterpolatedPersonnel(personnel);
   const followedPersonnel = useMemo(
-    () => interpolatedPersonnel.find((member) => member.id === followedOfficerId) || null,
+    () => interpolatedPersonnel.find((member) => isSamePersonnelId(member.id, followedOfficerId)) || null,
     [followedOfficerId, interpolatedPersonnel],
   );
   const clusteredPersonnel = usePersonnelClusters(personnel, interpolatedPersonnel, followedOfficerId, mapZoom);
   const clusterPulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
   const clusterPulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
 
+  const deploymentTarget = useMemo(() => resolveDeploymentMapTarget(assignment), [assignment]);
   const deploymentCenter = useMemo<[number, number]>(() => ([
-    Number.isFinite(assignment?.longitude) ? Number(assignment?.longitude) : CABAGAN_CENTER[0],
-    Number.isFinite(assignment?.latitude) ? Number(assignment?.latitude) : CABAGAN_CENTER[1],
-  ]), [assignment?.latitude, assignment?.longitude]);
-  const deploymentPoint = Number.isFinite(assignment?.longitude)
-    && Number.isFinite(assignment?.latitude)
-    && assignment?.hasDeploymentPoint !== false
+    deploymentTarget.longitude,
+    deploymentTarget.latitude,
+  ]), [deploymentTarget.latitude, deploymentTarget.longitude]);
+  const deploymentPoint = deploymentTarget.hasExactPoint
     ? {
-        longitude: Number(assignment?.longitude),
-        latitude: Number(assignment?.latitude),
+        longitude: deploymentTarget.longitude,
+        latitude: deploymentTarget.latitude,
         label: assignment?.deploymentPointLabel
           || (assignment?.deploymentType === 'route' ? 'Route start point' : 'Deployment point'),
         type: assignment?.deploymentType || 'point' as const,
@@ -311,7 +318,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
 
   const handleMapLoaded = useCallback(() => {
     setStyleLoading(false);
-    const followed = personnel.find((member) => member.id === followedOfficerId);
+    const followed = personnel.find((member) => isSamePersonnelId(member.id, followedOfficerId));
     if (followed) {
       cameraRef.current?.flyTo({
         center: [Number(followed.longitude), Number(followed.latitude)],
@@ -329,7 +336,10 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     focusDeployment: () => {
       cameraRef.current?.flyTo({
         center: deploymentCenter,
-        zoom: mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
+        zoom: Math.min(
+          deploymentTarget.zoom,
+          mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
+        ),
         pitch: enable3D ? 52 : 0,
         duration: 720,
       });
@@ -339,7 +349,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
       fitInitialPersonnel();
     },
     focusOfficer: (officerId: string) => {
-      const member = personnel.find((item) => item.id === officerId);
+      const member = personnel.find((item) => isSamePersonnelId(item.id, officerId));
       if (!member) return;
       cameraRef.current?.flyTo({
         center: [Number(member.longitude), Number(member.latitude)],
@@ -350,7 +360,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         duration: 720,
       });
     },
-  }), [deploymentCenter, enable3D, fitInitialPersonnel, mapMode, personnel]);
+  }), [deploymentCenter, deploymentTarget.zoom, enable3D, fitInitialPersonnel, mapMode, personnel]);
 
   useEffect(() => {
     if (!followedOfficerId) return;
@@ -583,36 +593,20 @@ const styles = StyleSheet.create({
   mapFallbackText: { marginTop: 6, color: '#64748b', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   mapFallbackTextDark: { color: '#9eabc0' },
   markerRoot: { width: 54, height: 63, alignItems: 'center', justifyContent: 'flex-start' },
-  deploymentMarkerRoot: { width: 64, height: 64, alignItems: 'center', justifyContent: 'flex-start' },
-  deploymentMarkerBadge: {
-    minWidth: 54,
-    height: 46,
-    paddingHorizontal: 5,
-    paddingVertical: 4,
+  deploymentMarkerRoot: {
+    width: 64,
+    height: 72,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    borderRadius: 15,
-    backgroundColor: '#2563EB',
+    justifyContent: 'flex-start',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.32,
     shadowRadius: 8,
     elevation: 9,
   },
+  deploymentMarkerShape: { position: 'absolute', top: 0 },
+  deploymentMarkerContent: { position: 'absolute', top: 12, alignItems: 'center' },
   deploymentMarkerText: { marginTop: -1, color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
-  deploymentMarkerArrow: {
-    width: 0,
-    height: 0,
-    marginTop: -2,
-    borderLeftWidth: 9,
-    borderRightWidth: 9,
-    borderTopWidth: 14,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#2563EB',
-  },
   markerPhotoWrap: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   markerCurrentRing: { padding: 2, borderWidth: 2, borderColor: 'transparent', borderRadius: 25 },
   markerCurrentRingVisible: { borderColor: '#FFFFFF' },

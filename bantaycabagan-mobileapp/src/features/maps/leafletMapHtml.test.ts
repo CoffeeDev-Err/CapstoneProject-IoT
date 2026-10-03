@@ -8,6 +8,7 @@ describe('Leaflet map document', () => {
       deploymentPointLabel: 'Main entrance',
       deploymentType: 'point',
       hasDeploymentPoint: true,
+      deploymentFocusZoom: 14.5,
       currentPersonnelId: 'PNP-001',
       isDark: true,
       mapPersonnel: [{
@@ -35,6 +36,8 @@ describe('Leaflet map document', () => {
     expect(html).toContain('setView([17.42,121.76],15)');
     expect(html).toContain('class="deployment-pin"');
     expect(html).toContain('class="deployment-symbol"');
+    expect(html).toContain('class="deployment-pin-shape"');
+    expect(html).toContain('"zoom":14.5');
     expect(html).toContain('Main entrance');
     expect(html).toContain('window.focusDeployment');
     expect(html).toContain("command.type==='focus-deployment'");
