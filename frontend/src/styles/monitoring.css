@@ -814,7 +814,7 @@
   height: 0;
   border-left: 9px solid transparent;
   border-right: 9px solid transparent;
-  border-top: 18px solid currentColor;
+  border-top: 14px solid currentColor;
   transform: translateX(-50%);
   z-index: 0;
 }
@@ -857,7 +857,9 @@
   width: 100%;
   height: 100%;
   display: flex;
-  font-size: var(--font-size-xs);
+  background: #ffffff;
+  color: #17213a;
+  font-size: var(--font-size-marker-initials);
 }
 
 .police-marker__photo[hidden],
@@ -869,9 +871,10 @@
   position: absolute;
   z-index: 2;
   top: -2px;
-  left: -2px;
-  width: 24px;
-  height: 24px;
+  right: -2px;
+  width: 19px;
+  height: 19px;
+  font-size: var(--font-size-marker-cue);
   line-height: 1;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.3);
 }
