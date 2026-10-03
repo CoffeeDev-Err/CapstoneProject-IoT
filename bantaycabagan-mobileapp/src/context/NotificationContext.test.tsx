@@ -64,6 +64,19 @@ it('retains the exact report reference when opening an in-app validation alert',
   await act(() => result.current.openNotification({ ...notification, isRead: true, referenceType: 'report', referenceId: 'RPT-ONE' }));
   expect(result.current.navigationRequest).toMatchObject({ destination: 'Reports', referenceId: 'RPT-ONE' });
 });
+
+it('keeps the deployment id when an in-app notification stores it in data', async () => {
+  const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });
+  await act(() => result.current.openNotification({
+    ...notification,
+    isRead: true,
+    referenceType: 'deployment',
+    data: { destination: 'Map', assignmentId: 'DEP-ONE' },
+  }));
+  expect(result.current.navigationRequest).toMatchObject({
+    destination: 'Map', referenceId: 'DEP-ONE',
+  });
+});
 it('opens a push report reference when the payload uses reportId', async () => {
   const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });
   const listener = jest.mocked(Notifications.addNotificationResponseReceivedListener).mock.calls[0][0];

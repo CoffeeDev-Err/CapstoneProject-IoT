@@ -224,7 +224,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (data.notificationId && token) void updateReadState(data.notificationId);
       setNavigationRequest({
         destination: data.destination || 'Map',
-        referenceId: data.referenceId || data.reportId,
+        referenceId: data.referenceId || data.assignmentId || data.reportId,
         requestId: Date.now(),
       });
       refreshNotifications().catch(() => undefined);
@@ -313,7 +313,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (!notification.isRead) void updateReadState(notification.id);
     setNavigationRequest({
       destination: destinationFor(notification),
-      referenceId: notification.referenceId,
+      referenceId: notification.referenceId
+        || notification.data?.assignmentId
+        || notification.data?.reportId,
       requestId: Date.now(),
     });
   }, [updateReadState]);

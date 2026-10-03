@@ -67,6 +67,8 @@ const webSearchInputReset = Platform.OS === 'web'
   : undefined;
 
 type OfficerMapScreenProps = {
+  deploymentNotificationId?: string;
+  deploymentNotificationRequestId?: number;
   headerContentHeight?: number;
   headerTopInset?: number;
   headerVisibility?: Animated.Value;
@@ -77,6 +79,8 @@ const MAP_INTERACTION_IDLE_DELAY_MS = 520;
 const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 
 export default function OfficerMapScreen({
+  deploymentNotificationId,
+  deploymentNotificationRequestId,
   headerContentHeight = 0,
   headerTopInset = 0,
   headerVisibility,
@@ -101,6 +105,8 @@ export default function OfficerMapScreen({
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelfFocus = useRef(false);
+  const lastAutomaticDeploymentId = useRef<string | null>(null);
+  const pendingDeploymentNotificationRequest = useRef<number | null>(null);
   const [backupActionPending, setBackupActionPending] = useState(false);
   const [showOwnEmergencyOverlay, setShowOwnEmergencyOverlay] = useState(false);
   const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
@@ -262,6 +268,33 @@ export default function OfficerMapScreen({
     onMapInteractionStart: handleMapInteractionStart,
     visiblePersonnel: selectablePersonnel,
   });
+
+  useEffect(() => {
+    if (!assignment || assignment.acknowledged) return;
+    if (lastAutomaticDeploymentId.current === assignment.id) return;
+    lastAutomaticDeploymentId.current = assignment.id;
+    handleCloseOfficer();
+    setDeploymentDetailsOpen(true);
+  }, [assignment, handleCloseOfficer]);
+
+  useEffect(() => {
+    if (!deploymentNotificationRequestId) return;
+    if (pendingDeploymentNotificationRequest.current === deploymentNotificationRequestId) return;
+    pendingDeploymentNotificationRequest.current = deploymentNotificationRequestId;
+    handleCloseOfficer();
+    void refreshOperations();
+  }, [
+    deploymentNotificationRequestId,
+    handleCloseOfficer,
+    refreshOperations,
+  ]);
+
+  useEffect(() => {
+    if (!assignment || pendingDeploymentNotificationRequest.current === null) return;
+    if (deploymentNotificationId && assignment.id !== deploymentNotificationId) return;
+    pendingDeploymentNotificationRequest.current = null;
+    setDeploymentDetailsOpen(true);
+  }, [assignment, deploymentNotificationId]);
   const handleMapLoad = useCallback(() => {
     handleBaseMapLoad();
     if (!pendingSelfFocus.current) return;
@@ -613,7 +646,7 @@ export default function OfficerMapScreen({
 
       </AnimatedSafeAreaView>
 
-      {deploymentPromptVisible && !selectedOfficer && (
+      {deploymentPromptVisible && !selectedOfficer && !deploymentDetailsOpen && (
         <View style={[
           styles.assignmentCard,
           { backgroundColor: colors.surface, borderColor: colors.border },

@@ -112,6 +112,10 @@ function FloatingTabBar({
     else if (navigationRequest.destination === 'Reports') navigation.navigate('Reports', {
       reportId: navigationRequest.referenceId, notificationRequestId: navigationRequest.requestId,
     });
+    else if (navigationRequest.destination === 'Map') navigation.navigate('Map', {
+      deploymentId: navigationRequest.referenceId,
+      notificationRequestId: navigationRequest.requestId,
+    });
     else navigation.navigate(navigationRequest.destination);
     clearNavigationRequest();
   }, [clearNavigationRequest, navigation, navigationRequest, openTaskModal]);
@@ -297,8 +301,13 @@ export default function MainTabs() {
     setMapInteracting(isInteracting);
   }, []);
 
-  const renderMapScreen = useCallback(() => (
+  const renderMapScreen = useCallback(({ route }: { route: { params?: {
+    deploymentId?: string;
+    notificationRequestId?: number;
+  } } }) => (
     <OfficerMapScreen
+      deploymentNotificationId={route.params?.deploymentId}
+      deploymentNotificationRequestId={route.params?.notificationRequestId}
       headerContentHeight={PAGE_HEADER_CONTENT_HEIGHT}
       headerTopInset={insets.top}
       headerVisibility={headerVisibility}
