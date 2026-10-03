@@ -48,6 +48,7 @@ import {
 } from '../features/maps/MapControls';
 import { OfficerDetailSheet } from '../features/maps/OfficerDetailSheet';
 import { DeploymentDetailSheet } from '../features/maps/DeploymentDetailSheet';
+import { useDeploymentPresentation } from '../features/maps/useDeploymentPresentation';
 
 const BACKUP_EMERGENCY_OVERLAY_MS = 2 * 60 * 1000;
 import { GpsReadingAge } from '../features/maps/GpsReadingAge';
@@ -105,20 +106,16 @@ export default function OfficerMapScreen({
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelfFocus = useRef(false);
-  const lastAutomaticDeploymentId = useRef<string | null>(null);
-  const pendingDeploymentNotificationRequest = useRef<number | null>(null);
   const [backupActionPending, setBackupActionPending] = useState(false);
   const [showOwnEmergencyOverlay, setShowOwnEmergencyOverlay] = useState(false);
   const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(false);
-  const [deploymentDetailsOpen, setDeploymentDetailsOpen] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
   const [clockNow, setClockNow] = useState(Date.now);
-  const assignment = currentOfficer.isOnDuty === false
-    ? undefined : selectCurrentDeployment(deployments, clockNow);
+  const assignment = selectCurrentDeployment(deployments, clockNow);
   const deploymentStyleLabel = assignment?.deploymentType === 'point'
     ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
     : assignment?.deploymentType === 'route' ? 'Route patrol' : 'Area patrol';
@@ -143,10 +140,6 @@ export default function OfficerMapScreen({
       Math.min(2_147_483_647, Math.max(0, nextShiftEnd - Date.now() + 50)));
     return () => clearTimeout(timer);
   }, [clockNow, deployments]);
-
-  useEffect(() => {
-    if (!assignment) setDeploymentDetailsOpen(false);
-  }, [assignment]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -269,32 +262,13 @@ export default function OfficerMapScreen({
     visiblePersonnel: selectablePersonnel,
   });
 
-  useEffect(() => {
-    if (!assignment || assignment.acknowledged) return;
-    if (lastAutomaticDeploymentId.current === assignment.id) return;
-    lastAutomaticDeploymentId.current = assignment.id;
-    handleCloseOfficer();
-    setDeploymentDetailsOpen(true);
-  }, [assignment, handleCloseOfficer]);
-
-  useEffect(() => {
-    if (!deploymentNotificationRequestId) return;
-    if (pendingDeploymentNotificationRequest.current === deploymentNotificationRequestId) return;
-    pendingDeploymentNotificationRequest.current = deploymentNotificationRequestId;
-    handleCloseOfficer();
-    void refreshOperations();
-  }, [
-    deploymentNotificationRequestId,
-    handleCloseOfficer,
+  const { detailsOpen: deploymentDetailsOpen, setDetailsOpen: setDeploymentDetailsOpen } = useDeploymentPresentation({
+    assignment,
+    notificationId: deploymentNotificationId,
+    notificationRequestId: deploymentNotificationRequestId,
+    closeOfficer: handleCloseOfficer,
     refreshOperations,
-  ]);
-
-  useEffect(() => {
-    if (!assignment || pendingDeploymentNotificationRequest.current === null) return;
-    if (deploymentNotificationId && assignment.id !== deploymentNotificationId) return;
-    pendingDeploymentNotificationRequest.current = null;
-    setDeploymentDetailsOpen(true);
-  }, [assignment, deploymentNotificationId]);
+  });
   const handleMapLoad = useCallback(() => {
     handleBaseMapLoad();
     if (!pendingSelfFocus.current) return;
