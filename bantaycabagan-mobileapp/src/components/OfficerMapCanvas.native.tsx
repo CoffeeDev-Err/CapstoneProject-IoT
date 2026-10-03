@@ -203,8 +203,16 @@ function PersonnelMarker({
             )}
           </View>
           {statusCue ? (
-            <View style={[styles.markerStatusCue, { backgroundColor: borderColor }]}>
-              <Text style={styles.markerStatusCueText}>{statusCue}</Text>
+            <View style={[
+              styles.markerStatusCue,
+              tone === 'boundary' && styles.markerStatusCueDiamond,
+              tone === 'operation' && styles.markerStatusCueSquare,
+              { backgroundColor: borderColor },
+            ]}>
+              <Text style={[
+                styles.markerStatusCueText,
+                tone === 'boundary' && styles.markerStatusCueDiamondText,
+              ]}>{statusCue}</Text>
             </View>
           ) : null}
         </View>
@@ -541,8 +549,16 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
               <View style={[styles.clusterMarker, { backgroundColor: markerToneColor(cluster.tone) }]}>
                 <Text style={styles.clusterMarkerText}>{cluster.members.length}</Text>
               </View>
-              <View style={[styles.clusterStatusCue, { backgroundColor: markerToneColor(cluster.tone) }]}>
-                <Text style={styles.clusterStatusCueText}>
+              <View style={[
+                styles.clusterStatusCue,
+                cluster.tone === 'boundary' && styles.markerStatusCueDiamond,
+                cluster.tone === 'operation' && styles.markerStatusCueSquare,
+                { backgroundColor: markerToneColor(cluster.tone) },
+              ]}>
+                <Text style={[
+                  styles.clusterStatusCueText,
+                  cluster.tone === 'boundary' && styles.markerStatusCueDiamondText,
+                ]}>
                   {cluster.tone === 'backup' ? 'SOS' : (cluster.tone === 'boundary' ? '!' : (cluster.tone === 'operation' ? 'OP' : '✓'))}
                 </Text>
               </View>
@@ -635,6 +651,9 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   markerStatusCueText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900' },
+  markerStatusCueSquare: { borderRadius: 4 },
+  markerStatusCueDiamond: { borderRadius: 3, transform: [{ rotate: '45deg' }] },
+  markerStatusCueDiamondText: { transform: [{ rotate: '-45deg' }] },
   markerPulse: {
     position: 'absolute',
     width: 44,

@@ -100,7 +100,7 @@ export const createLeafletMapHtml = ({
             .officer-arrow.boundary{border-top-color:#d97706}
             .officer-arrow.backup{border-top-color:#ff2f3d}
             .officer-cue{position:absolute;top:-6px;right:-2px;min-width:18px;height:18px;padding:0 3px;display:grid;place-items:center;border:2px solid #fff;border-radius:12px;background:#2563eb;color:#fff;font:900 7px/1 Arial,sans-serif;box-sizing:border-box}
-            .officer-cue.operation{background:#7c3aed}.officer-cue.boundary{background:#d97706;font-size:11px}.officer-cue.backup{background:#dc2626}
+            .officer-cue.operation{background:#7c3aed;border-radius:4px}.officer-cue.boundary{background:#d97706;border-radius:3px;transform:rotate(45deg);font-size:11px}.officer-cue.boundary>span{transform:rotate(-45deg)}.officer-cue.backup{background:#dc2626}
             .deployment-pin{position:relative;width:44px;height:54px;filter:drop-shadow(0 3px 4px rgba(15,23,42,.35))}
             .deployment-pin-shape{position:absolute;inset:0;width:44px;height:54px;display:block}
             .deployment-symbol{position:absolute;top:10px;left:15px;width:14px;height:14px;color:#fff}
@@ -194,7 +194,7 @@ export const createLeafletMapHtml = ({
               const cue=tone==='backup'?'SOS':(tone==='boundary'?'!':(tone==='operation'?'OP':'✓'));
               const html='<div class="officer-pin">'
                 +'<img class="officer-photo'+current+statusClass+'" src="'+escapeHtml(member.photoUrl)+'" alt="">'
-                +(cue?'<span class="officer-cue'+statusClass+'">'+cue+'</span>':'')
+                +(cue?'<span class="officer-cue'+statusClass+'"><span>'+cue+'</span></span>':'')
                 +'<div class="officer-arrow'+current+statusClass+'"></div>'
                 +'</div>';
               return L.divIcon({className:'',html,iconSize:[62,76],iconAnchor:[31,76]});
