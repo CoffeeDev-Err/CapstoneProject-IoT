@@ -46,6 +46,7 @@ const {
 	WALKING_MARKER_ANIMATION_DURATION_MS,
 	calculatedSpeedKmhBetweenFixes,
 	clusterPersonnel,
+	effectiveMarkerTarget,
 	easeOutCubic,
 	interpolatePosition,
 	markerMotionForFixes,
@@ -74,9 +75,20 @@ assert.deepEqual(
 	'Animation must land on the exact GPS destination',
 )
 assert.equal(GPS_UPDATE_INTERVAL_MS, 10_000, 'Mobile GPS cadence must match the tracker upload interval')
-assert.equal(MARKER_ANIMATION_DURATION_MS, 500, 'Mobile default motion must catch up in half a second')
-assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 500, 'Walking fixes must retain smooth half-second motion')
-assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 250, 'Vehicle fixes must catch up in a quarter second')
+assert.equal(MARKER_ANIMATION_DURATION_MS, 1600, 'Mobile default motion must remain visible instead of appearing to jump')
+assert.equal(WALKING_MARKER_ANIMATION_DURATION_MS, 1600, 'Walking fixes must use a visible smooth transition')
+assert.equal(VEHICLE_MARKER_ANIMATION_DURATION_MS, 900, 'Vehicle fixes must catch up smoothly without excessive lag')
+const displayedTarget = [121.7653, 17.4269]
+assert.equal(
+	effectiveMarkerTarget(displayedTarget, { latitude: 17.4269, longitude: 121.76532 }, true),
+	displayedTarget,
+	'A single sub-threshold GPS change may be treated as jitter',
+)
+assert.deepEqual(
+	effectiveMarkerTarget(displayedTarget, { latitude: 17.4269, longitude: 121.76536 }, true),
+	[121.76536, 17.4269],
+	'Cumulative small GPS steps must eventually move the displayed marker',
+)
 
 const baseFix = {
 	latitude: 17.4269,
@@ -125,9 +137,14 @@ assert.match(nativeMapSource, /cancelAnimationFrame\(animationFrame\.current\)/,
 assert.match(nativeMapSource, /STREET_FOCUS_ZOOM\s*=\s*16/, 'Following must preserve street-map context')
 assert.match(nativeMapSource, /SATELLITE_FOCUS_ZOOM\s*=\s*15/, 'Following must not over-zoom satellite imagery')
 assert.match(nativeMapSource, /motionByOfficer\.current\.get\(followedOfficerId\)/, 'The camera must follow only the selected officer')
-assert.match(fs.readFileSync(path.join(projectRoot, 'src/features/maps/usePersonnelClusters.ts'), 'utf8'), /member\.id !== followedOfficerId/, 'The followed officer must remain visible outside clusters')
+assert.match(fs.readFileSync(path.join(projectRoot, 'src/features/maps/usePersonnelClusters.ts'), 'utf8'), /!isSamePersonnelId\(member\.id, followedOfficerId\)/, 'The followed officer must remain visible exactly once even when ID casing differs')
 assert.match(nativeMapSource, /mapStyleRevision/, 'Native style changes must remount MapLibre reliably')
 assert.match(officerMapScreenSource, /Following <Text/, 'Following mode must replace the officer sheet with a compact banner')
+assert.match(
+	officerMapScreenSource,
+	/handleOfficerMarkerPress[\s\S]*setDeploymentDetailsOpen\(false\)[\s\S]*setSelectedOfficerId\(officerId\)/,
+	'Tapping any officer marker must close deployment details before opening officer details',
+)
 assert.match(officerMapScreenSource, /mapControlsExpanded/, 'Mobile map controls must be collapsible')
 assert.match(officerMapScreenSource, /Animated\.timing\(mapControlsProgress/, 'Map controls must animate open and closed')
 assert.match(officerMapScreenSource, />\s*Satellite\s*</, 'The satellite map option must have a visible label')

@@ -1,5 +1,10 @@
 import { createDevelopmentMapPersonnel, isMapPreviewAvailable } from './mockMapPersonnel';
-import { clusterPersonnel, confirmedFixFromMember, markerMotionForFixes } from './officerMapMath';
+import {
+  clusterPersonnel,
+  confirmedFixFromMember,
+  effectiveMarkerTarget,
+  markerMotionForFixes,
+} from './officerMapMath';
 
 it('supports preview APKs explicitly while keeping production disabled', () => {
   expect(isMapPreviewAvailable(false, 'true')).toBe(true);
@@ -24,9 +29,20 @@ it('exercises walking and vehicle animation with timestamped ten-second fixes', 
   const second = createDevelopmentMapPersonnel({ tick: 1, recordedAt: '2026-09-07T00:00:10.000Z' });
   expect(second.map((member) => member.id)).toEqual(first.map((member) => member.id));
   expect(second[0].latitude).not.toBe(first[0].latitude);
-  expect(markerMotionForFixes(confirmedFixFromMember(first[0]), confirmedFixFromMember(second[0])).durationMs).toBe(500);
-  expect(markerMotionForFixes(confirmedFixFromMember(first[1]), confirmedFixFromMember(second[1])).durationMs).toBe(250);
+  expect(markerMotionForFixes(confirmedFixFromMember(first[0]), confirmedFixFromMember(second[0])).durationMs).toBe(1600);
+  expect(markerMotionForFixes(confirmedFixFromMember(first[1]), confirmedFixFromMember(second[1])).durationMs).toBe(900);
   expect(second.some((member) => member.emergencyActive)).toBe(true);
   expect(second.some((member) => member.outsideBoundary)).toBe(true);
   expect(second.some((member) => member.operationActive)).toBe(true);
+});
+
+it('allows small consecutive GPS steps to accumulate beyond the jitter radius', () => {
+  const rendered: [number, number] = [121.7681, 17.4239];
+  const firstSmallStep = { latitude: 17.4239, longitude: 121.76812 };
+  const accumulatedStep = { latitude: 17.4239, longitude: 121.76816 };
+  expect(effectiveMarkerTarget(rendered, firstSmallStep, true)).toBe(rendered);
+  expect(effectiveMarkerTarget(rendered, accumulatedStep, true)).toEqual([
+    accumulatedStep.longitude,
+    accumulatedStep.latitude,
+  ]);
 });

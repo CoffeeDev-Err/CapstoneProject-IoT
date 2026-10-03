@@ -301,6 +301,10 @@ export default function OfficerMapScreen({
     pendingSelfFocus.current = false;
     setTimeout(() => focusCurrentOfficer(), 120);
   }, [focusCurrentOfficer, handleBaseMapLoad]);
+  const handleOfficerMarkerPress = useCallback((officerId: string) => {
+    setDeploymentDetailsOpen(false);
+    setSelectedOfficerId(officerId);
+  }, [setSelectedOfficerId]);
   useEffect(() => {
     if (preview.enabled) nativeMapRef.current?.fitPersonnel();
   }, [preview.enabled, nativeMapRef]);
@@ -487,7 +491,7 @@ export default function OfficerMapScreen({
             personnel={mapPersonnel}
             onMapInteractionEnd={handleMapInteractionEnd}
             onMapInteractionStart={handleMapInteractionStart}
-            onOfficerPress={setSelectedOfficerId}
+            onOfficerPress={handleOfficerMarkerPress}
           />
         )}
       </View>

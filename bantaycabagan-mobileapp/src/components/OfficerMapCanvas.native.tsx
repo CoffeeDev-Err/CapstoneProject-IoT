@@ -37,6 +37,7 @@ import {
 import {
   CLUSTER_MAX_ZOOM,
   confirmedFixFromMember,
+  effectiveMarkerTarget,
   interpolatePosition,
   markerMotionForFixes,
   markerTone,
@@ -90,13 +91,18 @@ const useInterpolatedPersonnel = (personnel: OfficerMapPerson[]) => {
       const rawTarget: [number, number] = [confirmedFix.longitude, confirmedFix.latitude];
       const start = currentPositions.current.get(member.id) || rawTarget;
       const motion = markerMotionForFixes(previousConfirmedFixes.current.get(member.id), confirmedFix);
-      const target = motion.suppressJitter
-        ? (effectiveTargets.current.get(member.id) || start)
-        : rawTarget;
+      const target = effectiveMarkerTarget(
+        effectiveTargets.current.get(member.id) || start,
+        confirmedFix,
+        motion.suppressJitter,
+      );
+      const targetChanged = start[0] !== target[0] || start[1] !== target[1];
       starts.set(member.id, start);
       motions.set(member.id, {
-        durationMs: start[0] === target[0] && start[1] === target[1] ? 0 : motion.durationMs,
-        suppressJitter: motion.suppressJitter,
+        durationMs: targetChanged ? motion.durationMs : 0,
+        // A sequence of individually small fixes may exceed the jitter radius
+        // cumulatively. In that case both the marker and follow camera move.
+        suppressJitter: motion.suppressJitter && !targetChanged,
         target,
       });
       effectiveTargets.current.set(member.id, target);
