@@ -5,6 +5,7 @@ import { SwipeDismissCard } from '../../components/SwipeDismissSheet';
 import { mobileTheme } from '../../constants/mobileTheme';
 import type { LivePersonnel } from '../../types/operations';
 import { GpsReadingAge } from './GpsReadingAge';
+import { isSamePersonnelId } from './officerMapState';
 
 type Props = {
   currentPersonnelId: string;
@@ -61,7 +62,7 @@ export function OfficerDetailSheet({
         <View style={styles.locationRow}>
           <Icon name="place" size={18} color="#93c5fd" />
           <Text style={styles.locationText} numberOfLines={2}>{officer.locationName}</Text>
-          {officer.id !== currentPersonnelId && (
+          {!isSamePersonnelId(officer.id, currentPersonnelId) && (
             <TouchableOpacity
               style={[styles.locateButton, isFollowing && styles.locateButtonFollowing]}
               onPress={onLocate}

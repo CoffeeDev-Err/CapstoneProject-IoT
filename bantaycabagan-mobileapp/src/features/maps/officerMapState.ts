@@ -2,6 +2,12 @@ import { isInsideCabagan } from '../../constants/cabaganGeofence';
 import type { OfficerMapPerson } from '../../components/OfficerMapCanvas';
 import type { LivePersonnel, OperationalTask } from '../../types/operations';
 
+export const normalizePersonnelId = (value?: string | null) => String(value || '').trim().toLowerCase();
+
+export const isSamePersonnelId = (first?: string | null, second?: string | null) => (
+  Boolean(normalizePersonnelId(first)) && normalizePersonnelId(first) === normalizePersonnelId(second)
+);
+
 export const selectVisiblePersonnel = (
   personnel: LivePersonnel[],
   currentPersonnelId: string,

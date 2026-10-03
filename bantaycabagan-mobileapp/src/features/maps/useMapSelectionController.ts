@@ -6,6 +6,7 @@ import type {
 } from '../../components/OfficerMapCanvas';
 import type { DeploymentAssignment, LivePersonnel } from '../../types/operations';
 import type { MapMode } from './MapControls';
+import { isSamePersonnelId } from './officerMapState';
 
 type MapCommand =
   | { type: 'update-personnel'; personnel: OfficerMapPerson[] }
@@ -22,6 +23,7 @@ type MapEvent = {
 
 type Options = {
   assignment?: DeploymentAssignment;
+  currentPersonnelId: string;
   mapMode: MapMode;
   mapPersonnel: OfficerMapPerson[];
   onMapInteractionEnd: () => void;
@@ -31,6 +33,7 @@ type Options = {
 
 export function useMapSelectionController({
   assignment,
+  currentPersonnelId,
   mapMode,
   mapPersonnel,
   onMapInteractionEnd,
@@ -45,16 +48,16 @@ export function useMapSelectionController({
   const [followedOfficerId, setFollowedOfficerId] = useState<string | null>(null);
 
   const selectedOfficer = selectedOfficerId
-    ? visiblePersonnel.find((member) => member.id === selectedOfficerId) || null
+    ? visiblePersonnel.find((member) => isSamePersonnelId(member.id, selectedOfficerId)) || null
     : null;
   const activeFollowedOfficerId = visiblePersonnel.some(
-    (member) => member.id === followedOfficerId,
+    (member) => isSamePersonnelId(member.id, followedOfficerId),
   ) ? followedOfficerId : null;
   const followedOfficer = activeFollowedOfficerId
-    ? visiblePersonnel.find((member) => member.id === activeFollowedOfficerId) || null
+    ? visiblePersonnel.find((member) => isSamePersonnelId(member.id, activeFollowedOfficerId)) || null
     : null;
   const isFollowingSelectedOfficer = Boolean(
-    selectedOfficer && selectedOfficer.id === activeFollowedOfficerId,
+    selectedOfficer && isSamePersonnelId(selectedOfficer.id, activeFollowedOfficerId),
   );
 
   const sendMapCommand = useCallback((command: MapCommand) => {
@@ -128,6 +131,19 @@ export function useMapSelectionController({
     nativeMapRef.current?.focusDeployment();
   }, [sendMapCommand]);
 
+  const focusCurrentOfficer = useCallback(() => {
+    const current = visiblePersonnel.find((member) => isSamePersonnelId(member.id, currentPersonnelId));
+    if (!current
+      || current.isVisibleOnMap === false
+      || current.isLocationStale === true
+      || !Number.isFinite(current.latitude)
+      || !Number.isFinite(current.longitude)) return false;
+    setSelectedOfficerId(null);
+    setFollowedOfficerId(current.id);
+    focusOfficer(current.id);
+    return true;
+  }, [currentPersonnelId, focusOfficer, visiblePersonnel]);
+
   const handleSearch = useCallback(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return;
@@ -150,7 +166,7 @@ export function useMapSelectionController({
 
   const handleLocateOfficer = useCallback(() => {
     if (!selectedOfficer) return;
-    if (selectedOfficer.id === followedOfficerId) {
+    if (isSamePersonnelId(selectedOfficer.id, followedOfficerId)) {
       setFollowedOfficerId(null);
       return;
     }
@@ -167,6 +183,7 @@ export function useMapSelectionController({
   return {
     activeFollowedOfficerId,
     followedOfficer,
+    focusCurrentOfficer,
     focusDeployment,
     handleCloseOfficer,
     handleLocateOfficer,

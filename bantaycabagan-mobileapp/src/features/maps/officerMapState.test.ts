@@ -2,9 +2,14 @@ import {
   selectActiveBackupRequest,
   selectEmergencyPersonnelIds,
   selectVisiblePersonnel,
+  isSamePersonnelId,
 } from './officerMapState';
 
 describe('officer map selectors', () => {
+  it('recognizes the current officer even when an API changes id casing or whitespace', () => {
+    expect(isSamePersonnelId(' PNP-001 ', 'pnp-001')).toBe(true);
+    expect(isSamePersonnelId('PNP-001', 'PNP-002')).toBe(false);
+  });
   it('filters stale and invalid positions', () => {
     const visible = selectVisiblePersonnel([
       { id: 'current', latitude: 17.4, longitude: 121.7 } as never,

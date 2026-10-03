@@ -36,8 +36,10 @@ import {
   selectEmergencyPersonnelIds,
   selectOperationPersonnelIds,
   selectVisiblePersonnel,
+  isSamePersonnelId,
 } from '../features/maps/officerMapState';
 import { createLeafletMapHtml } from '../features/maps/leafletMapHtml';
+import { resolveDeploymentMapTarget } from '../features/maps/deploymentMapTarget';
 import {
   getMapTopControlPosition,
   MapControls,
@@ -98,7 +100,7 @@ export default function OfficerMapScreen({
   const emergencyPulse = useRef(new Animated.Value(0)).current;
   const mapControlsProgress = useRef(new Animated.Value(0)).current;
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingDeploymentFocus = useRef(false);
+  const pendingSelfFocus = useRef(false);
   const [backupActionPending, setBackupActionPending] = useState(false);
   const [showOwnEmergencyOverlay, setShowOwnEmergencyOverlay] = useState(false);
   const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
@@ -235,6 +237,7 @@ export default function OfficerMapScreen({
   const {
     activeFollowedOfficerId,
     followedOfficer,
+    focusCurrentOfficer,
     focusDeployment,
     handleCloseOfficer,
     handleLocateOfficer,
@@ -252,6 +255,7 @@ export default function OfficerMapScreen({
     webMapRef,
   } = useMapSelectionController({
     assignment,
+    currentPersonnelId,
     mapMode,
     mapPersonnel,
     onMapInteractionEnd: handleMapInteractionEnd,
@@ -260,10 +264,10 @@ export default function OfficerMapScreen({
   });
   const handleMapLoad = useCallback(() => {
     handleBaseMapLoad();
-    if (!pendingDeploymentFocus.current) return;
-    pendingDeploymentFocus.current = false;
-    setTimeout(() => focusDeployment(), 120);
-  }, [focusDeployment, handleBaseMapLoad]);
+    if (!pendingSelfFocus.current) return;
+    pendingSelfFocus.current = false;
+    setTimeout(() => focusCurrentOfficer(), 120);
+  }, [focusCurrentOfficer, handleBaseMapLoad]);
   useEffect(() => {
     if (preview.enabled) nativeMapRef.current?.fitPersonnel();
   }, [preview.enabled, nativeMapRef]);
@@ -271,6 +275,17 @@ export default function OfficerMapScreen({
     ? mapPersonnel.some((member) => member.id === selectedOfficer.id && member.emergencyActive)
     : false;
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
+  const deploymentTarget = useMemo(() => resolveDeploymentMapTarget(assignment), [assignment]);
+  const canLocateCurrentOfficer = visiblePersonnel.some((member) => (
+    isSamePersonnelId(member.id, currentPersonnelId)
+    && member.isVisibleOnMap !== false
+    && member.isLocationStale !== true
+    && Number.isFinite(member.latitude)
+    && Number.isFinite(member.longitude)
+  ));
+  const isFollowingCurrentOfficer = Boolean(
+    followedOfficer && isSamePersonnelId(followedOfficer.id, currentPersonnelId),
+  );
 
   useEffect(() => {
     if (selectedOfficer) setLegendExpanded(false);
@@ -304,23 +319,24 @@ export default function OfficerMapScreen({
   }, [emergencyPulse, hasCriticalPersonnel]);
 
   const mapHtml = useMemo(() => createLeafletMapHtml({
-    latitude: assignment?.latitude ?? undefined,
-    longitude: assignment?.longitude ?? undefined,
+    latitude: deploymentTarget.latitude,
+    longitude: deploymentTarget.longitude,
     deploymentPointLabel: assignment?.deploymentPointLabel,
     deploymentType: assignment?.deploymentType,
-    hasDeploymentPoint: assignment?.hasDeploymentPoint,
+    hasDeploymentPoint: deploymentTarget.hasExactPoint,
+    deploymentFocusZoom: deploymentTarget.zoom,
     currentPersonnelId,
     isDark,
     mapPersonnel,
-  }), [assignment, currentPersonnelId, isDark, personnelRosterKey]);
+  }), [assignment, currentPersonnelId, deploymentTarget, isDark, personnelRosterKey]);
   const handleConfirmAssignment = async () => {
     if (!assignment || assignmentAcknowledgementPending) return;
     setAssignmentAcknowledgementPending(true);
     try {
       await acknowledgeDeployment(assignment.id);
       setDeploymentDetailsOpen(false);
-      pendingDeploymentFocus.current = Platform.OS === 'web';
-      setTimeout(() => focusDeployment(), 80);
+      pendingSelfFocus.current = Platform.OS === 'web';
+      setTimeout(() => focusCurrentOfficer(), 80);
     } catch (error) {
       Alert.alert('Unable to confirm assignment', requestErrorMessage(error, { action: 'confirm your deployment', write: true }));
     } finally {
@@ -500,7 +516,7 @@ export default function OfficerMapScreen({
               officer={currentOfficer}
               onRefresh={refreshOperations}
             />
-            {followedOfficer && !selectedOfficer && (
+            {followedOfficer && !isFollowingCurrentOfficer && !selectedOfficer && (
               <View style={styles.followBanner}>
                 <Icon name="near-me" size={17} color="#93c5fd" />
                 <View style={styles.followBannerContent}>
@@ -518,7 +534,7 @@ export default function OfficerMapScreen({
                 </TouchableOpacity>
               </View>
             )}
-            {assignment && !followedOfficer && !selectedOfficer && (
+            {assignment && (!followedOfficer || isFollowingCurrentOfficer) && !selectedOfficer && (
               <TouchableOpacity
                 accessibilityLabel={`View current deployment details for ${assignment.patrolArea}`}
                 activeOpacity={0.82}
@@ -563,6 +579,30 @@ export default function OfficerMapScreen({
                 setExpanded={setLegendExpanded}
               />
             )}
+            <TouchableOpacity
+              accessibilityLabel={canLocateCurrentOfficer
+                ? 'Locate my current position'
+                : 'Waiting for a fresh GPS fix'}
+              accessibilityState={{
+                disabled: !canLocateCurrentOfficer,
+                selected: isFollowingCurrentOfficer,
+              }}
+              activeOpacity={0.8}
+              disabled={!canLocateCurrentOfficer}
+              onPress={focusCurrentOfficer}
+              style={[
+                styles.locateMeButton,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                isFollowingCurrentOfficer && { backgroundColor: colors.blueSoft, borderColor: colors.blue },
+                !canLocateCurrentOfficer && styles.locateMeButtonDisabled,
+              ]}
+            >
+              <Icon
+                name={canLocateCurrentOfficer ? 'my-location' : 'location-disabled'}
+                size={22}
+                color={canLocateCurrentOfficer ? colors.blue : colors.textMuted}
+              />
+            </TouchableOpacity>
             {preview.available && <MapPreviewToggle enabled={preview.enabled} onPress={() => {
               handleCloseOfficer();
               handleStopFollowing();
@@ -733,6 +773,20 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  locateMeButton: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    shadowColor: '#172554',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 7,
+    elevation: 6,
+  },
+  locateMeButtonDisabled: { opacity: 0.52 },
   deploymentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   deploymentText: { flex: 1 },
   deploymentLabel: { color: mobileTheme.textMuted, fontSize: 8, lineHeight: 9, fontWeight: '800' },
