@@ -13,7 +13,7 @@ Assignment arrival does not depend on an older personnel snapshot already showin
 
 Incoming assignments are evaluated using the current time rather than the time the Map screen opened. The screen also reevaluates at shift start/end and when the app resumes. Older in-flight HTTP deployment snapshots cannot replace newer socket state.
 
-The POST/START location pin is now about 44 by 54 logical pixels, smaller than the officer marker. Walking transitions use 500 ms and vehicle transitions use 250 ms on web and mobile. Cumulative movement beyond the five-meter jitter radius still moves the marker and follow camera.
+The POST/START location pin is now about 44 by 54 logical pixels, smaller than the officer marker. Walking transitions use 500 ms and vehicle transitions use 250 ms on web and mobile. Every newer timestamped GPS fix moves the marker and follow camera to its coordinates, including steps below five meters and reported speed zero. Small changes without a newer measurement can still be treated as jitter. This also makes small GPS drift visible; it does not invent movement or GPS readings.
 
 ## GPS update path
 
@@ -39,3 +39,5 @@ Tracker fix/upload → Flespi → MQTT-triggered sync or bounded REST reconcilia
 7. Switch Map/Satellite while following an officer. Verify the officer marker remains visible and the compact POST/START pin appears only in the assigned officer's mobile map.
 
 Read-only inspection on October 3, 2026 found both registered trackers disconnected and no active deployments at inspection time. One stored measurement matched its latest Flespi timestamp and was received by GeoSentri approximately 2.6 seconds later. This does not identify the cause of the earlier screenshot's one-minute age. Historical Flespi message access returned HTTP 403 with the configured token, so a moving-tracker end-to-end cadence test is still required.
+
+During live sampling on October 4 (Philippine time), one active tracker had a gap of about 66 seconds between Flespi receipts. A fix measured at 01:40:38 reached Flespi at 01:41:08 (about 30 seconds later). Later fixes at 01:41:08 and 01:41:18 were ten seconds apart, and the latter was stored at 01:41:21. These samples confirm both intermittent upstream delays and periods of ten-second fresh readings. They do not determine whether tracker configuration, reception, or buffering caused the upstream gaps.

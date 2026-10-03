@@ -89,7 +89,11 @@ export const markerMotionForFixes = (from, target) => {
   const distanceMeters = distanceMetersBetweenFixes(from, target)
   const calculatedSpeed = calculatedSpeedKmhBetweenFixes(from, target)
   const speedKmh = resolveMotionSpeedKmh(from, target)
-  const suppressJitter = distanceMeters !== null
+  const previousTime = timestampMs(from.recordedAt)
+  const targetTime = timestampMs(target.recordedAt)
+  // A new confirmed reading must reach its coordinates, even for a short step.
+  const hasNewGpsFix = targetTime !== null && (previousTime === null || targetTime > previousTime)
+  const suppressJitter = !hasNewGpsFix && distanceMeters !== null
     && distanceMeters <= STATIONARY_JITTER_DISTANCE_METERS
     && (calculatedSpeed ?? speedKmh ?? 0) <= STATIONARY_SPEED_MAX_KMH
 

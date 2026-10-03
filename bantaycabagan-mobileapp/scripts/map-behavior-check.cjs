@@ -120,8 +120,8 @@ assert.equal(
 		latitude: 17.42691,
 		recordedAt: '2026-08-21T00:00:10.000Z',
 	}).suppressJitter,
-	true,
-	'Stationary GPS drift within five meters must not move the marker',
+	false,
+	'Every new timestamped GPS fix must reach its coordinates even within five meters',
 )
 assert.equal(
 	markerMotionForFixes(baseFix, {

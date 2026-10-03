@@ -46,3 +46,20 @@ it('allows small consecutive GPS steps to accumulate beyond the jitter radius', 
     accumulatedStep.latitude,
   ]);
 });
+
+it('moves the marker and follow target for a fresh two-meter fix even at reported zero speed', () => {
+  const previous = { latitude: 17.4239, longitude: 121.7681, recordedAt: '2026-10-04T00:00:00Z', speed: 0 };
+  const next = { ...previous, latitude: 17.423918, recordedAt: '2026-10-04T00:00:10Z' };
+  const motion = markerMotionForFixes(previous, next);
+  expect(motion.distanceMeters).toBeGreaterThan(1.9);
+  expect(motion.distanceMeters).toBeLessThan(2.1);
+  expect(motion.suppressJitter).toBe(false);
+  expect(motion.durationMs).toBe(500);
+  expect(effectiveMarkerTarget([previous.longitude, previous.latitude], next, motion.suppressJitter))
+    .toEqual([next.longitude, next.latitude]);
+});
+
+it('still filters small changes without a newer confirmed GPS measurement', () => {
+  const previous = { latitude: 17.4239, longitude: 121.7681, recordedAt: '2026-10-04T00:00:00Z', speed: 0 };
+  expect(markerMotionForFixes(previous, { ...previous, latitude: 17.423918 }).suppressJitter).toBe(true);
+});
