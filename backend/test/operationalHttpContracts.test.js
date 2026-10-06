@@ -35,6 +35,17 @@ const createTestApp = (service) => {
 }
 
 describe('operational HTTP contracts', () => {
+	it('keeps GPS history and optional road matching restricted to supervisors', async () => {
+		let receivedOptions
+		const app = createTestApp({ getReportRoute: async (_id, options) => {
+			receivedOptions = options; return { points: [], road_matching: { available: false } }
+		} })
+		await request(app).get('/api/reports/RPT-ONE/route?road_match=vehicle').expect(401)
+		await request(app).get('/api/reports/RPT-ONE/route?road_match=vehicle').set('Authorization', 'Bearer officer').expect(403)
+		await request(app).get('/api/reports/RPT-ONE/route?road_match=walking').set('Authorization', 'Bearer supervisor').expect(400)
+		await request(app).get('/api/reports/RPT-ONE/route?road_match=vehicle').set('Authorization', 'Bearer supervisor').expect(200)
+		assert.equal(receivedOptions.roadMatch, true)
+	})
 	it('allows report corrections only through an authenticated officer identity', async () => {
 		let receivedActor
 		const app = createTestApp({ editReport: async (_id, _body, actor) => {

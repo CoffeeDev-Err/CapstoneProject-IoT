@@ -7,8 +7,8 @@ const {
 } = require('../../utils/operationalValidation')
 const { getLocationFreshness } = require('../../utils/locationFreshness')
 
-// Sample new fixes, never poll-time copies of the last known coordinates.
-const HISTORY_SAMPLE_INTERVAL_MS = 10_000
+// Save every accepted GPS fix. Sampling applies only to simulated readings.
+const MOCK_HISTORY_SAMPLE_INTERVAL_MS = 30_000
 
 const createLocationIngestionService = ({
 	models,
@@ -231,12 +231,12 @@ const ingestLocation = async (payload = {}) => {
 		{ upsert: true, returnDocument: 'after' },
 	)
 
-	const latestHistory = await LocationHistory.findOne({ personnelId })
+	const latestHistory = source === 'gps' ? null : await LocationHistory.findOne({ personnelId })
 		.sort({ recordedAt: -1 })
 		.select('recordedAt')
 		.lean()
-	const shouldSample = !latestHistory?.recordedAt
-		|| recordedAt.getTime() - latestHistory.recordedAt.getTime() >= HISTORY_SAMPLE_INTERVAL_MS
+	const shouldSample = source === 'gps' || !latestHistory?.recordedAt
+		|| recordedAt.getTime() - latestHistory.recordedAt.getTime() >= MOCK_HISTORY_SAMPLE_INTERVAL_MS
 	if (shouldSample) {
 		await LocationHistory.create({
 			personnelId,
@@ -266,4 +266,4 @@ const ingestLocation = async (payload = {}) => {
 }
 
 module.exports = createLocationIngestionService
-module.exports.HISTORY_SAMPLE_INTERVAL_MS = HISTORY_SAMPLE_INTERVAL_MS
+module.exports.MOCK_HISTORY_SAMPLE_INTERVAL_MS = MOCK_HISTORY_SAMPLE_INTERVAL_MS

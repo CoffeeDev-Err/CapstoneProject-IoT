@@ -16,7 +16,10 @@ const createReportController = (operationalService, mediaStorage = {
 		return res.json({ report })
 	},
 	getReportRoute: async (req, res) => {
-		const route = await operationalService.getReportRoute(req.params.reportId)
+		if (req.query?.road_match !== undefined && req.query.road_match !== 'vehicle') {
+			return res.status(400).json({ success: false, message: 'Road matching is available only for vehicle travel on roads.' })
+		}
+		const route = await operationalService.getReportRoute(req.params.reportId, { roadMatch: req.query?.road_match === 'vehicle' })
 		if (!route) return res.status(404).json({ success: false, message: 'Report not found.' })
 		return res.json({ route })
 	},

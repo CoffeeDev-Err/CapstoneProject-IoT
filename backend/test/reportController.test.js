@@ -16,6 +16,25 @@ const createResponse = () => ({
 })
 
 describe('report controller', () => {
+	it('requests road matching only for explicit vehicle mode and rejects unsupported modes', async () => {
+		const calls = []
+		const controller = createReportController({ getReportRoute: async (id, options) => {
+			calls.push({ id, options }); return id === 'missing' ? null : { report_id: id, points: [] }
+		} })
+		for (const query of [{}, { road_match: 'vehicle' }]) {
+			const res = createResponse()
+			await controller.getReportRoute({ params: { reportId: 'R-1' }, query }, res)
+			assert.equal(res.statusCode, 200)
+		}
+		assert.deepEqual(calls.map(call => call.options.roadMatch), [false, true])
+		const bad = createResponse()
+		await controller.getReportRoute({ params: { reportId: 'R-1' }, query: { road_match: 'walking' } }, bad)
+		assert.equal(bad.statusCode, 400)
+		assert.equal(calls.length, 2)
+		const missing = createResponse()
+		await controller.getReportRoute({ params: { reportId: 'missing' }, query: {} }, missing)
+		assert.equal(missing.statusCode, 404)
+	})
 	it('reconciles concurrent retries after a submission-ID uniqueness conflict', async () => {
 		let lookups = 0
 		const deleted = []

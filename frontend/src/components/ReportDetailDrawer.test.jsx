@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import ReportDetailDrawer from './ReportDetailDrawer'
+import { getReportRoute } from '../services/operations'
+vi.mock('../services/operations', () => ({ getReportRoute: vi.fn() }))
 vi.mock('./ReportLocationMap', () => ({ default: () => <div>Report map</div> }))
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.clearAllMocks() })
 it('keeps content during exit and provides footer PDF/Close actions without a header X', async () => {
   const onClose = vi.fn()
   const report = { id: 'RPT-EXIT', title: 'Exit animation', officer: 'Officer', report_type: 'patrol', description: 'Keep visible' }
@@ -79,4 +81,56 @@ it('shows original and append-only corrected evidence separately', async () => {
   expect(screen.getByText('Reason: Wrong entrance shown')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Open corrected evidence 1 viewer for RPT-EVIDENCE' }))
     .toHaveAttribute('href', '/reports/RPT-EVIDENCE/evidence?correction=0')
+})
+
+const routeProps = { formatDateTime: value => value, onClose: vi.fn(), onDownload: vi.fn(), onValidationChange: vi.fn() }
+const routeReport = { id: 'RPT-ROUTE', title: 'Checkpoint visit', report_type: 'checkpoint', officer: 'Officer', description: 'Activity report' }
+const sample = { latitude: 17.4, longitude: 121.7, recorded_at: '2026-10-06T06:01:00Z' }
+const routeResponse = { points: [sample], window: { from: '2026-10-06T05:30:00Z', to: '2026-10-06T06:15:00Z', complete: false },
+  road_matching: { available: true, status: 'not_requested', segments: [] } }
+
+it('shows an unfinished activity window and requires explicit vehicle selection before road estimation', async () => {
+  getReportRoute.mockResolvedValue(routeResponse)
+  render(<ReportDetailDrawer {...routeProps} report={routeReport} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Show route' }))
+  await screen.findByText(/Collection window open until/)
+  expect(getReportRoute).toHaveBeenCalledWith('RPT-ROUTE', expect.objectContaining({ roadMatch: false }))
+  expect(screen.getByRole('button', { name: 'Estimate road route' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Vehicle travel on roads' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Estimate road route' }))
+  await waitFor(() => expect(getReportRoute).toHaveBeenCalledWith('RPT-ROUTE', expect.objectContaining({ roadMatch: true })))
+  await screen.findByRole('button', { name: 'Refresh route' })
+  getReportRoute.mockResolvedValue({ ...routeResponse, window: { ...routeResponse.window, complete: true } })
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh route' }))
+  await screen.findByText(/Collection window ended/)
+})
+
+it('keeps raw samples after provider failure and hides estimation when no provider is enabled', async () => {
+  getReportRoute.mockResolvedValue({ ...routeResponse, road_matching: { available: true, status: 'unavailable', segments: [] } })
+  render(<ReportDetailDrawer {...routeProps} report={routeReport} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Show route' }))
+  await screen.findByText(/1 GPS samples recorded/)
+  expect(screen.getByText(/A confident road estimate is unavailable/)).toBeTruthy()
+  getReportRoute.mockRejectedValue(Object.assign(new Error('offline'), { code: 'NETWORK_ERROR' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh route' }))
+  await screen.findByText(/load the GPS route/)
+  expect(screen.getByRole('checkbox', { name: 'Vehicle travel on roads' })).toBeTruthy()
+  getReportRoute.mockResolvedValue({ ...routeResponse, road_matching: { available: false, status: 'not_requested', segments: [] } })
+  fireEvent.click(screen.getByRole('button', { name: 'Show route' }))
+  await screen.findByText(/Road estimates are not enabled/)
+  expect(screen.queryByRole('button', { name: 'Estimate road route' })).toBeNull()
+})
+
+it('aborts old route requests when switching reports so late responses cannot replace the new report', async () => {
+  let resolveFirst
+  getReportRoute.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve })).mockResolvedValue(routeResponse)
+  const view = render(<ReportDetailDrawer {...routeProps} report={routeReport} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Show route' }))
+  const signal = getReportRoute.mock.calls[0][1].signal
+  view.rerender(<ReportDetailDrawer {...routeProps} report={{ ...routeReport, id: 'RPT-OTHER' }} />)
+  expect(signal.aborted).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Show route' }))
+  await screen.findByText(/1 GPS samples recorded/)
+  resolveFirst({ ...routeResponse, points: [sample, sample, sample] })
+  await waitFor(() => expect(screen.queryByText(/3 GPS samples recorded/)).toBeNull())
 })

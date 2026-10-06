@@ -45,7 +45,7 @@ const addReportRouteLayer = (map, data) => {
       id: 'geosentri-report-route-line',
       type: 'line',
       source: 'geosentri-report-route',
-      filter: ['==', ['geometry-type'], 'LineString'],
+      filter: ['==', ['get', 'kind'], 'trace'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
         'line-color': '#2563eb',
@@ -55,6 +55,19 @@ const addReportRouteLayer = (map, data) => {
       },
     })
   }
+  const layers = [
+    { id: 'geosentri-report-recorded', type: 'circle', filter: ['==', ['get', 'kind'], 'recorded'],
+      paint: { 'circle-radius': 3, 'circle-color': '#3b82f6', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff', 'circle-opacity': 0.7 } },
+    { id: 'geosentri-report-matched', type: 'line', filter: ['==', ['get', 'kind'], 'matched'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#a855f7', 'line-width': 5, 'line-opacity': 0.8 } },
+    { id: 'geosentri-report-turns', type: 'circle', filter: ['==', ['get', 'kind'], 'turn'],
+      paint: { 'circle-radius': 7, 'circle-color': '#f59e0b', 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' } },
+  ]
+  layers.forEach(layer => {
+    if (!map.getLayer(layer.id)) map.addLayer({ ...layer, source: 'geosentri-report-route' },
+      layer.type === 'line' ? 'geosentri-report-route-line' : undefined)
+  })
 }
 
 const createPointMarker = ({ className, label, title }) => {
@@ -71,13 +84,15 @@ const createPointMarker = ({ className, label, title }) => {
   return element
 }
 
-function ReportLocationMap({ incident, markerLabel = 'Reported location', routePoints = [] }) {
+function ReportLocationMap({ incident, markerLabel = 'Reported location', routePoints = [], roadMatching }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
   const routeDataRef = useRef(featureCollection())
   const positionsRef = useRef([])
   const pointMarkersRef = useRef([])
+  const popupRef = useRef(null)
+  const [visibleLayers, setVisibleLayers] = useState({ recorded: true, trace: true, turns: true, matched: true })
   const threeDRef = useRef(false)
   const mapModeRef = useRef('street')
   const isDarkRef = useRef(initialIsDark)
@@ -107,22 +122,36 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
   const routeTrace = useMemo(() => buildReportRouteTrace(routePoints), [routePoints])
 
   const mapPositions = useMemo(() => (
-    [...routeTrace.segments.flat(), ...(routePositions.length ? [routePositions[0]] : []), ...(incidentPosition ? [incidentPosition] : [])]
-  ), [incidentPosition, routePositions, routeTrace])
+    [...routeTrace.segments.flat(), ...(routePositions.length ? [routePositions[0]] : []), ...(incidentPosition ? [incidentPosition] : []),
+      ...(visibleLayers.matched ? (roadMatching?.segments || []).flatMap(segment => segment.coordinates.map(([longitude, latitude]) => [latitude, longitude])) : [])]
+  ), [incidentPosition, roadMatching, routePositions, routeTrace, visibleLayers.matched])
   const mapCenter = incidentPosition || routePositions[routePositions.length - 1] || null
   const mapCenterLatitude = mapCenter?.[0] ?? null
   const mapCenterLongitude = mapCenter?.[1] ?? null
 
   const routeData = useMemo(() => featureCollection(
-    routeTrace.segments.map((positions) => ({
+    [
+      ...(visibleLayers.trace ? routeTrace.segments.map((positions) => ({
         type: 'Feature',
-        properties: { kind: 'route' },
+        properties: { kind: 'trace' },
         geometry: {
           type: 'LineString',
           coordinates: positions.map(([latitude, longitude]) => [longitude, latitude]),
         },
-      })),
-  ), [routeTrace])
+      })) : []),
+      ...(visibleLayers.recorded ? routePoints.filter(point => isValidCoordinate(point.latitude, point.longitude)).map(point => ({
+        type: 'Feature', properties: { kind: 'recorded', recorded_at: point.recorded_at, accuracy: point.accuracy ?? 'unknown' },
+        geometry: { type: 'Point', coordinates: [Number(point.longitude), Number(point.latitude)] },
+      })) : []),
+      ...(visibleLayers.turns ? routeTrace.turns.map(turn => ({
+        type: 'Feature', properties: { ...turn, kind: 'turn' },
+        geometry: { type: 'Point', coordinates: [turn.longitude, turn.latitude] },
+      })) : []),
+      ...(visibleLayers.matched ? (roadMatching?.segments || []).map(segment => ({
+        type: 'Feature', properties: { kind: 'matched' }, geometry: { type: 'LineString', coordinates: segment.coordinates },
+      })) : []),
+    ],
+  ), [roadMatching, routePoints, routeTrace, visibleLayers])
 
   const fitReportMap = useCallback((animate = true) => {
     const map = mapRef.current
@@ -219,6 +248,24 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
       }, 120)
     }
     map.on('style.load', handleStyleLoad)
+    const showSample = event => {
+      const feature = event.features?.[0]
+      if (!feature) return
+      // A turn can coincide with its raw sample; keep the more specific tooltip.
+      if (feature.properties.kind === 'recorded' && map.getLayer('geosentri-report-turns')
+        && map.queryRenderedFeatures(event.point, { layers: ['geosentri-report-turns'] }).length) return
+      popupRef.current?.remove()
+      const details = document.createElement('div')
+      details.className = 'report-map-sample-details'
+      const properties = feature.properties
+      const time = value => new Date(value).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+      details.textContent = properties.kind === 'turn'
+        ? `Probable ${properties.direction === 'reversal' ? 'direction reversal' : `${properties.direction} turn`} (${properties.angle}°). Sample: ${time(properties.recorded_at)}. Direction change inferred between ${time(properties.from)} and ${time(properties.to)}; the exact corner is unknown.${properties.accuracy_unknown ? ' GPS accuracy was not recorded.' : ''}`
+        : `Recorded GPS sample: ${time(properties.recorded_at)}. Accuracy: ${properties.accuracy === 'unknown' ? 'not recorded' : `${properties.accuracy} m`}. These are received coordinates, not a verified road position.`
+      popupRef.current = new maplibregl.Popup({ maxWidth: '300px' }).setLngLat(feature.geometry.coordinates).setDOMContent(details).addTo(map)
+    }
+    map.on('click', 'geosentri-report-turns', showSample)
+    map.on('click', 'geosentri-report-recorded', showSample)
 
     const resizeObserver = new ResizeObserver(() => map.resize())
     resizeObserver.observe(containerRef.current)
@@ -228,6 +275,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
       resizeObserver.disconnect()
       pointMarkersRef.current.forEach((marker) => marker.remove())
       pointMarkersRef.current = []
+      popupRef.current?.remove()
       map.remove()
       mapRef.current = null
     }
@@ -235,6 +283,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
 
   useEffect(() => {
     routeDataRef.current = routeData
+    popupRef.current?.remove()
     positionsRef.current = mapPositions
     const map = mapRef.current
     if (!map) return
@@ -302,15 +351,27 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
         {routePositions.length > 0 && (
           <>
             <span><i className="report-map-dot report-map-dot--start" />Route start</span>
-            {routeTrace.segments.length > 0 && <span><i className="report-map-line" />Estimated GPS trace</span>}
+            {routeTrace.segments.length > 0 && <span><i className="report-map-line" />Filtered GPS trace</span>}
+            {routeTrace.turns.length > 0 && <span><i className="report-map-dot report-map-dot--turn" />Probable turn</span>}
+            {roadMatching?.segments?.length > 0 && <span><i className="report-map-line report-map-line--matched" />Estimated road route</span>}
           </>
         )}
       </div>
+      {routePoints.length > 0 && <fieldset className="report-route-layers">
+        <legend>GPS display layers</legend>
+        {[['recorded', 'Recorded GPS points'], ['trace', 'Filtered GPS trace'], ['turns', 'Probable turns'],
+          ...(roadMatching?.segments?.length ? [['matched', 'Estimated road route']] : [])].map(([key, label]) => (
+          <label key={key}><input type="checkbox" checked={visibleLayers[key]}
+            onChange={event => setVisibleLayers(previous => ({ ...previous, [key]: event.target.checked }))} />{label}</label>
+        ))}
+      </fieldset>}
       {routePoints.length > 0 && <p className="report-route-history__status">
         GPS samples indicate approximate positions, not a verified path along roads.
         {' '}{routeTrace.simplified} small position variations suppressed; {routeTrace.omitted} invalid or low-accuracy samples omitted from the trace.
         {routeTrace.unknownAccuracy > 0 && ` Accuracy was not recorded for ${routeTrace.unknownAccuracy} samples.`}
         {!routeTrace.segments.length && ' Insufficient reliable movement to draw a trace.'}
+        {routeTrace.turns.length > 0 && ` ${routeTrace.turns.length} probable direction changes; select an amber marker for details. Exact turn locations cannot be confirmed between samples.`}
+        {roadMatching?.segments?.length > 0 && ' The purple road route is an estimate for vehicle travel, not the recorded GPS path.'}
       </p>}
     </div>
   )

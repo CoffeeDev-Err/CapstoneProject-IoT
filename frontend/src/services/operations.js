@@ -138,9 +138,10 @@ export const updateReportValidation = async (reportId, validationStatus, revisio
   return payload.report
 }
 
-export const getReportRoute = async (reportId) => {
+export const getReportRoute = async (reportId, { roadMatch = false, signal } = {}) => {
   const payload = await apiRequest(
-    `/api/reports/${encodeURIComponent(reportId)}/route`,
+    `/api/reports/${encodeURIComponent(reportId)}/route${roadMatch ? '?road_match=vehicle' : ''}`,
+    { signal },
   )
   return payload.route
 }

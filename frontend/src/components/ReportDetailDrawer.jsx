@@ -15,6 +15,8 @@ const emptyRouteState = {
   message: '',
   from: '',
   to: '',
+  complete: null,
+  roadMatching: null,
 }
 
 const formatCoordinates = (latitude, longitude) => {
@@ -91,6 +93,12 @@ function ReportDrawerContent({
   const closeButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(Boolean(report), onClose, closeButtonRef)
   const [routeState, setRouteState] = useState(emptyRouteState)
+  const [vehicleTravel, setVehicleTravel] = useState(false)
+  const routeRequestRef = useRef(null)
+  useEffect(() => {
+    if (isClosing) routeRequestRef.current?.abort()
+    return () => routeRequestRef.current?.abort()
+  }, [isClosing])
 
   if (!report) {
     return null
@@ -112,7 +120,7 @@ function ReportDrawerContent({
     ? `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=18/${report.latitude}/${report.longitude}`
     : ''
 
-  const handleLoadRoute = async () => {
+  const handleLoadRoute = async (roadMatch = false) => {
     if (!report.id) {
       setRouteState({
         ...emptyRouteState,
@@ -123,14 +131,19 @@ function ReportDrawerContent({
       return
     }
 
+    routeRequestRef.current?.abort()
+    const request = new AbortController()
+    routeRequestRef.current = request
     setRouteState({
-      ...emptyRouteState,
+      ...activeRouteState,
       reportId: report.id,
       status: 'loading',
+      message: '',
     })
 
     try {
-      const result = await getReportRoute(report.id)
+      const result = await getReportRoute(report.id, { roadMatch, signal: request.signal })
+      if (request.signal.aborted || routeRequestRef.current !== request) return
       const points = [...(result?.points || [])].sort(
         (first, second) => new Date(first.recorded_at) - new Date(second.recorded_at),
       )
@@ -143,10 +156,13 @@ function ReportDrawerContent({
           : 'No GPS samples were captured for this report window.',
         from: result?.window?.from || '',
         to: result?.window?.to || '',
+        complete: result?.window?.complete ?? null,
+        roadMatching: result?.road_matching || null,
       })
     } catch (error) {
+      if (request.signal.aborted || routeRequestRef.current !== request) return
       setRouteState({
-        ...emptyRouteState,
+        ...activeRouteState,
         reportId: report.id,
         status: 'error',
         message: requestErrorMessage(error, { action: 'load the GPS route for this report' }),
@@ -333,6 +349,7 @@ function ReportDrawerContent({
                 }}
                 markerLabel={report.is_incident ? 'Reported incident' : 'Reported activity'}
                 routePoints={activeRouteState.points}
+                roadMatching={activeRouteState.roadMatching}
               />
             </Suspense>
 
@@ -344,7 +361,7 @@ function ReportDrawerContent({
               <button
                 type="button"
                 className="report-route-history__button"
-                onClick={handleLoadRoute}
+                onClick={() => handleLoadRoute()}
                 disabled={activeRouteState.status === 'loading'}
               >
                 <Route aria-hidden="true" />
@@ -366,8 +383,38 @@ function ReportDrawerContent({
             {activeRouteState.status === 'loaded' && (
               <p className="report-route-history__status">
                 {activeRouteState.points.length} GPS samples recorded from{' '}
-                {formatDateTime(activeRouteState.from)} to {formatDateTime(activeRouteState.to)}.
+                {formatDateTime(activeRouteState.points[0]?.recorded_at)} to {formatDateTime(activeRouteState.points.at(-1)?.recorded_at)}.
               </p>
+            )}
+            {activeRouteState.complete === false && (
+              <p className="report-route-history__status">Collection window open until {formatDateTime(activeRouteState.to)}.
+                {' '}Refresh route to include newer on-duty GPS readings. Missing readings are not filled in.</p>
+            )}
+            {activeRouteState.complete === true && (
+              <p className="report-route-history__status">Collection window ended at {formatDateTime(activeRouteState.to)}.
+                {' '}This does not guarantee continuous GPS coverage.</p>
+            )}
+            {activeRouteState.points.length > 0 && activeRouteState.roadMatching?.available && (
+              <div className="report-route-layers">
+                <label><input type="checkbox" checked={vehicleTravel}
+                  onChange={event => setVehicleTravel(event.target.checked)} />Vehicle travel on roads</label>
+                <button type="button" className="report-route-history__button"
+                  disabled={!vehicleTravel || activeRouteState.status === 'loading'}
+                  onClick={() => handleLoadRoute(true)}>Estimate road route</button>
+                <span>Use only for travel by vehicle on roads. Road matching estimates the path between recorded points.</span>
+              </div>
+            )}
+            {activeRouteState.points.length > 0 && activeRouteState.roadMatching?.available === false && (
+              <p className="report-route-history__status">Road estimates are not enabled. Recorded GPS points and the filtered trace remain available.</p>
+            )}
+            {activeRouteState.roadMatching && !['not_requested', 'matched', 'disabled'].includes(activeRouteState.roadMatching.status) && (
+              <p className="report-route-history__status">{activeRouteState.roadMatching.status === 'partial'
+                ? 'Only some segments could be matched confidently. Uncertain sections remain unconnected.'
+                : activeRouteState.roadMatching.status === 'insufficient_movement'
+                  ? 'Insufficient reliable movement to estimate a road route.'
+                  : activeRouteState.roadMatching.status === 'trace_too_large'
+                    ? 'This trace exceeds the road estimation limit. Recorded GPS layers remain available.'
+                    : 'A confident road estimate is unavailable. Recorded GPS layers remain available.'}</p>
             )}
             {['empty', 'error'].includes(activeRouteState.status) && (
               <p className={`report-route-history__status report-route-history__status--${activeRouteState.status}`}>
@@ -442,7 +489,7 @@ function ReportDetailDrawer({ report, ...props }) {
     const timer = setTimeout(() => setRetained({ input: null, report: null }), reduced ? 0 : 220)
     return () => clearTimeout(timer)
   }, [isClosing])
-  return displayed ? <ReportDrawerContent {...props} report={displayed} isClosing={isClosing} /> : null
+  return displayed ? <ReportDrawerContent key={displayed.id} {...props} report={displayed} isClosing={isClosing} /> : null
 }
 
 export default ReportDetailDrawer

@@ -1,4 +1,5 @@
 const { asDate } = require('./domain')
+const createReportRoadMatchingService = require('./reportRoadMatchingService')
 
 const REPORT_ROUTE_BEFORE_MS = 30 * 60 * 1000
 const REPORT_ROUTE_AFTER_MS = 15 * 60 * 1000
@@ -25,7 +26,8 @@ const serializeRoutePoint = (entry) => ({
 	recorded_at: new Date(entry.recordedAt).toISOString(),
 })
 
-const createReportRouteService = ({ Report, LocationHistory, now = () => new Date() }) => {
+const createReportRouteService = ({ Report, LocationHistory, now = () => new Date(),
+	roadMatchingService = createReportRoadMatchingService() }) => {
 	const computeSnapshot = async (report) => {
 		const { from, to } = getReportRouteWindow(report)
 		const history = await LocationHistory.find({
@@ -97,7 +99,7 @@ const createReportRouteService = ({ Report, LocationHistory, now = () => new Dat
 		return finalized
 	}
 
-	const getRoute = async (reportId) => {
+	const getRoute = async (reportId, { roadMatch = false } = {}) => {
 		const report = await Report.findOne({ reportNumber: reportId }).lean()
 		if (!report) return null
 		const { from, to, points } = await computeSnapshot(report)
@@ -110,6 +112,8 @@ const createReportRouteService = ({ Report, LocationHistory, now = () => new Dat
 				complete: now().getTime() >= to.getTime(),
 			},
 			points: points.map(serializeRoutePoint),
+			road_matching: roadMatch ? await roadMatchingService.match(points.map(serializeRoutePoint))
+				: { available: roadMatchingService.isAvailable(), status: 'not_requested', segments: [], inference: true },
 		}
 	}
 

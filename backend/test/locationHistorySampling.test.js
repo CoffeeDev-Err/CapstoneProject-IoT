@@ -57,16 +57,25 @@ it('records successive ten-second GPS fixes and preserves quality in history', a
 	assert.equal(history[3].accuracy, 4)
 })
 
-it('keeps sub-ten-second updates live but never duplicates or reorders history', async () => {
+it('saves each new GPS fix, including sub-ten-second fixes, without duplicates or reordering', async () => {
 	const { service, payload, history, current } = setup()
 	await service.ingestLocation(payload(0))
 	const subInterval = await service.ingestLocation(payload(5))
 	assert.equal(subInterval.accepted, true)
-	assert.equal(subInterval.historySampled, false)
+	assert.equal(subInterval.historySampled, true)
 	assert.equal(current().recordedAt.toISOString(), payload(5).recorded_at)
 	assert.equal((await service.ingestLocation(payload(5))).reason, 'stale_location')
 	assert.equal((await service.ingestLocation(payload(0))).accepted, false)
 	assert.equal((await service.ingestLocation(payload(10))).historySampled, true)
+	assert.equal(history.length, 3)
+	assert.deepEqual(history[1].location.coordinates, [payload(5).longitude, payload(5).latitude])
+})
+
+it('retains the simulated-reading sampling limit independently of real GPS fixes', async () => {
+	const { service, payload, history } = setup()
+	await service.ingestLocation(payload(0, { source: 'mock' }))
+	assert.equal((await service.ingestLocation(payload(5, { source: 'mock' }))).historySampled, false)
+	assert.equal((await service.ingestLocation(payload(30, { source: 'mock' }))).historySampled, true)
 	assert.equal(history.length, 2)
 })
 
