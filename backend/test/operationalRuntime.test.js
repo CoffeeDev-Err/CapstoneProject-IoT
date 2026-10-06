@@ -13,6 +13,7 @@ describe('operational runtime', () => {
 			personnelService: {
 				emitPersonnelCollection: () => calls.push('broadcast'),
 				getPersonnelWithLocations: async () => [],
+				evaluatePersonnelGeofences: async () => calls.push('geofences'),
 			},
 			flespiSyncService: { syncAssignedLocations: async () => { syncs += 1; return { accepted: 1 } } },
 			createFlespiMqttService: () => ({ start: () => true, isConnected: () => true, stop: () => {} }),
@@ -31,7 +32,7 @@ describe('operational runtime', () => {
 			now = 9000
 			await runtime.runFlespiFallbackSync()
 			assert.equal(syncs, 2, 'A silent MQTT connection must not stop REST reconciliation')
-			assert.deepEqual(calls, ['broadcast', 'arrivals', 'broadcast', 'arrivals'])
+			assert.deepEqual(calls, ['geofences', 'broadcast', 'arrivals', 'geofences', 'broadcast', 'arrivals'])
 		} finally {
 			runtime.stop()
 		}
@@ -83,4 +84,72 @@ describe('operational runtime', () => {
 		assert.deepEqual(calls, ['deployments', 'arrivals', 'gps-availability', 'battery', 'inactivity', 'geofences', 'reports'])
 		runtime.stop()
 	})
+})
+
+it('checks accepted telemetry immediately and serializes it with the lifecycle fallback', async () => {
+	let release
+	let entered
+	const started = new Promise((resolve) => { entered = resolve })
+	let checks = 0
+	let active = 0
+	let maxActive = 0
+	let arrivals = 0
+	const runtime = createOperationalRuntime({
+		io: {}, isDatabaseReady: () => true,
+		operationalService: {
+			reconcileDeploymentShifts: async () => {},
+			reconcileTaskArrivals: async () => { arrivals += 1 },
+			finalizeReportRouteSnapshots: async () => {},
+		},
+		personnelService: {
+			emitPersonnelCollection: () => {}, getPersonnelWithLocations: async () => [],
+			evaluatePersonnelGpsAvailability: async () => {},
+			evaluatePersonnelBattery: async () => {}, evaluatePersonnelInactivity: async () => {},
+			evaluatePersonnelGeofences: async () => {
+				checks += 1
+				active += 1
+				maxActive = Math.max(maxActive, active)
+				if (checks === 1) {
+					entered()
+					await new Promise((resolve) => { release = resolve })
+				}
+				active -= 1
+			},
+		},
+		flespiSyncService: { syncAssignedLocations: async () => ({ accepted: 1 }) },
+		logger: { error: () => assert.fail('No runtime errors expected') },
+	})
+	const sync = runtime.broadcastFlespiLocations({ deviceIds: ['tracker-1'] })
+	await started
+	const fallback = runtime.runOperationalLifecycleCheck()
+	await new Promise((resolve) => setImmediate(resolve))
+	assert.equal(checks, 1, 'Fallback must not overlap the telemetry check')
+	release()
+	await Promise.all([sync, fallback])
+	assert.equal(checks, 2, 'A check requested during an active pass must not be dropped')
+	assert.equal(maxActive, 1)
+	assert.equal(arrivals, 2, 'Both existing arrival paths still run')
+})
+
+it('ignores unchanged telemetry and keeps broadcasts and arrivals working after a geofence failure', async () => {
+	let accepted = 0
+	let checks = 0
+	const calls = []
+	const runtime = createOperationalRuntime({
+		io: {}, isDatabaseReady: () => true,
+		operationalService: { reconcileTaskArrivals: async () => calls.push('arrivals') },
+		personnelService: {
+			evaluatePersonnelGeofences: async () => { checks += 1; throw new Error('temporary failure') },
+			emitPersonnelCollection: () => calls.push('broadcast'), getPersonnelWithLocations: async () => [],
+		},
+		flespiSyncService: { syncAssignedLocations: async () => ({ accepted }) },
+		logger: { error: () => calls.push('error') },
+	})
+	await runtime.broadcastFlespiLocations()
+	assert.equal(checks, 0)
+	accepted = 1
+	await runtime.broadcastFlespiLocations()
+	await runtime.broadcastFlespiLocations()
+	assert.equal(checks, 2, 'A failed check must release its lock for the next reading')
+	assert.deepEqual(calls, ['error', 'broadcast', 'arrivals', 'error', 'broadcast', 'arrivals'])
 })

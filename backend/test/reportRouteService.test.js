@@ -14,6 +14,9 @@ describe('report route service', () => {
 			location: { type: 'Point', coordinates: [121.7, 17.4] },
 			recordedAt: new Date('2026-08-27T10:00:00.000Z'),
 			source: 'gps',
+			positionValid: true,
+			satellites: 9,
+			accuracy: 4,
 		}
 		const report = {
 			reportNumber: 'R-1',
@@ -35,6 +38,9 @@ describe('report route service', () => {
 		report.save = async () => { saved = true }
 		const route = await service.getRoute('R-1')
 		assert.equal(route.points.length, 2)
+		assert.equal(route.points[0].position_valid, true)
+		assert.equal(route.points[0].satellites, 9)
+		assert.equal(route.points[0].accuracy, 4)
 		assert.equal(route.window.complete, true)
 		assert.equal(saved, false)
 	})

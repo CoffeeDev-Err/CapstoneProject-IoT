@@ -19,10 +19,6 @@ const createPersonnelLifecycleService = ({
 		2,
 		Math.floor(Number(process.env.GEOFENCE_CONFIRMATION_READINGS) || 2),
 	)
-	const geofenceAlertCooldownMs = Math.max(
-		1,
-		Number(process.env.GEOFENCE_ALERT_COOLDOWN_MINUTES) || 2,
-	) * 60_000
 	const gpsUnavailableGraceMs = Math.max(
 		30,
 		Number(process.env.GPS_UNAVAILABLE_ALERT_GRACE_SECONDS) || 120,
@@ -484,7 +480,6 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 			continue
 		}
 
-		const previousTransitionAt = location.geofenceTransitionAt?.getTime?.() || 0
 		const result = await CurrentLocation.updateOne(
 			{
 				_id: location._id,
@@ -510,54 +505,51 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 
 		if (previousStatus !== 'outside' && nextStatus === 'inside') continue
 		const isOutside = nextStatus === 'outside'
-		const alertSuppressed = Boolean(
-			previousTransitionAt
-			&& now.getTime() - previousTransitionAt < geofenceAlertCooldownMs,
-		)
 		const officerName = profilesById.get(location.personnelId)?.fullName || location.personnelId
-		const notification = alertSuppressed
-			? null
-			: await Promise.all([
-				deliverNotification({
-					io,
-					recipientId: location.personnelId,
-					type: isOutside ? 'geofence' : 'success',
-					title: isOutside ? 'Outside Cabagan Boundary' : 'Back Inside Boundary',
-					message: isOutside
-						? 'Your assigned GPS tracker is outside the Cabagan boundary. Return to the authorized area or contact your supervisor if this is an approved assignment.'
-						: 'Your assigned GPS tracker is back inside the allowed Cabagan boundary.',
-					referenceType: 'geofence',
-					referenceId: assignment.assignmentId,
-					priority: isOutside ? 'critical' : 'low',
-					data: {
-						destination: 'Map',
-						latitude,
-						longitude,
-						boundaryId: 'cabagan-municipal',
-						...(isOutside && { alertClass: 'gps-safety' }),
-					},
-					dedupeKey: `geofence:${assignment.assignmentId}:${nextStatus}:${now.toISOString()}`,
-				}),
-				...(isOutside ? [deliverNotification({
-					io,
-					recipientId: 'supervisor',
-					type: 'geofence',
-					title: 'Personnel Outside Cabagan Boundary',
-					message: `${officerName} moved outside the Cabagan boundary${location.locationName ? ` near ${location.locationName}` : ''}.`,
-					referenceType: 'personnel',
-					referenceId: location.personnelId,
-					priority: 'critical',
-					data: { destination: 'Map', personnelId: location.personnelId, latitude, longitude },
-					dedupeKey: `geofence:${assignment.assignmentId}:supervisor-outside:${now.toISOString()}`,
-				})] : []),
-			]).then(([officerNotification]) => officerNotification)
+		// Every confirmed crossing needs its own message. A cooldown across opposite
+		// states can leave "Back Inside" as the latest alert while the tracker is outside.
+		// Distinct readings and the conditional state update already prevent duplicates.
+		const notification = await Promise.all([
+			deliverNotification({
+				io,
+				recipientId: location.personnelId,
+				type: isOutside ? 'geofence' : 'success',
+				title: isOutside ? 'Outside Cabagan Boundary' : 'Back Inside Boundary',
+				message: isOutside
+					? 'Your assigned GPS tracker is outside the Cabagan boundary. Return to the authorized area or contact your supervisor if this is an approved assignment.'
+					: 'Your assigned GPS tracker is back inside the allowed Cabagan boundary.',
+				referenceType: 'geofence',
+				referenceId: assignment.assignmentId,
+				priority: isOutside ? 'critical' : 'low',
+				data: {
+					destination: 'Map',
+					latitude,
+					longitude,
+					boundaryId: 'cabagan-municipal',
+					...(isOutside && { alertClass: 'gps-safety' }),
+				},
+				dedupeKey: `geofence:${assignment.assignmentId}:${nextStatus}:${now.toISOString()}`,
+			}),
+			...(isOutside ? [deliverNotification({
+				io,
+				recipientId: 'supervisor',
+				type: 'geofence',
+				title: 'Personnel Outside Cabagan Boundary',
+				message: `${officerName} moved outside the Cabagan boundary${location.locationName ? ` near ${location.locationName}` : ''}.`,
+				referenceType: 'personnel',
+				referenceId: location.personnelId,
+				priority: 'critical',
+				data: { destination: 'Map', personnelId: location.personnelId, latitude, longitude },
+				dedupeKey: `geofence:${assignment.assignmentId}:supervisor-outside:${now.toISOString()}`,
+			})] : []),
+		]).then(([officerNotification]) => officerNotification)
 		const transition = {
 			...(notification || {}),
 			personnelId: location.personnelId,
 			status: nextStatus,
 			latitude,
 			longitude,
-			alertSuppressed,
+			alertSuppressed: false,
 		}
 		transitions.push(transition)
 		io?.emit('geofence:transition', transition)

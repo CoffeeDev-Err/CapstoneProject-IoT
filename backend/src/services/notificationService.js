@@ -1,9 +1,15 @@
 const { randomUUID } = require('crypto')
+const { EventEmitter } = require('node:events')
 const { Notification, PushDevice } = require('../models')
 const { findCursorPage } = require('./operations/pagination')
 
 const PERSONNEL_ROOM_PREFIX = 'personnel:'
 const SUPERVISOR_ROOM = 'role:supervisor'
+const pushQueueEvents = new EventEmitter()
+const onPushQueued = (listener) => {
+	pushQueueEvents.on('queued', listener)
+	return () => pushQueueEvents.off('queued', listener)
+}
 const LEGACY_SUPERVISOR_SELF_NOTIFICATION_TITLES = [
 	'Deployment Updated',
 	'Officer Account Created',
@@ -69,6 +75,7 @@ const createNotificationRecord = async ({
 			dedupeKey,
 			pushQueuePending: queuePush && recipientId !== 'supervisor' && recipientId !== 'all',
 		})
+		if (notification.pushQueuePending) pushQueueEvents.emit('queued')
 		return { notification: toNotificationPayload(notification), created: true }
 	} catch (error) {
 		if (error?.code !== 11000 || !dedupeKey) throw error
@@ -212,6 +219,7 @@ module.exports = {
 	markAllNotificationsRead,
 	markTaskInboxNotificationsRead,
 	markNotificationRead,
+	onPushQueued,
 	registerPushDevice,
 	toNotificationPayload,
 	unregisterPushDevice,

@@ -66,6 +66,8 @@ const reportEvidenceCorrectionSchema = new mongoose.Schema({
 const reportRoutePointSchema = new mongoose.Schema({
 	location: { type: pointSchema, required: true },
 	accuracy: { type: Number, min: 0.1, max: 5000 },
+	positionValid: Boolean,
+	satellites: { type: Number, min: 0, max: 255 },
 	speed: { type: Number, min: 0, max: 300 },
 	heading: { type: Number, min: 0, max: 359.999 },
 	source: { type: String, enum: ['gps', 'mock'], default: 'gps' },

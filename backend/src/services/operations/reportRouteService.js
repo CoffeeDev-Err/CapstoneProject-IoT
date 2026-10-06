@@ -17,6 +17,8 @@ const serializeRoutePoint = (entry) => ({
 	latitude: entry.location.coordinates[1],
 	longitude: entry.location.coordinates[0],
 	accuracy: entry.accuracy ?? null,
+	position_valid: entry.positionValid ?? null,
+	satellites: entry.satellites ?? null,
 	speed: entry.speed ?? null,
 	heading: entry.heading ?? null,
 	source: entry.source || 'gps',
@@ -43,6 +45,8 @@ const createReportRouteService = ({ Report, LocationHistory, now = () => new Dat
 			merged.set(key, {
 				location: entry.location,
 				accuracy: entry.accuracy,
+				positionValid: entry.positionValid,
+				satellites: entry.satellites,
 				speed: entry.speed,
 				heading: entry.heading,
 				source: entry.source || 'gps',

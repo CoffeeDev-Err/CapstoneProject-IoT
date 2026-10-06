@@ -7,6 +7,9 @@ const TELEMETRY_PARAMETERS = [
 	'position.longitude',
 	'position.speed',
 	'position.direction',
+	'position.valid',
+	'position.satellites',
+	'position.accuracy',
 	'timestamp',
 	'server.timestamp',
 	'battery.level',
@@ -114,6 +117,11 @@ const fetchRegisteredDevices = async ({ forceRefresh = false } = {}) => {
 };
 
 const readTelemetry = (telemetry, parameter) => telemetry?.[parameter];
+const telemetryNumber = (value) => (
+	value === null || value === undefined || value === '' || typeof value === 'boolean'
+		? Number.NaN
+		: Number(value)
+);
 
 const fetchLatestTelemetry = async ({ deviceIds = [] } = {}) => {
 	const selector = [...new Set(deviceIds.map(String).filter(Boolean))].join(',');
@@ -131,20 +139,30 @@ const fetchLatestTelemetry = async ({ deviceIds = [] } = {}) => {
 		const trackerTimestamp = readTelemetry(telemetry, 'timestamp');
 		const serverTimestamp = readTelemetry(telemetry, 'server.timestamp');
 		const positionTimestamp = Math.max(
-			Number(latitude?.ts) || 0,
-			Number(longitude?.ts) || 0,
+			telemetryNumber(latitude?.ts) || 0,
+			telemetryNumber(longitude?.ts) || 0,
 		);
+		// Telemetry parameters update independently. A heartbeat/battery message
+		// must not make cached coordinates look like a fresh GPS fix.
+		const recordedAt = positionTimestamp || telemetryNumber(trackerTimestamp?.value)
+			|| telemetryNumber(serverTimestamp?.value);
+		const readPositionParameter = (parameter) => {
+			const entry = readTelemetry(telemetry, parameter);
+			return telemetryNumber(entry?.ts) >= recordedAt ? entry?.value : undefined;
+		};
+		const positionValid = readPositionParameter('position.valid');
 
 		return {
 			deviceId: String(item.id),
-			latitude: Number(latitude?.value),
-			longitude: Number(longitude?.value),
-			speed: Number(readTelemetry(telemetry, 'position.speed')?.value),
-			heading: Number(readTelemetry(telemetry, 'position.direction')?.value),
-			batteryLevel: Number(readTelemetry(telemetry, 'battery.level')?.value),
-			recordedAt: Number(trackerTimestamp?.value)
-				|| positionTimestamp
-				|| Number(serverTimestamp?.value),
+			latitude: telemetryNumber(latitude?.value),
+			longitude: telemetryNumber(longitude?.value),
+			speed: telemetryNumber(readPositionParameter('position.speed')),
+			heading: telemetryNumber(readPositionParameter('position.direction')),
+			positionValid: typeof positionValid === 'boolean' ? positionValid : undefined,
+			satellites: telemetryNumber(readPositionParameter('position.satellites')),
+			accuracy: telemetryNumber(readPositionParameter('position.accuracy')),
+			batteryLevel: telemetryNumber(readTelemetry(telemetry, 'battery.level')?.value),
+			recordedAt,
 			receivedAt: Number(serverTimestamp?.value) || null,
 		};
 	});

@@ -176,7 +176,11 @@ const pushDeliveryRuntime = createPushDeliveryRuntime({
 	service: createPushDeliveryService(),
 	isDatabaseReady: () => mongoose.connection.readyState === 1,
 })
-server.on('close', () => pushDeliveryRuntime.stop())
+const unsubscribePushQueue = notificationService.onPushQueued(() => void pushDeliveryRuntime.tick())
+server.on('close', () => {
+	unsubscribePushQueue()
+	pushDeliveryRuntime.stop()
+})
 
 const start = async () => {
 	try {

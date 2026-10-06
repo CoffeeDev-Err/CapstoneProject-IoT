@@ -27,7 +27,27 @@ const createOperationalRuntime = ({
 	const pendingFlespiDeviceIds = new Set()
 	let flespiMqttService = null
 	let lifecycleCheckRunning = false
+	let geofenceCheckPromise = null
+	let geofenceCheckPending = false
 	const timers = new Set()
+
+	const runGeofenceCheck = () => {
+		geofenceCheckPending = true
+		if (geofenceCheckPromise) return geofenceCheckPromise
+		geofenceCheckPromise = Promise.resolve().then(async () => {
+			try {
+				do {
+					geofenceCheckPending = false
+					await evaluatePersonnelGeofences({ io })
+				} while (geofenceCheckPending && isDatabaseReady())
+			} catch (error) {
+				logger.error('Personnel geofence check failed:', error.message)
+			} finally {
+				geofenceCheckPromise = null
+			}
+		})
+		return geofenceCheckPromise
+	}
 
 	const broadcastMockLocations = async () => {
 		if (locationUpdateRunning || !isDatabaseReady()) return
@@ -61,6 +81,7 @@ const createOperationalRuntime = ({
 					deviceIds: selectedDeviceIds,
 				})
 				if (result.accepted > 0) {
+					await runGeofenceCheck()
 					emitPersonnelCollection(io, 'personnel:update', await getPersonnelWithLocations())
 					await operationalService.reconcileTaskArrivals()
 				}
@@ -92,7 +113,7 @@ const createOperationalRuntime = ({
 			await evaluatePersonnelGpsAvailability({ io })
 			await evaluatePersonnelBattery({ io })
 			await evaluatePersonnelInactivity({ io })
-			await evaluatePersonnelGeofences({ io })
+			await runGeofenceCheck()
 			await operationalService.finalizeReportRouteSnapshots()
 		} catch (error) {
 			logger.error('Operational lifecycle check failed:', error.message)

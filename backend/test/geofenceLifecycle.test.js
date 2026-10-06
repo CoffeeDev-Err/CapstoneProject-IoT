@@ -7,7 +7,7 @@ const applyUpdate = (target, update) => {
 	for (const key of Object.keys(update.$unset || {})) delete target[key]
 }
 
-it('requires distinct accurate GPS readings and cools down rapid geofence reversals', async () => {
+it('requires distinct accurate GPS readings and notifies each confirmed boundary crossing', async () => {
 	const baseTime = new Date('2026-09-14T00:00:00.000Z')
 	const location = {
 		_id: 'location-1',
@@ -97,14 +97,39 @@ it('requires distinct accurate GPS readings and cools down rapid geofence revers
 	})
 	assert.equal(result.length, 1)
 	assert.equal(location.geofenceStatus, 'inside')
-	assert.equal(notifications.length, 2)
-	assert.equal(result[0].alertSuppressed, true)
+	assert.equal(notifications.length, 3)
+	assert.equal(notifications[2].title, 'Back Inside Boundary')
+	assert.equal(result[0].alertSuppressed, false)
 
+	// A new exit shortly after a return must not leave the return as the latest alert.
 	location.location.coordinates = [0, 0]
-	location.accuracy = 250
 	location.recordedAt = new Date(baseTime.getTime() + 40_000)
 	location.updatedAt = location.recordedAt
 	await service.evaluatePersonnelGeofences({ now: new Date(baseTime.getTime() + 41_000) })
-	assert.equal(location.geofenceStatus, 'inside')
+	location.recordedAt = new Date(baseTime.getTime() + 50_000)
+	location.updatedAt = location.recordedAt
+	result = await service.evaluatePersonnelGeofences({
+		now: new Date(baseTime.getTime() + 51_000),
+	})
+	assert.equal(result.length, 1)
+	assert.equal(location.geofenceStatus, 'outside')
+	assert.equal(result[0].alertSuppressed, false)
+	assert.equal(notifications.length, 5)
+	assert.equal(notifications[3].title, 'Outside Cabagan Boundary')
+	assert.equal(notifications[3].type, 'geofence')
+	assert.equal(notifications[4].recipientId, 'supervisor')
+	result = await service.evaluatePersonnelGeofences({
+		now: new Date(baseTime.getTime() + 52_000),
+	})
+	assert.equal(result.length, 0)
+	assert.equal(notifications.length, 5)
+
+	location.location.coordinates = [121.77, 17.42]
+	location.accuracy = 250
+	location.recordedAt = new Date(baseTime.getTime() + 60_000)
+	location.updatedAt = location.recordedAt
+	await service.evaluatePersonnelGeofences({ now: new Date(baseTime.getTime() + 61_000) })
+	assert.equal(location.geofenceStatus, 'outside')
 	assert.equal(location.geofenceCandidateCount, 0)
+	assert.equal(notifications.length, 5)
 })

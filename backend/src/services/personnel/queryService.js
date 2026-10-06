@@ -249,6 +249,8 @@ const getLocationHistory = async (personnelId, query = {}) => {
 			personnel_id: location.personnelId,
 			...readCoordinates(location.location),
 			accuracy: location.accuracy,
+			position_valid: location.positionValid,
+			satellites: location.satellites,
 			speed: location.speed,
 			heading: location.heading,
 			source: location.source,

@@ -338,8 +338,8 @@ function ReportDrawerContent({
 
             <div className="report-route-history">
               <div>
-                <strong>Officer route near report</strong>
-                <span>Saved snapshot from 30 minutes before to 15 minutes after the report time</span>
+                <strong>Officer GPS history near report</strong>
+                <span>Saved GPS snapshot from 30 minutes before to 15 minutes after the incident / activity time</span>
               </div>
               <button
                 type="button"
@@ -365,7 +365,7 @@ function ReportDrawerContent({
 
             {activeRouteState.status === 'loaded' && (
               <p className="report-route-history__status">
-                {activeRouteState.points.length} GPS samples shown from{' '}
+                {activeRouteState.points.length} GPS samples recorded from{' '}
                 {formatDateTime(activeRouteState.from)} to {formatDateTime(activeRouteState.to)}.
               </p>
             )}

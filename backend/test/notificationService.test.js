@@ -3,6 +3,29 @@ const { it } = require('node:test')
 const { Notification } = require('../src/models')
 const notificationService = require('../src/services/notificationService')
 
+it('wakes the push worker only after persisting new officer push intent', async (t) => {
+	let saved = false
+	let wakeups = 0
+	const unsubscribe = notificationService.onPushQueued(() => {
+		assert.equal(saved, true)
+		wakeups += 1
+	})
+	t.mock.method(Notification, 'create', async (payload) => {
+		saved = true
+		return { ...payload, createdAt: new Date() }
+	})
+	try {
+		await notificationService.deliverNotification({ recipientId: 'PNP-001', title: 'Outside', message: 'Return inside' })
+		assert.equal(wakeups, 1)
+		await notificationService.deliverNotification({ title: 'Supervisor', message: 'Boundary alert' })
+		await notificationService.createNotification({ recipientId: 'PNP-001', title: 'Record', message: 'Saved' })
+		assert.equal(wakeups, 1)
+		unsubscribe()
+		await notificationService.deliverNotification({ recipientId: 'PNP-001', title: 'Inside', message: 'Returned' })
+		assert.equal(wakeups, 1)
+	} finally { unsubscribe() }
+})
+
 it('saves push intent with the in-app notification before emitting realtime updates', async (t) => {
 	let record
 	const events = []

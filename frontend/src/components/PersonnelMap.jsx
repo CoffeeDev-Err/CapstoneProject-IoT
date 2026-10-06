@@ -7,6 +7,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
+import { createMapMarkerAnimator } from '../utils/mapMarkerAnimator'
+import { getMapPerformanceOptions } from '../utils/mapPerformance'
 import '../services/configureMapLibre'
 import MapAttribution from './MapAttribution'
 import GpsReadingAge from './GpsReadingAge'
@@ -31,7 +33,6 @@ import {
   MARKER_ANIMATION_DURATION_MS,
   confirmedFixFromMember,
   effectiveMarkerTarget,
-  interpolateLatLng,
   markerMotionForFixes,
 } from '../utils/mapMotion'
 
@@ -205,6 +206,9 @@ function PersonnelMap({
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
+  const animatorRef = useRef(null)
+  if (animatorRef.current === null) animatorRef.current = createMapMarkerAnimator()
+  const onSelectPersonnelRef = useRef(onSelectPersonnel)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
   const markerStatesRef = useRef(new Map())
   const clusterMarkerStatesRef = useRef(new Map())
@@ -221,12 +225,16 @@ function PersonnelMap({
   const followedPersonnel = personnel.find((member) => member.id === followedPersonnelId) || null
 
   useEffect(() => {
+    onSelectPersonnelRef.current = onSelectPersonnel
+  }, [onSelectPersonnel])
+
+  useEffect(() => {
     followedPersonnelIdRef.current = followedPersonnelId
   }, [followedPersonnelId])
 
   const clearClusterMarkers = useCallback(() => {
     clusterMarkerStatesRef.current.forEach((state) => {
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      animatorRef.current.cancel(state)
       state.marker.remove()
     })
     clusterMarkerStatesRef.current.clear()
@@ -235,7 +243,7 @@ function PersonnelMap({
   const renderClusters = useCallback(() => {
     const map = mapRef.current
     const index = clusterIndexRef.current
-    if (!map || !index || !map.isStyleLoaded()) return
+    if (!map || !index) return
 
     const bounds = map.getBounds()
     const clusters = index.getClusters(
@@ -307,37 +315,35 @@ function PersonnelMap({
         && state.targetPosition[1] === target[1]
       state.targetPosition = target
       if (targetUnchanged && state.animationFrame) return
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      animatorRef.current.cancel(state)
       state.animationFrame = null
       if (from[0] === target[0] && from[1] === target[1]) return
-      const startTime = performance.now()
-      let lastRenderedAt = 0
-      const tick = (now) => {
-        const progress = Math.min((now - startTime) / animationDurationMs, 1)
-        if (progress < 1 && now - lastRenderedAt < 1000 / 30) {
-          state.animationFrame = requestAnimationFrame(tick)
-          return
-        }
-        lastRenderedAt = now
-        const nextPosition = interpolateLatLng(from, target, progress)
-        state.currentPosition = nextPosition
-        state.marker.setLngLat([nextPosition[1], nextPosition[0]])
-        if (progress < 1) state.animationFrame = requestAnimationFrame(tick)
-        else state.animationFrame = null
-      }
-      state.animationFrame = requestAnimationFrame(tick)
+      animatorRef.current.animate(state, from, target, animationDurationMs)
     })
 
     clusterMarkerStatesRef.current.forEach((state, clusterKey) => {
       if (activeClusterKeys.has(clusterKey)) return
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      animatorRef.current.cancel(state)
       state.marker.remove()
       clusterMarkerStatesRef.current.delete(clusterKey)
     })
 
     markerStatesRef.current.forEach((state, memberId) => {
       const shouldRender = visibleMemberIds.has(String(memberId))
-        || state.element.classList.contains('is-followed')
+        || memberId === followedPersonnelIdRef.current
+      if (shouldRender && !state.marker) {
+        const visual = createPersonnelMarkerElement(state.member, () => {
+          const latest = markerStatesRef.current.get(memberId)
+          if (latest) onSelectPersonnelRef.current(latest.member)
+        })
+        Object.assign(state, {
+          marker: new maplibregl.Marker({ element: visual.button, anchor: 'bottom' })
+            .setLngLat([state.currentPosition[1], state.currentPosition[0]]),
+          element: visual.button, photo: visual.photo, initials: visual.initials,
+          pin: visual.pin, statusCue: visual.statusCue,
+        })
+        state.element.classList.toggle('is-followed', memberId === followedPersonnelIdRef.current)
+      }
       if (shouldRender && !state.isOnMap) {
         state.marker.addTo(map)
         state.isOnMap = true
@@ -345,12 +351,14 @@ function PersonnelMap({
       }
       if (shouldRender || !state.isOnMap) return
 
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      animatorRef.current.cancel(state)
       state.animationFrame = null
       state.currentPosition = [...state.targetPosition]
       state.marker.setLngLat([state.targetPosition[1], state.targetPosition[0]])
       state.marker.remove()
       state.isOnMap = false
+      // Release hidden DOM/images; the lightweight GPS state remains current.
+      state.marker = state.element = state.photo = state.initials = state.pin = state.statusCue = null
     })
   }, [])
 
@@ -404,6 +412,7 @@ function PersonnelMap({
     if (!hasMapTilerWebApiKey || !containerRef.current) return undefined
 
     const map = new maplibregl.Map({
+      ...getMapPerformanceOptions(),
       container: containerRef.current,
       style: getMapTilerWebStyleUrl('street', initialIsDark),
       center: LIVE_MAP_DEFAULT_CENTER,
@@ -424,7 +433,7 @@ function PersonnelMap({
       addOperationalLayers(map)
       applyThreeDimensionalTerrain(map, threeDRef.current)
       setMapReady(true)
-      map.once('idle', rebuildClusterIndex)
+      rebuildClusterIndex()
     }
     let clusterZoomBucket = Math.floor(map.getZoom())
     const handleZoom = () => {
@@ -458,13 +467,14 @@ function PersonnelMap({
       map.off('zoom', handleZoom)
       map.off('moveend', handleMoveEnd)
       markerStates.forEach((state) => {
-        if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
-        state.marker.remove()
+        animatorRef.current.cancel(state)
+        state.marker?.remove()
       })
       markerStates.clear()
       clusterIndexRef.current = null
       clusterCacheRef.current = null
       clearClusterMarkers()
+      animatorRef.current.clear()
       map.remove()
       mapRef.current = null
     }
@@ -479,27 +489,16 @@ function PersonnelMap({
     const validIds = new Set(validPersonnel.map((member) => member.id))
     markerStatesRef.current.forEach((state, id) => {
       if (validIds.has(id)) return
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
-      state.marker.remove()
+      animatorRef.current.cancel(state)
+      state.marker?.remove()
       markerStatesRef.current.delete(id)
     })
 
     validPersonnel.forEach((member) => {
       let state = markerStatesRef.current.get(member.id)
       if (!state) {
-        const markerElement = createPersonnelMarkerElement(member, () => {
-          const latestState = markerStatesRef.current.get(member.id)
-          if (latestState) onSelectPersonnel(latestState.member)
-        })
-        const marker = new maplibregl.Marker({ element: markerElement.button, anchor: 'bottom' })
-          .setLngLat([Number(member.longitude), Number(member.latitude)])
         state = {
-          marker,
-          element: markerElement.button,
-          photo: markerElement.photo,
-          initials: markerElement.initials,
-          pin: markerElement.pin,
-          statusCue: markerElement.statusCue,
+          marker: null, element: null, photo: null, initials: null, pin: null, statusCue: null,
           member,
           currentPosition: [Number(member.latitude), Number(member.longitude)],
           targetPosition: [Number(member.latitude), Number(member.longitude)],
@@ -512,18 +511,20 @@ function PersonnelMap({
       }
 
       state.member = member
-      state.element.classList.toggle('is-followed', member.id === followedPersonnelId)
-      state.element.setAttribute('aria-label', `View ${member.name} on live map`)
-      state.pin.className = `police-marker ${getMarkerClass(member)}`
-      updateMarkerSecondaryTone(state.pin, member)
-      updateMarkerCue(state.statusCue, member)
-      const nextPhoto = member.photoUrl || ''
-      if (state.photo.dataset.intendedSource !== nextPhoto) {
-        state.photo.dataset.intendedSource = nextPhoto
-        state.initials.textContent = getInitials(member.name)
-        state.photo.hidden = !nextPhoto
-        state.initials.hidden = Boolean(nextPhoto)
-        if (nextPhoto) state.photo.src = nextPhoto
+      if (state.element) {
+        state.element.classList.toggle('is-followed', member.id === followedPersonnelId)
+        state.element.setAttribute('aria-label', `View ${member.name} on live map`)
+        state.pin.className = `police-marker ${getMarkerClass(member)}`
+        updateMarkerSecondaryTone(state.pin, member)
+        updateMarkerCue(state.statusCue, member)
+        const nextPhoto = member.photoUrl || ''
+        if (state.photo.dataset.intendedSource !== nextPhoto) {
+          state.photo.dataset.intendedSource = nextPhoto
+          state.initials.textContent = getInitials(member.name)
+          state.photo.hidden = !nextPhoto
+          state.initials.hidden = Boolean(nextPhoto)
+          if (nextPhoto) state.photo.src = nextPhoto
+        }
       }
 
       const confirmedFix = confirmedFixFromMember(member)
@@ -543,12 +544,12 @@ function PersonnelMap({
       state.confirmedFix = confirmedFix
       state.targetPosition = target
       state.motionDuration = motion.durationMs
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame)
+      animatorRef.current.cancel(state)
       state.animationFrame = null
       if (from[0] === target[0] && from[1] === target[1]) return
       if (!state.isOnMap && member.id !== followedPersonnelId) {
         state.currentPosition = target
-        state.marker.setLngLat([target[1], target[0]])
+        state.marker?.setLngLat([target[1], target[0]])
         return
       }
       if (member.id === followedPersonnelId) {
@@ -558,28 +559,12 @@ function PersonnelMap({
           essential: true,
         })
       }
-      const startTime = performance.now()
-      let lastRenderedAt = 0
-
-      const tick = (now) => {
-        const progress = Math.min((now - startTime) / motion.durationMs, 1)
-        if (progress < 1 && now - lastRenderedAt < 1000 / 30) {
-          state.animationFrame = requestAnimationFrame(tick)
-          return
-        }
-        lastRenderedAt = now
-        const nextPosition = interpolateLatLng(from, target, progress)
-        state.currentPosition = nextPosition
-        state.marker.setLngLat([nextPosition[1], nextPosition[0]])
-        if (progress < 1) state.animationFrame = requestAnimationFrame(tick)
-        else state.animationFrame = null
-      }
-      state.animationFrame = requestAnimationFrame(tick)
+      animatorRef.current.animate(state, from, target, motion.durationMs)
     })
 
     rebuildClusterIndex()
     return undefined
-  }, [followedPersonnelId, onSelectPersonnel, personnel, rebuildClusterIndex])
+  }, [followedPersonnelId, personnel, rebuildClusterIndex])
 
   useEffect(() => {
     const map = mapRef.current

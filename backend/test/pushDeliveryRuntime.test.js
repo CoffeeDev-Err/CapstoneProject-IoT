@@ -49,3 +49,23 @@ it('starts once, drains immediately, and stops the polling timer', async (t) => 
 	runtime.stop()
 	assert.equal(cleared, 42)
 })
+
+it('drains new push intent arriving during a pass without waiting for the timer or overlapping workers', async () => {
+	let release
+	let calls = 0
+	const runtime = createRuntime({
+		isDatabaseReady: () => true,
+		service: { runOnce: async () => {
+			calls += 1
+			if (calls === 1) await new Promise((resolve) => { release = resolve })
+		} },
+	})
+	const first = runtime.tick()
+	await runtime.tick()
+	await runtime.tick()
+	assert.equal(calls, 1)
+	release()
+	await first
+	assert.equal(calls, 2, 'Concurrent wakeups coalesce into one additional queue pass')
+	runtime.stop()
+})

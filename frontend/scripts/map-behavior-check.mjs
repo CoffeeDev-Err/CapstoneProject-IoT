@@ -161,7 +161,7 @@ assert.match(
 )
 assert.match(
   personnelMapSource,
-  /state\.marker\.setLngLat\(\[nextPosition\[1\], nextPosition\[0\]\]\)/,
+  /animatorRef\.current\.animate\(state, from, target, animationDurationMs\)/,
   'Web cluster centroids must animate between GPS fixes',
 )
 assert.match(personnelMapSource, /PERSONNEL_CLUSTER_MAX_ZOOM = 17/, 'Zoom 18 must reveal individual markers')
@@ -169,7 +169,7 @@ assert.match(personnelMapSource, /PERSONNEL_CLUSTER_RADIUS = 56/, 'Cluster radiu
 assert.match(personnelMapSource, /STREET_FOCUS_ZOOM = 16/, 'Following must preserve street-map context')
 assert.match(personnelMapSource, /SATELLITE_FOCUS_ZOOM = 15/, 'Following must not over-zoom satellite imagery')
 assert.match(personnelMapSource, /member\.id === followedPersonnelId/, 'The map must follow only the selected officer')
-assert.match(personnelMapSource, /classList\.contains\('is-followed'\)/, 'The followed officer must remain visible outside clusters')
+assert.match(personnelMapSource, /memberId === followedPersonnelIdRef\.current/, 'The followed officer must remain visible outside clusters')
 assert.match(
   monitoringStyles,
   /\.maplibre-personnel-marker\.is-followed\s*\{[\s\S]*?z-index:\s*10/,
@@ -185,7 +185,7 @@ assert.match(
   /is-followed \.police-marker__photo-frame[\s\S]*?var\(--marker-secondary-color, var\(--map-status-duty\)\)/,
   'Web followed markers must render the secondary operational ring instead of a fixed blue ring',
 )
-assert.match(personnelMapSource, /cancelAnimationFrame/, 'Superseded marker animations must be cancelled')
+assert.match(personnelMapSource, /animatorRef\.current\.cancel\(state\)/, 'Superseded marker animations must be cancelled')
 assert.match(personnelMapSource, /markerMotionForFixes/, 'Web markers must use adaptive confirmed-fix motion')
 assert.match(personnelMapSource, /motionDuration/, 'Web cluster centroids must inherit adaptive motion timing')
 assert.match(personnelMapSource, /map\.on\('zoom', handleZoom\)/, 'Clusters must regroup automatically while zooming')

@@ -1,3 +1,5 @@
+import { getMapPerformanceOptions } from '../utils/mapPerformance'
+import { buildReportRouteTrace } from '../utils/reportRouteTrace'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -49,6 +51,7 @@ const addReportRouteLayer = (map, data) => {
         'line-color': '#2563eb',
         'line-width': 4,
         'line-opacity': 0.88,
+        'line-dasharray': [2, 1],
       },
     })
   }
@@ -101,26 +104,25 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
   const routePositions = useMemo(() => routePoints
     .filter((point) => isValidCoordinate(point.latitude, point.longitude))
     .map((point) => [Number(point.latitude), Number(point.longitude)]), [routePoints])
+  const routeTrace = useMemo(() => buildReportRouteTrace(routePoints), [routePoints])
 
   const mapPositions = useMemo(() => (
-    incidentPosition ? [...routePositions, incidentPosition] : routePositions
-  ), [incidentPosition, routePositions])
+    [...routeTrace.segments.flat(), ...(routePositions.length ? [routePositions[0]] : []), ...(incidentPosition ? [incidentPosition] : [])]
+  ), [incidentPosition, routePositions, routeTrace])
   const mapCenter = incidentPosition || routePositions[routePositions.length - 1] || null
   const mapCenterLatitude = mapCenter?.[0] ?? null
   const mapCenterLongitude = mapCenter?.[1] ?? null
 
   const routeData = useMemo(() => featureCollection(
-    routePositions.length > 1
-      ? [{
+    routeTrace.segments.map((positions) => ({
         type: 'Feature',
         properties: { kind: 'route' },
         geometry: {
           type: 'LineString',
-          coordinates: routePositions.map(([latitude, longitude]) => [longitude, latitude]),
+          coordinates: positions.map(([latitude, longitude]) => [longitude, latitude]),
         },
-      }]
-      : [],
-  ), [routePositions])
+      })),
+  ), [routeTrace])
 
   const fitReportMap = useCallback((animate = true) => {
     const map = mapRef.current
@@ -155,8 +157,8 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
       }).setLngLat([routePositions[0][1], routePositions[0][0]]).addTo(map))
     }
 
-    if (routePositions.length > 1) {
-      const lastPosition = routePositions[routePositions.length - 1]
+    if (routeTrace.segments.length) {
+      const lastPosition = routeTrace.segments.at(-1).at(-1)
       pointMarkersRef.current.push(new maplibregl.Marker({
         element: createPointMarker({
           className: 'report-map-marker--end',
@@ -175,7 +177,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
         anchor: 'center',
       }).setLngLat([incidentPosition[1], incidentPosition[0]]).addTo(map))
     }
-  }, [incidentPosition, markerLabel, routePositions])
+  }, [incidentPosition, markerLabel, routePositions, routeTrace])
 
   useEffect(() => {
     if (
@@ -190,6 +192,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     styleSignatureRef.current = `${currentMapMode}:${currentIsDark ? 'dark' : 'light'}`
 
     const map = new maplibregl.Map({
+      ...getMapPerformanceOptions(),
       container: containerRef.current,
       style: getMapTilerWebStyleUrl(currentMapMode, currentIsDark),
       center: [mapCenterLongitude, mapCenterLatitude],
@@ -199,7 +202,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
       dragRotate: true,
       touchZoomRotate: true,
       touchPitch: true,
-      antialias: true,
+      antialias: false,
       attributionControl: false,
       fadeDuration: 180,
     })
@@ -299,10 +302,16 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
         {routePositions.length > 0 && (
           <>
             <span><i className="report-map-dot report-map-dot--start" />Route start</span>
-            <span><i className="report-map-line" />Officer route</span>
+            {routeTrace.segments.length > 0 && <span><i className="report-map-line" />Estimated GPS trace</span>}
           </>
         )}
       </div>
+      {routePoints.length > 0 && <p className="report-route-history__status">
+        GPS samples indicate approximate positions, not a verified path along roads.
+        {' '}{routeTrace.simplified} small position variations suppressed; {routeTrace.omitted} invalid or low-accuracy samples omitted from the trace.
+        {routeTrace.unknownAccuracy > 0 && ` Accuracy was not recorded for ${routeTrace.unknownAccuracy} samples.`}
+        {!routeTrace.segments.length && ' Insufficient reliable movement to draw a trace.'}
+      </p>}
     </div>
   )
 }

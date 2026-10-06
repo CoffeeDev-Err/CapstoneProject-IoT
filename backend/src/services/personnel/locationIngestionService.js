@@ -7,7 +7,8 @@ const {
 } = require('../../utils/operationalValidation')
 const { getLocationFreshness } = require('../../utils/locationFreshness')
 
-const HISTORY_SAMPLE_INTERVAL_MS = 30_000
+// Sample new fixes, never poll-time copies of the last known coordinates.
+const HISTORY_SAMPLE_INTERVAL_MS = 10_000
 
 const createLocationIngestionService = ({
 	models,
@@ -63,7 +64,9 @@ const ingestLocation = async (payload = {}) => {
 	const latitude = Number(payload.latitude)
 	const longitude = Number(payload.longitude)
 	if (
-		!Number.isFinite(latitude)
+		payload.latitude == null || payload.latitude === '' || typeof payload.latitude === 'boolean'
+		|| payload.longitude == null || payload.longitude === '' || typeof payload.longitude === 'boolean'
+		|| !Number.isFinite(latitude)
 		|| !Number.isFinite(longitude)
 		|| latitude < -90
 		|| latitude > 90
@@ -108,6 +111,16 @@ const ingestLocation = async (payload = {}) => {
 	const accuracy = validateOptionalNumber(payload.accuracy, {
 		field: 'accuracy', label: 'GPS accuracy', min: 0.1, max: 5000,
 	})
+	const positionValid = payload.position_valid ?? undefined
+	if (positionValid !== undefined && typeof positionValid !== 'boolean') {
+		throw createValidationError('GPS validity must be a boolean.', 'position_valid')
+	}
+	const satellites = validateOptionalNumber(payload.satellites, {
+		field: 'satellites', label: 'Satellite count', min: 0, max: 255,
+	})
+	if (satellites !== undefined && !Number.isInteger(satellites)) {
+		throw createValidationError('Satellite count must be a whole number.', 'satellites')
+	}
 	const submittedLocationName = validateText(payload.location_name, {
 		field: 'location_name',
 		label: 'Location name',
@@ -120,6 +133,14 @@ const ingestLocation = async (payload = {}) => {
 			personnel: serializePersonnel(profile, current, { isOnDuty: false }),
 			accepted: false,
 			reason: 'off_duty',
+			historySampled: false,
+		}
+	}
+	if (source === 'gps' && positionValid === false) {
+		return {
+			personnel: serializePersonnel(profile, current, { isOnDuty: true }),
+			accepted: false,
+			reason: 'invalid_gps_fix',
 			historySampled: false,
 		}
 	}
@@ -180,6 +201,8 @@ const ingestLocation = async (payload = {}) => {
 		locationName: submittedLocationName || current?.locationName || profile.defaultLocationName,
 		location: point(longitude, latitude),
 		accuracy,
+		positionValid,
+		satellites,
 		speed,
 		heading,
 		batteryLevel,
@@ -192,9 +215,19 @@ const ingestLocation = async (payload = {}) => {
 			: (current?.lastMovedAt || current?.recordedAt || recordedAt),
 		inactivityAlertedAt: hasMoved ? null : current?.inactivityAlertedAt,
 	}
+	// Missing quality belongs to this new fix; do not carry accuracy/validity
+	// from a previous fix into the live record. Undefined $set values are omitted.
+	const unsetFields = Object.fromEntries(
+		['accuracy', 'positionValid', 'satellites', 'speed', 'heading']
+			.filter((field) => nextLocation[field] === undefined)
+			.map((field) => [field, 1]),
+	)
 	const updated = await CurrentLocation.findOneAndUpdate(
 		{ personnelId },
-		{ $set: nextLocation },
+		{
+			$set: Object.fromEntries(Object.entries(nextLocation).filter(([, value]) => value !== undefined)),
+			...(Object.keys(unsetFields).length ? { $unset: unsetFields } : {}),
+		},
 		{ upsert: true, returnDocument: 'after' },
 	)
 
@@ -210,6 +243,8 @@ const ingestLocation = async (payload = {}) => {
 			deviceAssignmentId: assignment?.assignmentId,
 			location: nextLocation.location,
 			accuracy: nextLocation.accuracy,
+			positionValid: nextLocation.positionValid,
+			satellites: nextLocation.satellites,
 			speed: nextLocation.speed,
 			heading: nextLocation.heading,
 			source,

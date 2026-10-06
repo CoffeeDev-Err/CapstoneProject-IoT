@@ -43,6 +43,7 @@ it('requests and stores telemetry only for an officer with an active deployment'
 			fetchLatestTelemetry: async () => [{
 				deviceId: 'device-1', latitude: 17.42, longitude: 121.77,
 				batteryLevel: 19, recordedAt: recordedAt.getTime(),
+				positionValid: true, satellites: 9, accuracy: 4,
 			}],
 		},
 		personnelService: {
@@ -58,6 +59,32 @@ it('requests and stores telemetry only for an officer with an active deployment'
 	})
 	assert.deepEqual(assignmentQueries[0].personnelId, { $in: ['PNP-001'] })
 	assert.equal(ingested[0].battery_level, 19)
+	assert.equal(ingested[0].position_valid, true)
+	assert.equal(ingested[0].satellites, 9)
+	assert.equal(ingested[0].accuracy, 4)
+})
+
+it('skips invalid or stale fixes before geocoding or live ingestion', async () => {
+	let geocoded = 0
+	let ingested = 0
+	const service = createFlespiSyncService({
+		deploymentModel: { distinct: async () => ['PNP-001', 'PNP-002'] },
+		assignmentModel: { find: () => ({ lean: async () => [
+			{ personnelId: 'PNP-001', flespiDeviceId: 'device-1', imei: '123456789012345' },
+			{ personnelId: 'PNP-002', flespiDeviceId: 'device-2', imei: '123456789012346' },
+		] }) },
+		flespiService: { fetchLatestTelemetry: async () => [
+			{ deviceId: 'device-1', latitude: 17.42, longitude: 121.77,
+				positionValid: false, recordedAt: Date.now() },
+			{ deviceId: 'device-2', latitude: 17.42, longitude: 121.77,
+				recordedAt: Date.now() - 3 * 60_000 },
+		] },
+		resolveLocation: async () => { geocoded += 1 },
+		personnelService: { ingestLocation: async () => { ingested += 1 } },
+	})
+	assert.deepEqual(await service.syncAssignedLocations(), { assignments: 2, accepted: 0, skipped: 2 })
+	assert.equal(geocoded, 0)
+	assert.equal(ingested, 0)
 })
 
 it('ingests a fresh fix without waiting for a slow place-name lookup', async () => {

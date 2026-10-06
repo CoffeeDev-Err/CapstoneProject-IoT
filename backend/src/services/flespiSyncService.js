@@ -69,6 +69,7 @@ const createFlespiSyncService = ({
 			const recordedAt = toRecordedAt(telemetry?.recordedAt)
 			if (
 				!telemetry
+				|| telemetry.positionValid === false
 				|| !Number.isFinite(telemetry.latitude)
 				|| !Number.isFinite(telemetry.longitude)
 				|| !recordedAt
@@ -94,6 +95,13 @@ const createFlespiSyncService = ({
 				),
 				speed: Number.isFinite(telemetry.speed) ? telemetry.speed : undefined,
 				heading: Number.isFinite(telemetry.heading) ? telemetry.heading : undefined,
+				position_valid: telemetry.positionValid,
+				satellites: Number.isInteger(telemetry.satellites)
+					&& telemetry.satellites >= 0 && telemetry.satellites <= 255
+					? telemetry.satellites : undefined,
+				accuracy: Number.isFinite(telemetry.accuracy)
+					&& telemetry.accuracy >= 0.1 && telemetry.accuracy <= 5000
+					? telemetry.accuracy : undefined,
 				battery_level: Number.isFinite(telemetry.batteryLevel)
 					? telemetry.batteryLevel
 					: undefined,

@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { analyticsSheets, buildAnalyticsWorkbook, buildIndividualReportPdf, currentEvidence, fitImage, reportExportRows } from './reportExports'
 
 it('requests signed photo bytes through the export endpoint and explains photo network failures', async () => {
@@ -33,13 +34,22 @@ it('writes a real XLSX with matching numeric metrics, rankings and literal text 
     totalReports: 2, totalValidatedIncidents: 1, totalResolvedCases: 1, highPriorityBarangays: 1, excludedOutsideCabaganReports: 0,
     barangays: [{ barangay: 'Centro', reportCount: 2, validatedIncidentCount: 1, priorityScore: 60, priorityLevel: 'High', assignedPersonnel: 1, availablePersonnel: 1, requiredPersonnel: 2, recommendation: 'Add patrol' }] }
   const reports = [{ id: 'RPT-1', title: '=HYPERLINK("bad")', severity: 4 }]
-  const book = await buildAnalyticsWorkbook(analytics, reports, '2026-09-15T00:00:00Z')
+  const png = readFileSync('src/assets/pnp-logo.png')
+  const fetchLogo = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, arrayBuffer: async () => png })
+  let book
+  try { book = await buildAnalyticsWorkbook(analytics, reports, '2026-09-15T00:00:00Z') } finally { fetchLogo.mockRestore() }
   const bytes = await book.xlsx.writeBuffer()
   expect(bytes[0]).toBe(0x50); expect(bytes[1]).toBe(0x4b)
   const { default: ExcelJS } = await import('exceljs')
   const reread = new ExcelJS.Workbook(); await reread.xlsx.load(bytes)
-  expect(reread.getWorksheet('Report rankings').getCell('C2').value).toBe(2)
-  expect(reread.getWorksheet('Reports').getCell('D2').value).toBe('=HYPERLINK("bad")')
-  expect(reread.getWorksheet('Reports').getCell('D2').type).toBe(ExcelJS.ValueType.String)
+  expect(reread.getWorksheet('Report rankings').getCell('C9').value).toBe(2)
+  expect(reread.getWorksheet('Reports').getCell('D9').value).toBe('=HYPERLINK("bad")')
+  expect(reread.getWorksheet('Reports').getCell('D9').type).toBe(ExcelJS.ValueType.String)
+  expect(reread.worksheets).toHaveLength(5)
+  expect(reread.getWorksheet('Summary').getCell('A5').value).toContain('OPERATIONAL ANALYTICS')
+  expect(reread.getWorksheet('Summary').getColumn(2).width).toBe(58)
+  expect(reread.getWorksheet('Reports').views[0].ySplit).toBe(8)
+  expect(reread.getWorksheet('Reports').pageSetup.fitToWidth).toBe(1)
+  expect(reread.getWorksheet('Summary').getImages()).toHaveLength(1)
   expect(analyticsSheets(analytics, reports, '2026-09-15')[0].rows).toContainEqual(['Submitted Reports', 2])
 }, 30000)
