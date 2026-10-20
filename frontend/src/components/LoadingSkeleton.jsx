@@ -39,6 +39,15 @@ export function PageLoadingSkeleton({ label = 'Loading page' }) {
 }
 
 export function AuthLoadingSkeleton() {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 200)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!visible) return null
+
   return (
     <div className="auth-loading-skeleton">
       <div className="auth-loading-skeleton__card">
@@ -201,3 +210,4 @@ export function EvidenceLoadingSkeleton() {
     </section>
   )
 }
+import { useEffect, useState } from 'react'

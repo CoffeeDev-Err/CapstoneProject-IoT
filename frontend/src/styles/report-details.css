@@ -167,6 +167,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 0.75rem;
 }
@@ -185,6 +186,22 @@
 .report-detail-section__header a:hover {
   text-decoration: underline;
 }
+
+.report-detail-section__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.85rem;
+}
+
+.report-detail-section__actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.report-detail-section__actions svg { width: 14px; height: 14px; }
 
 .report-detail-section p {
   margin: 0;
@@ -410,6 +427,52 @@
 .report-route-history__button svg {
   width: 16px;
   height: 16px;
+}
+
+.report-gps-history {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.report-gps-history__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.report-gps-history__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.report-gps-history__back:hover { text-decoration: underline; }
+.report-gps-history__back svg { width: 17px; height: 17px; }
+.report-gps-history__header .page-subtitle { margin-bottom: 0; }
+.report-gps-history__panel { padding: 1.25rem; }
+
+.report-gps-history__intro {
+  margin: 0 0 1rem;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.report-gps-history .report-location-map__canvas {
+  height: clamp(320px, 58vh, 620px);
+}
+
+@media (max-width: 600px) {
+  .report-gps-history__panel { padding: 0.85rem; }
+  .report-gps-history .report-location-map__canvas { height: 48vh; min-height: 300px; }
 }
 
 .report-map-dot--turn { background: #f59e0b; }

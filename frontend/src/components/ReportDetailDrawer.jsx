@@ -1,24 +1,10 @@
-import { requestErrorMessage } from '../utils/requestFeedback'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, Download, Maximize2, Route, XCircle } from 'lucide-react'
-import { SkeletonBlock } from './LoadingSkeleton'
-import { getReportRoute } from '../services/operations'
 import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
 
 const ReportLocationMap = lazy(() => import('./ReportLocationMap'))
-const emptyRouteState = {
-  reportId: null,
-  status: 'idle',
-  points: [],
-  message: '',
-  from: '',
-  to: '',
-  complete: null,
-  roadMatching: null,
-}
-
 const formatCoordinates = (latitude, longitude) => {
   if (
     latitude === null
@@ -92,21 +78,11 @@ function ReportDrawerContent({
 }) {
   const closeButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(Boolean(report), onClose, closeButtonRef)
-  const [routeState, setRouteState] = useState(emptyRouteState)
-  const [vehicleTravel, setVehicleTravel] = useState(false)
-  const routeRequestRef = useRef(null)
-  useEffect(() => {
-    if (isClosing) routeRequestRef.current?.abort()
-    return () => routeRequestRef.current?.abort()
-  }, [isClosing])
 
   if (!report) {
     return null
   }
 
-  const activeRouteState = routeState.reportId === report.id
-    ? routeState
-    : emptyRouteState
   const occurredAt = report.occurred_at || report.date_time
   const hasCoordinates = report.latitude !== null
     && report.latitude !== undefined
@@ -120,55 +96,9 @@ function ReportDrawerContent({
     ? `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=18/${report.latitude}/${report.longitude}`
     : ''
 
-  const handleLoadRoute = async (roadMatch = false) => {
-    if (!report.id) {
-      setRouteState({
-        ...emptyRouteState,
-        reportId: report.id,
-        status: 'error',
-        message: 'This report does not have enough information to load its route.',
-      })
-      return
-    }
-
-    routeRequestRef.current?.abort()
-    const request = new AbortController()
-    routeRequestRef.current = request
-    setRouteState({
-      ...activeRouteState,
-      reportId: report.id,
-      status: 'loading',
-      message: '',
-    })
-
-    try {
-      const result = await getReportRoute(report.id, { roadMatch, signal: request.signal })
-      if (request.signal.aborted || routeRequestRef.current !== request) return
-      const points = [...(result?.points || [])].sort(
-        (first, second) => new Date(first.recorded_at) - new Date(second.recorded_at),
-      )
-      setRouteState({
-        reportId: report.id,
-        status: points.length > 0 ? 'loaded' : 'empty',
-        points,
-        message: points.length > 0
-          ? ''
-          : 'No GPS samples were captured for this report window.',
-        from: result?.window?.from || '',
-        to: result?.window?.to || '',
-        complete: result?.window?.complete ?? null,
-        roadMatching: result?.road_matching || null,
-      })
-    } catch (error) {
-      if (request.signal.aborted || routeRequestRef.current !== request) return
-      setRouteState({
-        ...activeRouteState,
-        reportId: report.id,
-        status: 'error',
-        message: requestErrorMessage(error, { action: 'load the GPS route for this report' }),
-      })
-    }
-  }
+  const backParams = new URLSearchParams(window.location.pathname === '/reports' ? window.location.search : '')
+  backParams.set('report', report.id)
+  const gpsHistoryPath = `/reports/${encodeURIComponent(report.id)}/gps-history?back=${encodeURIComponent(`/reports?${backParams}`)}`
 
   return createPortal(
     <div className={`report-drawer-backdrop${isClosing ? ' is-closing' : ''}`} role="presentation" onClick={onClose}>
@@ -335,11 +265,10 @@ function ReportDrawerContent({
           <section className="report-detail-section">
             <div className="report-detail-section__header">
               <h4>{report.is_incident ? 'Incident map' : 'Activity map'}</h4>
-              {openStreetMapUrl && (
-                <a href={openStreetMapUrl} target="_blank" rel="noreferrer">
-                  Open full map
-                </a>
-              )}
+              <div className="report-detail-section__actions">
+                {openStreetMapUrl && <a href={openStreetMapUrl} target="_blank" rel="noreferrer">Open full map</a>}
+                <a href={gpsHistoryPath}><Route aria-hidden="true" />View GPS history</a>
+              </div>
             </div>
             <Suspense fallback={<div className="report-location-map__empty" role="status">Loading report map...</div>}>
               <ReportLocationMap
@@ -348,79 +277,8 @@ function ReportDrawerContent({
                   longitude: report.longitude,
                 }}
                 markerLabel={report.is_incident ? 'Reported incident' : 'Reported activity'}
-                routePoints={activeRouteState.points}
-                roadMatching={activeRouteState.roadMatching}
               />
             </Suspense>
-
-            <div className="report-route-history">
-              <div>
-                <strong>Officer GPS history near report</strong>
-                <span>Saved GPS snapshot from 30 minutes before to 15 minutes after the incident / activity time</span>
-              </div>
-              <button
-                type="button"
-                className="report-route-history__button"
-                onClick={() => handleLoadRoute()}
-                disabled={activeRouteState.status === 'loading'}
-              >
-                <Route aria-hidden="true" />
-                {activeRouteState.status === 'loading'
-                  ? 'Loading route...'
-                  : activeRouteState.status === 'loaded'
-                    ? 'Refresh route'
-                    : 'Show route'}
-              </button>
-            </div>
-
-            {activeRouteState.status === 'loading' && (
-              <div className="report-route-loading-skeleton" role="status" aria-label="Loading officer route">
-                <SkeletonBlock width="100%" height="0.7rem" />
-                <SkeletonBlock width="76%" height="0.7rem" />
-              </div>
-            )}
-
-            {activeRouteState.status === 'loaded' && (
-              <p className="report-route-history__status">
-                {activeRouteState.points.length} GPS samples recorded from{' '}
-                {formatDateTime(activeRouteState.points[0]?.recorded_at)} to {formatDateTime(activeRouteState.points.at(-1)?.recorded_at)}.
-              </p>
-            )}
-            {activeRouteState.complete === false && (
-              <p className="report-route-history__status">Collection window open until {formatDateTime(activeRouteState.to)}.
-                {' '}Refresh route to include newer on-duty GPS readings. Missing readings are not filled in.</p>
-            )}
-            {activeRouteState.complete === true && (
-              <p className="report-route-history__status">Collection window ended at {formatDateTime(activeRouteState.to)}.
-                {' '}This does not guarantee continuous GPS coverage.</p>
-            )}
-            {activeRouteState.points.length > 0 && activeRouteState.roadMatching?.available && (
-              <div className="report-route-layers">
-                <label><input type="checkbox" checked={vehicleTravel}
-                  onChange={event => setVehicleTravel(event.target.checked)} />Vehicle travel on roads</label>
-                <button type="button" className="report-route-history__button"
-                  disabled={!vehicleTravel || activeRouteState.status === 'loading'}
-                  onClick={() => handleLoadRoute(true)}>Estimate road route</button>
-                <span>Use only for travel by vehicle on roads. Road matching estimates the path between recorded points.</span>
-              </div>
-            )}
-            {activeRouteState.points.length > 0 && activeRouteState.roadMatching?.available === false && (
-              <p className="report-route-history__status">Road estimates are not enabled. Recorded GPS points and the filtered trace remain available.</p>
-            )}
-            {activeRouteState.roadMatching && !['not_requested', 'matched', 'disabled'].includes(activeRouteState.roadMatching.status) && (
-              <p className="report-route-history__status">{activeRouteState.roadMatching.status === 'partial'
-                ? 'Only some segments could be matched confidently. Uncertain sections remain unconnected.'
-                : activeRouteState.roadMatching.status === 'insufficient_movement'
-                  ? 'Insufficient reliable movement to estimate a road route.'
-                  : activeRouteState.roadMatching.status === 'trace_too_large'
-                    ? 'This trace exceeds the road estimation limit. Recorded GPS layers remain available.'
-                    : 'A confident road estimate is unavailable. Recorded GPS layers remain available.'}</p>
-            )}
-            {['empty', 'error'].includes(activeRouteState.status) && (
-              <p className={`report-route-history__status report-route-history__status--${activeRouteState.status}`}>
-                {activeRouteState.message}
-              </p>
-            )}
           </section>
 
           <section className="report-detail-section">

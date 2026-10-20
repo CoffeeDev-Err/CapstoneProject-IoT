@@ -20,7 +20,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import GuestOnlyRoute from '../components/GuestOnlyRoute'
-import { PageLoadingSkeleton } from '../components/LoadingSkeleton'
+import { AuthLoadingSkeleton, PageLoadingSkeleton } from '../components/LoadingSkeleton'
 import ProtectedRoute from '../components/ProtectedRoute'
 
 const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
@@ -31,10 +31,11 @@ const LoginPage = lazy(() => import('../pages/LoginPage'))
 const MonitoringPage = lazy(() => import('../pages/MonitoringPage'))
 const PersonnelPage = lazy(() => import('../pages/PersonnelPage'))
 const ReportsPage = lazy(() => import('../pages/ReportsPage'))
+const ReportGpsHistoryPage = lazy(() => import('../pages/ReportGpsHistoryPage'))
 const SettingsPage = lazy(() => import('../pages/SettingsPage'))
 
-const withPageLoader = (page) => (
-  <Suspense fallback={<PageLoadingSkeleton />}>
+const withPageLoader = (page, fallback = <PageLoadingSkeleton />) => (
+  <Suspense fallback={fallback}>
     {page}
   </Suspense>
 )
@@ -60,13 +61,14 @@ function AppRoutes() {
           <Route path="/deployments" element={withPageLoader(<AssignAreaPage key="deployment-list" view="list" />)} />
           <Route path="/personnel" element={withPageLoader(<PersonnelPage />)} />
           <Route path="/reports" element={withPageLoader(<ReportsPage />)} />
+          <Route path="/reports/:reportId/gps-history" element={withPageLoader(<ReportGpsHistoryPage />)} />
           <Route path="/settings" element={withPageLoader(<SettingsPage />)} />
         </Route>
       </Route>
 
       <Route element={<GuestOnlyRoute />}>
-        <Route path="/" element={withPageLoader(<LoginPage />)} />
-        <Route path="/login" element={withPageLoader(<LoginPage />)} />
+        <Route path="/" element={withPageLoader(<LoginPage />, <AuthLoadingSkeleton />)} />
+        <Route path="/login" element={withPageLoader(<LoginPage />, <AuthLoadingSkeleton />)} />
       </Route>
 
       {/* Redirect any unrecognised path back to the dashboard */}

@@ -48,10 +48,25 @@ describe('session outage recovery', () => {
     const guestView = render(<AuthProvider><MemoryRouter initialEntries={['/']}><Routes>
       <Route element={<GuestOnlyRoute />}><Route path="/" element={<p>Login form</p>} /></Route>
     </Routes></MemoryRouter></AuthProvider>)
-    expect(screen.getByText('Login form')).toBeInTheDocument()
+    expect(screen.queryByText('Checking secure session')).not.toBeInTheDocument()
+    expect(screen.queryByText('Login form')).not.toBeInTheDocument()
     await flush()
     expect(screen.getByText('Login form')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Unable to verify your session' })).not.toBeInTheDocument()
+    guestView.unmount()
+  })
+  it('only shows the sign-in skeleton when session verification is slow', async () => {
+    let rejectSession
+    getCurrentUser.mockReturnValue(new Promise((_resolve, reject) => { rejectSession = reject }))
+    const guestView = render(<AuthProvider><MemoryRouter initialEntries={['/login']}><Routes>
+      <Route element={<GuestOnlyRoute />}><Route path="/login" element={<p>Login form</p>} /></Route>
+    </Routes></MemoryRouter></AuthProvider>)
+
+    expect(screen.queryByText('Checking secure session')).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(200) })
+    expect(screen.getByText('Checking secure session')).toBeInTheDocument()
+    await act(async () => { rejectSession({ status: 401 }) })
+    expect(screen.getByText('Login form')).toBeInTheDocument()
     guestView.unmount()
   })
   it('keeps a verified user signed in when a background check times out', async () => {
