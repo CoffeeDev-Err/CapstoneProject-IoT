@@ -1,5 +1,15 @@
 const text = (value) => String(value || '').trim()
 
+export const getNotificationDisplayMessage = (notification = {}) => {
+  const message = text(notification.message)
+  if (notification.referenceType !== 'task' || notification.type !== 'emergency') return message
+  // Older backup alerts stored a coordinate fallback in the message itself.
+  return message.replace(
+    /\bat GPS\s+-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?(?=\.|$)/i,
+    'at the current GPS position',
+  )
+}
+
 export const getNotificationNavigationTarget = (notification = {}) => {
   const data = notification.data && typeof notification.data === 'object'
     ? notification.data

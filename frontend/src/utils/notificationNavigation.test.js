@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { getNotificationNavigationTarget } from './notificationNavigation'
+import { getNotificationDisplayMessage, getNotificationNavigationTarget } from './notificationNavigation'
 
 describe('notification navigation', () => {
+  it('uses a readable fallback for old backup alerts without changing their map target', () => {
+    const notification = {
+      type: 'emergency', referenceType: 'task', referenceId: 'TSK-OLD',
+      message: 'Backup requested by Mon Maguas at GPS 17.42831, 121.77042.',
+      data: { taskId: 'TSK-OLD', personnelId: 'PNP-ONE', latitude: 17.42831, longitude: 121.77042 },
+    }
+    expect(getNotificationDisplayMessage(notification))
+      .toBe('Backup requested by Mon Maguas at the current GPS position.')
+    expect(getNotificationNavigationTarget(notification).state.taskId).toBe('TSK-OLD')
+    expect(getNotificationDisplayMessage({ ...notification, type: 'info' })).toBe(notification.message)
+  })
   it('opens the exact report from its stored reference', () => {
     expect(getNotificationNavigationTarget({ referenceType: 'report', referenceId: 'RPT-ONE' }))
       .toEqual({ pathname: '/reports', state: { reportId: 'RPT-ONE' } })

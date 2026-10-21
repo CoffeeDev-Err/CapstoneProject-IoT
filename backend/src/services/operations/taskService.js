@@ -1,6 +1,7 @@
 const { randomUUID } = require('crypto')
 const { distanceInMeters, isValidCoordinates, point } = require('../../utils/geo')
 const { getLocationFreshness } = require('../../utils/locationFreshness')
+const { getLocalLocationName, resolveLocationName } = require('../reverseGeocodingService')
 const {
 	buildPrefixSearchConditions,
 	createPaginationMeta,
@@ -27,6 +28,35 @@ const {
 const { appendFilterCondition, findCursorPage } = require('./pagination')
 const { emitTaskRemoval } = require('./events')
 
+const BACKUP_LOCATION_FALLBACK = 'the current GPS position'
+const isPlaceName = (value) => {
+	const label = String(value || '').trim()
+	return Boolean(label)
+		&& label.length <= OPERATIONAL_LIMITS.taskLocation
+		&& !/[\r\n]/.test(label)
+		&& !/^GPS(?:\s|$)/i.test(label)
+		&& !/^location unavailable$/i.test(label)
+}
+
+const getBackupLocationName = async ({ requester, coordinates, resolveLocation, budgetMs }) => {
+	const localName = getLocalLocationName(coordinates.latitude, coordinates.longitude)
+	if (localName) return localName
+	if (isPlaceName(requester.locationName)) return requester.locationName.trim()
+
+	let timeout
+	try {
+		const resolved = await Promise.race([
+			Promise.resolve().then(() => resolveLocation(coordinates.latitude, coordinates.longitude)),
+			new Promise((resolve) => { timeout = setTimeout(() => resolve(''), budgetMs) }),
+		])
+		return isPlaceName(resolved) ? resolved.trim() : BACKUP_LOCATION_FALLBACK
+	} catch {
+		return BACKUP_LOCATION_FALLBACK
+	} finally {
+		clearTimeout(timeout)
+	}
+}
+
 const createTaskService = ({
 	io,
 	models,
@@ -36,6 +66,8 @@ const createTaskService = ({
 	auditService = { recordAudit: async () => null },
 	clock = () => new Date(),
 	idGenerator = randomUUID,
+	resolveBackupLocation = resolveLocationName,
+	backupLocationBudgetMs = 750,
 }) => {
 	const { CurrentLocation, Deployment, Task } = models
 	const { getPersonnelMember } = personnelService
@@ -460,7 +492,12 @@ const createTaskService = ({
 				field: 'description', label: 'Task description', maxLength: OPERATIONAL_LIMITS.taskDescription,
 			})
 		const locationName = taskType === 'backup'
-			? (requester.locationName || activeDeployment.patrolArea)
+			? await getBackupLocationName({
+				requester,
+				coordinates,
+				resolveLocation: resolveBackupLocation,
+				budgetMs: backupLocationBudgetMs,
+			})
 			: validateText(payload.location, {
 				field: 'location', label: 'Task location', maxLength: OPERATIONAL_LIMITS.taskLocation,
 				required: true, allowNewlines: false,

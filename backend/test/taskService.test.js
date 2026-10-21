@@ -30,7 +30,14 @@ const createService = ({
 	},
 })
 
-const createBackupFixture = ({ existingRequest = false } = {}) => {
+const createBackupFixture = ({
+	existingRequest = false,
+	latitude = 17.4305,
+	longitude = 121.765,
+	locationName = 'Catabayungan',
+	resolveBackupLocation,
+	backupLocationBudgetMs,
+} = {}) => {
 	const now = new Date('2026-09-11T08:00:00Z')
 	const tasks = []
 	const deliveries = []
@@ -76,10 +83,10 @@ const createBackupFixture = ({ existingRequest = false } = {}) => {
 			getPersonnelMember: async (personnelId) => ({
 				id: personnelId,
 				name: `Officer ${personnelId}`,
-				latitude: 17.4305,
-				longitude: 121.765,
+				latitude,
+				longitude,
 				isLocationStale: false,
-				locationName: 'Catabayungan',
+				locationName,
 			}),
 		},
 		notificationService: {
@@ -89,6 +96,8 @@ const createBackupFixture = ({ existingRequest = false } = {}) => {
 		auditService: { recordAudit: async (entry) => audits.push(entry) },
 		clock: () => now,
 		idGenerator: () => `${(++sequence).toString(16).padStart(8, '0')}-fixed-id`,
+		...(resolveBackupLocation && { resolveBackupLocation }),
+		...(backupLocationBudgetMs !== undefined && { backupLocationBudgetMs }),
 	})
 	return { audits, deliveries, service, tasks }
 }
@@ -301,6 +310,35 @@ describe('backup request concurrency', () => {
 		assert.equal(fixture.deliveries[0].data.taskId, task.id)
 		assert.equal(fixture.deliveries[0].data.personnelId, 'PNP-001')
 		assert.equal(fixture.audits[0].action, 'task.backup_requested')
+	})
+
+	it('uses a resolved place name while keeping the exact GPS request point', async () => {
+		const fixture = createBackupFixture({
+			latitude: 17.42831,
+			longitude: 121.77042,
+			locationName: 'GPS 17.42831, 121.77042',
+			resolveBackupLocation: async () => 'Eastern, Catabayungan, Cabagan',
+		})
+		const task = await fixture.service.createTask({ type: 'backup', requested_by: 'PNP-001' })
+		assert.equal(task.location, 'Eastern, Catabayungan, Cabagan')
+		assert.equal(task.latitude, 17.42831)
+		assert.equal(task.longitude, 121.77042)
+		assert.match(fixture.deliveries[0].message, /at Eastern, Catabayungan, Cabagan\./)
+	})
+
+	it('keeps backup alerts readable when place-name lookup is slow', async () => {
+		const fixture = createBackupFixture({
+			latitude: 17.42831,
+			longitude: 121.77042,
+			locationName: 'GPS 17.42831, 121.77042',
+			resolveBackupLocation: () => new Promise(() => {}),
+			backupLocationBudgetMs: 5,
+		})
+		const task = await fixture.service.createTask({ type: 'backup', requested_by: 'PNP-001' })
+		assert.equal(task.location, 'the current GPS position')
+		assert.match(fixture.deliveries[0].message, /at the current GPS position\./)
+		assert.equal(fixture.deliveries[0].data.latitude, 17.42831)
+		assert.equal(fixture.deliveries[0].data.longitude, 121.77042)
 	})
 
 	it('allows only one active request when the same account submits from two devices', async () => {

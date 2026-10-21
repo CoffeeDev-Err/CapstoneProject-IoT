@@ -24,7 +24,7 @@ import {
 import { useAuth } from '../context/useAuth'
 import { resolveApiAssetUrl } from '../services/apiAssets'
 import { matchesPrefixSearch } from '../utils/searchMatching'
-import { getNotificationNavigationTarget } from '../utils/notificationNavigation'
+import { getNotificationDisplayMessage, getNotificationNavigationTarget } from '../utils/notificationNavigation'
 import ConfirmModal from './ConfirmModal'
 import PasswordChangeModal from './PasswordChangeModal'
 import pnpLogo from '../assets/pnp-logo.png'
@@ -370,7 +370,7 @@ function TopBar({
                           <small>{formatNotificationTimestamp(notification.timestamp)}</small>
                         </div>
                         <strong className="notification-item__title">{notification.title}</strong>
-                        <p className="notification-item__message mb-0">{notification.message}</p>
+                        <p className="notification-item__message mb-0">{getNotificationDisplayMessage(notification)}</p>
                       </button>
                     </li>
                   ))}

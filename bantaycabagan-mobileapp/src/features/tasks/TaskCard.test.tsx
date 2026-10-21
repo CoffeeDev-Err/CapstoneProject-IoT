@@ -63,6 +63,8 @@ describe('TaskCard', () => {
       />,
     );
 
+    expect(view.getAllByText('Assist the patrol team.')).toHaveLength(1);
+
     await fireEvent.press(view.getByText('Backup requested'));
     await fireEvent.press(view.getByText('Accept Task'));
 

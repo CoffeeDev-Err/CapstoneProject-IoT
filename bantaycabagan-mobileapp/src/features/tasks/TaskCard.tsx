@@ -86,9 +86,11 @@ export function TaskCard({
           </View>
 
           <Text style={[styles.title, isDark && darkStyles.text]}>{task.title}</Text>
-          <Text style={[styles.description, isDark && darkStyles.muted]} numberOfLines={1}>
-            {task.description}
-          </Text>
+          {task.type !== 'backup' && Boolean(task.description) && (
+            <Text style={[styles.description, isDark && darkStyles.muted]} numberOfLines={1}>
+              {task.description}
+            </Text>
+          )}
           <View style={styles.locationRow}>
             <Icon name="place" size={17} color={colors.textMuted} />
             <Text style={[styles.locationText, isDark && darkStyles.text]} numberOfLines={1}>{task.location}</Text>
