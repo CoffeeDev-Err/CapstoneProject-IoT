@@ -84,7 +84,9 @@ const createPointMarker = ({ className, label, title }) => {
   return element
 }
 
-function ReportLocationMap({ incident, markerLabel = 'Reported location', routePoints = [], roadMatching }) {
+const EMPTY_ROUTE_POINTS = []
+
+function ReportLocationMap({ active = true, incident, markerLabel = 'Reported location', routePoints = EMPTY_ROUTE_POINTS, roadMatching }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
@@ -210,7 +212,8 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
 
   useEffect(() => {
     if (
-      !hasMapTilerWebApiKey
+      !active
+      || !hasMapTilerWebApiKey
       || !containerRef.current
       || mapCenterLatitude === null
       || mapCenterLongitude === null
@@ -238,11 +241,13 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     mapRef.current = map
     const removeNavigationListeners = addMobileLikeNavigationControls(map)
 
+    let resizeTimer
     const handleStyleLoad = () => {
       addReportRouteLayer(map, routeDataRef.current)
       applyThreeDimensionalTerrain(map, threeDRef.current)
       setMapReady(true)
-      window.setTimeout(() => {
+      window.clearTimeout(resizeTimer)
+      resizeTimer = window.setTimeout(() => {
         map.resize()
         fitReportMap(false)
       }, 120)
@@ -271,6 +276,11 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     resizeObserver.observe(containerRef.current)
 
     return () => {
+      window.clearTimeout(resizeTimer)
+      map.off('style.load', handleStyleLoad)
+      map.off('click', 'geosentri-report-turns', showSample)
+      map.off('click', 'geosentri-report-recorded', showSample)
+      map.stop()
       removeNavigationListeners()
       resizeObserver.disconnect()
       pointMarkersRef.current.forEach((marker) => marker.remove())
@@ -279,7 +289,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
       map.remove()
       mapRef.current = null
     }
-  }, [fitReportMap, initialIsDark, mapCenterLatitude, mapCenterLongitude])
+  }, [active, fitReportMap, initialIsDark, mapCenterLatitude, mapCenterLongitude])
 
   useEffect(() => {
     routeDataRef.current = routeData
@@ -291,7 +301,7 @@ function ReportLocationMap({ incident, markerLabel = 'Reported location', routeP
     renderPointMarkers()
     const timer = window.setTimeout(() => fitReportMap(true), 120)
     return () => window.clearTimeout(timer)
-  }, [fitReportMap, mapPositions, renderPointMarkers, routeData])
+  }, [active, fitReportMap, mapPositions, renderPointMarkers, routeData])
 
   useEffect(() => {
     const map = mapRef.current

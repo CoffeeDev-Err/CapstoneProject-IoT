@@ -7,12 +7,12 @@
 .report-action-btn--danger-outline { color: #c53030; border: 1px solid #c53030; background: transparent; }
 [data-theme='dark'] .report-action-btn--danger-outline { color: #ff9393; border-color: #ff9393; }
 .report-action-btn--danger-outline:hover { background: rgba(220,38,38,.09); }
-.report-detail-drawer { height: 100dvh; animation-duration: 220ms; }
+.report-detail-drawer { height: 100dvh; animation-duration: 150ms; }
 .report-detail-drawer__header, .report-detail-drawer__summary, .report-detail-drawer__footer { flex-shrink: 0; }
 .report-detail-drawer__footer { position: sticky; bottom: 0; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
-.report-drawer-backdrop.is-closing { animation: reportBackdropOut 180ms ease forwards; }
-.is-closing .report-detail-drawer { animation: reportDrawerOut 220ms ease forwards; }
-@keyframes reportBackdropOut { from { background-color: rgba(2,6,23,.52); } to { background-color: transparent; backdrop-filter: blur(0); } }
+.report-drawer-backdrop.is-closing { animation: reportBackdropOut 150ms ease forwards; }
+.is-closing .report-detail-drawer { animation: reportDrawerOut 150ms ease forwards; }
+@keyframes reportBackdropOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes reportDrawerOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(32px); } }
 .activity-modal-backdrop { position: fixed; inset: 0; z-index: 12000; background: rgba(2,6,23,.52); display: grid; place-items: center; padding: 1rem; animation: fadeIn 180ms ease; }
 .activity-modal { display: flex; flex-direction: column; width: min(760px,100%); max-height: 90dvh; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; box-shadow: 0 16px 64px #0004; }

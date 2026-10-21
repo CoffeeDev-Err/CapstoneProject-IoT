@@ -9,7 +9,7 @@ const protectedRoute = fs.readFileSync(path.join(projectRoot, 'src/components/Pr
 const authStyles = fs.readFileSync(path.join(projectRoot, 'src/styles/auth.css'), 'utf8')
 const loginPage = fs.readFileSync(path.join(projectRoot, 'src/pages/LoginPage.jsx'), 'utf8')
 
-assert.match(routes, /<Route element={<GuestOnlyRoute \/>}>[\s\S]*path="\/" element=\{withPageLoader\(<LoginPage \/>\)\}/,
+assert.match(routes, /<Route element={<GuestOnlyRoute \/>}>[\s\S]*path="\/" element=\{withPageLoader\(<LoginPage \/>, <AuthLoadingSkeleton \/>\)\}/,
   'The homepage must open the login page for unauthenticated visitors')
 assert.match(routes, /<Route element={<GuestOnlyRoute \/>}>[\s\S]*path="\/login"/,
   'The login alias must remain restricted to unauthenticated visitors')

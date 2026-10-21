@@ -7,8 +7,8 @@
   display: flex;
   justify-content: flex-end;
   background: rgba(2, 6, 23, 0.52);
-  backdrop-filter: blur(2px);
-  animation: fadeIn 0.18s ease both;
+
+  animation: fadeIn 0.15s ease both;
 }
 
 .report-detail-drawer {
@@ -894,3 +894,5 @@
     width: 100%;
   }
 }
+
+.report-map-deferred { min-height: 280px; }

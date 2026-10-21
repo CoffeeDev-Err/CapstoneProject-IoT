@@ -13,7 +13,7 @@ vi.mock('maplibre-gl', () => ({
       fixture.maps.push(this)
     }
     on(event, listener) { (this.listeners[event] ||= []).push(listener) }
-    off() {}
+    off(event, listener) { this.listeners[event] = this.listeners[event]?.filter((item) => item !== listener) }
     trigger(event) { this.listeners[event]?.forEach((listener) => listener()) }
     isStyleLoaded() { return fixture.loaded }
     getZoom() { return this.zoom }
@@ -29,6 +29,7 @@ vi.mock('maplibre-gl', () => ({
     resize() {}
     easeTo() {}
     flyTo() {}
+    stop() { this.stopped = true }
     remove() {}
   },
   Marker: class {

@@ -464,6 +464,8 @@ function PersonnelMap({
       removeNavigationListeners()
       resizeObserver.disconnect()
       window.removeEventListener('focus-live-map', handleFocusLiveMap)
+      map.stop()
+      map.off('style.load', handleStyleLoad)
       map.off('zoom', handleZoom)
       map.off('moveend', handleMoveEnd)
       markerStates.forEach((state) => {

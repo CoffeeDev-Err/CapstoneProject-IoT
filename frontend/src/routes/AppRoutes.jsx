@@ -22,21 +22,24 @@ import AppLayout from '../components/AppLayout'
 import GuestOnlyRoute from '../components/GuestOnlyRoute'
 import { AuthLoadingSkeleton, PageLoadingSkeleton } from '../components/LoadingSkeleton'
 import ProtectedRoute from '../components/ProtectedRoute'
+import { routeLoaders } from './routeLoaders'
+import RoutePreloader from './RoutePreloader'
 
-const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
-const AssignAreaPage = lazy(() => import('../pages/AssignAreaPage'))
-const DashboardPage = lazy(() => import('../pages/DashboardPage'))
-const EvidenceViewerPage = lazy(() => import('../pages/EvidenceViewerPage'))
-const LoginPage = lazy(() => import('../pages/LoginPage'))
-const MonitoringPage = lazy(() => import('../pages/MonitoringPage'))
-const PersonnelPage = lazy(() => import('../pages/PersonnelPage'))
-const ReportsPage = lazy(() => import('../pages/ReportsPage'))
-const ReportGpsHistoryPage = lazy(() => import('../pages/ReportGpsHistoryPage'))
-const SettingsPage = lazy(() => import('../pages/SettingsPage'))
+const AnalyticsPage = lazy(routeLoaders.analytics)
+const AssignAreaPage = lazy(routeLoaders.deployments)
+const DashboardPage = lazy(routeLoaders.dashboard)
+const EvidenceViewerPage = lazy(routeLoaders.evidence)
+const LoginPage = lazy(routeLoaders.login)
+const MonitoringPage = lazy(routeLoaders.map)
+const PersonnelPage = lazy(routeLoaders.personnel)
+const ReportsPage = lazy(routeLoaders.reports)
+const ReportGpsHistoryPage = lazy(routeLoaders.gpsHistory)
+const SettingsPage = lazy(routeLoaders.settings)
 
 const withPageLoader = (page, fallback = <PageLoadingSkeleton />) => (
   <Suspense fallback={fallback}>
     {page}
+    <RoutePreloader />
   </Suspense>
 )
 

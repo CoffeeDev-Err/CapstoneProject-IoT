@@ -1,10 +1,9 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, Download, Maximize2, Route, XCircle } from 'lucide-react'
 import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
-
-const ReportLocationMap = lazy(() => import('./ReportLocationMap'))
+import DeferredReportMap from './DeferredReportMap'
 const formatCoordinates = (latitude, longitude) => {
   if (
     latitude === null
@@ -70,12 +69,19 @@ const EvidenceFigure = ({ evidence, label, report, formatDateTime, correctionInd
 function ReportDrawerContent({
   report,
   formatDateTime,
-  onClose,
+  onClose: requestClose,
   onDownload,
   onValidationChange,
   validationState,
-  isClosing, isDownloading,
+  isClosing, isDownloading, onExitComplete,
 }) {
+  const closeRequested = useRef(false)
+  useEffect(() => { closeRequested.current = false }, [report?.id, isClosing])
+  const onClose = () => {
+    if (isClosing || closeRequested.current) return
+    closeRequested.current = true
+    requestClose()
+  }
   const closeButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(Boolean(report), onClose, closeButtonRef)
 
@@ -110,6 +116,9 @@ function ReportDrawerContent({
         aria-labelledby="report-detail-title"
         onClick={(event) => event.stopPropagation()}
         tabIndex={-1}
+        onAnimationEnd={(event) => {
+          if (isClosing && event.target === event.currentTarget && event.animationName === 'reportDrawerOut') onExitComplete()
+        }}
       >
         <header className="report-detail-drawer__header">
           <div>
@@ -241,7 +250,7 @@ function ReportDrawerContent({
                 type="button"
                 className="report-review-button report-review-button--reject"
                 onClick={() => onValidationChange('rejected')}
-                disabled={validationState?.isSaving || report.validation_status === 'rejected'}
+                disabled={isClosing || validationState?.isSaving || report.validation_status === 'rejected'}
               >
                 <XCircle aria-hidden="true" />
                 {report.validation_status === 'rejected' ? 'Rejected' : 'Reject'}
@@ -250,7 +259,7 @@ function ReportDrawerContent({
                 type="button"
                 className="report-review-button report-review-button--validate"
                 onClick={() => onValidationChange('validated')}
-                disabled={validationState?.isSaving || report.validation_status === 'validated'}
+                disabled={isClosing || validationState?.isSaving || report.validation_status === 'validated'}
               >
                 <CheckCircle2 aria-hidden="true" />
                 {validationState?.isSaving
@@ -270,15 +279,14 @@ function ReportDrawerContent({
                 <a href={gpsHistoryPath}><Route aria-hidden="true" />View GPS history</a>
               </div>
             </div>
-            <Suspense fallback={<div className="report-location-map__empty" role="status">Loading report map...</div>}>
-              <ReportLocationMap
+              <DeferredReportMap
+                active={!isClosing}
                 incident={{
                   latitude: report.latitude,
                   longitude: report.longitude,
                 }}
                 markerLabel={report.is_incident ? 'Reported incident' : 'Reported activity'}
               />
-            </Suspense>
           </section>
 
           <section className="report-detail-section">
@@ -341,13 +349,16 @@ function ReportDetailDrawer({ report, ...props }) {
   if (retained.input !== report) setRetained({ input: report, report: report || retained.report })
   const displayed = report || retained.report
   const isClosing = !report && Boolean(displayed)
+  const finishClose = useCallback(() => {
+    if (!report) setRetained({ input: null, report: null })
+  }, [report])
   useEffect(() => {
     if (!isClosing) return undefined
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    const timer = setTimeout(() => setRetained({ input: null, report: null }), reduced ? 0 : 220)
+    const timer = setTimeout(finishClose, reduced ? 0 : 200)
     return () => clearTimeout(timer)
-  }, [isClosing])
-  return displayed ? <ReportDrawerContent key={displayed.id} {...props} report={displayed} isClosing={isClosing} /> : null
+  }, [isClosing, finishClose])
+  return displayed ? <ReportDrawerContent key={displayed.id} {...props} report={displayed} isClosing={isClosing} onExitComplete={finishClose} /> : null
 }
 
 export default ReportDetailDrawer

@@ -5,6 +5,7 @@
  * this component only controls grouping and route links.
  */
 import { NavLink } from 'react-router-dom'
+import { prefetchRoute } from '../routes/routeLoaders'
 import {
   BarChart3,
   ClipboardList,
@@ -116,6 +117,9 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    onPointerEnter={() => prefetchRoute(item.to)}
+                    onFocus={() => prefetchRoute(item.to)}
+                    onTouchStart={() => prefetchRoute(item.to)}
                     end={item.to === '/map'}
                     onClick={() => handleNavItemClick(item)}
                     aria-label={item.label}

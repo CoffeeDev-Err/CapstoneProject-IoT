@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+vi.hoisted(() => { window.AnimationEvent ||= window.Event })
 import ReportDetailDrawer from './ReportDetailDrawer'
 vi.mock('./ReportLocationMap', () => ({ default: () => <div>Report map</div> }))
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 it('keeps content during exit and provides footer PDF/Close actions without a header X', async () => {
   const onClose = vi.fn()
   const report = { id: 'RPT-EXIT', title: 'Exit animation', officer: 'Officer', report_type: 'patrol', description: 'Keep visible' }
@@ -90,4 +91,49 @@ it('keeps the location map in the report and links to the separate GPS history v
     expect.stringContaining('/reports/RPT-ROUTE/gps-history'))
   expect(screen.queryByText('GPS display layers')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Estimate road route' })).toBeNull()
+})
+
+const exitReport = { id: 'RPT-CLOSE', title: 'Close test', officer: 'Officer', report_type: 'patrol' }
+const exitProps = { formatDateTime: () => '-', onDownload: () => {}, onValidationChange: () => {} }
+
+it('dismisses once, finishes on its own animation end, and restores focus and scrolling', async () => {
+  const trigger = document.createElement('button')
+  document.body.append(trigger)
+  trigger.focus()
+  const close = vi.fn()
+  const view = render(<ReportDetailDrawer {...exitProps} report={exitReport} onClose={close} />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus())
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(close).toHaveBeenCalledOnce()
+  view.rerender(<ReportDetailDrawer {...exitProps} report={null} onClose={close} />)
+  expect(document.body.style.overflow).toBe('hidden')
+  fireEvent.click(document.querySelector('.report-drawer-backdrop'))
+  expect(close).toHaveBeenCalledOnce()
+  const event = new Event('animationend', { bubbles: true })
+  Object.defineProperty(event, 'animationName', { value: 'reportDrawerOut' })
+  fireEvent(screen.getByRole('dialog'), event)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(document.body.style.overflow).not.toBe('hidden')
+  expect(trigger).toHaveFocus()
+  trigger.remove()
+})
+
+it('does not let the previous close timer dismiss a reopened report', () => {
+  vi.useFakeTimers()
+  const view = render(<ReportDetailDrawer {...exitProps} report={exitReport} onClose={() => {}} />)
+  view.rerender(<ReportDetailDrawer {...exitProps} report={null} onClose={() => {}} />)
+  act(() => vi.advanceTimersByTime(80))
+  view.rerender(<ReportDetailDrawer {...exitProps} report={exitReport} onClose={() => {}} />)
+  act(() => vi.advanceTimersByTime(300))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+})
+
+it('dismisses with reduced motion without waiting for animation events', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('matchMedia', () => ({ matches: true }))
+  const view = render(<ReportDetailDrawer {...exitProps} report={exitReport} onClose={() => {}} />)
+  view.rerender(<ReportDetailDrawer {...exitProps} report={null} onClose={() => {}} />)
+  act(() => vi.advanceTimersByTime(0))
+  expect(screen.queryByRole('dialog')).toBeNull()
 })

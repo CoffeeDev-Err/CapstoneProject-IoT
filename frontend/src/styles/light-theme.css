@@ -522,7 +522,6 @@
 /* Detail drawers and evidence viewer */
 :root:not([data-theme="dark"]) .report-drawer-backdrop {
   background: rgba(25, 46, 75, 0.2);
-  backdrop-filter: blur(4px);
 }
 
 :root:not([data-theme="dark"]) .profile-modal-layer {
