@@ -21,7 +21,9 @@ const {
 const {
 	canOfficerReadTask,
 	getOfficerPersonnelId,
+	isOfficerInTaskAudience,
 	isSupervisorActor,
+	taskOfficerAccessFilter,
 	taskParticipantFilter,
 	taskParticipantIds,
 } = require('./access')
@@ -29,6 +31,7 @@ const { appendFilterCondition, findCursorPage } = require('./pagination')
 const { emitTaskRemoval } = require('./events')
 
 const BACKUP_LOCATION_FALLBACK = 'the current GPS position'
+const BACKUP_NOTIFICATION_RADIUS_METERS = 1000
 const isPlaceName = (value) => {
 	const label = String(value || '').trim()
 	return Boolean(label)
@@ -75,7 +78,7 @@ const createTaskService = ({
 	const { recordAudit } = auditService
 	const backupArrivalRadiusMeters = Math.max(
 		25,
-		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 150,
+		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 200,
 	)
 	const loadTaskPersonnelMap = (tasks = []) => loadPersonnelMap(
 		tasks.flatMap((task) => taskParticipantIds(task)),
@@ -92,6 +95,36 @@ const createTaskService = ({
 		$and: activeShiftConditions(now),
 	})
 
+	const selectBackupAudience = async ({ requesterId, latitude, longitude }) => {
+		const onDutyPersonnelIds = (await getOnDutyPersonnelIds())
+			.map(String)
+			.filter((personnelId) => personnelId && personnelId !== requesterId)
+		if (!CurrentLocation || onDutyPersonnelIds.length === 0) {
+			return { personnelIds: onDutyPersonnelIds, mode: 'fallback_all' }
+		}
+		const locations = await CurrentLocation.find({
+			personnelId: { $in: onDutyPersonnelIds },
+			source: 'gps',
+			isSimulated: { $ne: true },
+		}).lean()
+		const origin = [longitude, latitude]
+		const nearbyPersonnelIds = locations.filter((location) => {
+			const freshness = getLocationFreshness({
+				recordedAt: location.recordedAt || location.updatedAt,
+				source: location.source,
+				now: clock(),
+			})
+			const coordinates = location.location?.coordinates || []
+			return !freshness.isLocationStale
+				&& location.positionValid !== false
+				&& isValidCoordinates(coordinates[1], coordinates[0])
+				&& distanceInMeters(origin, coordinates) <= BACKUP_NOTIFICATION_RADIUS_METERS
+		}).map((location) => location.personnelId)
+		return nearbyPersonnelIds.length > 0
+			? { personnelIds: [...new Set(nearbyPersonnelIds)], mode: 'nearby' }
+			: { personnelIds: onDutyPersonnelIds, mode: 'fallback_all' }
+	}
+
 	const isOfficerOnDuty = async (personnelId, now = clock()) => Boolean(
 		personnelId && await Deployment.exists({
 			personnelId,
@@ -104,7 +137,10 @@ const createTaskService = ({
 		io.to('role:supervisor').emit(eventName, payload)
 		const visiblePersonnelIds = new Set(taskParticipantIds(task))
 		if (['open', 'full'].includes(task.status)) {
-			const eligiblePersonnelIds = activePersonnelIds || await getOnDutyPersonnelIds()
+			const eligiblePersonnelIds = activePersonnelIds
+				|| (Array.isArray(task.eligiblePersonnelIds)
+					? task.eligiblePersonnelIds
+					: await getOnDutyPersonnelIds())
 			eligiblePersonnelIds.forEach((personnelId) => visiblePersonnelIds.add(personnelId))
 		}
 		for (const personnelId of visiblePersonnelIds) {
@@ -136,6 +172,8 @@ const createTaskService = ({
 		if (['backup', 'urgent'].includes(query.type)) filter.type = query.type
 		if (officerPersonnelId && query.view === 'active' && !officerIsOnDuty) {
 			appendFilterCondition(filter, taskParticipantFilter(officerPersonnelId))
+		} else if (officerPersonnelId && query.view === 'active') {
+			appendFilterCondition(filter, taskOfficerAccessFilter(officerPersonnelId))
 		} else if (officerPersonnelId && query.view !== 'active' && query.view !== 'accepted') {
 			appendFilterCondition(filter, taskParticipantFilter(officerPersonnelId))
 		} else if (isSupervisorActor(actor) && query.personnel_id && query.view !== 'accepted') {
@@ -198,23 +236,27 @@ const createTaskService = ({
 					$or: [{ arrivedAt: { $exists: false } }, { arrivedAt: null }],
 				},
 			},
-			...(scopedPersonnelIds.length > 0 && {
-				'responders.personnelId': { $in: scopedPersonnelIds },
-			}),
+			...(scopedPersonnelIds.length > 0 && { $or: [
+				{ 'responders.personnelId': { $in: scopedPersonnelIds } },
+				{ requestedBy: { $in: scopedPersonnelIds } },
+			] }),
 		}
 		const tasks = await Task.find(taskFilter).lean()
 		const pendingResponderIds = [...new Set(tasks.flatMap((task) => (
 			(task.responders || [])
 				.filter((responder) => (
 					!responder.arrivedAt
-					&& (scopedPersonnelIdSet.size === 0 || scopedPersonnelIdSet.has(responder.personnelId))
+					&& (scopedPersonnelIdSet.size === 0
+						|| scopedPersonnelIdSet.has(task.requestedBy)
+						|| scopedPersonnelIdSet.has(responder.personnelId))
 				))
 				.map((responder) => responder.personnelId)
 		)))]
 		if (pendingResponderIds.length === 0) return { checked: 0, arrived: 0 }
+		const requesterIds = [...new Set(tasks.map((task) => task.requestedBy).filter(Boolean))]
 
 		const locations = await CurrentLocation.find({
-			personnelId: { $in: pendingResponderIds },
+			personnelId: { $in: [...new Set([...pendingResponderIds, ...requesterIds])] },
 			source: 'gps',
 			isSimulated: { $ne: true },
 		}).lean()
@@ -223,12 +265,23 @@ const createTaskService = ({
 		let arrived = 0
 
 		for (const task of tasks) {
-			const taskCoordinates = task.location?.coordinates || []
-			if (!isValidCoordinates(taskCoordinates[1], taskCoordinates[0])) continue
+			const requesterLocation = locationsByPersonnelId.get(task.requestedBy)
+			if (!requesterLocation) continue
+			const requesterFreshness = getLocationFreshness({
+				recordedAt: requesterLocation.recordedAt || requesterLocation.updatedAt,
+				source: requesterLocation.source,
+				now: clock(),
+			})
+			const requesterCoordinates = requesterLocation.location?.coordinates || []
+			if (requesterFreshness.isLocationStale
+				|| requesterLocation.positionValid === false
+				|| !isValidCoordinates(requesterCoordinates[1], requesterCoordinates[0])) continue
 			for (const responder of task.responders || []) {
 				if (
 					responder.arrivedAt
-					|| (scopedPersonnelIdSet.size > 0 && !scopedPersonnelIdSet.has(responder.personnelId))
+					|| (scopedPersonnelIdSet.size > 0
+						&& !scopedPersonnelIdSet.has(task.requestedBy)
+						&& !scopedPersonnelIdSet.has(responder.personnelId))
 				) continue
 				const location = locationsByPersonnelId.get(responder.personnelId)
 				if (!location) continue
@@ -239,9 +292,10 @@ const createTaskService = ({
 				})
 				if (freshness.isLocationStale) continue
 				const responderCoordinates = location.location?.coordinates || []
-				if (!isValidCoordinates(responderCoordinates[1], responderCoordinates[0])) continue
+				if (location.positionValid === false
+					|| !isValidCoordinates(responderCoordinates[1], responderCoordinates[0])) continue
 				checked += 1
-				const distanceMeters = distanceInMeters(taskCoordinates, responderCoordinates)
+				const distanceMeters = distanceInMeters(requesterCoordinates, responderCoordinates)
 				if (!Number.isFinite(distanceMeters) || distanceMeters > backupArrivalRadiusMeters) continue
 
 				const updatedTask = await Task.findOneAndUpdate(
@@ -502,18 +556,23 @@ const createTaskService = ({
 				field: 'location', label: 'Task location', maxLength: OPERATIONAL_LIMITS.taskLocation,
 				required: true, allowNewlines: false,
 			})
-		const requiredResponders = taskType === 'backup'
-			? 3
-			: validateOptionalNumber(payload.required_responders ?? 3, {
-				field: 'required_responders', label: 'Required responders', min: 1, max: 5,
-			})
+		const requiredResponders = validateOptionalNumber(payload.required_responders ?? 3, {
+			field: 'required_responders', label: 'Required responders', min: 1, max: Number.MAX_SAFE_INTEGER,
+		})
 		if (!Number.isInteger(requiredResponders)) {
 			throw createValidationError(
-				'Required responders must be a whole number between 1 and 5.',
+				'Required responders must be a positive whole number.',
 				'required_responders',
 			)
 		}
 
+		const audience = taskType === 'backup'
+			? await selectBackupAudience({
+				requesterId: String(payload.requested_by).trim(),
+				latitude: coordinates.latitude,
+				longitude: coordinates.longitude,
+			})
+			: null
 		const createdAt = clock()
 		let task
 		try {
@@ -529,6 +588,10 @@ const createTaskService = ({
 				requesterName: requester?.name || 'Duty Supervisor',
 				assignedArea: activeDeployment?.patrolArea || locationName,
 				requiredResponders,
+				...(audience && {
+					eligiblePersonnelIds: audience.personnelIds,
+					audienceMode: audience.mode,
+				}),
 				locationName,
 				location: point(coordinates.longitude, coordinates.latitude),
 				status: 'open',
@@ -572,10 +635,8 @@ const createTaskService = ({
 			},
 			dedupeKey: `task:${task.taskId}:supervisor-created`,
 		})
-		const eligiblePersonnelIds = await Deployment.distinct('personnelId', {
-			status: 'active',
-			$and: activeShiftConditions(clock()),
-			personnelId: { $ne: task.requestedBy },
+		const eligiblePersonnelIds = audience?.personnelIds || await Deployment.distinct('personnelId', {
+			status: 'active', $and: activeShiftConditions(clock()), personnelId: { $ne: task.requestedBy },
 		})
 		await Promise.all(eligiblePersonnelIds.map((personnelId) => deliverNotification({
 			io,
@@ -603,6 +664,15 @@ const createTaskService = ({
 				status: 403,
 				body: { success: false, message: 'Only officers on an active deployment may accept this task.' },
 			}
+		}
+		const audienceTaskQuery = Task.findOne({ taskId })
+		const audienceTask = typeof audienceTaskQuery?.lean === 'function'
+			? await audienceTaskQuery.lean()
+			: await audienceTaskQuery
+		if (audienceTask?.type === 'backup'
+			&& !isOfficerInTaskAudience(audienceTask, personnelId)
+			&& audienceTask.requestedBy !== personnelId) {
+			return { status: 403, body: { success: false, message: 'This backup request was not sent to your response group.' } }
 		}
 		const acceptedAt = clock()
 		let task = await Task.findOneAndUpdate({
@@ -679,6 +749,50 @@ const createTaskService = ({
 			}
 		}
 		return { status: 200, body: { success: true, task: serialized } }
+	}
+
+	const expandTaskAudience = async (taskId, actor) => {
+		const task = await Task.findOne({ taskId })
+		if (!task) return createNotFoundResult('Task')
+		const officerPersonnelId = getOfficerPersonnelId(actor)
+		if (!isSupervisorActor(actor) && task.requestedBy !== officerPersonnelId) {
+			return { status: 403, body: { success: false, message: 'Only the requesting officer or the COP can request more responders.' } }
+		}
+		if (task.type !== 'backup' || !['open', 'full'].includes(task.status)) {
+			return { status: 409, body: { success: false, message: 'Only an active backup request can be expanded.' } }
+		}
+		const allOnDutyPersonnelIds = (await getOnDutyPersonnelIds())
+			.map(String)
+			.filter((personnelId) => personnelId && personnelId !== task.requestedBy)
+		const existingAudience = new Set(task.eligiblePersonnelIds || [])
+		const addedPersonnelIds = allOnDutyPersonnelIds.filter((personnelId) => !existingAudience.has(personnelId))
+		task.eligiblePersonnelIds = allOnDutyPersonnelIds
+		task.audienceMode = 'expanded_all'
+		task.audienceExpandedAt = clock()
+		await task.save()
+		const personnelById = await loadTaskPersonnelMap([task])
+		const serialized = serializeTask(task, personnelById)
+		await Promise.all(addedPersonnelIds.map((personnelId) => deliverNotification({
+			io,
+			recipientId: personnelId,
+			type: 'emergency',
+			title: 'Additional Backup Responders Needed',
+			message: `${task.title} at ${task.locationName}.`,
+			referenceType: 'task',
+			referenceId: task.taskId,
+			priority: 'critical',
+			data: { destination: 'Tasks', taskId: task.taskId, taskInbox: true },
+			dedupeKey: `task:${task.taskId}:audience-expanded`,
+		})))
+		await recordAudit({
+			actor,
+			action: 'task.audience_expanded',
+			entityType: 'task',
+			entityId: task.taskId,
+			changes: { addedPersonnelIds, eligibleCount: allOnDutyPersonnelIds.length },
+		})
+		await emitToAuthorizedOfficers('task:updated', serialized, task, allOnDutyPersonnelIds)
+		return { status: 200, body: { success: true, added_count: addedPersonnelIds.length, task: serialized } }
 	}
 
 	const deactivatePersonnelTasks = async (personnelId, actor = { role: 'system' }) => {
@@ -765,6 +879,7 @@ const createTaskService = ({
 		completeTask,
 		createTask,
 		deactivatePersonnelTasks,
+		expandTaskAudience,
 		getTask,
 		listTasks,
 		loadTasks,

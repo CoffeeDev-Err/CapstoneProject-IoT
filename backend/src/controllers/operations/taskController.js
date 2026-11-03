@@ -38,6 +38,10 @@ const createTaskController = (operationalService) => ({
 		const result = await operationalService.completeTask(req.params.taskId, req.auth.user)
 		res.status(result.status).json(result.body)
 	},
+	expandTaskAudience: async (req, res) => {
+		const result = await operationalService.expandTaskAudience(req.params.taskId, req.auth.user)
+		res.status(result.status).json(result.body)
+	},
 })
 
 module.exports = createTaskController

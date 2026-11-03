@@ -75,6 +75,8 @@ const serializeTask = (task, personnelById = new Map()) => ({
 	requester_name: personnelById.get(task.requestedBy)?.fullName || task.requesterName,
 	assigned_area: task.assignedArea || task.locationName,
 	required_responders: task.requiredResponders,
+	audience_mode: task.audienceMode,
+	eligible_responder_ids: task.eligiblePersonnelIds,
 	accepted_by: (task.responders || []).map((responder) => responder.personnelId),
 	arrived_by: (task.responders || [])
 		.filter((responder) => responder.arrivedAt)

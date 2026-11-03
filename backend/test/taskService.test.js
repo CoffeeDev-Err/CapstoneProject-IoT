@@ -37,6 +37,8 @@ const createBackupFixture = ({
 	locationName = 'Catabayungan',
 	resolveBackupLocation,
 	backupLocationBudgetMs,
+	onDutyPersonnelIds = [],
+	currentLocations = [],
 } = {}) => {
 	const now = new Date('2026-09-11T08:00:00Z')
 	const tasks = []
@@ -72,9 +74,12 @@ const createBackupFixture = ({
 	const service = createTaskService({
 		io: { emit: () => {}, to: () => ({ emit: () => {} }) },
 		models: {
+			CurrentLocation: {
+				find: () => ({ lean: async () => currentLocations }),
+			},
 			Deployment: {
 				findOne: () => ({ select: () => ({ lean: async () => ({ patrolArea: 'Catabayungan' }) }) }),
-				distinct: async () => [],
+				distinct: async () => onDutyPersonnelIds,
 			},
 			Task,
 		},
@@ -102,7 +107,7 @@ const createBackupFixture = ({
 	return { audits, deliveries, service, tasks }
 }
 
-const createArrivalFixture = ({ task, location }) => {
+const createArrivalFixture = ({ task, location, requesterLocation }) => {
 	const now = new Date('2026-09-14T08:00:00Z')
 	const deliveries = []
 	const audits = []
@@ -111,7 +116,16 @@ const createArrivalFixture = ({ task, location }) => {
 		io: { emit: () => {}, to: () => ({ emit: () => {} }) },
 		models: {
 			CurrentLocation: {
-				find: () => ({ lean: async () => location ? [location] : [] }),
+				find: () => ({ lean: async () => [
+					...(location ? [location] : []),
+					...(requesterLocation ? [requesterLocation] : [{
+						personnelId: task.requestedBy,
+						source: 'gps',
+						isSimulated: false,
+						recordedAt: new Date('2026-09-14T07:59:55Z'),
+						location: task.location,
+					}]),
+				] }),
 			},
 			Deployment: { distinct: async () => [] },
 			Task: {
@@ -204,6 +218,18 @@ describe('task authorization', () => {
 		const result = await createService().acceptTask('TSK-1', 'PNP-OFF-DUTY')
 		assert.equal(result.status, 403)
 		assert.match(result.body.message, /active deployment/)
+	})
+
+	it('rejects an on-duty officer outside the saved backup audience', async () => {
+		const result = await createService({
+			deploymentExists: true,
+			task: {
+				taskId: 'TSK-1', type: 'backup', requestedBy: 'PNP-REQUESTER',
+				eligiblePersonnelIds: ['PNP-NEAR'], responders: [], status: 'open',
+			},
+		}).acceptTask('TSK-1', 'PNP-OUTSIDE')
+		assert.equal(result.status, 403)
+		assert.match(result.body.message, /response group/)
 	})
 
 	it('allows only the requesting officer to cancel backup', async () => {
@@ -332,6 +358,32 @@ describe('task authorization', () => {
 		assert.equal(farFixture.getUpdates(), 0)
 	})
 
+	it('measures arrival from the requester live position instead of the original request point', async () => {
+		const task = {
+			taskId: 'TSK-MOVING', requestedBy: 'PNP-REQUESTER', requesterName: 'Requester',
+			type: 'backup', title: 'Backup request', description: '', locationName: 'Original point',
+			location: { type: 'Point', coordinates: [121.765, 17.4305] },
+			responders: [{ personnelId: 'PNP-RESPONDER', acceptedAt: new Date() }],
+			status: 'open', createdAt: new Date(), updatedAt: new Date(),
+		}
+		const fixture = createArrivalFixture({
+			task,
+			requesterLocation: {
+				personnelId: 'PNP-REQUESTER', source: 'gps', isSimulated: false,
+				recordedAt: new Date('2026-09-14T07:59:55Z'),
+				location: { type: 'Point', coordinates: [121.775, 17.4405] },
+			},
+			location: {
+				personnelId: 'PNP-RESPONDER', source: 'gps', isSimulated: false,
+				recordedAt: new Date('2026-09-14T07:59:55Z'),
+				location: { type: 'Point', coordinates: [121.77505, 17.44055] },
+			},
+		})
+		const result = await fixture.service.reconcileTaskArrivals({ personnelIds: ['PNP-REQUESTER'] })
+		assert.equal(result.arrived, 1)
+		assert.ok(task.responders[0].arrivalDistanceMeters < 20)
+	})
+
 	it('rejects completion by a different officer', async () => {
 		const task = {
 			taskId: 'TSK-1', requestedBy: 'PNP-REQUESTER', type: 'backup', status: 'open', responders: [],
@@ -342,6 +394,34 @@ describe('task authorization', () => {
 		})
 		assert.equal(result.status, 403)
 		assert.match(result.body.message, /requesting officer or the COP/)
+	})
+
+	it('lets the requester notify the remaining on-duty officers', async () => {
+		const deliveries = []
+		const task = {
+			taskId: 'TSK-EXPAND', type: 'backup', title: 'Backup request', locationName: 'Cabagan',
+			requestedBy: 'PNP-REQUESTER', requesterName: 'Requester', requiredResponders: 10,
+			eligiblePersonnelIds: ['PNP-NEAR'], audienceMode: 'nearby', responders: [],
+			status: 'open', createdAt: new Date(), updatedAt: new Date(), save: async () => {},
+		}
+		const service = createTaskService({
+			io: { emit: () => {}, to: () => ({ emit: () => {} }) },
+			models: {
+				Deployment: { distinct: async () => ['PNP-REQUESTER', 'PNP-NEAR', 'PNP-FAR'] },
+				Task: { findOne: async () => task },
+			},
+			loadPersonnelMap: async () => new Map(),
+			personnelService: { getPersonnelMember: async () => null },
+			notificationService: { deliverNotification: async (entry) => deliveries.push(entry) },
+		})
+		const result = await service.expandTaskAudience('TSK-EXPAND', {
+			role: 'officer', personnelId: 'PNP-REQUESTER',
+		})
+		assert.equal(result.status, 200)
+		assert.equal(result.body.added_count, 1)
+		assert.deepEqual(task.eligiblePersonnelIds, ['PNP-NEAR', 'PNP-FAR'])
+		assert.equal(task.audienceMode, 'expanded_all')
+		assert.deepEqual(deliveries.map(({ recipientId }) => recipientId), ['PNP-FAR'])
 	})
 })
 
@@ -367,6 +447,47 @@ describe('backup request concurrency', () => {
 		assert.equal(fixture.deliveries[0].data.taskId, task.id)
 		assert.equal(fixture.deliveries[0].data.personnelId, 'PNP-001')
 		assert.equal(fixture.audits[0].action, 'task.backup_requested')
+	})
+
+	it('uses the requested responder count without the former limit of five', async () => {
+		const fixture = createBackupFixture()
+		const task = await fixture.service.createTask({
+			type: 'backup', requested_by: 'PNP-001', required_responders: 12,
+		})
+		assert.equal(task.required_responders, 12)
+		assert.equal(fixture.tasks[0].requiredResponders, 12)
+	})
+
+	it('notifies only fresh on-duty officers within one kilometer', async () => {
+		const fixture = createBackupFixture({
+			onDutyPersonnelIds: ['PNP-001', 'PNP-NEAR', 'PNP-FAR'],
+			currentLocations: [
+				{
+					personnelId: 'PNP-NEAR', source: 'gps', isSimulated: false,
+					recordedAt: new Date('2026-09-11T07:59:55Z'),
+					location: { type: 'Point', coordinates: [121.7652, 17.4307] },
+				},
+				{
+					personnelId: 'PNP-FAR', source: 'gps', isSimulated: false,
+					recordedAt: new Date('2026-09-11T07:59:55Z'),
+					location: { type: 'Point', coordinates: [121.79, 17.46] },
+				},
+			],
+		})
+		const task = await fixture.service.createTask({ type: 'backup', requested_by: 'PNP-001' })
+		assert.equal(task.audience_mode, 'nearby')
+		assert.deepEqual(task.eligible_responder_ids, ['PNP-NEAR'])
+		assert.deepEqual(fixture.deliveries.map(({ recipientId }) => recipientId), ['supervisor', 'PNP-NEAR'])
+	})
+
+	it('falls back to every on-duty officer when nobody has a fresh location within one kilometer', async () => {
+		const fixture = createBackupFixture({
+			onDutyPersonnelIds: ['PNP-001', 'PNP-002', 'PNP-003'],
+			currentLocations: [],
+		})
+		const task = await fixture.service.createTask({ type: 'backup', requested_by: 'PNP-001' })
+		assert.equal(task.audience_mode, 'fallback_all')
+		assert.deepEqual(task.eligible_responder_ids, ['PNP-002', 'PNP-003'])
 	})
 
 	it('uses a resolved place name while keeping the exact GPS request point', async () => {
