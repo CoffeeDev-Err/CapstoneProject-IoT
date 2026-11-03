@@ -197,8 +197,8 @@ assert.match(
 )
 assert.doesNotMatch(nativeMapSource, /geosentri-patrol-area/, 'The obsolete dashed patrol-radius guide must stay hidden')
 assert.doesNotMatch(officerMapScreenSource, /geosentri-patrol-area/, 'The web fallback must not restore the obsolete patrol-radius guide')
-assert.match(officerMapScreenSource, /radius:1000[\s\S]*radius:200/, 'The web fallback must render the backup response and arrival radii')
-assert.match(nativeMapSource, /createRadiusPolygon\(zone\.latitude, zone\.longitude, 1000\)[\s\S]*createRadiusPolygon\(zone\.latitude, zone\.longitude, 200\)/, 'The native map must render the backup response and arrival radii')
+assert.match(officerMapScreenSource, /radius:\$\{BACKUP_RESPONSE_RADIUS_METERS\}[\s\S]*radius:\$\{BACKUP_ARRIVAL_RADIUS_METERS\}/, 'The web fallback must render the configured backup response and arrival radii')
+assert.match(nativeMapSource, /createRadiusPolygon\(zone\.latitude, zone\.longitude, BACKUP_RESPONSE_RADIUS_METERS\)[\s\S]*createRadiusPolygon\(zone\.latitude, zone\.longitude, BACKUP_ARRIVAL_RADIUS_METERS\)/, 'The native map must render the configured backup response and arrival radii')
 assert.match(
 	officerMapScreenSource,
 	/\{ backgroundColor:\s*colors\.surface,\s*borderColor:\s*colors\.border \}/,

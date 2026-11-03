@@ -29,7 +29,11 @@ import {
 } from '@maplibre/maplibre-react-native';
 import Svg, { Path, SvgUri } from 'react-native-svg';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { createRadiusPolygon } from '../features/maps/backupRadiusGeometry';
+import {
+  BACKUP_ARRIVAL_RADIUS_METERS,
+  BACKUP_RESPONSE_RADIUS_METERS,
+  createRadiusPolygon,
+} from '../features/maps/backupRadiusGeometry';
 import { CABAGAN_BOUNDARY_FEATURE, CABAGAN_OUTSIDE_MASK_FEATURE } from '../constants/cabaganGeofence';
 import {
   hasMapTilerApiKey,
@@ -297,9 +301,9 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   const clusteredPersonnel = usePersonnelClusters(personnel, interpolatedPersonnel, followedOfficerId, mapZoom);
   const radiusFeatures = useMemo(() => backupZones.map((zone) => ({
     zone,
-    response: createRadiusPolygon(zone.latitude, zone.longitude, 1000),
+    response: createRadiusPolygon(zone.latitude, zone.longitude, BACKUP_RESPONSE_RADIUS_METERS),
     arrival: zone.showArrivalRadius
-      ? createRadiusPolygon(zone.latitude, zone.longitude, 200)
+      ? createRadiusPolygon(zone.latitude, zone.longitude, BACKUP_ARRIVAL_RADIUS_METERS)
       : null,
   })), [backupZones]);
   const clusterPulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });

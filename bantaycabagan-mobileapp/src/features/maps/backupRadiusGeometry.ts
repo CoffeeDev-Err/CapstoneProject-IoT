@@ -7,6 +7,9 @@ export type BackupMapZone = {
 
 const EARTH_RADIUS_METERS = 6_371_008.8;
 
+export const BACKUP_RESPONSE_RADIUS_METERS = 1000;
+export const BACKUP_ARRIVAL_RADIUS_METERS = 50;
+
 export function createRadiusPolygon(latitude: number, longitude: number, radiusMeters: number, steps = 72) {
   const angularDistance = radiusMeters / EARTH_RADIUS_METERS;
   const latitudeRadians = latitude * Math.PI / 180;

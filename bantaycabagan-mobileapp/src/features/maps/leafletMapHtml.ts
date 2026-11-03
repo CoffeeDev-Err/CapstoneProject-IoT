@@ -1,5 +1,9 @@
 import type { OfficerMapPerson } from '../../components/OfficerMapCanvas';
-import type { BackupMapZone } from './backupRadiusGeometry';
+import {
+  BACKUP_ARRIVAL_RADIUS_METERS,
+  BACKUP_RESPONSE_RADIUS_METERS,
+  type BackupMapZone,
+} from './backupRadiusGeometry';
 
 type LeafletMapHtmlOptions = {
   latitude?: number;
@@ -169,12 +173,12 @@ export const createLeafletMapHtml = ({
 
             (${initialBackupZones}).forEach((zone)=>{
               L.circle([Number(zone.latitude),Number(zone.longitude)],{
-                radius:1000,color:'#ef4444',weight:2,opacity:.86,
+                radius:${BACKUP_RESPONSE_RADIUS_METERS},color:'#ef4444',weight:2,opacity:.86,
                 fillColor:'#ef4444',fillOpacity:.07,interactive:false
               }).addTo(map);
               if(zone.showArrivalRadius){
                 L.circle([Number(zone.latitude),Number(zone.longitude)],{
-                  radius:200,color:'#16a34a',weight:2.5,opacity:.92,
+                  radius:${BACKUP_ARRIVAL_RADIUS_METERS},color:'#16a34a',weight:2.5,opacity:.92,
                   fillColor:'#22c55e',fillOpacity:.10,interactive:false
                 }).addTo(map);
               }

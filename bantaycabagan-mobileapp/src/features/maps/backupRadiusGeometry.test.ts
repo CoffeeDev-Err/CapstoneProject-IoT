@@ -1,6 +1,15 @@
-import { createRadiusPolygon } from './backupRadiusGeometry';
+import {
+  BACKUP_ARRIVAL_RADIUS_METERS,
+  BACKUP_RESPONSE_RADIUS_METERS,
+  createRadiusPolygon,
+} from './backupRadiusGeometry';
 
 describe('backup radius geometry', () => {
+  it('keeps the notification and automatic-arrival radii aligned with operations', () => {
+    expect(BACKUP_RESPONSE_RADIUS_METERS).toBe(1000);
+    expect(BACKUP_ARRIVAL_RADIUS_METERS).toBe(50);
+  });
+
   it('creates a closed map polygon around the moving requester', () => {
     const feature = createRadiusPolygon(17.4239, 121.7681, 1000, 36);
     const coordinates = feature.geometry.coordinates[0];

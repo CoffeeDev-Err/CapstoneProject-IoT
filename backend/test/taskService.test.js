@@ -318,7 +318,7 @@ describe('task authorization', () => {
 
 		assert.equal(result.arrived, 1)
 		assert.equal(fixture.getUpdates(), 1)
-		assert.ok(task.responders[0].arrivalDistanceMeters < 150)
+		assert.ok(task.responders[0].arrivalDistanceMeters < 50)
 		assert.equal(fixture.deliveries.length, 2)
 		assert.deepEqual(new Set(fixture.deliveries.map((item) => item.recipientId)), new Set(['PNP-REQUESTER', 'supervisor']))
 		assert.equal(fixture.deliveries.find((item) => item.recipientId === 'supervisor').data.destination, 'Map')
@@ -356,6 +356,28 @@ describe('task authorization', () => {
 		assert.equal(farResult.arrived, 0)
 		assert.equal(farResult.checked, 1)
 		assert.equal(farFixture.getUpdates(), 0)
+	})
+
+	it('does not record automatic arrival outside the 50-meter response radius', async () => {
+		const task = {
+			taskId: 'TSK-RADIUS', requestedBy: 'PNP-REQUESTER', type: 'backup', status: 'open',
+			location: { type: 'Point', coordinates: [121.765, 17.4305] },
+			responders: [{ personnelId: 'PNP-RESPONDER', acceptedAt: new Date() }],
+		}
+		const fixture = createArrivalFixture({
+			task,
+			location: {
+				personnelId: 'PNP-RESPONDER', source: 'gps', isSimulated: false,
+				recordedAt: new Date('2026-09-14T07:59:55Z'),
+				location: { type: 'Point', coordinates: [121.76555, 17.4305] },
+			},
+		})
+
+		const result = await fixture.service.reconcileTaskArrivals()
+
+		assert.equal(result.checked, 1)
+		assert.equal(result.arrived, 0)
+		assert.equal(fixture.getUpdates(), 0)
 	})
 
 	it('measures arrival from the requester live position instead of the original request point', async () => {

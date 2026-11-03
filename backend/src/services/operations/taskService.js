@@ -78,7 +78,7 @@ const createTaskService = ({
 	const { recordAudit } = auditService
 	const backupArrivalRadiusMeters = Math.max(
 		25,
-		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 200,
+		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 50,
 	)
 	const loadTaskPersonnelMap = (tasks = []) => loadPersonnelMap(
 		tasks.flatMap((task) => taskParticipantIds(task)),
