@@ -156,6 +156,15 @@ export const completeOperationalTask = (
   token,
 );
 
+export const requestMoreOperationalResponders = (
+  taskId: string,
+  token?: string | null,
+) => request<{ task: OperationalTask; added_count: number }>(
+  `/api/tasks/${taskId}/request-more`,
+  { method: 'POST' },
+  token,
+);
+
 export const acknowledgeDeploymentAssignment = (
   assignmentId: string,
   token?: string | null,
@@ -167,6 +176,7 @@ export const acknowledgeDeploymentAssignment = (
 
 export const requestBackup = (
   actor: OfficerActor,
+  requiredResponders: number,
   deployment?: DeploymentAssignment,
   token?: string | null,
 ) => request<{ task: OperationalTask }>(
@@ -179,7 +189,7 @@ export const requestBackup = (
       description: 'Additional personnel assistance requested from the assigned area.',
       requested_by: actor.id,
       requester_name: actor.name,
-      required_responders: 3,
+      required_responders: requiredResponders,
       location: deployment?.patrolArea || actor.station,
       latitude: deployment?.latitude,
       longitude: deployment?.longitude,

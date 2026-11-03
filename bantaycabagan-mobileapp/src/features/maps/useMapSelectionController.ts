@@ -140,7 +140,7 @@ export function useMapSelectionController({
       || !Number.isFinite(current.longitude)) return false;
     setSelectedOfficerId(null);
     setFollowedOfficerId(current.id);
-    focusOfficer(current.id);
+    setTimeout(() => focusOfficer(current.id), 0);
     return true;
   }, [currentPersonnelId, focusOfficer, visiblePersonnel]);
 
@@ -171,8 +171,8 @@ export function useMapSelectionController({
       return;
     }
     setFollowedOfficerId(selectedOfficer.id);
-    focusOfficer(selectedOfficer.id);
     setSelectedOfficerId(null);
+    setTimeout(() => focusOfficer(selectedOfficer.id), 0);
   }, [focusOfficer, followedOfficerId, selectedOfficer]);
 
   const handleCloseOfficer = useCallback(() => {

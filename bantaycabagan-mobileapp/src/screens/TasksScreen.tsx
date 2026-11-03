@@ -72,6 +72,7 @@ export default function TasksScreen({
     refreshTaskHistory,
     loadMoreTaskHistory,
     refreshOperations,
+    requestMoreResponders,
   } = useOperationalContext();
   const [historyError, setHistoryError] = useState('');
   const [filter, setFilter] = useState<(typeof filters)[number]>('Open');
@@ -80,6 +81,7 @@ export default function TasksScreen({
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [expandingId, setExpandingId] = useState<string | null>(null);
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(() => new Set());
   const showingOfflineData = isOperationsOffline
@@ -178,9 +180,13 @@ export default function TasksScreen({
   }, [cancelBackupRequest]);
 
   const handleComplete = useCallback((task: OperationalTask) => {
+    const arrivedCount = task.responders.filter((responder) => responder.arrived_at).length;
+    const isPartial = arrivedCount < task.required_responders;
     Alert.alert(
-      'Complete backup response?',
-      'Confirm that the emergency assistance has ended. This will close the SOS alert for all officers.',
+      isPartial ? `Complete with ${arrivedCount} of ${task.required_responders}?` : 'Complete backup response?',
+      isPartial
+        ? `Only ${arrivedCount} of ${task.required_responders} requested responders have arrived. Completing now will close the remaining slots.`
+        : 'Confirm that the emergency assistance has ended. This will close the SOS alert for all officers.',
       [
         { text: 'Keep Active', style: 'cancel' },
         {
@@ -211,6 +217,32 @@ export default function TasksScreen({
     );
   }, [completeBackupRequest, onCreateReportFromBackup]);
 
+  const handleRequestMore = useCallback((task: OperationalTask) => {
+    Alert.alert(
+      'Request more responders?',
+      'This will notify the other active and on-duty officers who were outside the initial 1 km response group.',
+      [
+        { text: 'Not Now', style: 'cancel' },
+        {
+          text: 'Notify Officers',
+          onPress: async () => {
+            setExpandingId(task.id);
+            try {
+              const addedCount = await requestMoreResponders(task.id);
+              Alert.alert('Request expanded', addedCount > 0
+                ? `${addedCount} additional officer${addedCount === 1 ? '' : 's'} notified.`
+                : 'All available on-duty officers were already included.');
+            } catch (error) {
+              Alert.alert('Unable to request more responders', requestErrorMessage(error, { action: 'request more responders', write: true }));
+            } finally {
+              setExpandingId(null);
+            }
+          },
+        },
+      ],
+    );
+  }, [requestMoreResponders]);
+
   const handleCreateReport = useCallback((task: OperationalTask) => {
     onCreateReportFromBackup?.(task);
   }, [onCreateReportFromBackup]);
@@ -224,6 +256,7 @@ export default function TasksScreen({
       accepting={acceptingId === item.id}
       cancelling={cancellingId === item.id}
       completing={completingId === item.id}
+      expanding={expandingId === item.id}
       currentPersonnelId={currentPersonnelId}
       expanded={expandedTaskIds.has(item.id)}
       filterTranslateX={filterTranslateX}
@@ -232,11 +265,12 @@ export default function TasksScreen({
       onComplete={handleComplete}
       onCreateReport={handleCreateReport}
       onOpenReport={handleOpenReport}
+      onRequestMore={handleRequestMore}
       onToggle={toggleTask}
       task={item}
     />
-  ), [acceptingId, cancellingId, completingId, currentPersonnelId, expandedTaskIds,
-    filterTranslateX, handleAccept, handleCancel, handleComplete, handleCreateReport, handleOpenReport, toggleTask]);
+  ), [acceptingId, cancellingId, completingId, currentPersonnelId, expandedTaskIds, expandingId,
+    filterTranslateX, handleAccept, handleCancel, handleComplete, handleCreateReport, handleOpenReport, handleRequestMore, toggleTask]);
 
   return (
     <SafeAreaView

@@ -29,6 +29,7 @@ import {
 } from '@maplibre/maplibre-react-native';
 import Svg, { Path, SvgUri } from 'react-native-svg';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { createRadiusPolygon } from '../features/maps/backupRadiusGeometry';
 import { CABAGAN_BOUNDARY_FEATURE, CABAGAN_OUTSIDE_MASK_FEATURE } from '../constants/cabaganGeofence';
 import {
   hasMapTilerApiKey,
@@ -266,6 +267,7 @@ function DeploymentPointMarker({
 
 const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProps>(({
   assignment,
+  backupZones = [],
   compassTop = 150,
   currentPersonnelId,
   emergencyPulse,
@@ -293,6 +295,13 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     [followedOfficerId, interpolatedPersonnel],
   );
   const clusteredPersonnel = usePersonnelClusters(personnel, interpolatedPersonnel, followedOfficerId, mapZoom);
+  const radiusFeatures = useMemo(() => backupZones.map((zone) => ({
+    zone,
+    response: createRadiusPolygon(zone.latitude, zone.longitude, 1000),
+    arrival: zone.showArrivalRadius
+      ? createRadiusPolygon(zone.latitude, zone.longitude, 200)
+      : null,
+  })), [backupZones]);
   const clusterPulseOpacity = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
   const clusterPulseScale = emergencyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
 
@@ -508,6 +517,41 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
             }}
           />
         </GeoJSONSource>
+
+        {radiusFeatures.map(({ zone, response, arrival }) => (
+          <React.Fragment key={`backup-zone-${zone.id}`}>
+            <GeoJSONSource id={`backup-response-${zone.id}`} data={response}>
+              <Layer
+                id={`backup-response-fill-${zone.id}`}
+                type="fill"
+                source={`backup-response-${zone.id}`}
+                paint={{ 'fill-color': '#ef4444', 'fill-opacity': 0.07 }}
+              />
+              <Layer
+                id={`backup-response-line-${zone.id}`}
+                type="line"
+                source={`backup-response-${zone.id}`}
+                paint={{ 'line-color': '#ef4444', 'line-width': 2.25, 'line-opacity': 0.86 }}
+              />
+            </GeoJSONSource>
+            {arrival && (
+              <GeoJSONSource id={`backup-arrival-${zone.id}`} data={arrival}>
+                <Layer
+                  id={`backup-arrival-fill-${zone.id}`}
+                  type="fill"
+                  source={`backup-arrival-${zone.id}`}
+                  paint={{ 'fill-color': '#22c55e', 'fill-opacity': 0.10 }}
+                />
+                <Layer
+                  id={`backup-arrival-line-${zone.id}`}
+                  type="line"
+                  source={`backup-arrival-${zone.id}`}
+                  paint={{ 'line-color': '#16a34a', 'line-width': 2.5, 'line-opacity': 0.92 }}
+                />
+              </GeoJSONSource>
+            )}
+          </React.Fragment>
+        ))}
 
         {deploymentPoint && (
           <DeploymentPointMarker

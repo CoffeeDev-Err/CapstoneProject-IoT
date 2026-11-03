@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { Animated } from 'react-native';
 import type { DeploymentAssignment, LivePersonnel } from '../types/operations';
 import type { GeoSentriMapMode } from '../services/mapTilerConfig';
+import type { BackupMapZone } from '../features/maps/backupRadiusGeometry';
 
 export type OfficerMapPerson = LivePersonnel & {
   emergencyActive?: boolean;
@@ -18,6 +19,7 @@ export type OfficerMapCanvasHandle = {
 
 export type OfficerMapCanvasProps = {
   assignment?: DeploymentAssignment;
+  backupZones?: BackupMapZone[];
   compassTop?: number;
   currentPersonnelId: string;
   emergencyPulse: Animated.Value;

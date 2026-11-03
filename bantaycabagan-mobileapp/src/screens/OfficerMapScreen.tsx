@@ -11,6 +11,7 @@ import {
   Animated,
   AppState,
   Easing,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -107,6 +108,8 @@ export default function OfficerMapScreen({
   const mapInteractionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelfFocus = useRef(false);
   const [backupActionPending, setBackupActionPending] = useState(false);
+  const [backupRequestModalVisible, setBackupRequestModalVisible] = useState(false);
+  const [requiredRespondersText, setRequiredRespondersText] = useState('3');
   const [showOwnEmergencyOverlay, setShowOwnEmergencyOverlay] = useState(false);
   const [headerVisibilityValue, setHeaderVisibilityValue] = useState(1);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
@@ -218,6 +221,22 @@ export default function OfficerMapScreen({
     [...createMapPersonnel(visiblePersonnel, emergencyPersonnelIds, operationPersonnelIds), ...preview.personnel]
   ), [emergencyPersonnelIds, operationPersonnelIds, visiblePersonnel, preview.personnel]);
   const selectablePersonnel = useMemo(() => [...visiblePersonnel, ...preview.personnel], [visiblePersonnel, preview.personnel]);
+  const backupZones = useMemo(() => tasks
+    .filter((task) => task.type === 'backup' && (task.status === 'open' || task.status === 'full'))
+    .map((task) => {
+      const requester = personnel.find((member) => isSamePersonnelId(member.id, task.requested_by))
+        || (isSamePersonnelId(currentOfficer.id, task.requested_by) ? currentOfficer : undefined);
+      if (!requester
+        || !Number.isFinite(requester.latitude)
+        || !Number.isFinite(requester.longitude)) return null;
+      return {
+        id: task.id,
+        latitude: Number(requester.latitude),
+        longitude: Number(requester.longitude),
+        showArrivalRadius: Boolean(task.responders?.some((responder) => responder.arrived_at)),
+      };
+    })
+    .filter((zone): zone is NonNullable<typeof zone> => Boolean(zone)), [currentOfficer, personnel, tasks]);
 
   const currentOfficerHasActiveBackup = emergencyPersonnelIds.has(currentPersonnelId);
   const hasCriticalPersonnel = mapPersonnel.some((member) => member.emergencyActive);
@@ -327,7 +346,8 @@ export default function OfficerMapScreen({
     currentPersonnelId,
     isDark,
     mapPersonnel,
-  }), [assignment, currentPersonnelId, deploymentTarget, isDark, personnelRosterKey]);
+    backupZones,
+  }), [assignment, backupZones, currentPersonnelId, deploymentTarget, isDark, personnelRosterKey]);
   const handleConfirmAssignment = async () => {
     if (!assignment || assignmentAcknowledgementPending) return;
     setAssignmentAcknowledgementPending(true);
@@ -352,28 +372,26 @@ export default function OfficerMapScreen({
       return;
     }
 
-    Alert.alert(
-      'Request backup?',
-      `Request up to 3 responders at ${assignment?.patrolArea || currentOfficer.locationName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Request',
-          style: 'destructive',
-          onPress: async () => {
-            setBackupActionPending(true);
-            try {
-              await createBackupRequest();
-              Alert.alert('Backup requested', 'The request is now visible in Tasks.');
-            } catch (error) {
-              Alert.alert('Backup request needs attention', requestErrorMessage(error, { action: 'request backup', write: true }));
-            } finally {
-              setBackupActionPending(false);
-            }
-          },
-        },
-      ],
-    );
+    setRequiredRespondersText('3');
+    setBackupRequestModalVisible(true);
+  };
+
+  const submitBackupRequest = async () => {
+    const requiredResponders = Number(requiredRespondersText);
+    if (!Number.isInteger(requiredResponders) || requiredResponders < 1) {
+      Alert.alert('Enter a valid number', 'The number of responders must be a positive whole number.');
+      return;
+    }
+    setBackupActionPending(true);
+    try {
+      await createBackupRequest(requiredResponders);
+      setBackupRequestModalVisible(false);
+      Alert.alert('Backup requested', `The request is open for ${requiredResponders} responder${requiredResponders === 1 ? '' : 's'}.`);
+    } catch (error) {
+      Alert.alert('Backup request needs attention', requestErrorMessage(error, { action: 'request backup', write: true }));
+    } finally {
+      setBackupActionPending(false);
+    }
   };
 
   const handleCancelBackupRequest = () => {
@@ -443,6 +461,7 @@ export default function OfficerMapScreen({
           <OfficerMapCanvas
             ref={nativeMapRef}
             assignment={assignment}
+            backupZones={backupZones}
             compassTop={compassTop}
             currentPersonnelId={currentPersonnelId}
             emergencyPulse={emergencyPulse}
@@ -457,6 +476,74 @@ export default function OfficerMapScreen({
           />
         )}
       </View>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={backupRequestModalVisible}
+        onRequestClose={() => !backupActionPending && setBackupRequestModalVisible(false)}
+      >
+        <View style={styles.backupModalBackdrop}>
+          <View style={[styles.backupModalCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.backupModalHeader}>
+              <View style={[styles.backupModalIcon, { backgroundColor: colors.dangerSoft }]}>
+                <Icon name="campaign" size={24} color={colors.danger} />
+              </View>
+              <View style={styles.backupModalHeading}>
+                <Text style={[styles.backupModalTitle, { color: colors.text }]}>Request backup</Text>
+                <Text style={[styles.backupModalSubtitle, { color: colors.textMuted }]}>
+                  Choose how many responders are needed.
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.backupModalLabel, { color: colors.textMuted }]}>RESPONDERS NEEDED</Text>
+            <View style={styles.responderSelector}>
+              <TouchableOpacity
+                accessibilityLabel="Decrease responders"
+                disabled={backupActionPending || Number(requiredRespondersText) <= 1}
+                style={[styles.responderStepButton, { backgroundColor: colors.surfaceMuted }]}
+                onPress={() => setRequiredRespondersText(String(Math.max(1, (Number(requiredRespondersText) || 1) - 1)))}
+              >
+                <Icon name="remove" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <TextInput
+                accessibilityLabel="Number of responders needed"
+                editable={!backupActionPending}
+                keyboardType="number-pad"
+                selectTextOnFocus
+                value={requiredRespondersText}
+                onChangeText={(value) => setRequiredRespondersText(value.replace(/[^0-9]/g, ''))}
+                style={[styles.responderNumberInput, { color: colors.text, borderColor: colors.border }]}
+              />
+              <TouchableOpacity
+                accessibilityLabel="Increase responders"
+                disabled={backupActionPending}
+                style={[styles.responderStepButton, { backgroundColor: colors.surfaceMuted }]}
+                onPress={() => setRequiredRespondersText(String((Number(requiredRespondersText) || 0) + 1))}
+              >
+                <Icon name="add" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.backupModalHint, { color: colors.textMuted }]}>Nearby on-duty officers within 1 km will be notified first.</Text>
+            <View style={styles.backupModalActions}>
+              <TouchableOpacity
+                disabled={backupActionPending}
+                style={[styles.backupModalAction, { backgroundColor: colors.surfaceMuted }]}
+                onPress={() => setBackupRequestModalVisible(false)}
+              >
+                <Text style={[styles.backupModalActionText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={backupActionPending}
+                style={[styles.backupModalAction, { backgroundColor: colors.danger }]}
+                onPress={() => void submitBackupRequest()}
+              >
+                <Text style={[styles.backupModalActionText, { color: '#ffffff' }]}>{backupActionPending ? 'Requesting...' : 'Send Request'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {currentOfficerHasActiveBackup && showOwnEmergencyOverlay && (
         <Animated.View
@@ -881,4 +968,35 @@ const styles = StyleSheet.create({
     zIndex: 11,
   },
   backupButtonPending: { opacity: 0.72 },
+  backupModalBackdrop: {
+    flex: 1,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(2, 6, 23, 0.62)',
+  },
+  backupModalCard: {
+    width: '100%',
+    maxWidth: 390,
+    padding: 20,
+    borderRadius: 22,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    elevation: 14,
+  },
+  backupModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backupModalIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 23 },
+  backupModalHeading: { flex: 1 },
+  backupModalTitle: { fontSize: 19, fontWeight: '900' },
+  backupModalSubtitle: { marginTop: 3, fontSize: 12, lineHeight: 17 },
+  backupModalLabel: { marginTop: 22, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  responderSelector: { marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  responderStepButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  responderNumberInput: { width: 92, height: 52, borderWidth: 1, borderRadius: 16, fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  backupModalHint: { marginTop: 14, fontSize: 11, lineHeight: 16, textAlign: 'center' },
+  backupModalActions: { marginTop: 20, flexDirection: 'row', gap: 10 },
+  backupModalAction: { minHeight: 46, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  backupModalActionText: { fontSize: 13, fontWeight: '900' },
 });

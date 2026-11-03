@@ -33,6 +33,8 @@ export type OperationalTask = {
   requester_name: string;
   assigned_area: string;
   required_responders: number;
+  audience_mode?: 'nearby' | 'fallback_all' | 'expanded_all';
+  eligible_responder_ids?: string[];
   accepted_by: string[];
   arrived_by?: string[];
   responders: TaskResponder[];

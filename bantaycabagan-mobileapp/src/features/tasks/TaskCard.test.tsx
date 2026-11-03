@@ -111,6 +111,36 @@ describe('TaskCard', () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it('lets the requester expand a nearby response group', async () => {
+    const onRequestMore = jest.fn();
+    const ownTask = {
+      ...task,
+      requested_by: 'officer-1',
+      audience_mode: 'nearby' as const,
+    };
+    const view = await render(
+      <TaskCard
+        accepting={false}
+        cancelling={false}
+        completing={false}
+        currentPersonnelId="officer-1"
+        expanded
+        filterTranslateX={{ value: 0 } as never}
+        onAccept={jest.fn()}
+        onCancel={jest.fn()}
+        onComplete={jest.fn()}
+        onCreateReport={jest.fn()}
+        onOpenReport={jest.fn()}
+        onRequestMore={onRequestMore}
+        onToggle={jest.fn()}
+        task={ownTask}
+      />,
+    );
+
+    await fireEvent.press(view.getByText('Request More Responders'));
+    expect(onRequestMore).toHaveBeenCalledWith(ownTask);
+  });
+
   it('offers one report action after the requester completes the backup', async () => {
     const onCreateReport = jest.fn();
     const completedTask = {

@@ -196,7 +196,9 @@ assert.match(
 	'Map gestures must control the shared page header',
 )
 assert.doesNotMatch(nativeMapSource, /geosentri-patrol-area/, 'The obsolete dashed patrol-radius guide must stay hidden')
-assert.doesNotMatch(officerMapScreenSource, /L\.circle\(/, 'The web fallback must not restore the patrol-radius guide')
+assert.doesNotMatch(officerMapScreenSource, /geosentri-patrol-area/, 'The web fallback must not restore the obsolete patrol-radius guide')
+assert.match(officerMapScreenSource, /radius:1000[\s\S]*radius:200/, 'The web fallback must render the backup response and arrival radii')
+assert.match(nativeMapSource, /createRadiusPolygon\(zone\.latitude, zone\.longitude, 1000\)[\s\S]*createRadiusPolygon\(zone\.latitude, zone\.longitude, 200\)/, 'The native map must render the backup response and arrival radii')
 assert.match(
 	officerMapScreenSource,
 	/\{ backgroundColor:\s*colors\.surface,\s*borderColor:\s*colors\.border \}/,

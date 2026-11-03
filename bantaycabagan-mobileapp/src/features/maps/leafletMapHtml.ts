@@ -1,4 +1,5 @@
 import type { OfficerMapPerson } from '../../components/OfficerMapCanvas';
+import type { BackupMapZone } from './backupRadiusGeometry';
 
 type LeafletMapHtmlOptions = {
   latitude?: number;
@@ -10,6 +11,7 @@ type LeafletMapHtmlOptions = {
   currentPersonnelId: string;
   isDark: boolean;
   mapPersonnel: OfficerMapPerson[];
+  backupZones?: BackupMapZone[];
 };
 
 // Leaflet is pinned to an exact version and subresource-integrity hash so a
@@ -43,9 +45,11 @@ export const createLeafletMapHtml = ({
   currentPersonnelId,
   isDark,
   mapPersonnel,
+  backupZones = [],
 }: LeafletMapHtmlOptions) => {
     const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
+    const initialBackupZones = JSON.stringify(backupZones);
     const deploymentPoint = JSON.stringify({
       hasPoint: hasDeploymentPoint,
       label: deploymentPointLabel || (deploymentType === 'route' ? 'Route start point' : 'Deployment point'),
@@ -162,6 +166,19 @@ export const createLeafletMapHtml = ({
             window.mapInstance=map;
             window.officerMarkers=markers;
             window.personnelById=personnelById;
+
+            (${initialBackupZones}).forEach((zone)=>{
+              L.circle([Number(zone.latitude),Number(zone.longitude)],{
+                radius:1000,color:'#ef4444',weight:2,opacity:.86,
+                fillColor:'#ef4444',fillOpacity:.07,interactive:false
+              }).addTo(map);
+              if(zone.showArrivalRadius){
+                L.circle([Number(zone.latitude),Number(zone.longitude)],{
+                  radius:200,color:'#16a34a',weight:2.5,opacity:.92,
+                  fillColor:'#22c55e',fillOpacity:.10,interactive:false
+                }).addTo(map);
+              }
+            });
 
             const escapeHtml=(value)=>String(value||'')
               .replace(/&/g,'&amp;')

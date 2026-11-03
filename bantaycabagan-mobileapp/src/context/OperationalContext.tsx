@@ -16,6 +16,7 @@ import {
   fetchOperations,
   fetchLivePersonnel,
   requestBackup,
+  requestMoreOperationalResponders,
   resolveApiAssetUrl,
   resolveIncidentReport,
   editPoliceReport,
@@ -68,7 +69,8 @@ type OperationalContextValue = {
   acceptTask: (taskId: string) => Promise<void>;
   cancelBackupRequest: (taskId: string) => Promise<void>;
   completeBackupRequest: (taskId: string) => Promise<OperationalTask>;
-  createBackupRequest: () => Promise<void>;
+  createBackupRequest: (requiredResponders: number) => Promise<void>;
+  requestMoreResponders: (taskId: string) => Promise<number>;
   submitReport: (input: SubmitReportInput) => Promise<'submitted' | 'queued'>;
   resolveReport: (reportId: string, resolutionNotes: string) => Promise<void>;
   editReport: (reportId: string, input: Parameters<typeof editPoliceReport>[1]) => Promise<PoliceReport>;
@@ -289,10 +291,16 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     return response.task;
   }, [token]);
 
-  const createBackupRequest = useCallback(async () => {
-    const response = await requestBackup(actor, deployments[0], token);
+  const createBackupRequest = useCallback(async (requiredResponders: number) => {
+    const response = await requestBackup(actor, requiredResponders, deployments[0], token);
     setTasks((items) => upsertById(items, response.task));
   }, [actor, deployments, token]);
+
+  const requestMoreResponders = useCallback(async (taskId: string) => {
+    const response = await requestMoreOperationalResponders(taskId, token);
+    setTasks((items) => upsertById(items, response.task));
+    return response.added_count;
+  }, [token]);
 
   const submitReport = useCallback(async (input: SubmitReportInput) => {
     const result = await submitReportWithOfflineSync(input);
@@ -345,6 +353,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     cancelBackupRequest,
     completeBackupRequest,
     createBackupRequest,
+    requestMoreResponders,
     submitReport,
     resolveReport,
     editReport,
@@ -358,6 +367,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
     cancelBackupRequest,
     completeBackupRequest,
     createBackupRequest,
+    requestMoreResponders,
     currentOfficer,
     currentPersonnelId,
     deployments,

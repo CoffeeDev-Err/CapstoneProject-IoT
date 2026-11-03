@@ -11,6 +11,7 @@ type TaskCardProps = {
   accepting: boolean;
   cancelling: boolean;
   completing: boolean;
+  expanding?: boolean;
   currentPersonnelId: string;
   expanded: boolean;
   filterTranslateX: SharedValue<number>;
@@ -19,6 +20,7 @@ type TaskCardProps = {
   onComplete: (task: OperationalTask) => void;
   onCreateReport: (task: OperationalTask) => void;
   onOpenReport: (reportId: string) => void;
+  onRequestMore?: (task: OperationalTask) => void;
   onToggle: (taskId: string) => void;
   task: OperationalTask;
 };
@@ -27,6 +29,7 @@ export function TaskCard({
   accepting,
   cancelling,
   completing,
+  expanding = false,
   currentPersonnelId,
   expanded,
   filterTranslateX,
@@ -35,6 +38,7 @@ export function TaskCard({
   onComplete,
   onCreateReport,
   onOpenReport,
+  onRequestMore,
   onToggle,
   task,
 }: TaskCardProps) {
@@ -150,6 +154,16 @@ export function TaskCard({
 
             {ownRequest && active ? (
               <>
+                {!full && task.audience_mode === 'nearby' && onRequestMore && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.requestMoreButton, expanding && styles.actionPending]}
+                    onPress={() => onRequestMore(task)}
+                    disabled={cancelling || completing || expanding}
+                  >
+                    <Icon name="group-add" size={17} color="#ffffff" />
+                    <Text style={styles.actionButtonText}>{expanding ? 'Notifying...' : 'Request More Responders'}</Text>
+                  </TouchableOpacity>
+                )}
                 <View style={styles.ownRequestActions}>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.splitActionButton, styles.cancelButton, cancelling && styles.actionPending]}
@@ -267,6 +281,7 @@ const styles = StyleSheet.create({
   ownRequestActions: { marginTop: 12, flexDirection: 'row', gap: 8 },
   splitActionButton: { flex: 1, marginTop: 0, paddingHorizontal: 8 },
   completeButton: { backgroundColor: mobileTheme.blue },
+  requestMoreButton: { backgroundColor: mobileTheme.purple },
   arrivalStatus: { minHeight: 42, marginTop: 12, paddingHorizontal: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8 },
   arrivalStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' },
   arrivedStatus: { borderColor: mobileTheme.success, backgroundColor: mobileTheme.success },
