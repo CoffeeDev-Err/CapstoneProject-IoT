@@ -284,7 +284,7 @@ function Field({
             hitSlop={8}
           >
             <Icon
-              name={passwordVisible ? 'visibility-off' : 'visibility'}
+              name={passwordVisible ? 'visibility' : 'visibility-off'}
               size={21}
               color={colors.textMuted}
             />

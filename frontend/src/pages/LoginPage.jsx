@@ -528,7 +528,7 @@ function PasswordField({ label, error, ...inputProps }) {
           aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           aria-pressed={visible}
         >
-          {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          {visible ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />}
         </button>
       </span>
       {error && <small className="login-field-error">{error}</small>}

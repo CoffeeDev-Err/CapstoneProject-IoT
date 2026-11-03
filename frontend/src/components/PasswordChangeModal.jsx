@@ -217,7 +217,7 @@ function ModalPasswordField({ label, ...inputProps }) {
           aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           aria-pressed={visible}
         >
-          {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          {visible ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />}
         </button>
       </span>
     </label>
