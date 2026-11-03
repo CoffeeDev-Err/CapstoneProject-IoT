@@ -77,3 +77,109 @@ test('reactivating a mock officer restores access without assigning GPS', async 
 		models.Personnel.findOne = originalPersonnelFindOne
 	}
 })
+
+test('reactivating an officer reuses a stale active assignment owned by that officer', async () => {
+	const originals = {
+		userFindById: models.User.findById,
+		personnelFindOne: models.Personnel.findOne,
+		assignmentFindOne: models.GpsDeviceAssignment.findOne,
+		assignmentCreate: models.GpsDeviceAssignment.create,
+	}
+	const user = {
+		_id: '507f1f77bcf86cd799439014',
+		role: 'officer',
+		status: 'inactive',
+		personnelId: 'officer-p-1001',
+		isMockAccount: false,
+		username: '12-2004',
+		email: 'leo@pnp.gov.ph',
+		save: async () => {},
+	}
+	const profile = {
+		personnelId: user.personnelId,
+		fullName: 'Leo Gannad',
+		badgeNumber: 'P-1001',
+		rank: 'Police Corporal',
+		status: 'inactive',
+		dutyStatus: 'Off Duty',
+		save: async () => {},
+	}
+	let assignmentSaves = 0
+	const staleAssignment = {
+		_id: '507f1f77bcf86cd799439015',
+		assignmentId: 'GPS-STALE-002',
+		personnelId: user.personnelId,
+		flespiDeviceId: 'device-2',
+		imei: '7026287492',
+		deviceName: 'GPS-002',
+		status: 'active',
+		unassignedAt: null,
+		save: async () => { assignmentSaves += 1 },
+	}
+	models.User.findById = async () => user
+	models.Personnel.findOne = async () => profile
+	models.GpsDeviceAssignment.findOne = async () => staleAssignment
+	models.GpsDeviceAssignment.create = async () => {
+		throw new Error('A new assignment must not be created for the same officer and device.')
+	}
+
+	const service = createAccountService({
+		io,
+		personnelService: null,
+		auditService: { recordAudit: async () => {} },
+		fetchRegisteredDevices: async () => [{ id: 'device-2', imei: '7026287492', name: 'GPS-002' }],
+	})
+
+	try {
+		const result = await service.reactivateAccount('id', {
+			imei: '7026287492',
+			flespiDeviceId: 'device-2',
+		}, { actor })
+		assert.equal(user.status, 'active')
+		assert.equal(profile.status, 'active')
+		assert.equal(result.flespiDeviceName, 'GPS-002')
+		assert.equal(assignmentSaves, 1)
+	} finally {
+		models.User.findById = originals.userFindById
+		models.Personnel.findOne = originals.personnelFindOne
+		models.GpsDeviceAssignment.findOne = originals.assignmentFindOne
+		models.GpsDeviceAssignment.create = originals.assignmentCreate
+	}
+})
+
+test('reactivating an officer rejects a GPS device assigned to another officer', async () => {
+	const originals = {
+		userFindById: models.User.findById,
+		personnelFindOne: models.Personnel.findOne,
+		assignmentFindOne: models.GpsDeviceAssignment.findOne,
+	}
+	models.User.findById = async () => ({
+		_id: '507f1f77bcf86cd799439016',
+		role: 'officer',
+		status: 'inactive',
+		personnelId: 'officer-p-1001',
+		isMockAccount: false,
+	})
+	models.Personnel.findOne = async () => ({ personnelId: 'officer-p-1001' })
+	models.GpsDeviceAssignment.findOne = async (filter) => (
+		filter.$or
+			? { personnelId: 'officer-p-2002', imei: '7026287492', flespiDeviceId: 'device-2' }
+			: null
+	)
+	const service = createAccountService({
+		io,
+		personnelService: null,
+		fetchRegisteredDevices: async () => [{ id: 'device-2', imei: '7026287492', name: 'GPS-002' }],
+	})
+
+	try {
+		await assert.rejects(service.reactivateAccount('id', {
+			imei: '7026287492',
+			flespiDeviceId: 'device-2',
+		}, { actor }), { code: 'GPS_DEVICE_ASSIGNED' })
+	} finally {
+		models.User.findById = originals.userFindById
+		models.Personnel.findOne = originals.personnelFindOne
+		models.GpsDeviceAssignment.findOne = originals.assignmentFindOne
+	}
+})

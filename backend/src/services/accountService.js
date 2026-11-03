@@ -145,8 +145,8 @@ const validateAccountPayload = (
 	}
 }
 
-const validateRegisteredDevice = async ({ imei, flespiDeviceId }) => {
-	const devices = await fetchRegisteredDevices()
+const validateRegisteredDevice = async ({ imei, flespiDeviceId }, fetchDevices = fetchRegisteredDevices) => {
+	const devices = await fetchDevices()
 	const device = devices.find((item) => (
 		item.imei === String(imei)
 		&& item.id === String(flespiDeviceId)
@@ -162,7 +162,12 @@ const validateRegisteredDevice = async ({ imei, flespiDeviceId }) => {
 	return device
 }
 
-const createAccountService = ({ io, personnelService, auditService = defaultAuditService }) => {
+const createAccountService = ({
+	io,
+	personnelService,
+	auditService = defaultAuditService,
+	fetchRegisteredDevices: fetchDevices = fetchRegisteredDevices,
+}) => {
 	const { recordAudit } = auditService
 	const broadcastAccountData = async (identity) => {
 		io.emit('accounts:updated')
@@ -218,7 +223,7 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 
 	const createAccount = async (payload, { ipAddress, actor } = {}) => {
 		validateAccountPayload(payload)
-		const device = await validateRegisteredDevice(payload)
+		const device = await validateRegisteredDevice(payload, fetchDevices)
 		const personnelId = `officer-${String(payload.badgeNumber)
 			.trim()
 			.toLowerCase()
@@ -403,8 +408,15 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 			)
 			: Boolean(currentAssignment)
 
-		if (deviceChanged && wantsDevice) {
-			const device = await validateRegisteredDevice(payload)
+		if (nextStatus === 'inactive') {
+			if (currentAssignment) {
+				currentAssignment.status = 'released'
+				currentAssignment.unassignedAt = new Date()
+				await currentAssignment.save()
+			}
+			assignment = null
+		} else if (deviceChanged && wantsDevice) {
+			const device = await validateRegisteredDevice(payload, fetchDevices)
 			if (currentAssignment) {
 				currentAssignment.status = 'released'
 				currentAssignment.unassignedAt = new Date()
@@ -549,6 +561,7 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 
 		let profile = null
 		let assignment = null
+		let assignmentCreated = false
 		if (user.role === 'officer') {
 			profile = await Personnel.findOne({ personnelId: user.personnelId })
 			if (!profile) throw createHttpError('Personnel profile not found.', 404)
@@ -562,15 +575,21 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 						'imei',
 					)
 				}
-				const device = await validateRegisteredDevice(payload)
-				const existingAssignment = await GpsDeviceAssignment.findOne({
-					status: 'active',
-					$or: [
-						{ imei: device.imei },
-						{ personnelId: user.personnelId },
-					],
-				})
-				if (existingAssignment) {
+				const device = await validateRegisteredDevice(payload, fetchDevices)
+				const [deviceAssignment, personnelAssignment] = await Promise.all([
+					GpsDeviceAssignment.findOne({
+						status: 'active',
+						$or: [
+							{ imei: device.imei },
+							{ flespiDeviceId: device.id },
+						],
+					}),
+					GpsDeviceAssignment.findOne({
+						status: 'active',
+						personnelId: user.personnelId,
+					}),
+				])
+				if (deviceAssignment && deviceAssignment.personnelId !== user.personnelId) {
 					throw createHttpError(
 						'The selected GPS device is already assigned to an active account.',
 						409,
@@ -578,15 +597,32 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 						'imei',
 					)
 				}
-				assignment = await GpsDeviceAssignment.create({
-					assignmentId: `GPS-${randomUUID()}`,
-					personnelId: user.personnelId,
-					flespiDeviceId: device.id,
-					imei: device.imei,
-					deviceName: device.name,
-					assignedBy: actor?.username || 'supervisor',
-					assignedAt: new Date(),
-				})
+
+				if (personnelAssignment && personnelAssignment !== deviceAssignment) {
+					personnelAssignment.status = 'released'
+					personnelAssignment.unassignedAt = new Date()
+					await personnelAssignment.save()
+				}
+
+				if (deviceAssignment) {
+					assignment = deviceAssignment
+					assignment.flespiDeviceId = device.id
+					assignment.imei = device.imei
+					assignment.deviceName = device.name
+					assignment.unassignedAt = null
+					await assignment.save()
+				} else {
+					assignment = await GpsDeviceAssignment.create({
+						assignmentId: `GPS-${randomUUID()}`,
+						personnelId: user.personnelId,
+						flespiDeviceId: device.id,
+						imei: device.imei,
+						deviceName: device.name,
+						assignedBy: actor?.username || 'supervisor',
+						assignedAt: new Date(),
+					})
+					assignmentCreated = true
+				}
 			}
 		}
 
@@ -601,7 +637,9 @@ const createAccountService = ({ io, personnelService, auditService = defaultAudi
 				...(profile ? [profile.save()] : []),
 			])
 		} catch (error) {
-			if (assignment?._id) await GpsDeviceAssignment.deleteOne({ _id: assignment._id }).catch(() => {})
+			if (assignmentCreated && assignment?._id) {
+				await GpsDeviceAssignment.deleteOne({ _id: assignment._id }).catch(() => {})
+			}
 			throw error
 		}
 
