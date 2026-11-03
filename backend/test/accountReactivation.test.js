@@ -195,3 +195,46 @@ test('reactivating an officer rejects a GPS device assigned to another officer',
 		models.GpsDeviceAssignment.findOne = originals.assignmentFindOne
 	}
 })
+
+test('reactivation restores the previous GPS when replacement creation fails', async () => {
+	const originals = {
+		userFindById: models.User.findById,
+		personnelFindOne: models.Personnel.findOne,
+		assignmentFindOne: models.GpsDeviceAssignment.findOne,
+		assignmentCreate: models.GpsDeviceAssignment.create,
+	}
+	const user = {
+		_id: '507f1f77bcf86cd799439017', role: 'officer', status: 'inactive',
+		personnelId: 'officer-p-1001', isMockAccount: false,
+	}
+	const profile = { personnelId: user.personnelId }
+	let saves = 0
+	const previousAssignment = {
+		personnelId: user.personnelId, imei: '7026287502', flespiDeviceId: 'device-1',
+		status: 'active', unassignedAt: null,
+		save: async () => { saves += 1 },
+	}
+	models.User.findById = async () => user
+	models.Personnel.findOne = async () => profile
+	models.GpsDeviceAssignment.findOne = async (filter) => (filter.$or ? null : previousAssignment)
+	models.GpsDeviceAssignment.create = async () => { throw new Error('simulated assignment failure') }
+	const service = createAccountService({
+		io,
+		personnelService: null,
+		fetchRegisteredDevices: async () => [{ id: 'device-2', imei: '7026287492', name: 'GPS-002' }],
+	})
+
+	try {
+		await assert.rejects(service.reactivateAccount('id', {
+			imei: '7026287492', flespiDeviceId: 'device-2',
+		}, { actor }), /simulated assignment failure/)
+		assert.equal(previousAssignment.status, 'active')
+		assert.equal(previousAssignment.unassignedAt, null)
+		assert.equal(saves, 2)
+	} finally {
+		models.User.findById = originals.userFindById
+		models.Personnel.findOne = originals.personnelFindOne
+		models.GpsDeviceAssignment.findOne = originals.assignmentFindOne
+		models.GpsDeviceAssignment.create = originals.assignmentCreate
+	}
+})

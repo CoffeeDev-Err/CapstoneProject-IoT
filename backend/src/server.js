@@ -75,7 +75,7 @@ const io = new Server(server, {
 })
 
 const operationalService = createOperationalService({ io, auditService })
-const accountService = createAccountService({ io, personnelService, auditService })
+const accountService = createAccountService({ io, personnelService, operationalService, auditService })
 const flespiSyncService = createFlespiSyncService({
 	flespiService,
 	personnelService,

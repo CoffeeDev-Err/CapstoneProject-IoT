@@ -116,6 +116,47 @@ it('identifies a conflicting scheduled shift without cancelling or saving either
 	assert.equal(writes, 0)
 })
 
+it('cancels active and scheduled deployments when an officer account is deactivated', async () => {
+	const audits = []
+	const active = {
+		assignmentId: 'DEP-ACTIVE', personnelId: 'PNP-001', status: 'active',
+		save: async () => {},
+	}
+	const scheduled = {
+		assignmentId: 'DEP-SCHEDULED', personnelId: 'PNP-001', status: 'scheduled',
+		save: async () => {},
+	}
+	let lifecycleFilter
+	const Deployment = {
+		find: (filter) => {
+			if (filter.status?.$in) {
+				lifecycleFilter = filter
+				return Promise.resolve([active, scheduled])
+			}
+			return {
+				sort: () => ({ lean: async () => [] }),
+			}
+		},
+	}
+	const service = createService({
+		Deployment,
+		Personnel: {},
+		audits,
+	})
+
+	const result = await service.deactivatePersonnelDeployments('PNP-001', {
+		role: 'supervisor', username: '00-0001',
+	})
+	assert.deepEqual(lifecycleFilter.status, { $in: ['scheduled', 'active'] })
+	assert.equal(active.status, 'cancelled')
+	assert.equal(scheduled.status, 'cancelled')
+	assert.deepEqual(result, { cancelled: 2 })
+	assert.deepEqual(audits.map(({ action }) => action), [
+		'deployment.cancelled_on_account_deactivation',
+		'deployment.cancelled_on_account_deactivation',
+	])
+})
+
 describe('deployment acknowledgement', () => {
 	it('stores a content signature and publishes a scoped acknowledgement', async () => {
 		const now = Date.now()

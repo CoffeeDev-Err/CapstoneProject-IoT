@@ -48,6 +48,7 @@ const createOperationalService = ({ io, auditService }) => {
 		cancelTask,
 		completeTask,
 		createTask,
+		deactivatePersonnelTasks,
 		getTask,
 		listTasks,
 		loadTasks,
@@ -84,6 +85,7 @@ const createOperationalService = ({ io, auditService }) => {
 	})
 	const {
 		acknowledgeDeployment,
+		deactivatePersonnelDeployments,
 		getDeployment,
 		getUpcomingDeployment,
 		listDeployments,
@@ -92,6 +94,14 @@ const createOperationalService = ({ io, auditService }) => {
 		replaceDeployments,
 		updateDeploymentStatus,
 	} = deploymentService
+
+	const deactivatePersonnelOperations = async (personnelId, { actor } = {}) => {
+		const [taskResult, deploymentResult] = await Promise.all([
+			deactivatePersonnelTasks(personnelId, actor),
+			deactivatePersonnelDeployments(personnelId, actor),
+		])
+		return { ...taskResult, deploymentsCancelled: deploymentResult.cancelled }
+	}
 
 	const registerSocket = async (socket, actor) => {
 		const [taskPayload, deployments] = await Promise.all([
@@ -108,6 +118,7 @@ const createOperationalService = ({ io, auditService }) => {
 		cancelTask,
 		completeTask,
 		createTask,
+		deactivatePersonnelOperations,
 		getDeployment,
 		getUpcomingDeployment,
 		getReport,

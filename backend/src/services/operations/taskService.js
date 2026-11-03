@@ -681,11 +681,90 @@ const createTaskService = ({
 		return { status: 200, body: { success: true, task: serialized } }
 	}
 
+	const deactivatePersonnelTasks = async (personnelId, actor = { role: 'system' }) => {
+		const normalizedPersonnelId = String(personnelId || '').trim()
+		if (!normalizedPersonnelId) return { cancelled: 0, withdrawn: 0 }
+
+		const tasks = await Task.find({
+			status: { $in: ['open', 'full'] },
+			$or: [
+				{ requestedBy: normalizedPersonnelId },
+				{ 'responders.personnelId': normalizedPersonnelId },
+			],
+		})
+		if (tasks.length === 0) return { cancelled: 0, withdrawn: 0 }
+
+		const previouslyEligiblePersonnelIds = await getOnDutyPersonnelIds()
+		const remainingEligiblePersonnelIds = previouslyEligiblePersonnelIds.filter(
+			(eligiblePersonnelId) => eligiblePersonnelId !== normalizedPersonnelId,
+		)
+		let cancelled = 0
+		let withdrawn = 0
+		for (const task of tasks) {
+			const previousStatus = task.status
+			let action
+			let changes
+
+			if (task.requestedBy === normalizedPersonnelId) {
+				task.status = 'cancelled'
+				task.cancelledAt = clock()
+				task.activeRequestKey = undefined
+				cancelled += 1
+				action = 'task.cancelled_on_account_deactivation'
+				changes = {
+					personnelId: normalizedPersonnelId,
+					status: { from: previousStatus, to: 'cancelled' },
+				}
+			} else {
+				task.responders = (task.responders || []).filter(
+					(responder) => responder.personnelId !== normalizedPersonnelId,
+				)
+				if (task.status === 'full' && task.responders.length < task.requiredResponders) {
+					task.status = 'open'
+				}
+				withdrawn += 1
+				action = 'task.responder_withdrawn_on_account_deactivation'
+				changes = {
+					personnelId: normalizedPersonnelId,
+					status: { from: previousStatus, to: task.status },
+					responderCount: task.responders.length,
+				}
+			}
+
+			await task.save()
+			await recordAudit({
+				actor,
+				action,
+				entityType: 'task',
+				entityId: task.taskId,
+				changes,
+			})
+			const personnelById = await loadTaskPersonnelMap([task])
+			const serialized = serializeTask(task, personnelById)
+			emitTaskRemoval({
+				io,
+				taskId: task.taskId,
+				personnelIds: task.status === 'cancelled'
+					? previouslyEligiblePersonnelIds
+					: [normalizedPersonnelId],
+			})
+			await emitToAuthorizedOfficers(
+				'task:updated',
+				serialized,
+				task,
+				remainingEligiblePersonnelIds,
+			)
+		}
+		io.emit('dashboard:updated')
+		return { cancelled, withdrawn }
+	}
+
 	return {
 		acceptTask,
 		cancelTask,
 		completeTask,
 		createTask,
+		deactivatePersonnelTasks,
 		getTask,
 		listTasks,
 		loadTasks,

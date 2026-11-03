@@ -142,6 +142,63 @@ const createArrivalFixture = ({ task, location }) => {
 	return { audits, deliveries, getUpdates: () => updates, service }
 }
 
+it('cleans only active task participation when an officer account is deactivated', async () => {
+	const now = new Date('2026-11-03T10:00:00Z')
+	const audits = []
+	const requestedTask = {
+		taskId: 'TASK-REQUESTED', type: 'backup', title: 'Backup request', description: '',
+		requestedBy: 'PNP-001', requesterName: 'Officer One', requiredResponders: 2,
+		responders: [{ personnelId: 'PNP-002', acceptedAt: now }],
+		locationName: 'Cabagan', location: { coordinates: [121.76, 17.42] },
+		status: 'open', activeRequestKey: 'backup:PNP-001', createdAt: now, updatedAt: now,
+		save: async () => {},
+	}
+	const responseTask = {
+		taskId: 'TASK-RESPONSE', type: 'urgent', title: 'Urgent task', description: '',
+		requestedBy: 'supervisor', requesterName: 'Supervisor', requiredResponders: 2,
+		responders: [
+			{ personnelId: 'PNP-001', acceptedAt: now },
+			{ personnelId: 'PNP-002', acceptedAt: now },
+		],
+		locationName: 'Cabagan', location: { coordinates: [121.76, 17.42] },
+		status: 'full', createdAt: now, updatedAt: now,
+		save: async () => {},
+	}
+	let taskFilter
+	const service = createTaskService({
+		io: { emit: () => {}, to: () => ({ emit: () => {} }) },
+		models: {
+			Deployment: { distinct: async () => ['PNP-001', 'PNP-002'] },
+			Task: {
+				find: async (filter) => {
+					taskFilter = filter
+					return [requestedTask, responseTask]
+				},
+			},
+		},
+		loadPersonnelMap: async () => new Map(),
+		personnelService: { getPersonnelMember: async () => null },
+		notificationService: { deliverNotification: async () => {} },
+		auditService: { recordAudit: async (entry) => audits.push(entry) },
+		clock: () => now,
+	})
+
+	const result = await service.deactivatePersonnelTasks('PNP-001', {
+		role: 'supervisor', username: '00-0001',
+	})
+	assert.deepEqual(taskFilter.status, { $in: ['open', 'full'] })
+	assert.equal(requestedTask.status, 'cancelled')
+	assert.equal(requestedTask.cancelledAt, now)
+	assert.equal(requestedTask.activeRequestKey, undefined)
+	assert.equal(responseTask.status, 'open')
+	assert.deepEqual(responseTask.responders.map(({ personnelId }) => personnelId), ['PNP-002'])
+	assert.deepEqual(result, { cancelled: 1, withdrawn: 1 })
+	assert.deepEqual(audits.map(({ action }) => action), [
+		'task.cancelled_on_account_deactivation',
+		'task.responder_withdrawn_on_account_deactivation',
+	])
+})
+
 describe('task authorization', () => {
 	it('rejects task acceptance when the officer is off duty', async () => {
 		const result = await createService().acceptTask('TSK-1', 'PNP-OFF-DUTY')

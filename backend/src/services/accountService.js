@@ -162,9 +162,29 @@ const validateRegisteredDevice = async ({ imei, flespiDeviceId }, fetchDevices =
 	return device
 }
 
+const snapshotAssignment = (assignment) => assignment && ({
+	status: assignment.status,
+	unassignedAt: assignment.unassignedAt,
+})
+
+const restoreAssignment = async (assignment, snapshot) => {
+	if (!assignment || !snapshot) return
+	assignment.status = snapshot.status
+	assignment.unassignedAt = snapshot.unassignedAt
+	await assignment.save()
+}
+
+const releaseAssignment = async (assignment, now = new Date()) => {
+	if (!assignment) return
+	assignment.status = 'released'
+	assignment.unassignedAt = now
+	await assignment.save()
+}
+
 const createAccountService = ({
 	io,
 	personnelService,
+	operationalService,
 	auditService = defaultAuditService,
 	fetchRegisteredDevices: fetchDevices = fetchRegisteredDevices,
 }) => {
@@ -397,6 +417,8 @@ const createAccountService = ({
 		if (!profile) throw createHttpError('Personnel profile not found.', 404)
 
 		let assignment = currentAssignment
+		let assignmentCreated = false
+		const currentAssignmentSnapshot = snapshotAssignment(currentAssignment)
 		const requestedImei = String(payload.imei || '').trim()
 		const requestedFlespiDeviceId = String(payload.flespiDeviceId || '').trim()
 		const wantsDevice = Boolean(requestedImei && requestedFlespiDeviceId)
@@ -409,31 +431,42 @@ const createAccountService = ({
 			: Boolean(currentAssignment)
 
 		if (nextStatus === 'inactive') {
-			if (currentAssignment) {
-				currentAssignment.status = 'released'
-				currentAssignment.unassignedAt = new Date()
-				await currentAssignment.save()
-			}
+			await releaseAssignment(currentAssignment)
 			assignment = null
 		} else if (deviceChanged && wantsDevice) {
 			const device = await validateRegisteredDevice(payload, fetchDevices)
-			if (currentAssignment) {
-				currentAssignment.status = 'released'
-				currentAssignment.unassignedAt = new Date()
-				await currentAssignment.save()
-			}
-			assignment = await GpsDeviceAssignment.create({
-				assignmentId: `GPS-${randomUUID()}`,
-				personnelId: user.personnelId,
-				flespiDeviceId: device.id,
-				imei: device.imei,
-				deviceName: device.name,
-				assignedBy: 'supervisor',
+			const occupiedAssignment = await GpsDeviceAssignment.findOne({
+				status: 'active',
+				$or: [
+					{ imei: device.imei },
+					{ flespiDeviceId: device.id },
+				],
 			})
+			if (occupiedAssignment && occupiedAssignment.personnelId !== user.personnelId) {
+				throw createHttpError(
+					'The selected GPS device is already assigned to an active account.',
+					409,
+					'GPS_DEVICE_ASSIGNED',
+					'imei',
+				)
+			}
+			await releaseAssignment(currentAssignment)
+			try {
+				assignment = await GpsDeviceAssignment.create({
+					assignmentId: `GPS-${randomUUID()}`,
+					personnelId: user.personnelId,
+					flespiDeviceId: device.id,
+					imei: device.imei,
+					deviceName: device.name,
+					assignedBy: actor?.username || 'supervisor',
+				})
+				assignmentCreated = true
+			} catch (error) {
+				await restoreAssignment(currentAssignment, currentAssignmentSnapshot)
+				throw error
+			}
 		} else if (deviceChanged && user.isMockAccount) {
-			currentAssignment.status = 'released'
-			currentAssignment.unassignedAt = new Date()
-			await currentAssignment.save()
+			await releaseAssignment(currentAssignment)
 			assignment = null
 		}
 
@@ -442,7 +475,8 @@ const createAccountService = ({
 		profile.rank = String(payload.rank).trim()
 		profile.mobileNumber = normalizeMobileNumber(payload.mobileNumber)
 		if (payload.photoUrl) profile.photoUrl = payload.photoUrl
-		profile.status = normalizeStatus(payload.accountStatus)
+		profile.status = nextStatus
+		if (nextStatus === 'inactive') profile.dutyStatus = 'Off Duty'
 
 		user.username = nextLoginId
 		if (user.email !== nextEmail) {
@@ -456,27 +490,38 @@ const createAccountService = ({
 			user.forcePasswordReset = true
 		}
 
-		await Promise.all([
-			profile.save(),
-			user.save(),
-			Deployment.updateMany(
-				{ personnelId: user.personnelId },
-				{
-					$set: {
-						personnelName: profile.fullName,
-						rank: profile.rank,
+		try {
+			await Promise.all([
+				profile.save(),
+				user.save(),
+				Deployment.updateMany(
+					{ personnelId: user.personnelId },
+					{
+						$set: {
+							personnelName: profile.fullName,
+							rank: profile.rank,
+						},
 					},
-				},
-			),
-			Task.updateMany(
-				{ requestedBy: user.personnelId },
-				{ $set: { requesterName: profile.fullName } },
-			),
-			Report.updateMany(
-				{ submittedBy: user.personnelId },
-				{ $set: { officerName: profile.fullName } },
-			),
-		])
+				),
+				Task.updateMany(
+					{ requestedBy: user.personnelId },
+					{ $set: { requesterName: profile.fullName } },
+				),
+				Report.updateMany(
+					{ submittedBy: user.personnelId },
+					{ $set: { officerName: profile.fullName } },
+				),
+			])
+		} catch (error) {
+			if (assignmentCreated && assignment?._id) {
+				await GpsDeviceAssignment.deleteOne({ _id: assignment._id }).catch(() => {})
+			}
+			await restoreAssignment(currentAssignment, currentAssignmentSnapshot).catch(() => {})
+			throw error
+		}
+		if (nextStatus === 'inactive' && operationalService) {
+			await operationalService.deactivatePersonnelOperations(user.personnelId, { actor })
+		}
 		await revokeActiveSessions()
 		await recordAudit({
 			actor,
@@ -531,6 +576,9 @@ const createAccountService = ({
 				{ $set: { status: 'released', unassignedAt: now } },
 			)] : []),
 		])
+		if (user.role === 'officer' && operationalService) {
+			await operationalService.deactivatePersonnelOperations(user.personnelId, { actor })
+		}
 		await recordAudit({
 			actor,
 			action: 'account.deactivated',
@@ -562,6 +610,8 @@ const createAccountService = ({
 		let profile = null
 		let assignment = null
 		let assignmentCreated = false
+		let releasedPersonnelAssignment = null
+		let releasedPersonnelAssignmentSnapshot = null
 		if (user.role === 'officer') {
 			profile = await Personnel.findOne({ personnelId: user.personnelId })
 			if (!profile) throw createHttpError('Personnel profile not found.', 404)
@@ -605,30 +655,46 @@ const createAccountService = ({
 						&& deviceAssignment.assignmentId === personnelAssignment.assignmentId)
 				))
 				if (personnelAssignment && !sameAssignment) {
-					personnelAssignment.status = 'released'
-					personnelAssignment.unassignedAt = new Date()
-					await personnelAssignment.save()
+					releasedPersonnelAssignment = personnelAssignment
+					releasedPersonnelAssignmentSnapshot = snapshotAssignment(personnelAssignment)
+					await releaseAssignment(personnelAssignment)
 				}
 
 				if (deviceAssignment) {
-					assignment = deviceAssignment
-					assignment.status = 'active'
-					assignment.flespiDeviceId = device.id
-					assignment.imei = device.imei
-					assignment.deviceName = device.name
-					assignment.unassignedAt = null
-					await assignment.save()
+					try {
+						assignment = deviceAssignment
+						assignment.status = 'active'
+						assignment.flespiDeviceId = device.id
+						assignment.imei = device.imei
+						assignment.deviceName = device.name
+						assignment.unassignedAt = null
+						await assignment.save()
+					} catch (error) {
+						await restoreAssignment(
+							releasedPersonnelAssignment,
+							releasedPersonnelAssignmentSnapshot,
+						)
+						throw error
+					}
 				} else {
-					assignment = await GpsDeviceAssignment.create({
-						assignmentId: `GPS-${randomUUID()}`,
-						personnelId: user.personnelId,
-						flespiDeviceId: device.id,
-						imei: device.imei,
-						deviceName: device.name,
-						assignedBy: actor?.username || 'supervisor',
-						assignedAt: new Date(),
-					})
-					assignmentCreated = true
+					try {
+						assignment = await GpsDeviceAssignment.create({
+							assignmentId: `GPS-${randomUUID()}`,
+							personnelId: user.personnelId,
+							flespiDeviceId: device.id,
+							imei: device.imei,
+							deviceName: device.name,
+							assignedBy: actor?.username || 'supervisor',
+							assignedAt: new Date(),
+						})
+						assignmentCreated = true
+					} catch (error) {
+						await restoreAssignment(
+							releasedPersonnelAssignment,
+							releasedPersonnelAssignmentSnapshot,
+						)
+						throw error
+					}
 				}
 			}
 		}
@@ -647,6 +713,10 @@ const createAccountService = ({
 			if (assignmentCreated && assignment?._id) {
 				await GpsDeviceAssignment.deleteOne({ _id: assignment._id }).catch(() => {})
 			}
+			await restoreAssignment(
+				releasedPersonnelAssignment,
+				releasedPersonnelAssignmentSnapshot,
+			).catch(() => {})
 			throw error
 		}
 

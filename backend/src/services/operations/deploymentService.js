@@ -735,8 +735,49 @@ const createDeploymentService = ({
 		return manageablePayload.data
 	}
 
+	const deactivatePersonnelDeployments = async (personnelId, actor = { role: 'system' }) => {
+		const normalizedPersonnelId = String(personnelId || '').trim()
+		if (!normalizedPersonnelId) return { cancelled: 0 }
+		const deploymentsToCancel = await Deployment.find({
+			personnelId: normalizedPersonnelId,
+			status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES },
+		})
+		if (deploymentsToCancel.length === 0) return { cancelled: 0 }
+
+		for (const deployment of deploymentsToCancel) {
+			const previousStatus = deployment.status
+			deployment.status = 'cancelled'
+			await deployment.save()
+			await recordAudit({
+				actor,
+				action: 'deployment.cancelled_on_account_deactivation',
+				entityType: 'deployment',
+				entityId: deployment.assignmentId,
+				changes: {
+					personnelId: normalizedPersonnelId,
+					status: { from: previousStatus, to: 'cancelled' },
+				},
+			})
+		}
+
+		const [deployments, personnel] = await Promise.all([
+			loadDeployments(),
+			getPersonnelWithLocations(),
+		])
+		emitDeploymentCollection({
+			io,
+			eventName: 'deployments:updated',
+			deployments,
+			affectedPersonnelIds: [normalizedPersonnelId],
+		})
+		emitPersonnelCollection(io, 'personnel:update', personnel)
+		io.emit('dashboard:updated')
+		return { cancelled: deploymentsToCancel.length }
+	}
+
 	return {
 		acknowledgeDeployment,
+		deactivatePersonnelDeployments,
 		getDeployment,
 		getUpcomingDeployment,
 		listDeployments,
