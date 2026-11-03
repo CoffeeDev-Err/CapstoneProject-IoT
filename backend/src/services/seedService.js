@@ -229,32 +229,47 @@ const removeDisabledMockOfficerData = async () => {
 	console.log(`Removed ${userIds.length} disabled mock officer account(s).`)
 }
 
-const configureDemoGpsAssignment = async (personnelId) => {
+const configureDemoGpsAssignment = async (personnelId, assignmentModel = GpsDeviceAssignment) => {
 	const flespiDeviceId = String(process.env.DEMO_GPS_FLESPI_DEVICE_ID || '').trim()
 	const deviceIdent = String(process.env.DEMO_GPS_DEVICE_IDENT || '').trim()
 	const deviceName = String(process.env.DEMO_GPS_DEVICE_NAME || 'GPS-001').trim()
 
 	if (!personnelId || !flespiDeviceId || !deviceIdent) return
 
-	const conflictingAssignment = await GpsDeviceAssignment.findOne({
+	const deviceAssignment = await assignmentModel.findOne({
 		status: 'active',
 		$or: [
-			{ personnelId },
 			{ flespiDeviceId },
 			{ imei: deviceIdent },
 		],
 	}).lean()
 
-	if (conflictingAssignment && conflictingAssignment.personnelId !== personnelId) {
+	if (deviceAssignment && deviceAssignment.personnelId !== personnelId) {
 		console.warn(
-			`Demo GPS device is already assigned to ${conflictingAssignment.personnelId}; `
+			`Demo GPS device is already assigned to ${deviceAssignment.personnelId}; `
 			+ `skipping automatic assignment to ${personnelId}.`,
 		)
 		return
 	}
 
-	await GpsDeviceAssignment.updateOne(
-		{ assignmentId: conflictingAssignment?.assignmentId || 'GPS-DEMO-001' },
+	const personnelAssignment = await assignmentModel.findOne({
+		status: 'active',
+		personnelId,
+	}).lean()
+	if (personnelAssignment && (
+		personnelAssignment.flespiDeviceId !== flespiDeviceId
+		|| personnelAssignment.imei !== deviceIdent
+	)) {
+		console.warn(
+			`${personnelId} already has active GPS device ${personnelAssignment.deviceName || personnelAssignment.imei}; `
+			+ 'skipping automatic demo assignment.',
+		)
+		return
+	}
+
+	const currentAssignment = deviceAssignment || personnelAssignment
+	await assignmentModel.updateOne(
+		{ assignmentId: currentAssignment?.assignmentId || 'GPS-DEMO-001' },
 		{
 			$set: {
 				personnelId,
@@ -515,6 +530,7 @@ const seedDatabase = async (models) => {
 
 module.exports = seedDatabase
 module.exports.buildMockDeploymentSeedUpdate = buildMockDeploymentSeedUpdate
+module.exports.configureDemoGpsAssignment = configureDemoGpsAssignment
 module.exports.findProvisionedSupervisor = findProvisionedSupervisor
 module.exports.migrateProvisionedLoginId = migrateProvisionedLoginId
 module.exports.requireProvisionedLoginId = requireProvisionedLoginId
