@@ -1,3 +1,4 @@
+import { backupReportFields, canLinkBackup } from './backupReportContext';
 import { requestErrorMessage } from '../../utils/requestFeedback';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
@@ -142,39 +143,14 @@ export function useReportFormController({
     setEditTarget(null);
     setEditReason('');
     const assignedArea = selectPersonnelDeployment(deployments, currentPersonnelId)?.patrolArea || '';
-    const backupLatitude = Number(backupTask?.latitude);
-    const backupLongitude = Number(backupTask?.longitude);
-    const hasUsableBackupLocation = Boolean(
-      backupTask
-      && Number.isFinite(backupLatitude)
-      && Number.isFinite(backupLongitude)
-      && isInsideCabagan(backupLatitude, backupLongitude),
-    );
-    const backupContext = backupTask ? {
-      task_id: backupTask.id,
-      requested_at: backupTask.created_at,
-      completed_at: backupTask.completed_at || new Date().toISOString(),
-      request_location: backupTask.location,
-      assigned_area: backupTask.assigned_area || assignedArea,
-      latitude: hasUsableBackupLocation ? backupLatitude : undefined,
-      longitude: hasUsableBackupLocation ? backupLongitude : undefined,
-      responders: backupTask.responders || [],
-    } : undefined;
     const emptyForm: ReportForm = {
       ...createEmptyReportForm(),
-      occurred_at: backupTask?.created_at || new Date().toISOString(),
-      assigned_area: backupTask?.assigned_area || assignedArea,
-      barangay: getBarangayFromArea(backupTask?.assigned_area || backupTask?.location || assignedArea),
-      ...(backupTask && {
-        report_type: 'incident',
-        backup_task_id: backupTask.id,
-        backup_context: backupContext,
-        location: backupTask.location,
-        location_source: hasUsableBackupLocation ? 'backup_request' : 'manual',
-        latitude: hasUsableBackupLocation ? backupLatitude : undefined,
-        longitude: hasUsableBackupLocation ? backupLongitude : undefined,
-      }),
+      occurred_at: new Date().toISOString(),
+      assigned_area: assignedArea,
+      barangay: getBarangayFromArea(assignedArea),
+      ...(backupTask ? backupReportFields(backupTask, assignedArea) : {}),
     };
+    const backupContext = emptyForm.backup_context;
     try {
       const draft = await loadReportDraft(currentPersonnelId);
       if (draft) {
@@ -212,6 +188,15 @@ export function useReportFormController({
       );
     }
     setFormVisible(true);
+  };
+
+  const linkBackupRequest = (task: OperationalTask) => {
+    if (!canLinkBackup(task, currentPersonnelId)) {
+      Alert.alert('Backup unavailable', 'Choose your own completed backup request without a linked report.');
+      return;
+    }
+    const assignedArea = selectPersonnelDeployment(deployments, currentPersonnelId)?.patrolArea || '';
+    setForm((current) => ({ ...current, ...backupReportFields(task, assignedArea) }));
   };
 
   const openEditForm = (report: PoliceReport) => {
@@ -640,6 +625,7 @@ export function useReportFormController({
     isSaving,
     locationPickerVisible,
     openSubmitForm,
+    linkBackupRequest,
     resolutionNotes,
     resolveTarget,
     selectBarangay,

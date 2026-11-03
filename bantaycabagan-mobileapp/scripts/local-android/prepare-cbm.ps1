@@ -47,10 +47,19 @@ if (-not (Test-Path -LiteralPath $contractSource)) {
 
 Assert-CbmDestination
 
-$previousLockHash = $null
+# App version metadata does not change installed dependencies. Retain native
+# caches for a version-only release, while comparing all other lockfile data.
+function Get-DependencyLockSignature([string]$Path) {
+    # Node supports the empty root package key in npm's lockfile on PowerShell 5.
+    $signature = & node.exe -e "const fs=require('fs');const lock=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));delete lock.version;if(lock.packages&&lock.packages[''])delete lock.packages[''].version;process.stdout.write(JSON.stringify(lock));" $Path
+    if ($LASTEXITCODE -ne 0) { throw "Cannot read dependency lockfile: $Path" }
+    return $signature
+}
+
+$previousLockSignature = $null
 $destinationLock = Join-Path $destinationRoot 'package-lock.json'
 if (Test-Path -LiteralPath $destinationLock) {
-    $previousLockHash = (Get-FileHash -LiteralPath $destinationLock -Algorithm SHA256).Hash
+    $previousLockSignature = Get-DependencyLockSignature $destinationLock
 }
 
 if ($Fresh -and (Test-Path -LiteralPath $destinationRoot)) {
@@ -100,11 +109,11 @@ New-Item -ItemType Directory -Path $contractsDestination -Force | Out-Null
 Copy-Item -LiteralPath $contractSource `
     -Destination (Join-Path $contractsDestination 'domain-contracts.json') -Force
 
-$sourceLockHash = (Get-FileHash -LiteralPath (Join-Path $sourceRoot 'package-lock.json') -Algorithm SHA256).Hash
+$sourceLockSignature = Get-DependencyLockSignature (Join-Path $sourceRoot 'package-lock.json')
 $nodeModulesPath = Join-Path $destinationRoot 'node_modules'
 $dependenciesChanged = $Fresh -or
     -not (Test-Path -LiteralPath $nodeModulesPath) -or
-    $previousLockHash -ne $sourceLockHash
+    $previousLockSignature -ne $sourceLockSignature
 
 if ($dependenciesChanged) {
     Write-Host 'Installing the exact mobile dependencies from package-lock.json...'

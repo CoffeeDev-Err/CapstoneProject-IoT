@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SwipeDismissCard } from '../../components/SwipeDismissSheet';
 import { mobileTheme } from '../../constants/mobileTheme';
+import { useMobileTheme } from '../../context/ThemeContext';
 import type { DeploymentAssignment } from '../../types/operations';
 
 const deploymentTypeLabel = (assignment: DeploymentAssignment) => (
@@ -30,12 +31,13 @@ export function DeploymentDetailSheet({
   onClose: () => void;
   onViewMap: () => void;
 }) {
+  const { colors } = useMobileTheme();
   const exactLocation = assignment.hasDeploymentPoint !== false
     && Number.isFinite(assignment.latitude)
     && Number.isFinite(assignment.longitude);
 
   return (
-    <SwipeDismissCard key={assignment.id} style={styles.sheet} onClose={onClose}>
+    <SwipeDismissCard key={assignment.id} style={[styles.sheet, { backgroundColor: colors.surface }]} handleColor={colors.border} onClose={onClose}>
       {({ close }) => (
         <View style={styles.content}>
           <View style={styles.header}>
@@ -43,20 +45,20 @@ export function DeploymentDetailSheet({
               <Icon name="location-on" size={25} color="#FFFFFF" />
             </View>
             <View style={styles.headingCopy}>
-              <Text style={styles.eyebrow}>CURRENT DEPLOYMENT</Text>
-              <Text style={styles.title} numberOfLines={2}>{assignment.patrolArea}</Text>
-              <Text style={styles.type}>{deploymentTypeLabel(assignment)}</Text>
+              <Text style={[styles.eyebrow, { color: colors.mapDuty }]}>CURRENT DEPLOYMENT</Text>
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{assignment.patrolArea}</Text>
+              <Text style={[styles.type, { color: colors.textMuted }]}>{deploymentTypeLabel(assignment)}</Text>
             </View>
             <TouchableOpacity
               accessibilityLabel="Close deployment details"
               onPress={() => close()}
-              style={styles.closeButton}
+              style={[styles.closeButton, { borderColor: colors.border }]}
             >
-              <Icon name="close" size={20} color="#CBD5E1" />
+              <Icon name="close" size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.details}>
+          <View style={[styles.details, { borderColor: colors.border }]}>
             <Detail
               icon="place"
               label={assignment.deploymentType === 'route' ? 'Starting point' : 'Deployment point'}
@@ -98,12 +100,13 @@ function Detail({ icon, label, value }: {
   label: string;
   value: string;
 }) {
+  const { colors } = useMobileTheme();
   return (
     <View style={styles.detailRow}>
-      <Icon name={icon} size={18} color="#93C5FD" />
+      <Icon name={icon} size={18} color={colors.mapDuty} />
       <View style={styles.detailCopy}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <Text style={styles.detailValue}>{value}</Text>
+        <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{label}</Text>
+        <Text style={[styles.detailValue, { color: colors.text }]}>{value}</Text>
       </View>
     </View>
   );
@@ -112,7 +115,7 @@ function Detail({ icon, label, value }: {
 const styles = StyleSheet.create({
   sheet: {
     position: 'absolute', right: 20, bottom: 104, left: 20, padding: 0,
-    borderRadius: 20, backgroundColor: mobileTheme.navy, shadowColor: '#000000',
+    borderRadius: 20, backgroundColor: mobileTheme.surface, shadowColor: '#000000',
     shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 13,
   },
   content: { paddingHorizontal: 16, paddingBottom: 16 },

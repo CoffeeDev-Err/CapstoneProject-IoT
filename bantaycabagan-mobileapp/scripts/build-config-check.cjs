@@ -13,7 +13,7 @@ const previewEnvironment = easConfig.build.preview.env;
 
 assert.equal(easConfig.build.preview.android.buildType, 'apk');
 assert.equal(previewEnvironment.ANDROID_BUILD_ARCHS, undefined);
-assert.equal(previewEnvironment.EXPO_PUBLIC_MAP_PREVIEW, 'true');
+assert.equal(previewEnvironment.EXPO_PUBLIC_MAP_PREVIEW, 'false');
 assert.equal(easConfig.build.production.env.EXPO_PUBLIC_MAP_PREVIEW, 'false');
 assert.equal(appConfig.version, packageMetadata.version);
 if (existsSync(androidBuildGradlePath)) {

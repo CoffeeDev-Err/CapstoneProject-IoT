@@ -13,6 +13,7 @@ import { formatReportDate } from '../features/reports/reportDisplay';
 import { Image as CachedImage } from 'expo-image';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -58,6 +59,7 @@ import { ReportEvidenceField } from '../features/reports/ReportEvidenceField';
 import { ReportResolutionSheet } from '../features/reports/ReportResolutionSheet';
 import { ReportLocationFields } from '../features/reports/ReportLocationFields';
 import { useReportFormController } from '../features/reports/useReportFormController';
+import { canLinkBackup } from '../features/reports/backupReportContext';
 import { OfflineDataNotice } from '../components/OfflineDataNotice';
 import { SlidingUnderlineTabs } from '../components/SlidingUnderlineTabs';
 import { PAGE_HEADER_CONTENT_HEIGHT } from '../components/PolicePageHeader';
@@ -94,10 +96,17 @@ const dateRangeFor = (preset: ReportDatePreset) => {
 };
 
 export default function ReportsScreen() {
+  const [backupPickerVisible, setBackupPickerVisible] = useState(false);
   const { colors, isDark } = useMobileTheme();
   const insets = useSafeAreaInsets();
   const {
     currentPersonnelId,
+    tasks,
+    refreshTaskHistory,
+    loadMoreTaskHistory,
+    taskHistoryHasMore,
+    isTaskHistoryLoading,
+    isTaskHistoryLoadingMore,
     reports,
     deployments,
     personnel,
@@ -125,6 +134,7 @@ export default function ReportsScreen() {
     isSaving,
     locationPickerVisible,
     openSubmitForm,
+    linkBackupRequest,
     resolutionNotes,
     resolveTarget,
     selectBarangay,
@@ -174,7 +184,10 @@ export default function ReportsScreen() {
     const backupTask = route.params?.backupTask;
     if (!requestId || !backupTask || handledBackupReportRequestRef.current === requestId) return;
     handledBackupReportRequestRef.current = requestId;
-    openSubmitForm(backupTask).catch(() => undefined);
+    openSubmitForm(backupTask).catch(() => {
+      handledBackupReportRequestRef.current = null;
+      Alert.alert('Unable to open backup report', 'Open the completed request in Tasks and try Create Incident Report again.');
+    });
   }, [openSubmitForm, route.params?.backupReportRequestId, route.params?.backupTask]);
   const [filter, setFilter] = useState<(typeof reportFilters)[number]>('all');
   const [datePreset, setDatePreset] = useState<ReportDatePreset>('all');
@@ -437,6 +450,51 @@ export default function ReportsScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {!editTarget && !form.backup_context ? (
+              <View style={[styles.backupContextCard, { backgroundColor: colors.surface }]}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setBackupPickerVisible((visible) => !visible);
+                    if (!backupPickerVisible) void refreshTaskHistory().catch(() => {
+                      Alert.alert('Backup requests unavailable', 'Try loading completed requests again.');
+                    });
+                  }}
+                >
+                  <Text style={[styles.backupContextTitle, { color: colors.text }]}>Link a completed backup request (optional)</Text>
+                  <Text style={[styles.backupContextValue, { color: colors.textMuted }]}>Include its response team and recorded arrivals in this incident report.</Text>
+                </TouchableOpacity>
+                {backupPickerVisible ? (
+                  <View>
+                    {isTaskHistoryLoading ? <Text style={{ color: colors.textMuted }}>Loading completed requests...</Text> : null}
+                    {tasks.filter((task) => canLinkBackup(task, currentPersonnelId)
+                      && !reports.some((report) => report.backup_response?.task_id === task.id)).map((task) => (
+                      <TouchableOpacity
+                        key={task.id}
+                        accessibilityRole="button"
+                        style={styles.backupContextMeta}
+                        onPress={() => {
+                          linkBackupRequest(task);
+                          setBackupPickerVisible(false);
+                        }}
+                      >
+                        <Text style={[styles.backupContextTitle, { color: colors.text }]}>{task.location}</Text>
+                        <Text style={[styles.backupContextValue, { color: colors.textMuted }]}>{formatReportDate(task.completed_at || task.created_at)} · {task.responders.length} responders</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {!isTaskHistoryLoading && !tasks.some((task) => canLinkBackup(task, currentPersonnelId)
+                      && !reports.some((report) => report.backup_response?.task_id === task.id)) ? (
+                      <Text style={[styles.backupContextValue, { color: colors.textMuted }]}>No available completed backup requests in the loaded history.</Text>
+                    ) : null}
+                    {taskHistoryHasMore ? (
+                      <TouchableOpacity accessibilityRole="button" disabled={isTaskHistoryLoadingMore} onPress={() => void loadMoreTaskHistory().catch(() => Alert.alert('Unable to load requests', 'Please try again.'))}>
+                        <Text style={[styles.backupContextValue, { color: mobileTheme.blue }]}>{isTaskHistoryLoadingMore ? 'Loading...' : 'Load more completed requests'}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
             {form.backup_context ? (
               <View style={[
                 styles.backupContextCard,

@@ -14,7 +14,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://geosentri.com",
         "ALLOW_CLEARTEXT_TRAFFIC": "false",
-        "EXPO_PUBLIC_MAP_PREVIEW": "true"
+        "EXPO_PUBLIC_MAP_PREVIEW": "false"
       },
       "android": {
         "buildType": "apk"

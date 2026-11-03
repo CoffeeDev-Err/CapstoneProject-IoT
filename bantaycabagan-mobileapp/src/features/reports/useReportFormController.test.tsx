@@ -350,6 +350,42 @@ it('prefills a completed backup report from its immutable task context', async (
   expect(result.current.form.backup_context?.responders[0].name).toBe('Responder Two');
 });
 
+it('links a manually opened report without losing its text or evidence', async () => {
+  const submitReport = jest.fn(async () => 'submitted' as const);
+  const { result } = await renderHook(() => useReportFormController({ ...options, submitReport }));
+  await act(async () => { await result.current.openSubmitForm(); });
+  await act(() => {
+    result.current.updateForm('title', 'Incident from patrol');
+    result.current.updateForm('description', 'Details entered before linking');
+    result.current.linkBackupRequest(completedBackupTask);
+  });
+  expect(result.current.form).toMatchObject({
+    title: 'Incident from patrol',
+    description: 'Details entered before linking',
+    backup_task_id: completedBackupTask.id,
+    report_type: 'incident',
+    backup_context: { responders: completedBackupTask.responders },
+  });
+  await act(async () => { await result.current.handleSubmit(jest.fn()); });
+  expect(submitReport).toHaveBeenCalledWith(expect.objectContaining({
+    backup_task_id: completedBackupTask.id,
+    backup_context: expect.objectContaining({ responders: completedBackupTask.responders }),
+  }));
+});
+
+it.each([
+  { ...completedBackupTask, requested_by: 'another-officer' },
+  { ...completedBackupTask, status: 'open' as const },
+  { ...completedBackupTask, status: 'cancelled' as const },
+  { ...completedBackupTask, report_id: 'already-linked-report' },
+])('rejects linking an unavailable backup request', async (task) => {
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(async () => { await result.current.openSubmitForm(); });
+  await act(() => result.current.linkBackupRequest(task));
+  expect(result.current.form.backup_task_id).toBeUndefined();
+  expect(Alert.alert).toHaveBeenCalledWith('Backup unavailable', expect.any(String));
+});
+
 it('does not attach an unrelated saved draft to the selected backup task', async () => {
   jest.mocked(loadReportDraft).mockResolvedValueOnce({
     form: {

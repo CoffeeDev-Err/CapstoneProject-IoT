@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SwipeDismissCard } from '../../components/SwipeDismissSheet';
 import { mobileTheme } from '../../constants/mobileTheme';
+import { useMobileTheme } from '../../context/ThemeContext';
 import type { LivePersonnel } from '../../types/operations';
 import { GpsReadingAge } from './GpsReadingAge';
 import { isSamePersonnelId } from './officerMapState';
@@ -28,8 +29,9 @@ export function OfficerDetailSheet({
   pulseOpacity,
   pulseScale,
 }: Props) {
+  const { colors } = useMobileTheme();
   return (
-    <SwipeDismissCard key={officer.id} style={styles.sheet} onClose={onClose}>
+    <SwipeDismissCard key={officer.id} style={[styles.sheet, { backgroundColor: colors.surface }]} handleColor={colors.border} onClose={onClose}>
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.profilePhotoWrap}>
@@ -50,18 +52,18 @@ export function OfficerDetailSheet({
             )}
           </View>
           <View style={styles.identity}>
-            <Text style={styles.name} numberOfLines={1}>{officer.name}</Text>
-            <Text style={styles.rank} numberOfLines={1}>{officer.rank}</Text>
+            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{officer.name}</Text>
+            <Text style={[styles.rank, { color: colors.mapDuty }]} numberOfLines={1}>{officer.rank}</Text>
             <View style={styles.statusRow}>
               <View style={styles.statusDot} />
-              <Text style={styles.statusText}>{officer.status}</Text>
+              <Text style={[styles.statusText, { color: colors.textMuted }]}>{officer.status}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.locationRow}>
-          <Icon name="place" size={18} color="#93c5fd" />
-          <Text style={styles.locationText} numberOfLines={2}>{officer.locationName}</Text>
+        <View style={[styles.locationRow, { borderTopColor: colors.border }]}>
+          <Icon name="place" size={18} color={colors.mapDuty} />
+          <Text style={[styles.locationText, { color: colors.text }]} numberOfLines={2}>{officer.locationName}</Text>
           {!isSamePersonnelId(officer.id, currentPersonnelId) && (
             <TouchableOpacity
               style={[styles.locateButton, isFollowing && styles.locateButtonFollowing]}
@@ -77,8 +79,8 @@ export function OfficerDetailSheet({
           )}
         </View>
 
-        <View style={styles.telemetryGrid}>
-          <GpsReadingAge recordedAt={officer.locationRecordedAt} />
+        <View style={[styles.telemetryGrid, { borderTopColor: colors.borderSoft }]}>
+          <GpsReadingAge recordedAt={officer.locationRecordedAt} color={colors.textMuted} />
           <Telemetry icon="speed" label="Speed" value={
             Number.isFinite(officer.speed) ? `${Number(officer.speed).toFixed(1)} km/h` : 'Unavailable'
           } />
@@ -109,11 +111,12 @@ function Telemetry({ icon, label, value }: {
   label: string;
   value: string;
 }) {
+  const { colors } = useMobileTheme();
   return (
     <View style={styles.telemetryItem}>
-      <Icon name={icon} size={16} color="#93a4bd" />
-      <Text style={styles.telemetryLabel}>{label}</Text>
-      <Text style={styles.telemetryValue} numberOfLines={1}>{value}</Text>
+      <Icon name={icon} size={16} color={colors.textMuted} />
+      <Text style={[styles.telemetryLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.telemetryValue, { color: colors.text }]} numberOfLines={1}>{value}</Text>
     </View>
   );
 }
@@ -121,7 +124,7 @@ function Telemetry({ icon, label, value }: {
 const styles = StyleSheet.create({
   sheet: {
     position: 'absolute', right: 20, bottom: 104, left: 20, padding: 0,
-    borderRadius: 18, backgroundColor: mobileTheme.navy, shadowColor: '#000000',
+    borderRadius: 18, backgroundColor: mobileTheme.surface, shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 14, elevation: 12,
   },
   content: { padding: 16, paddingTop: 8 },

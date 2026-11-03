@@ -12,7 +12,6 @@ import {
   createBottomTabNavigator,
   type BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mobileTheme } from '../constants/mobileTheme';
@@ -29,6 +28,7 @@ import { SwipeDismissSheet } from '../components/SwipeDismissSheet';
 import { PAGE_HEADER_CONTENT_HEIGHT, PolicePageHeader } from '../components/PolicePageHeader';
 import { useReportDraftReminder } from '../features/reports/useReportDraftReminder';
 import type { OperationalTask } from '../types/operations';
+import { backupReportParams, existingReportParams, type ReportNavigationParams } from './reportNavigation';
 
 const Tab = createBottomTabNavigator();
 const TAB_BAR_MIN_BOTTOM_OFFSET = 12;
@@ -68,6 +68,8 @@ const tabLabels: Record<string, string> = {
 };
 
 type FloatingTabBarProps = BottomTabBarProps & {
+  reportNavigationRequest: ReportNavigationParams | null;
+  clearReportNavigationRequest: () => void;
   openTaskModal: () => void;
   openTaskCount: number;
   navigationRequest: NotificationNavigationRequest | null;
@@ -77,6 +79,8 @@ type FloatingTabBarProps = BottomTabBarProps & {
 };
 
 function FloatingTabBar({
+  reportNavigationRequest,
+  clearReportNavigationRequest,
   state,
   navigation,
   openTaskModal,
@@ -87,6 +91,11 @@ function FloatingTabBar({
   dismissUnfinishedDraft,
 }: FloatingTabBarProps) {
   const { colors, isDark } = useMobileTheme();
+  useEffect(() => {
+    if (!reportNavigationRequest) return;
+    navigation.navigate('Reports', reportNavigationRequest);
+    clearReportNavigationRequest();
+  }, [navigation, reportNavigationRequest, clearReportNavigationRequest]);
   const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(0);
   const activeIndicatorX = useRef(new Animated.Value(0)).current;
@@ -246,7 +255,8 @@ function FloatingTabBar({
 }
 
 export default function MainTabs() {
-  const navigation = useNavigation<any>();
+  const [reportNavigationRequest, setReportNavigationRequest] = useState<ReportNavigationParams | null>(null);
+  const clearReportNavigationRequest = useCallback(() => setReportNavigationRequest(null), []);
   const insets = useSafeAreaInsets();
   const {
     currentPersonnelId,
@@ -390,6 +400,8 @@ export default function MainTabs() {
         tabBar={(props) => (
           <FloatingTabBar
             {...props}
+            reportNavigationRequest={reportNavigationRequest}
+            clearReportNavigationRequest={clearReportNavigationRequest}
             openTaskCount={openTaskCount}
 			openTaskModal={openTaskModal}
             navigationRequest={navigationRequest}
@@ -402,7 +414,12 @@ export default function MainTabs() {
         <Tab.Screen name="Map" options={{ lazy: false }}>
           {renderMapScreen}
         </Tab.Screen>
-        <Tab.Screen name="Tasks" component={TasksScreen} options={{ lazy: true }} />
+        <Tab.Screen name="Tasks" options={{ lazy: true }}>
+          {({ navigation }) => <TasksScreen
+            onCreateReportFromBackup={(task) => navigation.navigate('Reports', backupReportParams(task))}
+            onOpenReport={(reportId) => navigation.navigate('Reports', existingReportParams(reportId))}
+          />}
+        </Tab.Screen>
         <Tab.Screen name="Reports" component={ReportsScreen} options={{ lazy: false }} />
         <Tab.Screen name="Profile" component={OfficerProfileScreen} options={{ lazy: false }} />
       </Tab.Navigator>
@@ -416,16 +433,8 @@ export default function MainTabs() {
       >
         {({ close }) => <TasksScreen
           presentation="modal"
-          onCreateReportFromBackup={(task: OperationalTask) => close(() => navigation.navigate('Reports', {
-            backupTask: task,
-            backupReportRequestId: Date.now(),
-            reportId: undefined,
-            notificationRequestId: undefined,
-          }))}
-          onOpenReport={(reportId: string) => close(() => navigation.navigate('Reports', {
-            reportId,
-            notificationRequestId: Date.now(),
-          }))}
+          onCreateReportFromBackup={(task: OperationalTask) => close(() => setReportNavigationRequest(backupReportParams(task)))}
+          onOpenReport={(reportId: string) => close(() => setReportNavigationRequest(existingReportParams(reportId)))}
         />}
       </SwipeDismissSheet>
 

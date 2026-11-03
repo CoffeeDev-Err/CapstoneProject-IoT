@@ -115,8 +115,9 @@ export function TaskCard({
                 cancelled ? styles.statusCancelled
                   : completed ? styles.statusCompleted
                     : full ? styles.statusFull : styles.statusOpen,
+                { backgroundColor: cancelled ? colors.surfaceMuted : full ? colors.blueSoft : colors.successSoft },
               ]}>
-                <Text style={[styles.statusText, isDark && darkStyles.text]}>{statusLabel}</Text>
+                <Text style={[styles.statusText, { color: colors.text }]}>{statusLabel}</Text>
               </View>
             </View>
 
@@ -196,10 +197,12 @@ export function TaskCard({
                   arrived ? styles.arrivedStatus : styles.arrivalWaitingStatus,
                 ]}
               >
-                <Icon name={arrived ? 'verified' : 'my-location'} size={18} color={arrived ? '#ffffff' : mobileTheme.blue} />
-                <Text style={[styles.arrivalStatusText, !arrived && styles.arrivalWaitingText]}>
-                  {arrived ? 'Arrival Confirmed' : 'Waiting for GPS Arrival'}
-                </Text>
+                <View style={styles.arrivalStatusRow}>
+                  <Icon name={arrived ? 'verified' : 'my-location'} size={18} color={arrived ? '#ffffff' : mobileTheme.blue} />
+                  <Text style={[styles.arrivalStatusText, !arrived && styles.arrivalWaitingText]}>
+                    {arrived ? 'Arrival Confirmed' : 'Waiting for GPS Arrival'}
+                  </Text>
+                </View>
                 {!arrived && (
                   <Text style={[styles.arrivalAutomaticText, isDark && darkStyles.muted]}>
                     Updates automatically near the request point
@@ -260,20 +263,21 @@ const styles = StyleSheet.create({
   statusCompleted: { backgroundColor: mobileTheme.successSoft },
   statusCancelled: { backgroundColor: '#e2e2ea' },
   statusText: { color: mobileTheme.text, fontSize: 10, fontWeight: '800' },
-  actionButton: { minHeight: 42, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: mobileTheme.purple },
+  actionButton: { minHeight: 42, marginTop: 12, paddingHorizontal: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: mobileTheme.purple },
   ownRequestActions: { marginTop: 12, flexDirection: 'row', gap: 8 },
   splitActionButton: { flex: 1, marginTop: 0, paddingHorizontal: 8 },
   completeButton: { backgroundColor: mobileTheme.blue },
-  arrivalStatus: { minHeight: 42, marginTop: 12, paddingHorizontal: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8 },
+  arrivalStatus: { minHeight: 42, marginTop: 12, paddingHorizontal: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8 },
+  arrivalStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' },
   arrivedStatus: { borderColor: mobileTheme.success, backgroundColor: mobileTheme.success },
   arrivalWaitingStatus: { borderColor: mobileTheme.blue, backgroundColor: mobileTheme.blueSoft },
-  arrivalStatusText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  arrivalStatusText: { flexShrink: 1, color: '#ffffff', fontSize: 13, fontWeight: '800', textAlign: 'center', textAlignVertical: 'center' },
   arrivalWaitingText: { color: mobileTheme.blue },
-  arrivalAutomaticText: { flexBasis: '100%', color: mobileTheme.textMuted, fontSize: 9, textAlign: 'center' },
+  arrivalAutomaticText: { color: mobileTheme.textMuted, fontSize: 9, textAlign: 'center' },
   actionButtonDisabled: { backgroundColor: '#e2e2ea' },
   cancelButton: { backgroundColor: mobileTheme.danger },
   actionPending: { opacity: 0.6 },
-  actionButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  actionButtonText: { flexShrink: 1, color: '#ffffff', fontSize: 13, fontWeight: '800', textAlign: 'center', textAlignVertical: 'center' },
   actionButtonTextDisabled: { color: mobileTheme.textMuted },
   arrivalHint: { marginTop: 7, color: mobileTheme.textMuted, fontSize: 10, lineHeight: 15, textAlign: 'center' },
 });
