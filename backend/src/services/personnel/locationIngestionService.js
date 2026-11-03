@@ -84,6 +84,10 @@ const ingestLocation = async (payload = {}) => {
 		error.status = 400
 		throw error
 	}
+	const receivedAt = payload.received_at ? new Date(payload.received_at) : clock()
+	if (Number.isNaN(receivedAt.getTime())) {
+		throw createValidationError('received_at must be a valid date.', 'received_at')
+	}
 
 	const source = payload.source === 'mock' ? 'mock' : 'gps'
 	if (recordedAt > new Date(Date.now() + 5 * 60 * 1000)) {
@@ -168,7 +172,7 @@ const ingestLocation = async (payload = {}) => {
 			if (speed !== undefined) current.speed = speed
 			if (heading !== undefined) current.heading = heading
 			if (batteryLevel !== undefined) current.batteryLevel = batteryLevel
-			current.receivedAt = clock()
+			current.receivedAt = receivedAt
 			await current.save()
 			return {
 				personnel: serializePersonnel(profile, current, {
@@ -209,7 +213,7 @@ const ingestLocation = async (payload = {}) => {
 		source,
 		isSimulated: source === 'mock',
 		recordedAt,
-		receivedAt: clock(),
+		receivedAt,
 		lastMovedAt: hasMoved
 			? recordedAt
 			: (current?.lastMovedAt || current?.recordedAt || recordedAt),

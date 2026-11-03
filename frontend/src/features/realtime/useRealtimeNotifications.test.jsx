@@ -1,16 +1,21 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRealtimeNotifications } from './useRealtimeNotifications'
-import { deleteNotifications, getNotifications, readAllNotifications, readNotification } from '../../services/notifications'
+import { deleteNotifications, getNotificationPage, readAllNotifications, readNotification } from '../../services/notifications'
 const showFeedback = vi.hoisted(() => vi.fn())
 vi.mock('../../context/useFeedback', () => ({ useFeedback: () => ({ showFeedback }) }))
-vi.mock('../../services/notifications', () => ({ deleteNotifications: vi.fn(), getNotifications: vi.fn(), readAllNotifications: vi.fn(), readNotification: vi.fn() }))
+vi.mock('../../services/notifications', () => ({ deleteNotifications: vi.fn(), getNotificationPage: vi.fn(), readAllNotifications: vi.fn(), readNotification: vi.fn() }))
 const notification = { id: 'server-1', isRead: false, timestamp: '2026-09-01', message: 'Backup' }
-beforeEach(() => { vi.resetAllMocks(); getNotifications.mockResolvedValue([notification]) })
+const page = (notifications, { hasNextPage = false, nextCursor = null } = {}) => ({
+  notifications,
+  pagination: { limit: 50, hasNextPage, nextCursor },
+  unreadCount: notifications.filter((item) => !item.isRead).length,
+})
+beforeEach(() => { vi.resetAllMocks(); getNotificationPage.mockResolvedValue(page([notification])) })
 afterEach(cleanup)
-async function open() {
+async function open(expectedLength = 1) {
   const view = renderHook(() => useRealtimeNotifications(true))
-  await waitFor(() => expect(view.result.current.notifications).toHaveLength(1))
+  await waitFor(() => expect(view.result.current.notifications).toHaveLength(expectedLength))
   return view
 }
 describe('notification request failures', () => {
@@ -42,11 +47,11 @@ describe('notification request failures', () => {
     expect(result.current.notifications[0].message).toBe('New alert')
   })
   it('surfaces history failures and ignores results after sign-out', async () => {
-    getNotifications.mockRejectedValueOnce({ status: 401 })
+    getNotificationPage.mockRejectedValueOnce({ status: 401 })
     const view = renderHook(({ authenticated }) => useRealtimeNotifications(authenticated), { initialProps: { authenticated: true } })
     await waitFor(() => expect(showFeedback).toHaveBeenCalledWith(expect.stringMatching(/Sign in again/), expect.anything()))
     view.unmount()
-    getNotifications.mockResolvedValueOnce([notification])
+    getNotificationPage.mockResolvedValueOnce(page([notification]))
     let reject
     readNotification.mockReturnValue(new Promise((_resolve, fail) => { reject = fail }))
     const next = renderHook(({ authenticated }) => useRealtimeNotifications(authenticated), { initialProps: { authenticated: true } })
@@ -81,5 +86,23 @@ describe('notification request failures', () => {
     expect(result.current.notifications[0]).toMatchObject({
       referenceType: 'task', referenceId: 'TSK-ONE', data: { personnelId: 'PNP-ONE' },
     })
+  })
+
+  it('loads every cursor page without the old 25-notification cap', async () => {
+    const first = Array.from({ length: 50 }, (_, index) => ({
+      ...notification, id: `server-${index}`, timestamp: `2026-09-01T00:${String(index).padStart(2, '0')}:00Z`,
+    }))
+    const rest = Array.from({ length: 25 }, (_, index) => ({
+      ...notification, id: `server-${index + 50}`, timestamp: `2026-08-31T23:${String(index).padStart(2, '0')}:00Z`,
+    }))
+    getNotificationPage
+      .mockResolvedValueOnce(page(first, { hasNextPage: true, nextCursor: 'next-page' }))
+      .mockResolvedValueOnce(page(rest))
+    const { result } = await open(50)
+    expect(result.current.notifications).toHaveLength(50)
+    await act(async () => { await result.current.loadAllNotifications() })
+    expect(getNotificationPage).toHaveBeenLastCalledWith({ cursor: 'next-page', limit: 50 })
+    expect(result.current.notifications).toHaveLength(75)
+    expect(result.current.hasMoreNotifications).toBe(false)
   })
 })

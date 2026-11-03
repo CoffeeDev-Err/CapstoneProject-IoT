@@ -49,6 +49,9 @@ function AppLayout() {
     markNotificationAsRead,
     markAllNotificationsRead,
     clearNotifications,
+    hasMoreNotifications,
+    loadingAllNotifications,
+    loadAllNotifications,
   } = usePersonnelContext()
 
   return (
@@ -72,6 +75,9 @@ function AppLayout() {
           onReadNotification={markNotificationAsRead}
           onReadAllNotifications={markAllNotificationsRead}
           onClearNotifications={clearNotifications}
+          hasMoreNotifications={hasMoreNotifications}
+          loadingAllNotifications={loadingAllNotifications}
+          onShowAllNotifications={loadAllNotifications}
         />
 
         {/* React Router renders the matched child page component here */}

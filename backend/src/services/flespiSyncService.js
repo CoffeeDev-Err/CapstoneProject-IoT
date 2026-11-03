@@ -1,6 +1,10 @@
 const { Deployment, GpsDeviceAssignment } = require('../models')
 const { getLocationFreshness } = require('../utils/locationFreshness')
-const { formatCoordinates, resolveLocationName } = require('./reverseGeocodingService')
+const {
+	formatCoordinates,
+	getLocalLocationName,
+	resolveLocationName,
+} = require('./reverseGeocodingService')
 
 const toRecordedAt = (value) => {
 	const timestamp = Number(value)
@@ -15,21 +19,30 @@ const createFlespiSyncService = ({
 	deploymentModel = Deployment,
 	clock = () => new Date(),
 	resolveLocation = resolveLocationName,
-	locationNameBudgetMs = 500,
 }) => {
-	const resolveLocationForLiveFix = async (latitude, longitude) => {
-		let timeout
-		try {
-			return await Promise.race([
-				Promise.resolve().then(() => resolveLocation(latitude, longitude))
-					.catch(() => formatCoordinates(latitude, longitude)),
-				new Promise((resolve) => {
-					timeout = setTimeout(() => resolve(formatCoordinates(latitude, longitude)), locationNameBudgetMs)
-				}),
-			])
-		} finally {
-			clearTimeout(timeout)
+	const resolvedLocationNames = new Map()
+	const pendingLocationNames = new Map()
+	const locationKey = (latitude, longitude) => `${latitude.toFixed(4)},${longitude.toFixed(4)}`
+	const resolveLocationForLiveFix = (latitude, longitude) => {
+		const localName = getLocalLocationName(latitude, longitude)
+		if (localName) return localName
+		const fallback = formatCoordinates(latitude, longitude)
+		const key = locationKey(latitude, longitude)
+		if (resolvedLocationNames.has(key)) return resolvedLocationNames.get(key)
+		if (!pendingLocationNames.has(key)) {
+			const pending = Promise.resolve()
+				.then(() => resolveLocation(latitude, longitude))
+				.then((name) => {
+					if (resolvedLocationNames.size >= 500) {
+						resolvedLocationNames.delete(resolvedLocationNames.keys().next().value)
+					}
+					resolvedLocationNames.set(key, name || fallback)
+				})
+				.catch(() => resolvedLocationNames.set(key, fallback))
+				.finally(() => pendingLocationNames.delete(key))
+			pendingLocationNames.set(key, pending)
 		}
+		return fallback
 	}
 	const syncAssignedLocations = async ({ deviceIds = [] } = {}) => {
 		const selectedDeviceIds = [...new Set(deviceIds.map(String).filter(Boolean))]
@@ -67,6 +80,7 @@ const createFlespiSyncService = ({
 		await Promise.all(assignments.map(async (assignment) => {
 			const telemetry = telemetryByDevice.get(String(assignment.flespiDeviceId))
 			const recordedAt = toRecordedAt(telemetry?.recordedAt)
+			const receivedAt = toRecordedAt(telemetry?.receivedAt)
 			if (
 				!telemetry
 				|| telemetry.positionValid === false
@@ -89,7 +103,7 @@ const createFlespiSyncService = ({
 				longitude: telemetry.longitude,
 				// Place-name lookup must not hold live coordinates behind a geocoder queue.
 				// The resolver continues populating its cache for later refreshes.
-				location_name: await resolveLocationForLiveFix(
+				location_name: resolveLocationForLiveFix(
 					telemetry.latitude,
 					telemetry.longitude,
 				),
@@ -106,6 +120,7 @@ const createFlespiSyncService = ({
 					? telemetry.batteryLevel
 					: undefined,
 				recorded_at: recordedAt.toISOString(),
+				received_at: receivedAt?.toISOString(),
 				source: 'gps',
 			})
 

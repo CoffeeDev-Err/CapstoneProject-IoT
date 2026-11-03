@@ -26,6 +26,9 @@ export const usePersonnelRealtime = () => {
     markNotificationAsRead,
     markAllNotificationsRead,
     clearNotifications,
+    hasMoreNotifications,
+    loadingAllNotifications,
+    loadAllNotifications,
   } = useRealtimeNotifications(isAuthenticated)
 
   const isConnected = usePersonnelSocketSubscriptions({
@@ -94,6 +97,9 @@ export const usePersonnelRealtime = () => {
     markNotificationAsRead,
     markAllNotificationsRead,
     clearNotifications,
+    hasMoreNotifications,
+    loadingAllNotifications,
+    loadAllNotifications,
     refreshReports,
     retryInitialData,
   }

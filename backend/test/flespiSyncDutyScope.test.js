@@ -24,6 +24,7 @@ it('does not request or store assigned tracker telemetry when no officer is on d
 
 it('requests and stores telemetry only for an officer with an active deployment', async () => {
 	const recordedAt = new Date()
+	const receivedAt = new Date(recordedAt.getTime() + 2_000)
 	const assignmentQueries = []
 	const ingested = []
 	const service = createFlespiSyncService({
@@ -43,6 +44,7 @@ it('requests and stores telemetry only for an officer with an active deployment'
 			fetchLatestTelemetry: async () => [{
 				deviceId: 'device-1', latitude: 17.42, longitude: 121.77,
 				batteryLevel: 19, recordedAt: recordedAt.getTime(),
+				receivedAt: receivedAt.getTime(),
 				positionValid: true, satellites: 9, accuracy: 4,
 			}],
 		},
@@ -62,6 +64,7 @@ it('requests and stores telemetry only for an officer with an active deployment'
 	assert.equal(ingested[0].position_valid, true)
 	assert.equal(ingested[0].satellites, 9)
 	assert.equal(ingested[0].accuracy, 4)
+	assert.equal(ingested[0].received_at, receivedAt.toISOString())
 })
 
 it('skips invalid or stale fixes before geocoding or live ingestion', async () => {
@@ -93,7 +96,6 @@ it('ingests a fresh fix without waiting for a slow place-name lookup', async () 
 	const pendingLookup = new Promise((resolve) => { finishLookup = resolve })
 	const ingested = []
 	const service = createFlespiSyncService({
-		locationNameBudgetMs: 1,
 		resolveLocation: () => pendingLookup,
 		deploymentModel: { distinct: async () => ['PNP-001'] },
 		assignmentModel: { find: () => ({ lean: async () => [{

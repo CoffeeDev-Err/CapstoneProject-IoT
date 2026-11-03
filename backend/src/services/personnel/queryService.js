@@ -70,6 +70,9 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 			: (freshness.isLocationStale ? 'stale' : 'current'),
 		locationAgeSeconds: freshness.locationAgeSeconds,
 		locationRecordedAt: freshness.locationRecordedAt?.toISOString(),
+		locationReceivedAt: currentLocation?.receivedAt?.toISOString(),
+		accuracy: Number.isFinite(currentLocation?.accuracy) ? currentLocation.accuracy : null,
+		satellites: Number.isFinite(currentLocation?.satellites) ? currentLocation.satellites : null,
 		speed: Number.isFinite(currentLocation?.speed) ? currentLocation.speed : null,
 		batteryLevel: Number.isFinite(currentLocation?.batteryLevel)
 			? currentLocation.batteryLevel

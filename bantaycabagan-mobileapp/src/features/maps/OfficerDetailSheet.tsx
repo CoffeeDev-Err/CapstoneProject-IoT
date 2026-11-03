@@ -89,6 +89,12 @@ export function OfficerDetailSheet({
               ? `${Math.round(Number(officer.batteryLevel))}%`
               : 'Unavailable'
           } />
+          <Telemetry icon="gps-fixed" label="Accuracy" value={
+            Number.isFinite(officer.accuracy) ? `±${Math.round(Number(officer.accuracy))} m` : 'Unavailable'
+          } />
+          <Telemetry icon="satellite-alt" label="Satellites" value={
+            Number.isFinite(officer.satellites) ? String(Math.round(Number(officer.satellites))) : 'Unavailable'
+          } />
           <Telemetry icon="schedule" label="GPS time" value={
             officer.locationRecordedAt
               ? new Date(officer.locationRecordedAt).toLocaleString('en-PH', {
@@ -107,7 +113,7 @@ export function OfficerDetailSheet({
 }
 
 function Telemetry({ icon, label, value }: {
-  icon: 'speed' | 'battery-full' | 'schedule';
+  icon: 'speed' | 'battery-full' | 'gps-fixed' | 'satellite-alt' | 'schedule';
   label: string;
   value: string;
 }) {

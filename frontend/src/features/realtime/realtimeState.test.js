@@ -27,8 +27,15 @@ describe('realtime state transitions', () => {
     const result = mergeNotifications(
       [{ id: 'N-2', timestamp: '2026-01-02T00:00:00Z' }],
       [{ id: 'N-1', timestamp: '2026-01-01T00:00:00Z' }, { id: 'N-2', timestamp: '2020-01-01T00:00:00Z' }],
-      25,
     )
     expect(result.map(({ id }) => id)).toEqual(['N-2', 'N-1'])
   })
+
+	it('does not truncate a complete notification history', () => {
+		const history = Array.from({ length: 75 }, (_, index) => ({
+			id: `N-${index}`,
+			timestamp: new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString(),
+		}))
+		expect(mergeNotifications([], history)).toHaveLength(75)
+	})
 })

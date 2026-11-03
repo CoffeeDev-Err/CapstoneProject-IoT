@@ -133,6 +133,11 @@ export const effectiveMarkerTarget = (
     : rawTarget;
 };
 
+export const isSameMarkerTarget = (
+  first: [number, number] | undefined,
+  second: [number, number],
+) => Boolean(first && first[0] === second[0] && first[1] === second[1]);
+
 export type MarkerTone = 'duty' | 'operation' | 'boundary' | 'backup';
 
 export type PersonnelCluster = {

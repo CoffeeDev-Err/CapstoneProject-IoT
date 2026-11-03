@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   deleteNotifications,
-  getNotifications,
+  getNotificationPage,
   readAllNotifications,
   readNotification,
 } from '../../services/notifications'
@@ -9,13 +9,14 @@ import { mergeNotifications } from './realtimeState'
 import { useFeedback } from '../../context/useFeedback'
 import { requestErrorMessage } from '../../utils/requestFeedback'
 
-const MAX_NOTIFICATIONS = 25
-
 export const useRealtimeNotifications = (isAuthenticated) => {
   const [notifications, setNotifications] = useState([])
+  const [pagination, setPagination] = useState({ hasNextPage: false, nextCursor: null })
+  const [loadingAllNotifications, setLoadingAllNotifications] = useState(false)
   const notificationSequenceRef = useRef(0)
   const { showFeedback } = useFeedback()
   const actionBusy = useRef(false)
+  const historyBusy = useRef(false)
   const generation = useRef(0)
 
   const createNotification = useCallback((payload) => {
@@ -34,9 +35,38 @@ export const useRealtimeNotifications = (isAuthenticated) => {
 
   const addNotification = useCallback((payload) => {
     setNotifications((current) => (
-      mergeNotifications(current, [createNotification(payload)], MAX_NOTIFICATIONS)
+      mergeNotifications(current, [createNotification(payload)])
     ))
   }, [createNotification])
+
+  const loadAllNotifications = useCallback(async () => {
+    if (!isAuthenticated || historyBusy.current || !pagination.hasNextPage) return
+    const currentGeneration = generation.current
+    historyBusy.current = true
+    setLoadingAllNotifications(true)
+    try {
+      let cursor = pagination.nextCursor
+      let lastPagination = pagination
+      const history = []
+      while (cursor && currentGeneration === generation.current) {
+        const page = await getNotificationPage({ cursor, limit: 50 })
+        history.push(...page.notifications)
+        lastPagination = page.pagination
+        cursor = page.pagination?.hasNextPage ? page.pagination.nextCursor : null
+      }
+      if (currentGeneration === generation.current) {
+        setNotifications((current) => mergeNotifications(current, history))
+        setPagination(lastPagination)
+      }
+    } catch (error) {
+      if (currentGeneration === generation.current) showFeedback(requestErrorMessage(error, { action: 'load all notification history' }), {
+        type: 'error', title: 'Notification history unavailable',
+      })
+    } finally {
+      historyBusy.current = false
+      if (currentGeneration === generation.current) setLoadingAllNotifications(false)
+    }
+  }, [isAuthenticated, pagination, showFeedback])
 
   const runAction = useCallback(async (action, request, apply) => {
     if (actionBusy.current || !isAuthenticated) return
@@ -76,15 +106,17 @@ export const useRealtimeNotifications = (isAuthenticated) => {
   useEffect(() => {
     generation.current += 1
     actionBusy.current = false
+    historyBusy.current = false
     if (!isAuthenticated) return undefined
     let active = true
 
-    getNotifications()
-      .then((history) => {
+    getNotificationPage({ limit: 50 })
+      .then((page) => {
         if (!active) return
         setNotifications((current) => (
-          mergeNotifications(current, history, MAX_NOTIFICATIONS)
+          mergeNotifications(current, page.notifications)
         ))
+        setPagination(page.pagination)
       })
       .catch((error) => {
         if (active) showFeedback(requestErrorMessage(error, { action: 'load notification history' }), {
@@ -106,5 +138,8 @@ export const useRealtimeNotifications = (isAuthenticated) => {
     markNotificationAsRead,
     markAllNotificationsRead,
     clearNotifications,
+    hasMoreNotifications: pagination.hasNextPage,
+    loadingAllNotifications: isAuthenticated && loadingAllNotifications,
+    loadAllNotifications,
   }
 }

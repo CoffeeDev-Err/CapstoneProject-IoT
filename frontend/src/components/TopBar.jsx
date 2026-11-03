@@ -30,7 +30,7 @@ import PasswordChangeModal from './PasswordChangeModal'
 import pnpLogo from '../assets/pnp-logo.png'
 
 const NOTIFICATION_HISTORY_OPTIONS = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'Show All' },
   { value: 'today', label: 'Today' },
   { value: '7-days', label: '7 days' },
   { value: '30-days', label: '30 days' },
@@ -135,6 +135,9 @@ function TopBar({
   onReadNotification,
   onReadAllNotifications,
   onClearNotifications,
+  hasMoreNotifications = false,
+  loadingAllNotifications = false,
+  onShowAllNotifications,
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -215,6 +218,7 @@ function TopBar({
 
     if (nextOpen) {
       onReadAllNotifications?.()
+      if (notificationHistoryRange === 'all') onShowAllNotifications?.()
       setDropdownOpen(false)
     }
   }
@@ -305,7 +309,9 @@ function TopBar({
               <div className="notification-dropdown__header">
                 <div>
                   <strong>Notifications</strong>
-                  <small>{filteredNotifications.length} of {notifications.length} shown</small>
+                  <small>{loadingAllNotifications
+                    ? `Loading history · ${notifications.length} loaded`
+                    : `${filteredNotifications.length} of ${notifications.length}${hasMoreNotifications ? '+' : ''} shown`}</small>
                 </div>
                 <div className="notification-dropdown__actions">
                   <button type="button" onClick={onReadAllNotifications} disabled={notifications.length === 0}>
@@ -335,7 +341,10 @@ function TopBar({
                       key={option.value}
                       type="button"
                       className={notificationHistoryRange === option.value ? 'is-active' : ''}
-                      onClick={() => setNotificationHistoryRange(option.value)}
+                      onClick={() => {
+                        setNotificationHistoryRange(option.value)
+                        if (option.value === 'all') onShowAllNotifications?.()
+                      }}
                       aria-pressed={notificationHistoryRange === option.value}
                     >
                       {option.label}

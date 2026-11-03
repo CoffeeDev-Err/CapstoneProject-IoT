@@ -159,6 +159,9 @@ export type LivePersonnel = {
   locationAgeSeconds?: number | null;
   locationStaleAfterSeconds?: number;
   locationRecordedAt?: string;
+  locationReceivedAt?: string;
+  accuracy?: number | null;
+  satellites?: number | null;
   speed?: number | null;
   batteryLevel?: number | null;
   lastKnownLocationName?: string;

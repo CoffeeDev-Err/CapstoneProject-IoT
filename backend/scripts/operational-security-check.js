@@ -332,7 +332,10 @@ assert.equal(headers['Cache-Control'], 'no-store')
 		const createNotificationController = require('../src/controllers/notificationController')
 		const requested = []
 		const controller = createNotificationController({
-			getNotifications: async (recipientId) => { requested.push(recipientId); return [] },
+			getNotificationPage: async (recipientId) => {
+				requested.push(recipientId)
+				return { notifications: [], pagination: { hasNextPage: false, nextCursor: null } }
+			},
 			markNotificationRead: async (_id, recipientId) => {
 				requested.push(recipientId)
 				return { _id: 'notification-1' }

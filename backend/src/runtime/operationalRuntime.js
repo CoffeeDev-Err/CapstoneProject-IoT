@@ -81,9 +81,14 @@ const createOperationalRuntime = ({
 					deviceIds: selectedDeviceIds,
 				})
 				if (result.accepted > 0) {
-					await runGeofenceCheck()
+					// Put the accepted coordinates on the live socket first. Geofence and
+					// arrival reconciliation still run for the same fix, but no longer hold
+					// the marker behind their additional database work.
 					emitPersonnelCollection(io, 'personnel:update', await getPersonnelWithLocations())
-					await operationalService.reconcileTaskArrivals()
+					await Promise.all([
+						runGeofenceCheck(),
+						operationalService.reconcileTaskArrivals(),
+					])
 				}
 			}
 		} catch (error) {

@@ -57,8 +57,11 @@ const createNotificationController = (notificationService) => ({
 	},
 
 	getNotifications: async (req, res) => {
-		const notifications = await notificationService.getNotifications(SUPERVISOR_RECIPIENT)
-		res.json({ notifications })
+		const page = await notificationService.getNotificationPage(
+			SUPERVISOR_RECIPIENT,
+			req.query,
+		)
+		res.json(page)
 	},
 
 	markRead: async (req, res) => {

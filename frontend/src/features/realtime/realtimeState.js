@@ -4,9 +4,9 @@ export const mergeNotifications = (current, history, limit) => {
   history.forEach((notification) => {
     if (!byId.has(notification.id)) byId.set(notification.id, notification)
   })
-  return [...byId.values()]
+  const merged = [...byId.values()]
     .sort((first, second) => new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime())
-    .slice(0, limit)
+  return Number.isFinite(limit) ? merged.slice(0, limit) : merged
 }
 
 export const mergeReports = (reports, updates) => {

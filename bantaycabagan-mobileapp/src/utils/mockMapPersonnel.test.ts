@@ -4,6 +4,7 @@ import {
   confirmedFixFromMember,
   effectiveMarkerTarget,
   markerMotionForFixes,
+  isSameMarkerTarget,
 } from './officerMapMath';
 
 it('supports preview APKs explicitly while keeping production disabled', () => {
@@ -11,6 +12,12 @@ it('supports preview APKs explicitly while keeping production disabled', () => {
   expect(isMapPreviewAvailable(true, 'false')).toBe(true);
   expect(isMapPreviewAvailable(false, 'false')).toBe(false);
   expect(isMapPreviewAvailable(false, '')).toBe(false);
+});
+
+test('recognizes an already scheduled marker target so duplicate snapshots do not restart motion', () => {
+  expect(isSameMarkerTarget([121.765, 17.42], [121.765, 17.42])).toBe(true);
+  expect(isSameMarkerTarget([121.765, 17.42], [121.7651, 17.42])).toBe(false);
+  expect(isSameMarkerTarget(undefined, [121.765, 17.42])).toBe(false);
 });
 
 it('provides 96 identifiable test markers that cluster and separate on zoom', () => {

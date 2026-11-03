@@ -32,7 +32,10 @@ describe('operational runtime', () => {
 			now = 9000
 			await runtime.runFlespiFallbackSync()
 			assert.equal(syncs, 2, 'A silent MQTT connection must not stop REST reconciliation')
-			assert.deepEqual(calls, ['geofences', 'broadcast', 'arrivals', 'geofences', 'broadcast', 'arrivals'])
+			assert.deepEqual(calls.slice(0, 3).sort(), ['arrivals', 'broadcast', 'geofences'])
+			assert.equal(calls[0], 'broadcast', 'The first accepted fix must broadcast before reconciliation')
+			assert.deepEqual(calls.slice(3).sort(), ['arrivals', 'broadcast', 'geofences'])
+			assert.equal(calls[3], 'broadcast', 'The next accepted fix must also broadcast first')
 		} finally {
 			runtime.stop()
 		}
@@ -151,5 +154,8 @@ it('ignores unchanged telemetry and keeps broadcasts and arrivals working after 
 	await runtime.broadcastFlespiLocations()
 	await runtime.broadcastFlespiLocations()
 	assert.equal(checks, 2, 'A failed check must release its lock for the next reading')
-	assert.deepEqual(calls, ['error', 'broadcast', 'arrivals', 'error', 'broadcast', 'arrivals'])
+	assert.equal(calls[0], 'broadcast')
+	assert.deepEqual(calls.slice(0, 3).sort(), ['arrivals', 'broadcast', 'error'])
+	assert.equal(calls[3], 'broadcast')
+	assert.deepEqual(calls.slice(3).sort(), ['arrivals', 'broadcast', 'error'])
 })

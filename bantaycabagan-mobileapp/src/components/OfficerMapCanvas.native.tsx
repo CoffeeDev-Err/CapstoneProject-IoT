@@ -44,6 +44,7 @@ import {
   confirmedFixFromMember,
   effectiveMarkerTarget,
   interpolatePosition,
+  isSameMarkerTarget,
   markerMotionForFixes,
   markerSecondaryTone,
   markerTone,
@@ -97,15 +98,19 @@ const useInterpolatedPersonnel = (personnel: OfficerMapPerson[]) => {
       const rawTarget: [number, number] = [confirmedFix.longitude, confirmedFix.latitude];
       const start = currentPositions.current.get(member.id) || rawTarget;
       const motion = markerMotionForFixes(previousConfirmedFixes.current.get(member.id), confirmedFix);
+      const previousTarget = effectiveTargets.current.get(member.id);
       const target = effectiveMarkerTarget(
-        effectiveTargets.current.get(member.id) || start,
+        previousTarget || start,
         confirmedFix,
         motion.suppressJitter,
       );
       const targetChanged = start[0] !== target[0] || start[1] !== target[1];
+      const isNewTarget = !isSameMarkerTarget(previousTarget, target);
       starts.set(member.id, start);
       motions.set(member.id, {
-        durationMs: targetChanged ? motion.durationMs : 0,
+        // A metadata refresh or duplicate socket snapshot can arrive during a
+        // transition. Do not restart a full animation toward the same target.
+        durationMs: targetChanged && isNewTarget ? motion.durationMs : 0,
         // A sequence of individually small fixes may exceed the jitter radius
         // cumulatively. In that case both the marker and follow camera move.
         suppressJitter: motion.suppressJitter && !targetChanged,

@@ -11,6 +11,28 @@ const createResponse = () => ({
 })
 
 describe('notification controller', () => {
+	it('returns the paginated supervisor stream and ignores a requested recipient', async () => {
+		const calls = []
+		const page = {
+			notifications: Array.from({ length: 50 }, (_, index) => ({ id: `NOT-${index}` })),
+			pagination: { limit: 50, hasNextPage: true, nextCursor: 'next-page' },
+			unreadCount: 55,
+		}
+		const controller = createNotificationController({
+			getNotificationPage: async (recipientId, query) => {
+				calls.push({ recipientId, query })
+				return page
+			},
+		})
+		const req = { query: { cursor: 'current-page', limit: '50', recipient_id: 'PNP-OTHER' } }
+		const res = createResponse()
+
+		await controller.getNotifications(req, res)
+
+		assert.deepEqual(calls, [{ recipientId: 'supervisor', query: req.query }])
+		assert.deepEqual(res.body, page)
+	})
+
 	it('returns the authenticated officer notification page and forwards its cursor', async () => {
 		const calls = []
 		const page = {

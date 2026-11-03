@@ -198,6 +198,20 @@ function ProfileModal({
             <strong>{battery}</strong>
           </div>
           <div className="profile-map-card__metric">
+            <LocateFixed size={16} aria-hidden="true" />
+            <span>Accuracy</span>
+            <strong>{Number.isFinite(selectedPersonnel.accuracy)
+              ? `±${Math.round(Number(selectedPersonnel.accuracy))} m`
+              : 'Unavailable'}</strong>
+          </div>
+          <div className="profile-map-card__metric">
+            <RadioTower size={16} aria-hidden="true" />
+            <span>Satellites</span>
+            <strong>{Number.isFinite(selectedPersonnel.satellites)
+              ? Math.round(Number(selectedPersonnel.satellites))
+              : 'Unavailable'}</strong>
+          </div>
+          <div className="profile-map-card__metric">
             <Clock3 size={16} aria-hidden="true" />
             <span>GPS time</span>
             <strong>{formatGpsDateTime(selectedPersonnel.locationRecordedAt)}</strong>
