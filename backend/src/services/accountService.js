@@ -598,7 +598,13 @@ const createAccountService = ({
 					)
 				}
 
-				if (personnelAssignment && personnelAssignment !== deviceAssignment) {
+				const sameAssignment = Boolean(deviceAssignment && personnelAssignment && (
+					(deviceAssignment._id && personnelAssignment._id
+						&& String(deviceAssignment._id) === String(personnelAssignment._id))
+					|| (deviceAssignment.assignmentId && personnelAssignment.assignmentId
+						&& deviceAssignment.assignmentId === personnelAssignment.assignmentId)
+				))
+				if (personnelAssignment && !sameAssignment) {
 					personnelAssignment.status = 'released'
 					personnelAssignment.unassignedAt = new Date()
 					await personnelAssignment.save()
@@ -606,6 +612,7 @@ const createAccountService = ({
 
 				if (deviceAssignment) {
 					assignment = deviceAssignment
+					assignment.status = 'active'
 					assignment.flespiDeviceId = device.id
 					assignment.imei = device.imei
 					assignment.deviceName = device.name

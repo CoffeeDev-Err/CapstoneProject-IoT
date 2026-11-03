@@ -78,7 +78,7 @@ test('reactivating a mock officer restores access without assigning GPS', async 
 	}
 })
 
-test('reactivating an officer reuses a stale active assignment owned by that officer', async () => {
+test('reactivating an officer reuses the same active assignment returned as separate documents', async () => {
 	const originals = {
 		userFindById: models.User.findById,
 		personnelFindOne: models.Personnel.findOne,
@@ -104,8 +104,9 @@ test('reactivating an officer reuses a stale active assignment owned by that off
 		dutyStatus: 'Off Duty',
 		save: async () => {},
 	}
-	let assignmentSaves = 0
-	const staleAssignment = {
+	let deviceAssignmentSaves = 0
+	let personnelAssignmentSaves = 0
+	const assignmentValues = {
 		_id: '507f1f77bcf86cd799439015',
 		assignmentId: 'GPS-STALE-002',
 		personnelId: user.personnelId,
@@ -114,11 +115,20 @@ test('reactivating an officer reuses a stale active assignment owned by that off
 		deviceName: 'GPS-002',
 		status: 'active',
 		unassignedAt: null,
-		save: async () => { assignmentSaves += 1 },
+	}
+	const deviceAssignment = {
+		...assignmentValues,
+		save: async () => { deviceAssignmentSaves += 1 },
+	}
+	const personnelAssignment = {
+		...assignmentValues,
+		save: async () => { personnelAssignmentSaves += 1 },
 	}
 	models.User.findById = async () => user
 	models.Personnel.findOne = async () => profile
-	models.GpsDeviceAssignment.findOne = async () => staleAssignment
+	models.GpsDeviceAssignment.findOne = async (filter) => (
+		filter.personnelId ? personnelAssignment : deviceAssignment
+	)
 	models.GpsDeviceAssignment.create = async () => {
 		throw new Error('A new assignment must not be created for the same officer and device.')
 	}
@@ -138,7 +148,9 @@ test('reactivating an officer reuses a stale active assignment owned by that off
 		assert.equal(user.status, 'active')
 		assert.equal(profile.status, 'active')
 		assert.equal(result.flespiDeviceName, 'GPS-002')
-		assert.equal(assignmentSaves, 1)
+		assert.equal(deviceAssignment.status, 'active')
+		assert.equal(deviceAssignmentSaves, 1)
+		assert.equal(personnelAssignmentSaves, 0)
 	} finally {
 		models.User.findById = originals.userFindById
 		models.Personnel.findOne = originals.personnelFindOne
