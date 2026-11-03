@@ -45,6 +45,23 @@ export const CABAGAN_BOUNDARY_FEATURE = {
   },
 };
 
+// Match the web map: tint the area outside Cabagan while leaving the
+// municipality itself clear. The reversed boundary is the polygon's hole.
+export const CABAGAN_OUTSIDE_MASK_FEATURE = {
+  type: 'Feature' as const,
+  properties: { name: 'Outside Cabagan' },
+  geometry: {
+    type: 'Polygon' as const,
+    coordinates: [
+      [
+        [120.8, 16.2], [122.8, 16.2], [122.8, 18.2],
+        [120.8, 18.2], [120.8, 16.2],
+      ],
+      [...CABAGAN_BOUNDARY_FEATURE.geometry.coordinates[0]].reverse(),
+    ],
+  },
+};
+
 const isPointOnSegment = (
   point: [number, number],
   start: [number, number],

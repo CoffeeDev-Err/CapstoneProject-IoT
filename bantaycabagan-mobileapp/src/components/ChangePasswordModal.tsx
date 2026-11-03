@@ -11,7 +11,7 @@ import {
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useMobileTheme } from '../context/ThemeContext';
-import { SwipeDismissSheet } from './SwipeDismissSheet';
+import { SheetScrollView, SwipeDismissSheet } from './SwipeDismissSheet';
 import VerificationCodeInput from './VerificationCodeInput';
 import { PASSWORD_CHANGE_CODE_MESSAGE, PASSWORD_REQUIREMENTS } from '../features/auth/authCopy';
 import {
@@ -159,7 +159,12 @@ export default function ChangePasswordModal({
       sheetStyle={[styles.sheet, isDark && darkStyles.sheet]}
     >
       {({ close }) => (
-        <View style={styles.content}>
+        <SheetScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <View>
               <Text style={styles.step}>Step {step === 'password' ? '1' : '2'} of 2</Text>
@@ -241,7 +246,7 @@ export default function ChangePasswordModal({
               <Text style={[styles.resendText, isDark && darkStyles.muted]}>Sign out</Text>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </SheetScrollView>
       )}
     </SwipeDismissSheet>
   );
@@ -294,6 +299,7 @@ const styles = StyleSheet.create({
   sheet: {
     backgroundColor: mobileTheme.surface,
   },
+  scroll: { flexShrink: 1 },
   content: { padding: 20, paddingTop: 4 },
   header: {
     marginBottom: 18,

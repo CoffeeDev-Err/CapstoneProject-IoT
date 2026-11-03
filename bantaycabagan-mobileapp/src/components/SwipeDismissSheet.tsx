@@ -9,10 +9,14 @@ import React, {
   useState,
 } from 'react';
 import {
+  Dimensions,
   FlatList,
   type FlatListProps,
+  Keyboard,
+  KeyboardAvoidingView,
   type LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   type ScrollViewProps,
@@ -20,7 +24,6 @@ import {
   type StyleProp,
   View,
   type ViewStyle,
-  useWindowDimensions,
 } from 'react-native';
 import {
   Gesture,
@@ -303,6 +306,13 @@ const useExpandableSheetMotion = ({
     );
   }, [dismissDistance, entranceOpacity, finishClose, isClosing, scrollLocked, translateY]);
 
+  const expand = useCallback(() => {
+    if (!active || closingRef.current) return;
+    scrollLocked.value = false;
+    setContentScrollEnabled(true);
+    translateY.value = withTiming(0, { duration: 180, easing: OPEN_EASING });
+  }, [active, scrollLocked, translateY]);
+
   const panGesture = Gesture.Pan()
     .enabled(dismissible)
     .activeOffsetY([-5, 5])
@@ -434,6 +444,7 @@ const useExpandableSheetMotion = ({
   return {
     backdropAnimatedStyle,
     close,
+    expand,
     handleSheetLayout,
     nativeGesture,
     panGesture,
@@ -554,7 +565,9 @@ export function SwipeDismissSheet({
   topInset = 0,
   visible,
 }: SwipeDismissSheetProps) {
-  const { height: screenHeight } = useWindowDimensions();
+  // The window height changes when Android opens the keyboard. Keep the sheet's
+  // dismissal distance stable so that a keyboard resize cannot reset its motion.
+  const screenHeight = useRef(Dimensions.get('screen').height).current;
   const { colors } = useMobileTheme();
   const motion = useExpandableSheetMotion({
     active: visible,
@@ -569,6 +582,16 @@ export function SwipeDismissSheet({
     scrollOffset: motion.scrollOffset,
   }), [motion.nativeGesture, motion.scrollEnabled, motion.scrollOffset]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      motion.expand,
+    );
+    if (Keyboard.isVisible()) motion.expand();
+    return () => subscription.remove();
+  }, [visible, motion.expand]);
+
   if (!visible) return null;
 
   return (
@@ -581,48 +604,53 @@ export function SwipeDismissSheet({
       onRequestClose={() => { if (dismissible) motion.close(); }}
     >
       <GestureHandlerRootView style={styles.modalRoot}>
-        <View style={[styles.modalRoot, { paddingTop: topInset }, containerStyle]}>
-          <Animated.View style={[styles.backdrop, motion.backdropAnimatedStyle]}>
-            {dismissible && tapOutsideToClose && (
-              <Pressable
-                accessibilityLabel="Close panel"
-                accessibilityRole="button"
-                style={StyleSheet.absoluteFill}
-                onPress={() => motion.close()}
-              />
-            )}
-          </Animated.View>
-          <GestureDetector gesture={motion.panGesture}>
-            <Animated.View
-              onLayout={motion.handleSheetLayout}
-              style={[
-                styles.sheet,
-                { backgroundColor: colors.surface },
-                sheetStyle,
-                motion.sheetAnimatedStyle,
-              ]}
-            >
-              {dismissible ? (
+        <KeyboardAvoidingView
+          style={styles.modalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.modalRoot, { paddingTop: topInset }, containerStyle]}>
+            <Animated.View style={[styles.backdrop, motion.backdropAnimatedStyle]}>
+              {dismissible && tapOutsideToClose && (
                 <Pressable
                   accessibilityLabel="Close panel"
                   accessibilityRole="button"
-                  hitSlop={8}
+                  style={StyleSheet.absoluteFill}
                   onPress={() => motion.close()}
-                  style={[
-                    styles.closeButton,
-                    { borderColor: colors.border, backgroundColor: colors.surface },
-                  ]}
-                >
-                  <Icon name="close" size={18} color={colors.textMuted} />
-                </Pressable>
-              ) : null}
-              <SheetScrollContext.Provider value={scrollContext}>
-                {dismissible ? <DragHandle close={motion.close} color={handleColor} /> : <View style={styles.handleTouchArea} />}
-                {typeof children === 'function' ? children({ close: motion.close }) : children}
-              </SheetScrollContext.Provider>
+                />
+              )}
             </Animated.View>
-          </GestureDetector>
-        </View>
+            <GestureDetector gesture={motion.panGesture}>
+              <Animated.View
+                onLayout={motion.handleSheetLayout}
+                style={[
+                  styles.sheet,
+                  { backgroundColor: colors.surface },
+                  sheetStyle,
+                  motion.sheetAnimatedStyle,
+                ]}
+              >
+                {dismissible ? (
+                  <Pressable
+                    accessibilityLabel="Close panel"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => motion.close()}
+                    style={[
+                      styles.closeButton,
+                      { borderColor: colors.border, backgroundColor: colors.surface },
+                    ]}
+                  >
+                    <Icon name="close" size={18} color={colors.textMuted} />
+                  </Pressable>
+                ) : null}
+                <SheetScrollContext.Provider value={scrollContext}>
+                  {dismissible ? <DragHandle close={motion.close} color={handleColor} /> : <View style={styles.handleTouchArea} />}
+                  {typeof children === 'function' ? children({ close: motion.close }) : children}
+                </SheetScrollContext.Provider>
+              </Animated.View>
+            </GestureDetector>
+          </View>
+        </KeyboardAvoidingView>
       </GestureHandlerRootView>
     </Modal>
   );

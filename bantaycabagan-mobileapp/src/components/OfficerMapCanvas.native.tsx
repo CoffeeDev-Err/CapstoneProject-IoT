@@ -29,7 +29,7 @@ import {
 } from '@maplibre/maplibre-react-native';
 import Svg, { Path, SvgUri } from 'react-native-svg';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { CABAGAN_BOUNDARY_FEATURE } from '../constants/cabaganGeofence';
+import { CABAGAN_BOUNDARY_FEATURE, CABAGAN_OUTSIDE_MASK_FEATURE } from '../constants/cabaganGeofence';
 import {
   hasMapTilerApiKey,
   loadMapTilerStyle,
@@ -487,22 +487,24 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
           }}
         />
 
-        <GeoJSONSource id="geosentri-cabagan-boundary" data={CABAGAN_BOUNDARY_FEATURE}>
+        <GeoJSONSource id="geosentri-outside-mask" data={CABAGAN_OUTSIDE_MASK_FEATURE}>
           <Layer
-            id="geosentri-cabagan-fill"
+            id="geosentri-outside-mask-fill"
             type="fill"
-            source="geosentri-cabagan-boundary"
-            paint={{ 'fill-color': '#ef4444', 'fill-opacity': 0.025 }}
+            source="geosentri-outside-mask"
+            paint={{ 'fill-color': '#f52c2c', 'fill-opacity': 0.10 }}
           />
+        </GeoJSONSource>
+
+        <GeoJSONSource id="geosentri-cabagan-boundary" data={CABAGAN_BOUNDARY_FEATURE}>
           <Layer
             id="geosentri-cabagan-line"
             type="line"
             source="geosentri-cabagan-boundary"
             paint={{
-              'line-color': '#ef4444',
-              'line-width': 2.1,
-              'line-opacity': 0.88,
-              'line-dasharray': [3, 2],
+              'line-color': '#f71616',
+              'line-width': 2,
+              'line-dasharray': [4, 3.5],
             }}
           />
         </GeoJSONSource>

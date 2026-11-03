@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SwipeDismissSheet } from '../../components/SwipeDismissSheet';
+import { SheetScrollView, SwipeDismissSheet } from '../../components/SwipeDismissSheet';
 import { mobileTheme } from '../../constants/mobileTheme';
 import { useMobileTheme } from '../../context/ThemeContext';
 import type { PoliceReport } from '../../types/operations';
@@ -22,10 +22,15 @@ export function ReportResolutionSheet({
 }: ReportResolutionSheetProps) {
   const { colors, isDark } = useMobileTheme();
   return (
-    <SwipeDismissSheet visible={Boolean(target)} onClose={onClose}
+    <SwipeDismissSheet visible={Boolean(target)} initiallyExpanded onClose={onClose}
       sheetStyle={[styles.sheet, isDark && { backgroundColor: colors.surface }]}>
       {({ close }) => (
-        <View style={styles.content}>
+        <SheetScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={[styles.title, { color: colors.text }]}>Resolve Incident</Text>
           <Text style={[styles.copy, { color: colors.textMuted }]}>
             Confirm that {target?.title} has been handled. This will update the web dashboard.
@@ -45,7 +50,7 @@ export function ReportResolutionSheet({
               <Text style={styles.confirmText}>{saving ? 'Saving...' : 'Confirm Resolve'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </SheetScrollView>
       )}
     </SwipeDismissSheet>
   );
@@ -53,6 +58,7 @@ export function ReportResolutionSheet({
 
 const styles = StyleSheet.create({
   sheet: { borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: mobileTheme.surface },
+  scroll: { flexShrink: 1 },
   content: { padding: 20, paddingBottom: 30 },
   title: { fontSize: 19, fontWeight: '800' },
   copy: { marginTop: 7, fontSize: 12, lineHeight: 18 },
