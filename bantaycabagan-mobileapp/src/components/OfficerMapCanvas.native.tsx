@@ -291,6 +291,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
 }, ref) => {
   const mapRef = useRef<MapRef>(null);
   const cameraRef = useRef<CameraRef>(null);
+  const previousFollowedOfficerId = useRef<string | null>(null);
   const initialFitDone = useRef(false);
   const userInteractionInProgress = useRef(false);
   const [mapStyle, setMapStyle] = useState<string | StyleSpecification | null>(null);
@@ -398,6 +399,14 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
   }), [deploymentCenter, deploymentTarget.zoom, enable3D, fitInitialPersonnel, mapMode, personnel]);
 
   useEffect(() => {
+    const followedOfficerChanged = !isSamePersonnelId(
+      previousFollowedOfficerId.current,
+      followedOfficerId,
+    );
+    previousFollowedOfficerId.current = followedOfficerId;
+    // The explicit locate action owns the initial camera move. Automatic
+    // tracking resumes with the next GPS fix for the same followed officer.
+    if (followedOfficerChanged) return;
     if (!followedOfficerId) return;
     const motion = motionByOfficer.current.get(followedOfficerId);
     if (!motion || motion.durationMs <= 0 || motion.suppressJitter) return;
@@ -573,6 +582,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
 
         {followedPersonnel && (
           <PersonnelMarker
+            key={`followed-${followedPersonnel.id}`}
             member={followedPersonnel}
             currentPersonnelId={currentPersonnelId}
             emergencyPulse={emergencyPulse}

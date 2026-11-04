@@ -42,6 +42,8 @@ export function useMapSelectionController({
 }: Options) {
   const nativeMapRef = useRef<OfficerMapCanvasHandle>(null);
   const webMapRef = useRef<any>(null);
+  const followTransitionFrame = useRef<number | null>(null);
+  const focusTransitionFrame = useRef<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
@@ -121,7 +123,45 @@ export function useMapSelectionController({
     nativeMapRef.current?.focusOfficer(officerId);
   }, [sendMapCommand]);
 
+  const cancelPendingFocusTransition = useCallback(() => {
+    if (followTransitionFrame.current !== null) {
+      cancelAnimationFrame(followTransitionFrame.current);
+      followTransitionFrame.current = null;
+    }
+    if (focusTransitionFrame.current !== null) {
+      cancelAnimationFrame(focusTransitionFrame.current);
+      focusTransitionFrame.current = null;
+    }
+  }, []);
+
+  useEffect(() => cancelPendingFocusTransition, [cancelPendingFocusTransition]);
+
+  const followAndFocusOfficer = useCallback((officerId: string) => {
+    cancelPendingFocusTransition();
+    const commitFollow = () => {
+      setFollowedOfficerId(officerId);
+      focusTransitionFrame.current = requestAnimationFrame(() => {
+        focusTransitionFrame.current = null;
+        focusOfficer(officerId);
+      });
+    };
+
+    // MapLibre can receive conflicting native marker/camera updates when one
+    // followed officer is replaced directly by another. Restore the previous
+    // marker first, then focus the next officer on the following frame.
+    if (followedOfficerId && !isSamePersonnelId(followedOfficerId, officerId)) {
+      setFollowedOfficerId(null);
+      followTransitionFrame.current = requestAnimationFrame(() => {
+        followTransitionFrame.current = null;
+        commitFollow();
+      });
+      return;
+    }
+    commitFollow();
+  }, [cancelPendingFocusTransition, focusOfficer, followedOfficerId]);
+
   const focusDeployment = useCallback(() => {
+    cancelPendingFocusTransition();
     setFollowedOfficerId(null);
     setSelectedOfficerId(null);
     if (Platform.OS === 'web') {
@@ -129,7 +169,7 @@ export function useMapSelectionController({
       return;
     }
     nativeMapRef.current?.focusDeployment();
-  }, [sendMapCommand]);
+  }, [cancelPendingFocusTransition, sendMapCommand]);
 
   const focusCurrentOfficer = useCallback(() => {
     const current = visiblePersonnel.find((member) => isSamePersonnelId(member.id, currentPersonnelId));
@@ -139,10 +179,9 @@ export function useMapSelectionController({
       || !Number.isFinite(current.latitude)
       || !Number.isFinite(current.longitude)) return false;
     setSelectedOfficerId(null);
-    setFollowedOfficerId(current.id);
-    setTimeout(() => focusOfficer(current.id), 0);
+    followAndFocusOfficer(current.id);
     return true;
-  }, [currentPersonnelId, focusOfficer, visiblePersonnel]);
+  }, [currentPersonnelId, followAndFocusOfficer, visiblePersonnel]);
 
   const handleSearch = useCallback(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -170,10 +209,9 @@ export function useMapSelectionController({
       setFollowedOfficerId(null);
       return;
     }
-    setFollowedOfficerId(selectedOfficer.id);
     setSelectedOfficerId(null);
-    setTimeout(() => focusOfficer(selectedOfficer.id), 0);
-  }, [focusOfficer, followedOfficerId, selectedOfficer]);
+    followAndFocusOfficer(selectedOfficer.id);
+  }, [followAndFocusOfficer, followedOfficerId, selectedOfficer]);
 
   const handleCloseOfficer = useCallback(() => {
     if (selectedOfficerId === followedOfficerId) setFollowedOfficerId(null);
@@ -197,7 +235,10 @@ export function useMapSelectionController({
     setSearchFocused,
     setSearchQuery,
     setSelectedOfficerId,
-    stopFollowing: () => setFollowedOfficerId(null),
+    stopFollowing: () => {
+      cancelPendingFocusTransition();
+      setFollowedOfficerId(null);
+    },
     webMapRef,
   };
 }
