@@ -2,7 +2,9 @@ import {
   BatteryMedium,
   Clock3,
   Gauge,
+  LocateFixed,
   MapPin,
+  RadioTower,
   X,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
