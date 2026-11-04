@@ -213,7 +213,7 @@ assert.match(
 );
 assert.match(
   reportsSource,
-  /styles\.formActions[\s\S]*confirmCancelReportForm\(close\)[\s\S]*>Cancel<[\s\S]*handleSubmit\(close\)/,
+  /styles\.formActions[\s\S]*confirmCancelReportForm\((?:close|dismissReportForm)\)[\s\S]*>Cancel<[\s\S]*handleSubmit\((?:close|dismissReportForm)\)/,
   'New and correction forms must keep a visible Cancel action beside Submit',
 );
 assert.match(
@@ -322,8 +322,8 @@ assert.match(
 );
 assert.match(
   reportsSource,
-  /<SheetScrollView[\s\S]*contentContainerStyle=\{styles\.form\}/,
-  'Submit Report fields must use the shared elastic scrolling container',
+  /<ScrollView[\s\S]*contentContainerStyle=\{styles\.form\}[\s\S]*keyboardDismissMode="on-drag"[\s\S]*keyboardShouldPersistTaps="handled"/,
+  'Submit Report fields must keep a keyboard-safe scrolling container',
 );
 assert.match(
   swipeSheetSource,

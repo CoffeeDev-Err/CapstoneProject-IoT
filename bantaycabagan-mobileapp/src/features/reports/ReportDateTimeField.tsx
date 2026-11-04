@@ -14,11 +14,7 @@ export const parseReportTime = (text: string) => {
   const date = new Date(text.replace(' ', 'T') + ':00');
   return Number.isFinite(date.getTime()) && toLocalReportTime(date.toISOString()) === text ? date.toISOString() : '';
 };
-export function ReportDateTimeField({ value, onChange, onFocus }: {
-  value: string;
-  onChange: (value: string) => void;
-  onFocus?: () => void;
-}) {
+export function ReportDateTimeField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const { colors, isDark } = useMobileTheme();
   const [text, setText] = useState(() => toLocalReportTime(value));
   const emitted = useRef(value);
@@ -30,7 +26,6 @@ export function ReportDateTimeField({ value, onChange, onFocus }: {
       placeholder="YYYY-MM-DD HH:mm" placeholderTextColor={colors.textMuted}
       autoCorrect={false} maxLength={16}
       style={[styles.input, isDark && styles.inputDark, { color: colors.text }]}
-      onFocus={onFocus}
       onChangeText={(next) => { setText(next); emitted.current = parseReportTime(next); onChange(emitted.current); }} />
     <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>
       When it happened, in local time. Format: YYYY-MM-DD HH:mm (24-hour).

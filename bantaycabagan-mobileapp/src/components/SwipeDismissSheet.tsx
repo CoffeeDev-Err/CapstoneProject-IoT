@@ -72,7 +72,6 @@ const SNAP_SPRING = {
 
 type SwipeDismissControls = {
   close: (afterClose?: () => void) => void;
-  expand: () => void;
 };
 
 type SwipeDismissSheetProps = {
@@ -646,9 +645,7 @@ export function SwipeDismissSheet({
                 ) : null}
                 <SheetScrollContext.Provider value={scrollContext}>
                   {dismissible ? <DragHandle close={motion.close} color={handleColor} /> : <View style={styles.handleTouchArea} />}
-                  {typeof children === 'function'
-                    ? children({ close: motion.close, expand: motion.expand })
-                    : children}
+                  {typeof children === 'function' ? children({ close: motion.close }) : children}
                 </SheetScrollContext.Provider>
               </Animated.View>
             </GestureDetector>
@@ -675,9 +672,7 @@ export function SwipeDismissCard({
   return (
     <Animated.View style={[style, motion.animatedStyle]}>
       <DragHandle close={motion.close} color={handleColor} gesture={motion.panGesture} />
-      {typeof children === 'function'
-        ? children({ close: motion.close, expand: () => undefined })
-        : children}
+      {typeof children === 'function' ? children({ close: motion.close }) : children}
     </Animated.View>
   );
 }

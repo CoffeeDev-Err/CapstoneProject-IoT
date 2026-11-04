@@ -15,7 +15,10 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,7 +29,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, {
   cancelAnimation,
@@ -38,10 +41,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { ReportLocationPickerModal } from '../components/ReportLocationPickerModal';
-import {
-  SheetScrollView,
-  SwipeDismissSheet,
-} from '../components/SwipeDismissSheet';
 import { CABAGAN_BARANGAYS } from '../constants/cabaganBarangays';
 import { mobileTheme } from '../constants/mobileTheme';
 import { useOperationalContext } from '../context/OperationalContext';
@@ -62,7 +61,6 @@ import { useReportFormController } from '../features/reports/useReportFormContro
 import { canLinkBackup } from '../features/reports/backupReportContext';
 import { OfflineDataNotice } from '../components/OfflineDataNotice';
 import { SlidingUnderlineTabs } from '../components/SlidingUnderlineTabs';
-import { PAGE_HEADER_CONTENT_HEIGHT } from '../components/PolicePageHeader';
 
 const reportTypes = REPORT_TYPES;
 const reportFilters = REPORT_FILTERS;
@@ -98,7 +96,6 @@ const dateRangeFor = (preset: ReportDatePreset) => {
 export default function ReportsScreen() {
   const [backupPickerVisible, setBackupPickerVisible] = useState(false);
   const { colors, isDark } = useMobileTheme();
-  const insets = useSafeAreaInsets();
   const {
     currentPersonnelId,
     tasks,
@@ -168,6 +165,10 @@ export default function ReportsScreen() {
   }, 'Reports'>>();
   const handledDraftRequestRef = useRef<number | null>(null);
   const handledBackupReportRequestRef = useRef<number | null>(null);
+  const dismissReportForm = useCallback(() => {
+    Keyboard.dismiss();
+    closeReportForm();
+  }, [closeReportForm]);
   const { reportId, openReport, selectedReport, loading: detailLoading, error: detailError, refresh: refreshDetail } = useReportDetails(token, reports);
   useEffect(() => {
     if (route.params?.reportId) { openReport(route.params.reportId); refreshDetail(); }
@@ -421,30 +422,39 @@ export default function ReportsScreen() {
         />
       </Animated.View>
 
-      <SwipeDismissSheet
+      <Modal
+        animationType="slide"
+        hardwareAccelerated
+        presentationStyle="fullScreen"
         visible={formVisible && !locationPickerVisible}
-        initiallyExpanded
-        topInset={insets.top + PAGE_HEADER_CONTENT_HEIGHT}
-        tapOutsideToClose={false}
-        sheetStyle={[styles.modalScreen, isDark && themeStyles.screen]}
-        onClose={() => {
-          closeReportForm();
-        }}
+        onRequestClose={() => confirmCancelReportForm(dismissReportForm)}
       >
-        {({ close, expand }) => (
-        <SafeAreaView
+        <KeyboardAvoidingView
+          style={styles.submitModalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <SafeAreaView
             style={[styles.modalScreen, isDark && themeStyles.screen]}
-            edges={['bottom']}
+            edges={['top', 'bottom']}
           >
           <View style={[styles.modalHeader, isDark && themeStyles.border]}>
             <View>
               <Text style={[styles.modalTitle, isDark && themeStyles.text]}>{editTarget ? 'Correct Report' : 'Submit Report'}</Text>
               <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>{editTarget ? 'Changes are recorded and sent for review' : 'Record an incident or completed activity'}</Text>
             </View>
+            <TouchableOpacity
+              accessibilityLabel="Close report form"
+              accessibilityRole="button"
+              onPress={() => confirmCancelReportForm(dismissReportForm)}
+              style={[styles.modalCloseButton, { borderColor: colors.border }]}
+            >
+              <Icon name="close" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
           </View>
 
-          <SheetScrollView
+          <ScrollView
             contentContainerStyle={styles.form}
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -550,10 +560,10 @@ export default function ReportsScreen() {
             </View>
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>TITLE</Text>
-            <TextInput style={[styles.input, isDark && themeStyles.formInputDark]} value={form.title} onChangeText={(value) => updateForm('title', value)} onFocus={expand} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[styles.input, isDark && themeStyles.formInputDark]} value={form.title} onChangeText={(value) => updateForm('title', value)} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>INCIDENT / ACTIVITY DATE AND TIME</Text>
-            <ReportDateTimeField value={form.occurred_at} onChange={(value) => updateForm('occurred_at', value)} onFocus={expand} />
+            <ReportDateTimeField value={form.occurred_at} onChange={(value) => updateForm('occurred_at', value)} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>ASSIGNED AREA</Text>
             <View style={[styles.autoField, isDark && themeStyles.formInputDark]}>
@@ -566,7 +576,6 @@ export default function ReportsScreen() {
             <ReportLocationFields
               form={form}
               onEditLocation={updateManualLocation}
-              onFieldFocus={expand}
               onOpenBarangays={() => setBarangayPickerVisible(true)}
               onOpenMap={() => {
                 setLocationPickerVisible(true);
@@ -579,7 +588,6 @@ export default function ReportsScreen() {
               style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]}
               value={form.description}
               onChangeText={(value) => updateForm('description', value)}
-              onFocus={expand}
               maxLength={REPORT_FIELD_LIMITS.description}
               placeholder="What happened and what action was taken?"
               placeholderTextColor={colors.textMuted}
@@ -633,13 +641,13 @@ export default function ReportsScreen() {
 
             {editTarget ? <>
               <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REASON FOR CORRECTION</Text>
-              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]} value={editReason} onChangeText={setEditReason} onFocus={expand} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
+              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]} value={editReason} onChangeText={setEditReason} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
             </> : null}
             <View style={styles.formActions}>
               <TouchableOpacity
                 accessibilityRole="button"
                 style={[styles.formCancelButton, { borderColor: colors.danger, backgroundColor: colors.surface }]}
-                onPress={() => confirmCancelReportForm(close)}
+                onPress={() => confirmCancelReportForm(dismissReportForm)}
                 disabled={isSaving}
               >
                 <Text style={[styles.formCancelButtonText, { color: colors.danger }]}>Cancel</Text>
@@ -650,16 +658,16 @@ export default function ReportsScreen() {
                 style={[styles.primaryButton, styles.formPrimaryButton, submitReportPressStyle]}
                 onPressIn={() => { submitReportScale.value = withSpring(0.96, PRESS_IN_SPRING); }}
                 onPressOut={() => { submitReportScale.value = withSpring(1, PRESS_OUT_SPRING); }}
-                onPress={() => handleSubmit(close)}
+                onPress={() => handleSubmit(dismissReportForm)}
                 disabled={isSaving}
               >
                 <Text style={styles.primaryButtonText}>{formSubmitLabel}</Text>
               </AnimatedTouchableOpacity>
             </View>
-          </SheetScrollView>
+          </ScrollView>
           </SafeAreaView>
-        )}
-      </SwipeDismissSheet>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <ReportLocationPickerModal
         visible={locationPickerVisible}
@@ -1110,6 +1118,7 @@ const styles = StyleSheet.create({
     backgroundColor: mobileTheme.background,
   },
   modalHeader: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: mobileTheme.border },
+  modalCloseButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 20 },
   modalTitle: { color: mobileTheme.text, fontSize: 19, fontWeight: '800' },
   modalSubtitle: { marginTop: 2, color: mobileTheme.textMuted, fontSize: 11 },
   form: { padding: 18, paddingBottom: 36 },
