@@ -8,13 +8,14 @@ import { REPORT_FIELD_LIMITS, type ReportForm } from './reportForm';
 type ReportLocationFieldsProps = {
   form: ReportForm;
   onEditLocation: (value: string) => void;
+  onFieldFocus?: () => void;
   onOpenBarangays: () => void;
   onOpenMap: () => void;
   onUseCurrentGps: () => void;
 };
 
 export function ReportLocationFields({
-  form, onEditLocation, onOpenBarangays, onOpenMap, onUseCurrentGps,
+  form, onEditLocation, onFieldFocus, onOpenBarangays, onOpenMap, onUseCurrentGps,
 }: ReportLocationFieldsProps) {
   const { colors, isDark } = useMobileTheme();
   const inputSurface = isDark ? styles.floatingSurfaceDark : null;
@@ -39,6 +40,7 @@ export function ReportLocationFields({
       <Text style={[styles.label, { color: colors.textMuted }]}>EXACT INCIDENT PLACE / LANDMARK</Text>
       <TextInput style={[styles.input, inputSurface, { color: colors.text }]}
         value={form.location} onChangeText={onEditLocation}
+        onFocus={onFieldFocus}
         maxLength={REPORT_FIELD_LIMITS.location}
         placeholder="Example: Anao Public Market entrance" placeholderTextColor={colors.textMuted} />
       <View style={styles.assistRow}>

@@ -15,3 +15,9 @@ it('keeps a partial edit visible while marking the form time invalid', async () 
   await view.rerender(<ReportDateTimeField value="" onChange={onChange} />);
   expect(view.getByLabelText('Incident or activity date and time')).toHaveProp('value', '2026-09-');
 });
+it('expands the report sheet before the keyboard changes the Android viewport', async () => {
+  const onFocus = jest.fn();
+  const view = await render(<ReportDateTimeField value="2026-09-08T12:30:00Z" onChange={jest.fn()} onFocus={onFocus} />);
+  await fireEvent(view.getByLabelText('Incident or activity date and time'), 'focus');
+  expect(onFocus).toHaveBeenCalledTimes(1);
+});

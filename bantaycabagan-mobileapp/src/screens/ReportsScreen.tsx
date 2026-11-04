@@ -168,7 +168,6 @@ export default function ReportsScreen() {
   }, 'Reports'>>();
   const handledDraftRequestRef = useRef<number | null>(null);
   const handledBackupReportRequestRef = useRef<number | null>(null);
-  const [expandFormAfterMap, setExpandFormAfterMap] = useState(false);
   const { reportId, openReport, selectedReport, loading: detailLoading, error: detailError, refresh: refreshDetail } = useReportDetails(token, reports);
   useEffect(() => {
     if (route.params?.reportId) { openReport(route.params.reportId); refreshDetail(); }
@@ -424,16 +423,15 @@ export default function ReportsScreen() {
 
       <SwipeDismissSheet
         visible={formVisible && !locationPickerVisible}
-        initiallyExpanded={expandFormAfterMap}
+        initiallyExpanded
         topInset={insets.top + PAGE_HEADER_CONTENT_HEIGHT}
         tapOutsideToClose={false}
         sheetStyle={[styles.modalScreen, isDark && themeStyles.screen]}
         onClose={() => {
-          setExpandFormAfterMap(false);
           closeReportForm();
         }}
       >
-        {({ close }) => (
+        {({ close, expand }) => (
         <SafeAreaView
             style={[styles.modalScreen, isDark && themeStyles.screen]}
             edges={['bottom']}
@@ -552,10 +550,10 @@ export default function ReportsScreen() {
             </View>
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>TITLE</Text>
-            <TextInput style={[styles.input, isDark && themeStyles.formInputDark]} value={form.title} onChangeText={(value) => updateForm('title', value)} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[styles.input, isDark && themeStyles.formInputDark]} value={form.title} onChangeText={(value) => updateForm('title', value)} onFocus={expand} maxLength={REPORT_FIELD_LIMITS.title} placeholder="Short report title" placeholderTextColor={colors.textMuted} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>INCIDENT / ACTIVITY DATE AND TIME</Text>
-            <ReportDateTimeField value={form.occurred_at} onChange={(value) => updateForm('occurred_at', value)} />
+            <ReportDateTimeField value={form.occurred_at} onChange={(value) => updateForm('occurred_at', value)} onFocus={expand} />
 
             <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>ASSIGNED AREA</Text>
             <View style={[styles.autoField, isDark && themeStyles.formInputDark]}>
@@ -568,9 +566,9 @@ export default function ReportsScreen() {
             <ReportLocationFields
               form={form}
               onEditLocation={updateManualLocation}
+              onFieldFocus={expand}
               onOpenBarangays={() => setBarangayPickerVisible(true)}
               onOpenMap={() => {
-                setExpandFormAfterMap(true);
                 setLocationPickerVisible(true);
               }}
               onUseCurrentGps={useCurrentGpsSuggestion}
@@ -581,6 +579,7 @@ export default function ReportsScreen() {
               style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]}
               value={form.description}
               onChangeText={(value) => updateForm('description', value)}
+              onFocus={expand}
               maxLength={REPORT_FIELD_LIMITS.description}
               placeholder="What happened and what action was taken?"
               placeholderTextColor={colors.textMuted}
@@ -634,7 +633,7 @@ export default function ReportsScreen() {
 
             {editTarget ? <>
               <Text style={[styles.fieldLabel, isDark && themeStyles.muted]}>REASON FOR CORRECTION</Text>
-              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]} value={editReason} onChangeText={setEditReason} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
+              <TextInput accessibilityLabel="Reason for correction" style={[styles.input, styles.textArea, isDark && themeStyles.formInputDark]} value={editReason} onChangeText={setEditReason} onFocus={expand} maxLength={REPORT_FIELD_LIMITS.correctionReason} multiline placeholder="Explain what was incorrect" placeholderTextColor={colors.textMuted} />
             </> : null}
             <View style={styles.formActions}>
               <TouchableOpacity
