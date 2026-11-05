@@ -1,6 +1,8 @@
 import { getMapPerformanceOptions } from '../utils/mapPerformance'
 import { buildReportRouteTrace } from '../utils/reportRouteTrace'
 import { checkpointDetails, groupCheckpoints, hourlySequenceFeatures } from '../utils/dutyGpsHistory'
+import { createHistoryPopupContent } from '../utils/historyMapPopup'
+import { CABAGAN_CENTER } from '../utils/cabaganGeofence'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -93,7 +95,7 @@ const createPointMarker = ({ className, label, title }) => {
 const EMPTY_ROUTE_POINTS = []
 
 function ReportLocationMap({ active = true, incident, markerLabel = 'Reported location', routePoints = EMPTY_ROUTE_POINTS, roadMatching,
-  hourlyCheckpoints, onSelectHour, mapLabel = 'Reported location and officer route map', emptyMessage = 'No valid GPS coordinates were saved for this report.' }) {
+  hourlyCheckpoints, onSelectHour, historyContext, mapLabel = 'Reported location and officer route map', emptyMessage = 'No valid GPS coordinates were saved for this report.' }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
@@ -101,6 +103,9 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   const positionsRef = useRef([])
   const pointMarkersRef = useRef([])
   const popupRef = useRef(null)
+  const popupTriggerRef = useRef(null)
+  const suppressFocusPopupRef = useRef(false)
+  const historyContextRef = useRef(historyContext)
   const [visibleLayers, setVisibleLayers] = useState({ recorded: true, trace: true, turns: true, matched: true })
   const threeDRef = useRef(false)
   const mapModeRef = useRef('street')
@@ -109,7 +114,10 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   const [mapMode, setMapMode] = useState('street')
   const [threeDEnabled, setThreeDEnabled] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  const [mapError, setMapError] = useState('')
   const isDark = useDocumentTheme()
+
+  useEffect(() => { historyContextRef.current = historyContext }, [historyContext])
 
   useEffect(() => {
     mapModeRef.current = mapMode
@@ -134,7 +142,9 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
     [...routePositions, ...(hourlyCheckpoints || []).filter(hour => hour.checkpoint).map(hour => [Number(hour.checkpoint.latitude), Number(hour.checkpoint.longitude)]), ...(incidentPosition ? [incidentPosition] : []),
       ...(visibleLayers.matched ? (roadMatching?.segments || []).flatMap(segment => segment.coordinates.map(([longitude, latitude]) => [latitude, longitude])) : [])]
   ), [hourlyCheckpoints, incidentPosition, roadMatching, routePositions, visibleLayers.matched])
-  const mapCenter = incidentPosition || mapPositions.at(-1) || null
+  // History stays a map even with no records. This is a neutral area center,
+  // never a fabricated officer position or fallback live location.
+  const mapCenter = incidentPosition || mapPositions.at(-1) || (historyContext ? CABAGAN_CENTER : null)
   const mapCenterLatitude = mapCenter?.[0] ?? null
   const mapCenterLongitude = mapCenter?.[1] ?? null
 
@@ -150,7 +160,9 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
         },
       })) : []),
       ...(visibleLayers.recorded ? routePoints.filter(point => isValidCoordinate(point.latitude, point.longitude)).map(point => ({
-        type: 'Feature', properties: { kind: 'recorded', recorded_at: point.recorded_at, accuracy: point.accuracy ?? 'unknown' },
+        type: 'Feature', properties: { kind: 'recorded', recorded_at: point.recorded_at, accuracy: point.accuracy ?? 'unknown',
+          ...(historyContext && { location_name: point.location_name || '', speed: point.speed, battery_level: point.battery_level,
+            satellites: point.satellites, device_assignment_id: point.device_assignment_id }) },
         geometry: { type: 'Point', coordinates: [Number(point.longitude), Number(point.latitude)] },
       })) : []),
       ...(visibleLayers.turns ? routeTrace.turns.map(turn => ({
@@ -161,7 +173,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
         type: 'Feature', properties: { kind: 'matched' }, geometry: { type: 'LineString', coordinates: segment.coordinates },
       })) : []),
     ],
-  ), [hourlyCheckpoints, roadMatching, routePoints, routeTrace, visibleLayers])
+  ), [historyContext, hourlyCheckpoints, roadMatching, routePoints, routeTrace, visibleLayers])
 
   const fitReportMap = useCallback((animate = true) => {
     const map = mapRef.current
@@ -181,6 +193,14 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
     map.fitBounds(bounds, { padding: 28, maxZoom: 17, duration: animate ? 650 : 0 })
   }, [])
 
+  const restorePopupFocus = useCallback(() => {
+    const trigger = popupTriggerRef.current
+    if (!trigger?.isConnected) return
+    suppressFocusPopupRef.current = true
+    trigger.focus({ preventScroll: true })
+    suppressFocusPopupRef.current = false
+  }, [])
+
   const renderPointMarkers = useCallback(() => {
     const map = mapRef.current
     if (!map) return
@@ -191,12 +211,21 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       const element = document.createElement('button')
       element.type = 'button'
       element.className = 'duty-gps-marker'
-      element.textContent = group.map(hour => hour.hour + 1).join(', ')
+      element.textContent = historyContext ? String(group[0].hour + 1) : group.map(hour => hour.hour + 1).join(', ')
+      if (historyContext && group.length > 1) {
+        const count = document.createElement('span')
+        count.className = 'duty-gps-marker__count'
+        count.textContent = `+${group.length - 1}`
+        element.append(count)
+      }
       element.setAttribute('aria-label', group.map(checkpointDetails).join('\n'))
+      if (historyContext) element.setAttribute('aria-expanded', 'false')
       const showDetails = () => {
         popupRef.current?.remove()
-        const content = document.createElement('div')
-        group.forEach(hour => {
+        const content = historyContext
+          ? createHistoryPopupContent({ hours: group, context: historyContext })
+          : document.createElement('div')
+        if (!historyContext) group.forEach(hour => {
           const button = document.createElement('button')
           button.type = 'button'
           button.className = 'duty-gps-popup-hour'
@@ -204,12 +233,24 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
           button.addEventListener('click', () => onSelectHour?.(String(hour.hour)))
           content.append(button)
         })
-        popupRef.current = new maplibregl.Popup({ maxWidth: '340px', focusAfterOpen: false })
+        popupRef.current = new maplibregl.Popup({ maxWidth: '340px', focusAfterOpen: false,
+          ...(historyContext && { className: 'history-location-popup', closeOnClick: false }) })
           .setLngLat([group[0].checkpoint.longitude, group[0].checkpoint.latitude]).setDOMContent(content).addTo(map)
+        if (historyContext) {
+          popupTriggerRef.current = element
+          element.classList.add('is-selected')
+          element.setAttribute('aria-expanded', 'true')
+          popupRef.current.on?.('close', () => { element.classList.remove('is-selected'); element.setAttribute('aria-expanded', 'false') })
+          popupRef.current.getElement?.()?.querySelector('.maplibregl-popup-close-button')?.addEventListener('click', restorePopupFocus)
+        }
       }
       element.addEventListener('mouseenter', showDetails)
-      element.addEventListener('focus', showDetails)
-      element.addEventListener('click', () => { onSelectHour?.(String(group[0].hour)); showDetails() })
+      element.addEventListener('focus', () => { if (!suppressFocusPopupRef.current) showDetails() })
+      element.addEventListener('click', event => {
+        event.stopPropagation()
+        onSelectHour?.(String(group[0].hour)); showDetails()
+        if (event.detail === 0) popupRef.current?.getElement?.()?.querySelector('button, select')?.focus()
+      })
       pointMarkersRef.current.push(new maplibregl.Marker({ element }).setLngLat([group[0].checkpoint.longitude, group[0].checkpoint.latitude]).addTo(map))
     })
 
@@ -242,7 +283,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
         anchor: 'center',
       }).setLngLat([incidentPosition[1], incidentPosition[0]]).addTo(map))
     }
-  }, [hourlyCheckpoints, incidentPosition, markerLabel, onSelectHour, routePositions, routeTrace])
+  }, [historyContext, hourlyCheckpoints, incidentPosition, markerLabel, onSelectHour, restorePopupFocus, routePositions, routeTrace])
 
   useEffect(() => {
     if (
@@ -262,7 +303,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       container: containerRef.current,
       style: getMapTilerWebStyleUrl(currentMapMode, currentIsDark),
       center: [mapCenterLongitude, mapCenterLatitude],
-      zoom: 17,
+      zoom: historyContextRef.current ? 13 : 17,
       maxZoom: 20,
       maxPitch: 65,
       dragRotate: true,
@@ -280,6 +321,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       addReportRouteLayer(map, routeDataRef.current)
       applyThreeDimensionalTerrain(map, threeDRef.current)
       setMapReady(true)
+      setMapError('')
       window.clearTimeout(resizeTimer)
       resizeTimer = window.setTimeout(() => {
         map.resize()
@@ -287,6 +329,10 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       }, 120)
     }
     map.on('style.load', handleStyleLoad)
+    const handleMapError = () => {
+      if (historyContextRef.current && !map.isStyleLoaded()) setMapError('The map could not be loaded. Check your connection and try again.')
+    }
+    map.on('error', handleMapError)
     const showSample = event => {
       const feature = event.features?.[0]
       if (!feature) return
@@ -294,6 +340,14 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       if (feature.properties.kind === 'recorded' && map.getLayer('geosentri-report-turns')
         && map.queryRenderedFeatures(event.point, { layers: ['geosentri-report-turns'] }).length) return
       popupRef.current?.remove()
+      if (historyContextRef.current && feature.properties.kind === 'recorded') {
+        popupTriggerRef.current = null
+        const content = createHistoryPopupContent({ point: { ...feature.properties,
+          longitude: feature.geometry.coordinates[0], latitude: feature.geometry.coordinates[1] }, context: historyContextRef.current })
+        popupRef.current = new maplibregl.Popup({ maxWidth: '340px', className: 'history-location-popup', focusAfterOpen: false })
+          .setLngLat(feature.geometry.coordinates).setDOMContent(content).addTo(map)
+        return
+      }
       const details = document.createElement('div')
       details.className = 'report-map-sample-details'
       const properties = feature.properties
@@ -305,6 +359,13 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
     }
     map.on('click', 'geosentri-report-turns', showSample)
     map.on('click', 'geosentri-report-recorded', showSample)
+    const showHistorySample = event => { if (historyContextRef.current) showSample(event) }
+    map.on('mouseenter', 'geosentri-report-recorded', showHistorySample)
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') { popupRef.current?.remove(); restorePopupFocus() }
+    }
+    containerRef.current.addEventListener('keydown', closeOnEscape)
+    const mapContainer = containerRef.current
 
     const resizeObserver = new ResizeObserver(() => map.resize())
     resizeObserver.observe(containerRef.current)
@@ -312,8 +373,11 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
     return () => {
       window.clearTimeout(resizeTimer)
       map.off('style.load', handleStyleLoad)
+      map.off('error', handleMapError)
       map.off('click', 'geosentri-report-turns', showSample)
       map.off('click', 'geosentri-report-recorded', showSample)
+      map.off('mouseenter', 'geosentri-report-recorded', showHistorySample)
+      mapContainer.removeEventListener('keydown', closeOnEscape)
       map.stop()
       removeNavigationListeners()
       resizeObserver.disconnect()
@@ -323,7 +387,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       map.remove()
       mapRef.current = null
     }
-  }, [active, fitReportMap, initialIsDark, mapCenterLatitude, mapCenterLongitude])
+  }, [active, fitReportMap, initialIsDark, mapCenterLatitude, mapCenterLongitude, restorePopupFocus])
 
   useEffect(() => {
     routeDataRef.current = routeData
@@ -364,11 +428,12 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   if (!hasMapTilerWebApiKey) {
     return (
       <div className="report-location-map__empty">
-        Map is unavailable. Saved GPS details remain available below.
+        {historyContext ? 'The history map is unavailable. Please check the map service and try again.' : 'Map is unavailable. Saved GPS details remain available below.'}
       </div>
     )
   }
 
+  const MapDetails = historyContext ? 'details' : 'div'
   return (
     <div className="report-location-map">
       <div className="report-location-map__stage">
@@ -381,13 +446,21 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
           onThreeDChange={setThreeDEnabled}
         />
         <MapAttribution />
-        {!mapReady && (
-          <div className="map-style-loading map-style-loading--compact" role="status" aria-label="Loading report map">
+        {historyContext && mapError && <div className="history-map-service-error" role="status"><span>{mapError}</span>
+          <button type="button" onClick={() => {
+            setMapError('')
+            mapRef.current?.setStyle(getMapTilerWebStyleUrl(mapModeRef.current, isDarkRef.current), { diff: false })
+          }}>Retry map</button>
+        </div>}
+        {!mapReady && !mapError && (
+          <div className="map-style-loading map-style-loading--compact" role="status" aria-label={historyContext ? 'Loading history map' : 'Loading report map'}>
             <SkeletonBlock width="4.5rem" height="0.6rem" />
           </div>
         )}
       </div>
 
+      <MapDetails className={historyContext ? 'history-map-options' : undefined}>
+      {historyContext && <summary>Map layers &amp; legend</summary>}
       <div className="report-location-map__legend" aria-label="Map legend">
         {hourlyCheckpoints && <span><i className="report-map-line" />Hourly sequence → (approximate connections)</span>}
         {incidentPosition && (
@@ -418,6 +491,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
         {routeTrace.turns.length > 0 && ` ${routeTrace.turns.length} probable direction changes; select an amber marker for details. Exact turn locations cannot be confirmed between samples.`}
         {roadMatching?.segments?.length > 0 && ' The purple road route is an estimate for vehicle travel, not the recorded GPS path.'}
       </p>}
+      </MapDetails>
     </div>
   )
 }

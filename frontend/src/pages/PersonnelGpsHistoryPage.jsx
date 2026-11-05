@@ -1,14 +1,18 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clock3, History, Info, MapPin, RefreshCw, Route } from 'lucide-react'
+import InitialsAvatar from '../components/InitialsAvatar'
+import SelectControl from '../components/SelectControl'
 import { getDutyGpsHistory } from '../services/personnel'
 import { requestErrorMessage } from '../utils/requestFeedback'
-import { checkpointDetails, historyTime, hourLabel, patrolLabel, phtDate } from '../utils/dutyGpsHistory'
+import { hourLabel, patrolLabel, phtDate } from '../utils/dutyGpsHistory'
 import '../styles/dutyGpsHistory.css'
 
 const HistoryMap = lazy(() => import('../components/ReportLocationMap'))
 const EMPTY_POINTS = []
-const statusLabel = { no_reading: 'No GPS reading', in_progress: 'Awaiting GPS reading', upcoming: 'Upcoming hour', expired: 'Outside retention period' }
+const shiftTime = value => new Date(value).toLocaleString('en-PH', {
+  timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+})
 
 export default function PersonnelGpsHistoryPage() {
   const { personnelId } = useParams()
@@ -50,68 +54,80 @@ export default function PersonnelGpsHistoryPage() {
   }, [date, deploymentId, requestedHour, personnelId, refresh, roadMatch, view])
 
   const data = state.data
-  const selectedHour = data?.hours.find(item => String(item.hour) === hour)
+  const visibleHours = useMemo(() => view === 'hourly' && data?.duty
+    ? data.hours.filter(item => hour === '' || String(item.hour) === hour) : undefined, [data, hour, view])
+  const historyContext = useMemo(() => ({ ...data?.duty,
+    personnelName: data?.duty?.personnelName || data?.personnel?.name,
+    rank: data?.duty?.rank || data?.personnel?.rank,
+    badge: data?.duty?.badge || data?.personnel?.badge,
+  }), [data])
+  const pointCount = view === 'hourly' ? (visibleHours || []).filter(item => item.checkpoint).length : data?.duty ? data.points.length : 0
+  const missingHours = (visibleHours || []).filter(item => !item.checkpoint && ['no_reading', 'expired'].includes(item.status)).length
   const resetSelection = () => { setHour(''); setRoadMatch(false) }
+  const retry = () => setRefresh(value => value + 1)
   return <div className="page-container fade-in p-3 p-md-4 duty-gps-history">
-    <header className="reports-header mb-3">
+    <header className="duty-gps-history__header">
       <div>
-        <Link to="/personnel" className="report-gps-history__back"><ArrowLeft aria-hidden="true" />Back to personnel</Link>
-        <h2 className="page-title">Personnel GPS history</h2>
-        <p className="page-subtitle">{data?.personnel.name || personnelId}{data?.personnel.rank ? ` · ${data.personnel.rank} · ${data.personnel.badge}` : ''}</p>
+        <Link to="/personnel" className="duty-gps-history__back"><ArrowLeft aria-hidden="true" />Personnel</Link>
+        <h2 className="page-title">GPS history</h2>
+        <p className="page-subtitle">Explore saved duty locations on the map.</p>
       </div>
-      <button type="button" className="report-action-btn report-action-btn--secondary" disabled={state.loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw aria-hidden="true" />Refresh history</button>
+      <button type="button" className="report-action-btn report-action-btn--secondary" disabled={state.loading} onClick={retry}>
+        <RefreshCw aria-hidden="true" className={state.loading ? 'history-refreshing' : ''} />Refresh history
+      </button>
     </header>
     <section className="widget-card duty-gps-history__panel">
+      <div className="duty-gps-history__officer">
+        <InitialsAvatar name={data?.personnel.name || personnelId} className="duty-gps-history__avatar" />
+        <div className="duty-gps-history__identity">
+          <h3>{data?.personnel.name || personnelId}</h3>
+          <p>{[data?.personnel.rank, data?.personnel.badge].filter(Boolean).join(' · ') || 'Personnel duty history'}</p>
+        </div>
+        <span className="duty-gps-history__retention"><Clock3 aria-hidden="true" />30-day history</span>
+      </div>
       <div className="duty-gps-history__filters">
-        <label>Date (PHT)<input type="date" value={date} max={dateBounds.max} min={dateBounds.min}
+        <label className="history-date-filter"><span><CalendarDays aria-hidden="true" />Date (PHT)</span><input type="date" value={date} max={dateBounds.max} min={dateBounds.min}
           onChange={event => { if (!event.target.value) return; setDate(event.target.value); setDeploymentId(''); resetSelection() }} /></label>
-        <label>Duty shift<select value={deploymentId || data?.duty?.id || ''} disabled={state.loading || !data?.shifts.length}
+        <label className="history-duty-filter"><span>Duty shift</span><SelectControl value={deploymentId || data?.duty?.id || ''} disabled={state.loading || !data?.shifts.length}
           onChange={event => { setDeploymentId(event.target.value); resetSelection() }}>
           {!data?.shifts.length && <option value="">No duty for this date</option>}
-          {data?.shifts.map(duty => <option key={duty.id} value={duty.id}>{historyTime(duty.shiftStart)} – {historyTime(duty.shiftEnd)} · {duty.patrolArea}</option>)}
-        </select></label>
-        <label>Display<select value={view} onChange={event => { setView(event.target.value); setRoadMatch(false) }}>
-          <option value="hourly">Hourly checkpoints</option><option value="detailed">Detailed GPS trace</option>
-        </select></label>
-        <label>Hour<select value={hour} disabled={state.loading || !data?.hours.length} onChange={event => { setHour(event.target.value); setRoadMatch(false) }}>
-          <option value="">Full duty</option>{data?.hours.map(item => <option key={item.hour} value={item.hour}>Hour {item.hour + 1}: {hourLabel(item)}</option>)}
-        </select></label>
+          {data?.shifts.map(duty => <option key={duty.id} value={duty.id}>{shiftTime(duty.shiftStart)} – {shiftTime(duty.shiftEnd)}</option>)}
+        </SelectControl></label>
+        <label className="history-hour-filter"><span>Hour</span><SelectControl value={hour} disabled={state.loading || !data?.hours.length} onChange={event => { setHour(event.target.value); setRoadMatch(false) }}>
+          <option value="">Full duty</option>{data?.hours.map(item => <option key={item.hour} value={item.hour}>Hour {item.hour + 1} · {hourLabel(item)}</option>)}
+        </SelectControl></label>
       </div>
-      <p className="duty-gps-history__note">Saved for 30 days. Times use Philippine time. Sleeping and offline devices do not create new GPS readings.</p>
-      {state.loading && <p role="status">Loading GPS history…</p>}
-      {state.error && <p role="alert">{state.error}</p>}
-      {data && !data.duty && <p>No duty GPS history is available for this date. Choose another date.</p>}
-      {data?.duty && <>
-        <h3>{patrolLabel(data.duty)} · {data.duty.patrolArea}</h3>
-        <p>{historyTime(data.duty.shiftStart)} – {historyTime(data.duty.shiftEnd)} PHT</p>
-        <p className="duty-gps-history__note">{view === 'hourly'
-          ? 'Each numbered checkpoint is the last accepted GPS reading in that duty hour. Dashed arrows show the order of hourly locations; they do not establish the route travelled.'
-          : 'Detailed GPS trace uses accepted recorded positions. Gaps over one minute and unreliable movement remain unconnected; a GPS trace cannot prove the exact road or footpath travelled.'}</p>
-        <Suspense fallback={<p role="status">Loading history map…</p>}>
-          <HistoryMap mapLabel="Personnel duty GPS history map" emptyMessage="No accepted GPS readings are available for this selection."
-            hourlyCheckpoints={view === 'hourly' ? data.hours : undefined} onSelectHour={setHour}
-            routePoints={view === 'detailed' ? data.points : EMPTY_POINTS} roadMatching={data.road_matching} />
-        </Suspense>
-        {view === 'detailed' && <p>{data.points.length} accepted GPS readings in this selection.</p>}
-        {view === 'detailed' && data.duty.patrolMode === 'car' && hour !== '' && <label className="duty-gps-history__road-option">
-          <input type="checkbox" checked={roadMatch} onChange={event => setRoadMatch(event.target.checked)} />Estimate road route for this hour (OSRM, optional)
-        </label>}
-        {roadMatch && <p>{data.road_matching?.segments?.length ? 'Purple lines are an estimated road route between GPS samples.'
-          : 'A road estimate is unavailable for this selection. The recorded GPS trace remains available.'}</p>}
-        <h3>Hourly records</h3>
-        <div className="duty-gps-history__hours">
-          {data.hours.map(item => <button type="button" key={item.hour} aria-pressed={hour === String(item.hour)}
-            className={`duty-gps-hour${hour === String(item.hour) ? ' is-selected' : ''}`} onClick={() => { setHour(String(item.hour)); setRoadMatch(false) }}>
-            <strong>{item.hour + 1}. {hourLabel(item)}</strong><span>{item.checkpoint ? historyTime(item.checkpoint.recorded_at) + ' PHT' : statusLabel[item.status]}</span>
-            {item.checkpoint && <span>{item.checkpoint.location_name || `${Number(item.checkpoint.latitude).toFixed(6)}, ${Number(item.checkpoint.longitude).toFixed(6)}`}</span>}
-          </button>)}
+      <div className="duty-gps-history__map-toolbar">
+        <div className="history-view-switch" role="group" aria-label="Display">
+          <button type="button" aria-pressed={view === 'hourly'} onClick={() => { setView('hourly'); setRoadMatch(false) }}><History aria-hidden="true" />Hourly checkpoints</button>
+          <button type="button" aria-pressed={view === 'detailed'} onClick={() => { setView('detailed'); setRoadMatch(false) }}><Route aria-hidden="true" />Detailed GPS trace</button>
         </div>
-        {selectedHour && <section className="duty-gps-history__details" aria-label="Selected hourly checkpoint details">
-          <h3>Hour {selectedHour.hour + 1} details</h3><p>{checkpointDetails(selectedHour)}</p>
-          <p>{data.duty.personnelName} · {data.duty.rank} · {data.duty.badge} · {patrolLabel(data.duty)} · {data.duty.patrolArea}</p>
-          {selectedHour.checkpoint?.device_assignment_id && <p>GPS assignment: {selectedHour.checkpoint.device_assignment_id}</p>}
-        </section>}
-      </>}
+        <span className="duty-gps-history__point-count" aria-live="polite">{state.loading ? 'Loading locations…'
+          : `${pointCount} ${view === 'hourly' ? pointCount === 1 ? 'checkpoint' : 'checkpoints' : pointCount === 1 ? 'GPS reading' : 'GPS readings'}${missingHours ? ` · ${missingHours} ${missingHours === 1 ? 'hour' : 'hours'} without readings` : ''}`}</span>
+      </div>
+      <div className="duty-gps-history__map" aria-busy={state.loading}>
+        <Suspense fallback={<div className="history-map-feedback" role="status">Loading history map…</div>}>
+          <HistoryMap mapLabel="Personnel duty GPS history map" emptyMessage="No accepted GPS readings are available for this selection."
+            historyContext={historyContext} hourlyCheckpoints={visibleHours}
+            routePoints={view === 'detailed' && data?.duty ? data.points : EMPTY_POINTS} roadMatching={data?.road_matching} />
+        </Suspense>
+        {state.loading && <div className="history-map-feedback" role="status"><span className="history-map-feedback__loader" /><strong>Loading GPS history…</strong><span>Finding saved locations for this duty.</span></div>}
+        {!state.loading && state.error && <div className="history-map-feedback history-map-feedback--error" role="alert"><Info aria-hidden="true" /><strong>History could not be loaded</strong><p>{state.error}</p><button type="button" className="report-action-btn report-action-btn--secondary" onClick={retry}>Try again</button></div>}
+        {!state.loading && !state.error && pointCount === 0 && <div className="history-map-feedback" role="status"><MapPin aria-hidden="true" />
+          <strong>{!data?.duty ? 'No duty history for this date' : hour === '' ? 'No GPS readings for this duty' : 'No GPS readings for this hour'}</strong>
+          <p>Choose another {hour === '' ? 'date or duty shift' : 'hour'}. Saved locations will appear here automatically.</p>
+        </div>}
+      </div>
+      <footer className="duty-gps-history__footer">
+        <div className="duty-gps-history__caption"><MapPin aria-hidden="true" /><span>{data?.duty ? `${patrolLabel(data.duty)} · ${data.duty.patrolArea}` : 'Personnel duty locations'}</span></div>
+        <p>{view === 'hourly' ? 'Hover or select a dot for location, date and GPS details. Dashed arrows show location order.'
+          : 'Hover or select a recorded point for details. Gaps in readings remain unconnected.'}</p>
+        {view === 'detailed' && data?.duty?.patrolMode === 'car' && hour !== '' && <label className="duty-gps-history__road-option">
+          <input type="checkbox" checked={roadMatch} onChange={event => setRoadMatch(event.target.checked)} />Estimate road route for this hour
+        </label>}
+        {roadMatch && <p>{data?.road_matching?.segments?.length ? 'The purple road route is an estimate between GPS samples.' : 'A road estimate is unavailable. Recorded GPS points remain available.'}</p>}
+        <details className="history-reading-note"><summary><Info aria-hidden="true" />About these readings</summary><p>All times use Philippine time (PHT). Hourly dots show the last accepted reading in each duty hour. GPS positions are approximate; connecting lines do not establish the exact path travelled. Sleeping and offline devices do not create new readings. Available readings are retained for 30 days.</p></details>
+      </footer>
     </section>
   </div>
 }

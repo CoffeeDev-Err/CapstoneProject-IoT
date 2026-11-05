@@ -15,15 +15,16 @@ const open = () => render(<MemoryRouter initialEntries={['/personnel/P-1/gps-his
 beforeEach(() => { fixture.get.mockReset(); fixture.get.mockResolvedValue(payload); fixture.map = null })
 afterEach(cleanup)
 
-it('defaults to hourly history and shows the original reading time and missing hours for an off-duty officer', async () => {
+it('opens hourly dots on the map without an hourly card grid or permanent details panel', async () => {
   open()
   expect(await screen.findByText('Fixed post · School')).toBeTruthy()
-  expect(screen.getAllByRole('button', { name: /No GPS reading/ })).toHaveLength(7)
+  expect(screen.getByText('1 checkpoint · 7 hours without readings')).toBeTruthy()
   expect(fixture.get).toHaveBeenCalledWith(expect.objectContaining({ personnelId: 'P-1', view: 'hourly' }))
   await waitFor(() => expect(fixture.map?.hourlyCheckpoints).toHaveLength(8))
-  fireEvent.click(screen.getByRole('button', { name: /^1\. / }))
-  expect(screen.getByRole('region', { name: 'Selected hourly checkpoint details' }).textContent).toContain('0 km/h')
-  expect(screen.getByRole('region', { name: 'Selected hourly checkpoint details' }).textContent).toContain('90%')
+  expect(screen.queryByText('Hourly records')).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Selected hourly checkpoint details' })).toBeNull()
+  expect(fixture.map.hourlyCheckpoints[0].checkpoint.recorded_at).toBe('2026-11-04T23:58:00Z')
+  expect(fixture.map.historyContext.personnelName).toBe('Officer One')
   expect(fixture.get).toHaveBeenCalledTimes(1)
 })
 it('loads every detailed page before drawing and allows detailed history for fixed posts', async () => {
@@ -32,8 +33,8 @@ it('loads every detailed page before drawing and allows detailed history for fix
   const firstPoint = { latitude: 17.42, longitude: 121.77, recorded_at: hours[0].from }
   const nextPoint = { ...firstPoint, recorded_at: hours[0].to }
   fixture.get.mockImplementation(async query => query.cursor ? { ...payload, points: [nextPoint] } : { ...payload, points: [firstPoint], next_cursor: '123' })
-  fireEvent.change(screen.getByLabelText('Display'), { target: { value: 'detailed' } })
-  expect(await screen.findByText('2 accepted GPS readings in this selection.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Detailed GPS trace' }))
+  expect(await screen.findByText('2 GPS readings')).toBeTruthy()
   expect(fixture.get).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: '123', deploymentId: 'D-1' }))
   await waitFor(() => expect(fixture.map?.routePoints).toHaveLength(2))
   expect(fixture.map.hourlyCheckpoints).toBeUndefined()
@@ -41,11 +42,24 @@ it('loads every detailed page before drawing and allows detailed history for fix
 it('shows an empty history or request error without drawing an earlier officer trace', async () => {
   fixture.get.mockResolvedValueOnce({ ...payload, duty: null, shifts: [] })
   open()
-  expect(await screen.findByText(/No duty GPS history is available/)).toBeTruthy()
+  expect(await screen.findByText('No duty history for this date')).toBeTruthy()
   fixture.get.mockRejectedValueOnce(new Error('Unavailable'))
   fireEvent.click(screen.getByRole('button', { name: 'Refresh history' }))
   expect(await screen.findByRole('alert')).toBeTruthy()
-  expect(screen.queryByLabelText('Test history map')).toBeNull()
+  expect(screen.getByLabelText('Test history map')).toBeTruthy()
+  expect(fixture.map.routePoints).toEqual([])
+  expect(fixture.map.hourlyCheckpoints).toBeUndefined()
+})
+it('filters hourly dots without changing the original data or creating a new GPS reading', async () => {
+  open()
+  await screen.findByText('Fixed post · School')
+  fireEvent.change(screen.getByLabelText('Hour'), { target: { value: '0' } })
+  await waitFor(() => expect(fixture.map?.hourlyCheckpoints).toHaveLength(1))
+  expect(fixture.map.hourlyCheckpoints[0].checkpoint.battery_level).toBe(90)
+  expect(fixture.get).toHaveBeenCalledTimes(1)
+  fireEvent.change(screen.getByLabelText('Hour'), { target: { value: '1' } })
+  expect(await screen.findByText('No GPS readings for this hour')).toBeTruthy()
+  expect(fixture.map.hourlyCheckpoints[0].checkpoint).toBeNull()
 })
 it('clears the selected duty and hour when changing dates', async () => {
   open()

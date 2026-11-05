@@ -209,22 +209,23 @@ function PersonnelPage() {
                   <span className="personnel-location"><MapPin aria-hidden="true" /><span>{officer.locationName || 'Unavailable'}</span></span>
                 </td>
                 <td className="personnel-actions">
+                  <div className="personnel-action-group">
                   {!officer.isMockPersonnel && <button type="button" className="report-action-btn report-action-btn--secondary"
                     aria-label={`View GPS history for ${officer.name}`}
                     onClick={event => { event.stopPropagation(); navigate(`/personnel/${encodeURIComponent(officer.id)}/gps-history`) }}>
-                    <History aria-hidden="true" />View GPS history
+                    <History aria-hidden="true" />GPS history
                   </button>}
                   <button
                     type="button"
-                    className="report-action-btn report-action-btn--primary"
+                    className="report-action-btn report-action-btn--secondary personnel-map-action"
                     disabled={!canLocate}
                     aria-label={`View ${officer.name} on live map`}
                     title={canLocate ? `Locate ${officer.name}` : 'Map unavailable: officer is off duty or has no current visible GPS fix.'}
                     onClick={(event) => { event.stopPropagation(); locatePersonnel(officer) }}
                   >
-                    <MapPin aria-hidden="true" />View on map
+                    <MapPin aria-hidden="true" /><span className="personnel-map-action__label">View map</span>
                   </button>
-                  {!canLocate && <small className="personnel-map-unavailable">No live location</small>}
+                  </div>
                 </td>
               </tr>
               )

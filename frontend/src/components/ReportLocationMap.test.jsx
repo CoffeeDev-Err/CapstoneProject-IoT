@@ -24,9 +24,10 @@ vi.mock('maplibre-gl', () => ({
     setLngLat() { return this } addTo() { return this } remove() {}
   },
   Popup: class {
-    constructor() { fixture.popups.push(this) }
+    constructor() { this.events = {}; fixture.popups.push(this) }
+    on(event, callback) { this.events[event] = callback; return this }
     setLngLat() { return this } setDOMContent(element) { this.element = element; return this }
-    addTo() { return this } remove() { this.removed = true }
+    addTo() { return this } remove() { this.removed = true; this.events.close?.() }
   },
 }))
 vi.mock('../services/configureMapLibre', () => ({}))
@@ -58,6 +59,48 @@ it('groups hourly markers and provides hover/click details without drawing a det
   fireEvent.click(fixture.popups.at(-1).element.querySelectorAll('button')[1])
   expect(onSelectHour).toHaveBeenCalledWith('1')
   expect(map.getSource('geosentri-report-route').data.features.some(feature => feature.properties.kind === 'trace')).toBe(false)
+})
+
+it('keeps a neutral history map with no dots when no accepted readings exist', () => {
+  render(<ReportLocationMap historyContext={{ personnelName: 'Officer One' }} hourlyCheckpoints={[]} mapLabel="Personnel duty GPS history map" />)
+  expect(screen.getByLabelText('Personnel duty GPS history map')).toBeTruthy()
+  expect(fixture.maps[0].options.center).toEqual([121.829, 17.3928])
+  expect(fixture.markers).toHaveLength(0)
+})
+it('opens grouped history details and clears the selected marker when the popup closes', () => {
+  const hours = [0, 1].map(hour => ({ hour, from: `2026-11-05T0${hour}:00:00Z`, to: `2026-11-05T0${hour + 1}:00:00Z`,
+    checkpoint: { latitude: 17.42, longitude: 121.77, recorded_at: `2026-11-05T0${hour}:59:00Z`, speed: 0, battery_level: 90 } }))
+  render(<ReportLocationMap historyContext={{ personnelName: 'Officer One' }} hourlyCheckpoints={hours} />)
+  const marker = fixture.markers[0].element
+  fireEvent.click(marker)
+  expect(marker).toHaveAttribute('aria-expanded', 'true')
+  const popup = fixture.popups.at(-1)
+  expect(popup.element.textContent).toContain('2 hourly readings at this location')
+  expect(popup.element.textContent).toContain('90%')
+  act(() => popup.remove())
+  expect(marker).toHaveAttribute('aria-expanded', 'false')
+  expect(marker).not.toHaveClass('is-selected')
+})
+it('lets the user retry an unavailable history map without changing saved readings', () => {
+  render(<ReportLocationMap historyContext={{}} hourlyCheckpoints={[]} />)
+  const map = fixture.maps[0]
+  map.isStyleLoaded = () => false
+  act(() => map.events.error())
+  expect(screen.getByText(/The map could not be loaded/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry map' }))
+  expect(map.styleChanges).toBe(1)
+  expect(screen.queryByText(/The map could not be loaded/)).toBeNull()
+  expect(fixture.markers).toHaveLength(0)
+})
+it('shows structured details on a detailed GPS point hover while keeping report behavior available', () => {
+  render(<ReportLocationMap historyContext={{ personnelName: 'Officer One' }} routePoints={[{ ...samples[0], location_name: 'School', battery_level: 90, speed: 0 }]} />)
+  const map = fixture.maps[0]
+  act(() => map.events['style.load']())
+  const feature = map.getSource('geosentri-report-route').data.features.find(item => item.properties.kind === 'recorded')
+  act(() => map.events['mouseenter:geosentri-report-recorded']({ features: [feature] }))
+  expect(fixture.popups.at(-1).element.textContent).toContain('School')
+  expect(fixture.popups.at(-1).element.textContent).toContain('90%')
+  expect(fixture.popups.at(-1).element.textContent).toContain('0 km/h')
 })
 
 it('cancels delayed map work and listeners when dismissed, and can initialize after reopening', () => {
