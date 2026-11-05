@@ -50,6 +50,23 @@ it('changes only the existing GPS TTL index and safely handles a fresh database'
 	assert.deepEqual(commands, [{ collMod: 'location_history', index: { name: 'recordedAt_1', expireAfterSeconds: 2592000 } }])
 	await ensureRetention({ collection: () => ({ listIndexes: () => ({ toArray: async () => { const error = new Error(); error.code = 26; throw error } }) }) })
 })
+it('recreates only the GPS TTL index when Atlas forbids collMod', async () => {
+	const calls = []
+	const collection = {
+		listIndexes: () => ({ toArray: async () => [{ key: { recordedAt: 1 }, name: 'recordedAt_1', expireAfterSeconds: 86400 }] }),
+		dropIndex: async name => calls.push(['dropIndex', name]),
+		createIndex: async (key, options) => calls.push(['createIndex', key, options]),
+	}
+	const database = {
+		collection: () => collection,
+		command: async () => { const error = new Error('user is not allowed to do action [collMod]'); error.code = 8000; throw error },
+	}
+	await ensureRetention(database)
+	assert.deepEqual(calls, [
+		['dropIndex', 'recordedAt_1'],
+		['createIndex', { recordedAt: 1 }, { name: 'recordedAt_1', expireAfterSeconds: 2592000 }],
+	])
+})
 it('restricts officer duty GPS history to authenticated supervisors', async () => {
 	let calls = 0
 	const app = express()
