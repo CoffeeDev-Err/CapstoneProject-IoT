@@ -82,13 +82,12 @@ it('shows original and append-only corrected evidence separately', async () => {
     .toHaveAttribute('href', '/reports/RPT-EVIDENCE/evidence?correction=0')
 })
 
-it('keeps the location map in the report and links to the separate GPS history view', async () => {
+it('keeps the incident/activity location map without the retired report GPS history link', async () => {
   render(<ReportDetailDrawer report={{ id: 'RPT-ROUTE', title: 'Checkpoint visit', report_type: 'checkpoint',
     officer: 'Officer', description: 'Activity report', latitude: 17.4, longitude: 121.7 }}
   formatDateTime={value => value} onClose={vi.fn()} onDownload={vi.fn()} onValidationChange={vi.fn()} />)
   expect(await screen.findByText('Report map')).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'View GPS history' })).toHaveAttribute('href',
-    expect.stringContaining('/reports/RPT-ROUTE/gps-history'))
+  expect(screen.queryByRole('link', { name: 'View GPS history' })).toBeNull()
   expect(screen.queryByText('GPS display layers')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Estimate road route' })).toBeNull()
 })

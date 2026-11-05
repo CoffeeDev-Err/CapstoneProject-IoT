@@ -48,6 +48,9 @@ const createPersonnelController = ({ io, operationalService, personnelService })
 			await personnelService.getLocationHistory(req.params.personnelId, req.query),
 		)
 	},
+	getDutyGpsHistory: async (req, res) => {
+		res.json(await personnelService.getDutyGpsHistory(req.params.personnelId, req.query))
+	},
 
 	ingestLocation: async (req, res) => {
 		const result = await personnelService.ingestLocation({

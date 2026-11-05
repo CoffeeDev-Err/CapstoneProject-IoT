@@ -63,7 +63,11 @@ export function OfficerDetailSheet({
 
         <View style={[styles.locationRow, { borderTopColor: colors.border }]}>
           <Icon name="place" size={18} color={colors.mapDuty} />
-          <Text style={[styles.locationText, { color: colors.text }]} numberOfLines={2}>{officer.locationName}</Text>
+          <Text style={[styles.locationText, { color: colors.text }]} numberOfLines={2}>{
+            officer.isLocationStale
+              ? `Last known: ${officer.lastKnownLocationName || officer.locationName}`
+              : officer.locationName
+          }</Text>
           {!isSamePersonnelId(officer.id, currentPersonnelId) && (
             <TouchableOpacity
               style={[styles.locateButton, isFollowing && styles.locateButtonFollowing]}

@@ -73,7 +73,8 @@ export const buildReportRouteTrace = (points = []) => {
     if (previous) {
       const elapsed = time - Date.parse(previous.recorded_at)
       const distance = routeDistanceMeters(previous, point)
-      if (elapsed <= 0 || elapsed > MAX_GAP_MS || distance / (elapsed / 1000) > MAX_SPEED_METERS_PER_SECOND) finishSegment()
+      if (elapsed <= 0 || elapsed > MAX_GAP_MS || distance / (elapsed / 1000) > MAX_SPEED_METERS_PER_SECOND
+        || (previous.device_assignment_id && point.device_assignment_id && previous.device_assignment_id !== point.device_assignment_id)) finishSegment()
     }
     if (anchor) {
       const distance = routeDistanceMeters(anchor, point)

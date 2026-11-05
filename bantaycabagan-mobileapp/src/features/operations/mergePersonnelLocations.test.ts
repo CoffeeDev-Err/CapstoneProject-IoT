@@ -32,5 +32,15 @@ it('does not retain removed officers or expose a fresh fix after duty ends', () 
 it('does not keep old readings artificially fresh', () => {
   const [result] = mergePersonnelLocations([latest], [older], now + 180_000);
   expect(result.isLocationStale).toBe(true);
-  expect(result.isVisibleOnMap).toBe(false);
+  expect(result.isVisibleOnMap).toBe(true);
+  expect(result.latitude).toBe(latest.latitude);
+  expect(result.locationRecordedAt).toBe(latest.locationRecordedAt);
+  expect(result.locationAgeSeconds).toBe(190);
+  expect(result.lastKnownLocationName).toBe('Current place');
+});
+
+it('resumes with the newest measurement after sleep without preserving the stale position', () => {
+  const [stale] = mergePersonnelLocations([latest], [older], now + 600_000);
+  const fresh = { ...latest, latitude: 17.425, locationRecordedAt: new Date(now + 600_000).toISOString() };
+  expect(mergePersonnelLocations([stale], [fresh], now + 600_000)).toEqual([fresh]);
 });

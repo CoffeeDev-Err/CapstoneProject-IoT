@@ -84,6 +84,10 @@ currentLocationSchema.index({ recordedAt: -1 })
 const locationHistorySchema = new mongoose.Schema({
 	personnelId: { type: String, required: true },
 	deviceAssignmentId: String,
+	deploymentId: String,
+	duty: mongoose.Schema.Types.Mixed,
+	locationName: String,
+	batteryLevel: Number,
 	location: { type: pointSchema, required: true },
 	accuracy: { type: Number, min: 0.1, max: 5000 },
 	positionValid: Boolean,
@@ -98,7 +102,22 @@ const locationHistorySchema = new mongoose.Schema({
 	timestamps: false,
 })
 locationHistorySchema.index({ personnelId: 1, recordedAt: -1 })
-locationHistorySchema.index({ recordedAt: 1 }, { expireAfterSeconds: 86400 })
+locationHistorySchema.index({ recordedAt: 1 }, { expireAfterSeconds: 30 * 86400 })
+locationHistorySchema.index({ personnelId: 1, deploymentId: 1, recordedAt: 1 })
+
+// One durable checkpoint per deployment hour. The original measurement time
+// controls expiry, so sleeping/offline devices never acquire a fresh timestamp.
+const dutyGpsHourSchema = new mongoose.Schema({
+	personnelId: { type: String, required: true },
+	deploymentId: { type: String, required: true },
+	hour: { type: Number, required: true },
+	duty: { type: mongoose.Schema.Types.Mixed, required: true },
+	checkpoint: { type: mongoose.Schema.Types.Mixed, required: true },
+	recordedAt: { type: Date, required: true },
+}, { collection: 'duty_gps_hours', timestamps: false })
+dutyGpsHourSchema.index({ personnelId: 1, deploymentId: 1, hour: 1 }, { unique: true })
+dutyGpsHourSchema.index({ personnelId: 1, recordedAt: -1 })
+dutyGpsHourSchema.index({ recordedAt: 1 }, { expireAfterSeconds: 30 * 86400 })
 
 const barangaySchema = new mongoose.Schema({
 	code: { type: String, required: true, trim: true, uppercase: true },
@@ -121,5 +140,6 @@ module.exports = {
 	GpsDeviceAssignment: model('GpsDeviceAssignment', gpsDeviceAssignmentSchema),
 	CurrentLocation: model('CurrentLocation', currentLocationSchema),
 	LocationHistory: model('LocationHistory', locationHistorySchema),
+	DutyGpsHour: model('DutyGpsHour', dutyGpsHourSchema),
 	Barangay: model('Barangay', barangaySchema),
 }

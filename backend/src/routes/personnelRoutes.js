@@ -21,6 +21,7 @@ const createPersonnelRoutes = ({ authService, controller }) => {
 	router.get('/:personnelId', ...operationalRead, asyncHandler(controller.getPersonnelMember))
 	router.patch('/:personnelId/status', ...supervisorOnly, asyncHandler(controller.updateDutyStatus))
 	router.get('/:personnelId/location-history', ...supervisorOnly, asyncHandler(controller.getLocationHistory))
+	router.get('/:personnelId/gps-history', ...supervisorOnly, asyncHandler(controller.getDutyGpsHistory))
 
 	return router
 }

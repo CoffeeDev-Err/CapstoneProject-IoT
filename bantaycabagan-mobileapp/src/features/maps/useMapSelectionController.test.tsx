@@ -51,3 +51,22 @@ it('stages a safe marker transition when returning from another officer to the c
   await act(async () => jest.runOnlyPendingTimers());
   expect(focusOfficer).toHaveBeenLastCalledWith(current.id);
 });
+
+it('allows selecting and locating a stale last known position', async () => {
+  const current = { ...member('current', 17.42), isLocationStale: true };
+  const view = await renderHook(() => useMapSelectionController({
+    currentPersonnelId: current.id,
+    mapMode: 'street', mapPersonnel: [current] as OfficerMapPerson[],
+    onMapInteractionEnd: jest.fn(), onMapInteractionStart: jest.fn(),
+    visiblePersonnel: [current],
+  }));
+  const focusOfficer = jest.fn();
+  view.result.current.nativeMapRef.current = {
+    fitPersonnel: jest.fn(), focusDeployment: jest.fn(), focusOfficer,
+  } as OfficerMapCanvasHandle;
+  await act(async () => view.result.current.setSelectedOfficerId(current.id));
+  expect(view.result.current.selectedOfficer?.id).toBe(current.id);
+  await act(async () => { expect(view.result.current.focusCurrentOfficer()).toBe(true); });
+  await act(async () => jest.runOnlyPendingTimers());
+  expect(focusOfficer).toHaveBeenCalledWith(current.id);
+});

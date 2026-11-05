@@ -120,7 +120,8 @@ export default function OfficerMapScreen({
   const { assignment, refreshClock } = useCurrentDeployment(deployments);
   const deploymentStyleLabel = assignment?.deploymentType === 'point'
     ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
-    : assignment?.deploymentType === 'route' ? 'Route patrol' : 'Area patrol';
+    : assignment?.deploymentType === 'route'
+      ? `Route patrol${assignment.patrolMode ? ` · ${{ walk: 'Walk', car: 'Car', motorcycle: 'Motorcycle' }[assignment.patrolMode]}` : ''}` : 'Area patrol';
   const canRequestBackup = Boolean(assignment);
   const deploymentPromptVisible = Boolean(assignment && !assignment.acknowledged);
   const overlayTranslateY = headerVisibility?.interpolate({
@@ -297,7 +298,6 @@ export default function OfficerMapScreen({
   const canLocateCurrentOfficer = visiblePersonnel.some((member) => (
     isSamePersonnelId(member.id, currentPersonnelId)
     && member.isVisibleOnMap !== false
-    && member.isLocationStale !== true
     && Number.isFinite(member.latitude)
     && Number.isFinite(member.longitude)
   ));

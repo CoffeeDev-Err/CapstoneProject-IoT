@@ -30,6 +30,7 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 	const freshness = getLocationFreshness({
 		recordedAt: currentLocation?.recordedAt || currentLocation?.updatedAt,
 		source: currentLocation?.source,
+		now: clock(),
 	})
 	const hasCurrentLocation = hasCoordinates && !freshness.isLocationStale
 	const localLocationName = hasCoordinates
@@ -50,7 +51,9 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 		longitude: hasCoordinates ? coordinates[0] : null,
 		status: isOnDuty ? 'On Duty' : 'Off Duty',
 		isOnDuty,
-		isVisibleOnMap: isOnDuty && hasCurrentLocation,
+		// Visibility is separate from freshness: keep the last known position
+		// clickable during a tracker sleep/outage without refreshing its age.
+		isVisibleOnMap: isOnDuty && hasCoordinates,
 		...(options.includePrivateDetails !== false && {
 			mobileNumber: profile.mobileNumber,
 		}),

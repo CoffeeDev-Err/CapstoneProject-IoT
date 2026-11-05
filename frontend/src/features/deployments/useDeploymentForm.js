@@ -95,6 +95,7 @@ export function useDeploymentForm({
       && hasValidPersonnelSelection
       && hasPatrolArea
       && hasValidDeploymentPoint
+      && (assignmentForm.deploymentType !== 'route' || ['walk', 'car', 'motorcycle'].includes(assignmentForm.patrolMode))
       && hasValidShiftStart
       && hasValidShiftEnd
       && isWithinMaximumDuration
@@ -139,6 +140,8 @@ export function useDeploymentForm({
     editingAssignmentId && hasSelectedPersonnel && selectedPersonnelMembers.length !== 1
       ? 'Select exactly one personnel member when editing an individual deployment.' : '',
     !hasPatrolArea ? 'Select a patrol area.' : '',
+    assignmentForm.deploymentType === 'route' && !assignmentForm.patrolMode
+      ? 'Choose Walk, Car, or Motorcycle Patrol.' : '',
     assignmentForm.deploymentType === 'point' && !hasDeploymentPoint
       ? 'Set the fixed deployment point on the map.' : '',
     assignmentForm.deploymentType === 'point' && !assignmentForm.deploymentPointLabel.trim()

@@ -14,6 +14,7 @@ const deploymentSchema = new mongoose.Schema({
 	patrolAreaId: { type: String, trim: true, lowercase: true, maxlength: OPERATIONAL_LIMITS.deploymentArea },
 	patrolArea: { type: String, required: true, maxlength: OPERATIONAL_LIMITS.deploymentArea },
 	deploymentType: { type: String, enum: ['area', 'point', 'route'], default: 'area' },
+	patrolMode: { type: String, enum: ['', 'walk', 'car', 'motorcycle'], default: '' },
 	deploymentPointLabel: { type: String, default: '', maxlength: OPERATIONAL_LIMITS.locationName },
 	shiftStart: Date,
 	shiftEnd: Date,

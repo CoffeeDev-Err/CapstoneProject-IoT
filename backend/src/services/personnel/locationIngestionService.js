@@ -6,6 +6,8 @@ const {
 	validateText,
 } = require('../../utils/operationalValidation')
 const { getLocationFreshness } = require('../../utils/locationFreshness')
+const createGpsFixGuard = require('./gpsFixGuard')
+const { snapshotDuty } = require('./dutyGpsHistoryService')
 
 // Save every accepted GPS fix. Sampling applies only to simulated readings.
 const MOCK_HISTORY_SAMPLE_INTERVAL_MS = 30_000
@@ -14,6 +16,7 @@ const createLocationIngestionService = ({
 	models,
 	currentShiftFilter,
 	serializePersonnel,
+	dutyHistoryService,
 	clock = () => new Date(),
 }) => {
 	const {
@@ -23,6 +26,7 @@ const createLocationIngestionService = ({
 		LocationHistory,
 		Personnel,
 	} = models
+	const gpsFixGuard = createGpsFixGuard({ clock: () => clock().getTime() })
 
 const ingestLocation = async (payload = {}) => {
 	const imei = String(payload.imei || '').trim()
@@ -53,7 +57,8 @@ const ingestLocation = async (payload = {}) => {
 
 	const [profile, activeDeployment] = await Promise.all([
 		Personnel.findOne({ personnelId, status: 'active' }).lean(),
-		Deployment.findOne(currentShiftFilter(clock(), { personnelId })).select('_id').lean(),
+		Deployment.findOne(currentShiftFilter(clock(), { personnelId }))
+			.select('_id assignmentId personnelId personnelName rank deploymentType patrolMode patrolArea shiftStart shiftEnd').lean(),
 	])
 	if (!profile) {
 		const error = new Error('Active personnel profile not found.')
@@ -133,6 +138,7 @@ const ingestLocation = async (payload = {}) => {
 	})
 	const current = await CurrentLocation.findOne({ personnelId })
 	if (source === 'gps' && !activeDeployment) {
+		gpsFixGuard.clear(personnelId)
 		return {
 			personnel: serializePersonnel(profile, current, { isOnDuty: false }),
 			accepted: false,
@@ -141,6 +147,7 @@ const ingestLocation = async (payload = {}) => {
 		}
 	}
 	if (source === 'gps' && positionValid === false) {
+		gpsFixGuard.clear(personnelId)
 		return {
 			personnel: serializePersonnel(profile, current, { isOnDuty: true }),
 			accepted: false,
@@ -194,6 +201,25 @@ const ingestLocation = async (payload = {}) => {
 		}
 	}
 
+	if (source === 'gps') {
+		const rejectionReason = gpsFixGuard.check({
+			personnelId,
+			assignmentId: assignment.assignmentId,
+			current,
+			fix: { coordinates: [longitude, latitude], recordedAt, speed, accuracy, satellites },
+		})
+		if (rejectionReason) {
+			return {
+				personnel: serializePersonnel(profile, current, { isOnDuty: true }),
+				accepted: false,
+				reason: rejectionReason,
+				historySampled: false,
+			}
+		}
+	} else {
+		gpsFixGuard.clear(personnelId)
+	}
+
 	const movementThreshold = Math.max(5, Number(process.env.MOVEMENT_THRESHOLD_METERS) || 20)
 	const hasMoved = !current
 		|| current.source !== source
@@ -242,9 +268,17 @@ const ingestLocation = async (payload = {}) => {
 	const shouldSample = source === 'gps' || !latestHistory?.recordedAt
 		|| recordedAt.getTime() - latestHistory.recordedAt.getTime() >= MOCK_HISTORY_SAMPLE_INTERVAL_MS
 	if (shouldSample) {
-		await LocationHistory.create({
+		const sample = {
 			personnelId,
 			deviceAssignmentId: assignment?.assignmentId,
+			...(source === 'gps' && activeDeployment?.assignmentId && {
+				deploymentId: activeDeployment.assignmentId,
+				duty: snapshotDuty(activeDeployment, profile),
+			}),
+			// Use only a name supplied for this fix; never attach an old place name
+			// to newly moved coordinates in historical evidence.
+			locationName: submittedLocationName || '',
+			batteryLevel,
 			location: nextLocation.location,
 			accuracy: nextLocation.accuracy,
 			positionValid: nextLocation.positionValid,
@@ -254,7 +288,15 @@ const ingestLocation = async (payload = {}) => {
 			source,
 			isSimulated: source === 'mock',
 			recordedAt,
-		})
+		}
+		await LocationHistory.create(sample)
+		if (source === 'gps' && dutyHistoryService) {
+			try { await dutyHistoryService.saveCheckpoint(sample) } catch (error) {
+				// The accepted raw fix is durable. Reading history repairs this summary;
+				// a summary failure must not suppress live location broadcasts.
+				console.error('Hourly GPS checkpoint pending repair:', error.message)
+			}
+		}
 	}
 
 	return {

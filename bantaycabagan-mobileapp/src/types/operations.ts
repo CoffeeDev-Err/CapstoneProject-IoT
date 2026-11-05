@@ -124,6 +124,7 @@ export type DeploymentAssignment = {
   patrolAreaId?: string;
   patrolArea: string;
   deploymentType?: 'area' | 'point' | 'route';
+  patrolMode?: '' | 'walk' | 'car' | 'motorcycle';
   coverageBarangays?: string[];
   deploymentPointLabel?: string;
   hasDeploymentPoint?: boolean;

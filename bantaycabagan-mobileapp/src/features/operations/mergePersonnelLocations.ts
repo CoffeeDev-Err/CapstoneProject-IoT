@@ -22,7 +22,7 @@ export function mergePersonnelLocations(previous: LivePersonnel[], incoming: Liv
       locationReceivedAt: latest.locationReceivedAt,
       lastUpdated: latest.lastUpdated,
       locationName: stale ? 'GPS location unavailable' : latest.locationName,
-      lastKnownLocationName: latest.lastKnownLocationName,
+      lastKnownLocationName: latest.lastKnownLocationName || latest.locationName,
       speed: latest.speed,
       accuracy: latest.accuracy,
       satellites: latest.satellites,
@@ -30,7 +30,7 @@ export function mergePersonnelLocations(previous: LivePersonnel[], incoming: Liv
       isLocationStale: stale,
       locationAgeSeconds: age,
       locationStatus: !hasCoordinates ? 'unavailable' : stale ? 'stale' : 'current',
-      isVisibleOnMap: member.isOnDuty === true && hasCoordinates && !stale,
+      isVisibleOnMap: member.isOnDuty === true && hasCoordinates,
     } as LivePersonnel;
   });
 }

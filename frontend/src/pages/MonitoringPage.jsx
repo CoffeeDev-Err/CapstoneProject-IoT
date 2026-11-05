@@ -167,7 +167,7 @@ function MonitoringPage() {
     }
 
     if (
-      member.isLocationStale === true
+      member.isVisibleOnMap === false
       || !Number.isFinite(member.latitude)
       || !Number.isFinite(member.longitude)
     ) {

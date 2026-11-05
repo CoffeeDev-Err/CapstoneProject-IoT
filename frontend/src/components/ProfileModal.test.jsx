@@ -1,8 +1,23 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProfileModal from './ProfileModal'
 
 afterEach(cleanup)
+
+it('allows locating an on-duty officer at a stale last known position', () => {
+  const locate = vi.fn()
+  render(<ProfileModal selectedPersonnel={{
+    id: 'P-1', name: 'Officer One', locationName: 'GPS location unavailable',
+    lastKnownLocationName: 'Last patrol location', isLocationStale: true, isVisibleOnMap: true,
+    latitude: 17.42, longitude: 121.77, locationRecordedAt: new Date(Date.now() - 600_000).toISOString(),
+  }} onClose={vi.fn()} onLocate={locate} />)
+  expect(screen.getByText('Last known location')).toBeInTheDocument()
+  expect(screen.getByText('Last patrol location')).toBeInTheDocument()
+  const button = screen.getByRole('button', { name: 'Locate personnel on map' })
+  expect(button).toBeEnabled()
+  fireEvent.click(button)
+  expect(locate).toHaveBeenCalledOnce()
+})
 
 describe('ProfileModal backup context', () => {
   it('shows the request location separately from the officer current location', () => {

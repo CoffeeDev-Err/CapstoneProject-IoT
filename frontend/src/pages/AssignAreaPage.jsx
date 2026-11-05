@@ -419,6 +419,7 @@ function AssignAreaPage({ view = 'form' }) {
       patrolAreaId: selectedPatrolArea.id,
       patrolArea: selectedPatrolArea.name,
       deploymentType: assignmentForm.deploymentType,
+      patrolMode: assignmentForm.deploymentType === 'route' ? assignmentForm.patrolMode : '',
       coverageBarangays: selectedPatrolArea.coverageBarangays,
       deploymentPointLabel: includesDeploymentPoint ? assignmentForm.deploymentPointLabel.trim() : '',
       latitude: includesDeploymentPoint ? Number(assignmentForm.latitude) : null,
@@ -562,6 +563,7 @@ function AssignAreaPage({ view = 'form' }) {
       patrolAreaId: area.id,
       patrolArea: area.name,
       deploymentType: area.defaultDeploymentType,
+      patrolMode: '',
       coverageBarangays: area.coverageBarangays,
       deploymentPointLabel: '',
       latitude: null,
@@ -575,6 +577,7 @@ function AssignAreaPage({ view = 'form' }) {
     setAssignmentForm((previous) => ({
       ...previous,
       deploymentType,
+      patrolMode: deploymentType === 'route' ? previous.patrolMode : '',
       ...(deploymentType === 'area' && {
         deploymentPointLabel: '',
         latitude: null,
@@ -869,6 +872,18 @@ function AssignAreaPage({ view = 'form' }) {
                   <span><strong>Route patrol</strong><small>Patrol the selected road or route</small></span>
                 </button>
               </div>
+
+              {assignmentForm.deploymentType === 'route' && <fieldset className="assignment-style-summary">
+                <legend>Route patrol mode (required)</legend>
+                <div className="d-flex flex-wrap gap-3">
+                  {[['walk', 'Walk Patrol'], ['car', 'Car Patrol'], ['motorcycle', 'Motorcycle Patrol']].map(([value, label]) => (
+                    <label key={value} className="d-flex align-items-center gap-2">
+                      <input type="radio" name="patrolMode" value={value} checked={assignmentForm.patrolMode === value}
+                        onChange={handleFormChange('patrolMode')} />{label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>}
 
               {assignmentForm.deploymentType === 'area' ? (
                 <div className="assignment-style-summary">

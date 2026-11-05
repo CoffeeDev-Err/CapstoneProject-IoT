@@ -44,6 +44,22 @@ const samples = [
   { latitude: 17.4003, longitude: 121.7004, accuracy: 4, recorded_at: '2026-10-06T06:00:20Z' },
 ]
 
+it('groups hourly markers and provides hover/click details without drawing a detailed route', () => {
+  const onSelectHour = vi.fn()
+  const hours = [0, 1].map(hour => ({ hour, from: `2026-11-05T0${hour}:00:00Z`, to: `2026-11-05T0${hour + 1}:00:00Z`,
+    checkpoint: { latitude: 17.42, longitude: 121.77, recorded_at: `2026-11-05T0${hour}:59:00Z`, speed: 0 } }))
+  render(<ReportLocationMap hourlyCheckpoints={hours} onSelectHour={onSelectHour} />)
+  const map = fixture.maps[0]
+  act(() => map.events['style.load']())
+  expect(fixture.markers).toHaveLength(1)
+  expect(fixture.markers[0].element.textContent).toBe('1, 2')
+  fireEvent.mouseEnter(fixture.markers[0].element)
+  expect(fixture.popups.at(-1).element.textContent).toContain('Hour 2')
+  fireEvent.click(fixture.popups.at(-1).element.querySelectorAll('button')[1])
+  expect(onSelectHour).toHaveBeenCalledWith('1')
+  expect(map.getSource('geosentri-report-route').data.features.some(feature => feature.properties.kind === 'trace')).toBe(false)
+})
+
 it('cancels delayed map work and listeners when dismissed, and can initialize after reopening', () => {
   vi.useFakeTimers()
   const incident = { latitude: 17.4, longitude: 121.7 }

@@ -89,7 +89,8 @@ export function UpcomingShiftCard({
                   <Text style={[styles.shiftDetailValue, isDark && darkStyles.muted]} numberOfLines={2}>
                     {upcomingDeployment.deploymentType === 'point'
                       ? `Fixed post${upcomingDeployment.deploymentPointLabel ? ` · ${upcomingDeployment.deploymentPointLabel}` : ''}`
-                      : upcomingDeployment.deploymentType === 'route' ? 'Route patrol' : 'Area patrol'}
+                      : upcomingDeployment.deploymentType === 'route'
+                        ? `Route patrol${upcomingDeployment.patrolMode ? ` · ${{ walk: 'Walk', car: 'Car', motorcycle: 'Motorcycle' }[upcomingDeployment.patrolMode]}` : ''}` : 'Area patrol'}
                   </Text>
                 </View>
               </View>

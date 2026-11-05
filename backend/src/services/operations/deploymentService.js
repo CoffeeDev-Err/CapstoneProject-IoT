@@ -71,6 +71,10 @@ const normalizeDeploymentConfiguration = (assignment) => {
 	if (deploymentType === 'route' && patrolArea.category !== 'route') {
 		throw createValidationError('Route patrol requires a road or route patrol area.', 'deploymentType')
 	}
+	const patrolMode = deploymentType === 'route' ? String(assignment.patrolMode || '').trim().toLowerCase() : ''
+	if (patrolMode && !['walk', 'car', 'motorcycle'].includes(patrolMode)) {
+		throw createValidationError('Choose Walk, Car, or Motorcycle Patrol.', 'patrolMode')
+	}
 	const hasLatitude = assignment.latitude !== null
 		&& assignment.latitude !== undefined && assignment.latitude !== ''
 	const hasLongitude = assignment.longitude !== null
@@ -100,6 +104,7 @@ const normalizeDeploymentConfiguration = (assignment) => {
 		patrolAreaId: patrolArea.id,
 		patrolArea: patrolArea.name,
 		deploymentType,
+		patrolMode,
 		coverageBarangayCodes: patrolArea.coverageBarangayCodes,
 		deploymentPointLabel,
 		latitude,
@@ -606,6 +611,16 @@ const createDeploymentService = ({
 		const previousById = new Map(
 			previousDeployments.map((deployment) => [deployment.assignmentId, deployment]),
 		)
+		for (const assignment of normalizedAssignments) {
+			if (assignment.deploymentType !== 'route' || assignment.patrolMode) continue
+			const previous = previousById.get(assignment.id)
+			if (previous?.deploymentType === 'route') {
+				// Keep older deployments readable and unchanged in a batch save.
+				assignment.patrolMode = previous.patrolMode || ''
+			} else {
+				throw createValidationError('Choose Walk, Car, or Motorcycle Patrol for route patrol.', 'patrolMode')
+			}
+		}
 
 		if (normalizedAssignments.length > 0) {
 			await Deployment.bulkWrite(normalizedAssignments.map((assignment) => {
@@ -622,6 +637,7 @@ const createDeploymentService = ({
 					patrolAreaId: assignment.patrolAreaId,
 					patrolArea: assignment.patrolArea,
 					deploymentType: assignment.deploymentType,
+					patrolMode: assignment.patrolMode,
 					deploymentPointLabel: assignment.deploymentPointLabel,
 					shiftStart: assignment.shiftStart,
 					shiftEnd: assignment.shiftEnd,

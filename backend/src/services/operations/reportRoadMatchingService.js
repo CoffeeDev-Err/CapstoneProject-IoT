@@ -26,7 +26,8 @@ const prepareSegments = points => {
 		if (previous) {
 			const elapsed = time - Date.parse(previous.recorded_at)
 			if (elapsed < 1000 || elapsed > 60_000
-				|| distanceInMeters(coordinates(previous), coordinates(point)) / (elapsed / 1000) > 55) finish()
+				|| distanceInMeters(coordinates(previous), coordinates(point)) / (elapsed / 1000) > 55
+				|| (previous.device_assignment_id && point.device_assignment_id && previous.device_assignment_id !== point.device_assignment_id)) finish()
 		}
 		if (anchor) {
 			const stationary = numberOrNull(anchor.speed) === 0 && numberOrNull(point.speed) === 0

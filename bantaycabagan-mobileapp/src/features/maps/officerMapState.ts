@@ -20,12 +20,14 @@ export const selectVisiblePersonnel = (
   if (personnel.length) {
     return personnel.filter((member) => (
       member.isVisibleOnMap !== false
-      && member.isLocationStale !== true
+      && member.isOnDuty !== false
       && Number.isFinite(member.latitude)
       && Number.isFinite(member.longitude)
     ));
   }
-  return currentPersonnelId && currentOfficer.isVisibleOnMap !== false ? [currentOfficer] : [];
+  return currentPersonnelId && currentOfficer.isVisibleOnMap !== false
+    && Number.isFinite(currentOfficer.latitude) && Number.isFinite(currentOfficer.longitude)
+    ? [currentOfficer] : [];
 };
 
 export const selectEmergencyPersonnelIds = (tasks: OperationalTask[]) => new Set(

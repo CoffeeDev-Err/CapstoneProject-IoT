@@ -44,8 +44,8 @@ function ProfileModal({
 
   if (!selectedPersonnel) return null
 
-  const hasCurrentLocation = !selectedPersonnel.isLocationStale
-    && selectedPersonnel.isVisibleOnMap !== false
+  const hasMapLocation = selectedPersonnel.isVisibleOnMap !== false
+    && Number.isFinite(selectedPersonnel.latitude) && Number.isFinite(selectedPersonnel.longitude)
   const speed = Number.isFinite(selectedPersonnel.speed)
     ? `${selectedPersonnel.speed.toFixed(1)} km/h`
     : 'Unavailable'
@@ -100,19 +100,18 @@ function ProfileModal({
         <div className="profile-map-card__location">
           <MapPin size={17} aria-hidden="true" />
           <div>
-            <span>{selectedTask ? 'Current officer location' : 'Last confirmed location'}</span>
-            <strong>{selectedPersonnel.locationName || 'Location unavailable'}</strong>
-            {selectedPersonnel.isLocationStale && selectedPersonnel.lastKnownLocationName && (
-              <small>Last known: {selectedPersonnel.lastKnownLocationName}</small>
-            )}
+            <span>{selectedPersonnel.isLocationStale ? 'Last known location' : (selectedTask ? 'Current officer location' : 'Last confirmed location')}</span>
+            <strong>{(selectedPersonnel.isLocationStale
+              ? selectedPersonnel.lastKnownLocationName || selectedPersonnel.locationName
+              : selectedPersonnel.locationName) || 'Location unavailable'}</strong>
           </div>
           <button
             type="button"
             className="profile-map-card__locate"
             onClick={onLocate}
-            disabled={!hasCurrentLocation}
+            disabled={!hasMapLocation}
             aria-label="Locate personnel on map"
-            title={hasCurrentLocation ? 'Locate on map' : 'Waiting for a current GPS fix'}
+            title={hasMapLocation ? 'Locate on map' : 'Waiting for a GPS location'}
           >
             <LocateFixed size={17} aria-hidden="true" />
             <span>Locate</span>

@@ -5,6 +5,18 @@ const { deploymentNoticeSignature } = require('../src/services/operations/domain
 const { formatDeploymentNotificationMessage, normalizeDeploymentConfiguration } = createDeploymentService
 
 describe('deployment configuration', () => {
+	it('validates route modes, clears non-route modes and changes notice/acknowledgement signatures', () => {
+		const route = { patrolAreaId: 'cabagan-santa-maria-road', deploymentType: 'route' }
+		for (const patrolMode of ['walk', 'car', 'motorcycle']) {
+			assert.equal(normalizeDeploymentConfiguration({ ...route, patrolMode }).patrolMode, patrolMode)
+		}
+		assert.throws(() => normalizeDeploymentConfiguration({ ...route, patrolMode: 'aircraft' }), /Walk, Car, or Motorcycle/)
+		assert.equal(normalizeDeploymentConfiguration({ patrolAreaId: 'barangay-magassi', deploymentType: 'area', patrolMode: 'car' }).patrolMode, '')
+		assert.notEqual(deploymentNoticeSignature({ ...route, patrolMode: 'car' }), deploymentNoticeSignature({ ...route, patrolMode: 'walk' }))
+		const { deploymentSignature } = require('../src/services/operations/domain')
+		assert.notEqual(deploymentSignature({ ...route, patrolMode: 'car' }), deploymentSignature({ ...route, patrolMode: 'walk' }))
+		assert.equal(deploymentSignature(route), deploymentSignature({ ...route, patrolMode: '' }))
+	})
 	it('allows a barangay-wide patrol without an exact point', () => {
 		assert.deepEqual(
 			normalizeDeploymentConfiguration({
@@ -16,6 +28,7 @@ describe('deployment configuration', () => {
 				patrolArea: 'Barangay Magassi',
 				deploymentType: 'area',
 				coverageBarangayCodes: ['MAGASSI'],
+				patrolMode: '',
 				deploymentPointLabel: '',
 				latitude: null,
 				longitude: null,

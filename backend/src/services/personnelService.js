@@ -3,6 +3,7 @@ const {
 	Deployment,
 	GpsDeviceAssignment,
 	LocationHistory,
+	DutyGpsHour,
 	Personnel,
 } = require('../models')
 const { createNotification, deliverNotification } = require('./notificationService')
@@ -10,6 +11,11 @@ const createLocationIngestionService = require('./personnel/locationIngestionSer
 const createMockMovementService = require('./personnel/mockMovementService')
 const createPersonnelLifecycleService = require('./personnel/lifecycleService')
 const createPersonnelQueryService = require('./personnel/queryService')
+const createDutyGpsHistoryService = require('./personnel/dutyGpsHistoryService')
+
+const dutyHistoryService = createDutyGpsHistoryService({
+	models: { Deployment, DutyGpsHour, LocationHistory, Personnel },
+})
 
 const queryService = createPersonnelQueryService({
 	models: { CurrentLocation, Deployment, LocationHistory, Personnel },
@@ -35,6 +41,7 @@ const { ingestLocation } = createLocationIngestionService({
 	},
 	currentShiftFilter,
 	serializePersonnel,
+	dutyHistoryService,
 })
 const {
 	evaluatePersonnelBattery,
@@ -52,6 +59,7 @@ const { updateMockLocations } = createMockMovementService({
 })
 
 module.exports = {
+	getDutyGpsHistory: dutyHistoryService.getHistory,
 	emitPersonnelCollection,
 	evaluatePersonnelBattery,
 	evaluatePersonnelGeofences,

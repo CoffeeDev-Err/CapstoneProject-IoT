@@ -23,6 +23,11 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Personnel roster', () => {
+  it('opens saved GPS history for an off-duty officer independently of live-map access', () => {
+    render(<PersonnelPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'View GPS history for Ben Reyes' }))
+    expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith('/personnel/p-002/gps-history')
+  })
   it('groups officer initials, name, and badge and keeps the five column headings', () => {
     render(<PersonnelPage />)
     const table = screen.getByRole('table', { name: 'Registered personnel' })

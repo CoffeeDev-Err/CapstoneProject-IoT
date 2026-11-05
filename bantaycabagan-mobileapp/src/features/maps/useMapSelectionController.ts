@@ -175,7 +175,6 @@ export function useMapSelectionController({
     const current = visiblePersonnel.find((member) => isSamePersonnelId(member.id, currentPersonnelId));
     if (!current
       || current.isVisibleOnMap === false
-      || current.isLocationStale === true
       || !Number.isFinite(current.latitude)
       || !Number.isFinite(current.longitude)) return false;
     setSelectedOfficerId(null);

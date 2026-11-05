@@ -21,7 +21,7 @@ export const routeLoaders = {
   map: createRouteLoader(() => import('../pages/MonitoringPage')),
   personnel: createRouteLoader(() => import('../pages/PersonnelPage')),
   reports: createRouteLoader(() => import('../pages/ReportsPage')),
-  gpsHistory: createRouteLoader(() => import('../pages/ReportGpsHistoryPage')),
+  gpsHistory: createRouteLoader(() => import('../pages/PersonnelGpsHistoryPage')),
   settings: createRouteLoader(() => import('../pages/SettingsPage')),
 }
 

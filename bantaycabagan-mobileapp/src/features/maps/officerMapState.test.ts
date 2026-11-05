@@ -10,12 +10,24 @@ describe('officer map selectors', () => {
     expect(isSamePersonnelId(' PNP-001 ', 'pnp-001')).toBe(true);
     expect(isSamePersonnelId('PNP-001', 'PNP-002')).toBe(false);
   });
-  it('filters stale and invalid positions', () => {
+  it('keeps stale last known positions while filtering invalid, hidden and off-duty records', () => {
     const visible = selectVisiblePersonnel([
       { id: 'current', latitude: 17.4, longitude: 121.7 } as never,
       { id: 'stale', latitude: 17.4, longitude: 121.7, isLocationStale: true } as never,
+      { id: 'missing', latitude: null, longitude: null } as never,
+      { id: 'hidden', latitude: 17.4, longitude: 121.7, isVisibleOnMap: false } as never,
+      { id: 'off-duty', latitude: 17.4, longitude: 121.7, isOnDuty: false } as never,
     ], 'current', { isOnDuty: true } as never);
-    expect(visible.map(({ id }) => id)).toEqual(['current']);
+    expect(visible.map(({ id }) => id)).toEqual(['current', 'stale']);
+  });
+
+  it('keeps the current officer fallback only when last known coordinates exist', () => {
+    expect(selectVisiblePersonnel([], 'P-1', {
+      id: 'P-1', isOnDuty: true, isLocationStale: true, latitude: 17.4, longitude: 121.7,
+    } as never)).toHaveLength(1);
+    expect(selectVisiblePersonnel([], 'P-1', {
+      id: 'P-1', isOnDuty: true, latitude: null, longitude: null,
+    } as never)).toEqual([]);
   });
 
   it('does not render personnel locations for an off-duty officer', () => {

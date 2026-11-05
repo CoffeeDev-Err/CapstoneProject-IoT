@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, Download, Maximize2, Route, XCircle } from 'lucide-react'
+import { CheckCircle2, Download, Maximize2, XCircle } from 'lucide-react'
 import { getEvidenceViewerPath, resolveMediaUrl } from '../utils/mediaUrls'
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog'
 import DeferredReportMap from './DeferredReportMap'
@@ -101,10 +101,6 @@ function ReportDrawerContent({
   const openStreetMapUrl = hasCoordinates
     ? `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=18/${report.latitude}/${report.longitude}`
     : ''
-
-  const backParams = new URLSearchParams(window.location.pathname === '/reports' ? window.location.search : '')
-  backParams.set('report', report.id)
-  const gpsHistoryPath = `/reports/${encodeURIComponent(report.id)}/gps-history?back=${encodeURIComponent(`/reports?${backParams}`)}`
 
   return createPortal(
     <div className={`report-drawer-backdrop${isClosing ? ' is-closing' : ''}`} role="presentation" onClick={onClose}>
@@ -276,7 +272,6 @@ function ReportDrawerContent({
               <h4>{report.is_incident ? 'Incident map' : 'Activity map'}</h4>
               <div className="report-detail-section__actions">
                 {openStreetMapUrl && <a href={openStreetMapUrl} target="_blank" rel="noreferrer">Open full map</a>}
-                <a href={gpsHistoryPath}><Route aria-hidden="true" />View GPS history</a>
               </div>
             </div>
               <DeferredReportMap

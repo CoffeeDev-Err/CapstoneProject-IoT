@@ -182,7 +182,8 @@ function DeploymentList({
                         <small className="assignment-personnel-rank">
                           {assignment.deploymentType === 'point'
                             ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
-                            : assignment.deploymentType === 'route' ? 'Route patrol' : 'Area patrol'}
+                            : assignment.deploymentType === 'route'
+                              ? `Route patrol${assignment.patrolMode ? ` · ${{ walk: 'Walk', car: 'Car', motorcycle: 'Motorcycle' }[assignment.patrolMode]}` : ''}` : 'Area patrol'}
                         </small>
                       </td>
                       <td data-label="Instructions" className="assignment-instructions-cell">

@@ -31,6 +31,14 @@ const matchBody = (samples, body) => createService({ environment,
 	fetchImpl: async () => ({ ok: true, json: async () => body }),
 }).match(samples)
 
+it('does not join a road estimate across GPS assignment changes', async () => {
+	let requests = 0
+	const samples = longerTrace(4).map((point, index) => ({ ...point, device_assignment_id: index < 2 ? 'GPS-1' : 'GPS-2' }))
+	const service = createService({ environment, fetchImpl: async () => { requests++; throw new Error('Must not match separate two-point fragments') } })
+	assert.equal((await service.match(samples)).status, 'insufficient_movement')
+	assert.equal(requests, 0)
+})
+
 it('does not contact a provider unless an approved base URL is configured', async () => {
 	let requests = 0
 	for (const url of ['', 'not-a-url', 'file:///tmp/route', 'https://user:secret@matching.example.org', 'https://matching.example.org?token=secret']) {

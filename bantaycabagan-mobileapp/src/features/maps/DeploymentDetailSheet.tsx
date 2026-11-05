@@ -8,7 +8,9 @@ import type { DeploymentAssignment } from '../../types/operations';
 const deploymentTypeLabel = (assignment: DeploymentAssignment) => (
   assignment.deploymentType === 'point'
     ? 'Fixed Post'
-    : assignment.deploymentType === 'route' ? 'Route Patrol' : 'Area Patrol'
+    : assignment.deploymentType === 'route'
+      ? `Route Patrol${assignment.patrolMode ? ` · ${{ walk: 'Walk Patrol', car: 'Car Patrol', motorcycle: 'Motorcycle Patrol' }[assignment.patrolMode]}` : ''}`
+      : 'Area Patrol'
 );
 
 const formatShift = (assignment: DeploymentAssignment) => {

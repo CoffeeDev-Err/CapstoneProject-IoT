@@ -1,5 +1,6 @@
 import { getMapPerformanceOptions } from '../utils/mapPerformance'
 import { buildReportRouteTrace } from '../utils/reportRouteTrace'
+import { checkpointDetails, groupCheckpoints, hourlySequenceFeatures } from '../utils/dutyGpsHistory'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -56,6 +57,11 @@ const addReportRouteLayer = (map, data) => {
     })
   }
   const layers = [
+    { id: 'geosentri-hourly-sequence', type: 'line', filter: ['==', ['get', 'kind'], 'hourly_sequence'],
+      paint: { 'line-color': '#2563eb', 'line-width': 3, 'line-dasharray': [2, 2] } },
+    { id: 'geosentri-hourly-arrows', type: 'symbol', filter: ['==', ['get', 'kind'], 'hourly_arrow'],
+      layout: { 'text-field': '→', 'text-size': 24, 'text-rotate': ['get', 'bearing'], 'text-rotation-alignment': 'map', 'text-allow-overlap': true },
+      paint: { 'text-color': '#2563eb', 'text-halo-color': '#ffffff', 'text-halo-width': 1 } },
     { id: 'geosentri-report-recorded', type: 'circle', filter: ['==', ['get', 'kind'], 'recorded'],
       paint: { 'circle-radius': 3, 'circle-color': '#3b82f6', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff', 'circle-opacity': 0.7 } },
     { id: 'geosentri-report-matched', type: 'line', filter: ['==', ['get', 'kind'], 'matched'],
@@ -86,7 +92,8 @@ const createPointMarker = ({ className, label, title }) => {
 
 const EMPTY_ROUTE_POINTS = []
 
-function ReportLocationMap({ active = true, incident, markerLabel = 'Reported location', routePoints = EMPTY_ROUTE_POINTS, roadMatching }) {
+function ReportLocationMap({ active = true, incident, markerLabel = 'Reported location', routePoints = EMPTY_ROUTE_POINTS, roadMatching,
+  hourlyCheckpoints, onSelectHour, mapLabel = 'Reported location and officer route map', emptyMessage = 'No valid GPS coordinates were saved for this report.' }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const [initialIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
@@ -124,15 +131,16 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   const routeTrace = useMemo(() => buildReportRouteTrace(routePoints), [routePoints])
 
   const mapPositions = useMemo(() => (
-    [...routeTrace.segments.flat(), ...(routePositions.length ? [routePositions[0]] : []), ...(incidentPosition ? [incidentPosition] : []),
+    [...routePositions, ...(hourlyCheckpoints || []).filter(hour => hour.checkpoint).map(hour => [Number(hour.checkpoint.latitude), Number(hour.checkpoint.longitude)]), ...(incidentPosition ? [incidentPosition] : []),
       ...(visibleLayers.matched ? (roadMatching?.segments || []).flatMap(segment => segment.coordinates.map(([longitude, latitude]) => [latitude, longitude])) : [])]
-  ), [incidentPosition, roadMatching, routePositions, routeTrace, visibleLayers.matched])
-  const mapCenter = incidentPosition || routePositions[routePositions.length - 1] || null
+  ), [hourlyCheckpoints, incidentPosition, roadMatching, routePositions, visibleLayers.matched])
+  const mapCenter = incidentPosition || mapPositions.at(-1) || null
   const mapCenterLatitude = mapCenter?.[0] ?? null
   const mapCenterLongitude = mapCenter?.[1] ?? null
 
   const routeData = useMemo(() => featureCollection(
     [
+      ...hourlySequenceFeatures(hourlyCheckpoints || []),
       ...(visibleLayers.trace ? routeTrace.segments.map((positions) => ({
         type: 'Feature',
         properties: { kind: 'trace' },
@@ -153,7 +161,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
         type: 'Feature', properties: { kind: 'matched' }, geometry: { type: 'LineString', coordinates: segment.coordinates },
       })) : []),
     ],
-  ), [roadMatching, routePoints, routeTrace, visibleLayers])
+  ), [hourlyCheckpoints, roadMatching, routePoints, routeTrace, visibleLayers])
 
   const fitReportMap = useCallback((animate = true) => {
     const map = mapRef.current
@@ -178,6 +186,32 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
     if (!map) return
     pointMarkersRef.current.forEach((marker) => marker.remove())
     pointMarkersRef.current = []
+
+    groupCheckpoints(hourlyCheckpoints || []).forEach(group => {
+      const element = document.createElement('button')
+      element.type = 'button'
+      element.className = 'duty-gps-marker'
+      element.textContent = group.map(hour => hour.hour + 1).join(', ')
+      element.setAttribute('aria-label', group.map(checkpointDetails).join('\n'))
+      const showDetails = () => {
+        popupRef.current?.remove()
+        const content = document.createElement('div')
+        group.forEach(hour => {
+          const button = document.createElement('button')
+          button.type = 'button'
+          button.className = 'duty-gps-popup-hour'
+          button.textContent = checkpointDetails(hour)
+          button.addEventListener('click', () => onSelectHour?.(String(hour.hour)))
+          content.append(button)
+        })
+        popupRef.current = new maplibregl.Popup({ maxWidth: '340px', focusAfterOpen: false })
+          .setLngLat([group[0].checkpoint.longitude, group[0].checkpoint.latitude]).setDOMContent(content).addTo(map)
+      }
+      element.addEventListener('mouseenter', showDetails)
+      element.addEventListener('focus', showDetails)
+      element.addEventListener('click', () => { onSelectHour?.(String(group[0].hour)); showDetails() })
+      pointMarkersRef.current.push(new maplibregl.Marker({ element }).setLngLat([group[0].checkpoint.longitude, group[0].checkpoint.latitude]).addTo(map))
+    })
 
     if (routePositions.length > 0) {
       pointMarkersRef.current.push(new maplibregl.Marker({
@@ -208,7 +242,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
         anchor: 'center',
       }).setLngLat([incidentPosition[1], incidentPosition[0]]).addTo(map))
     }
-  }, [incidentPosition, markerLabel, routePositions, routeTrace])
+  }, [hourlyCheckpoints, incidentPosition, markerLabel, onSelectHour, routePositions, routeTrace])
 
   useEffect(() => {
     if (
@@ -322,7 +356,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   if (!mapCenter) {
     return (
       <div className="report-location-map__empty">
-        No valid GPS coordinates were saved for this report.
+        {emptyMessage}
       </div>
     )
   }
@@ -330,7 +364,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   if (!hasMapTilerWebApiKey) {
     return (
       <div className="report-location-map__empty">
-        Add VITE_MAPTILER_API_KEY to display the report location and route.
+        Map is unavailable. Saved GPS details remain available below.
       </div>
     )
   }
@@ -338,7 +372,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
   return (
     <div className="report-location-map">
       <div className="report-location-map__stage">
-        <div ref={containerRef} className="report-location-map__canvas" aria-label="Reported location and officer route map" />
+        <div ref={containerRef} className="report-location-map__canvas" aria-label={mapLabel} />
         <MapStyleControls
           compact
           mapMode={mapMode}
@@ -355,6 +389,7 @@ function ReportLocationMap({ active = true, incident, markerLabel = 'Reported lo
       </div>
 
       <div className="report-location-map__legend" aria-label="Map legend">
+        {hourlyCheckpoints && <span><i className="report-map-line" />Hourly sequence → (approximate connections)</span>}
         {incidentPosition && (
           <span><i className="report-map-dot report-map-dot--incident" />{markerLabel}</span>
         )}

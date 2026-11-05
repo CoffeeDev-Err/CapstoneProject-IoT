@@ -127,3 +127,57 @@ it('rejects stale or future readings, missing coordinates and malformed quality'
 	assert.equal(history.length, 0)
 	assert.equal(writes(), 0)
 })
+
+it('keeps a held jump out of the live position, reading clock, inactivity and route history', async () => {
+	const { service, payload, current, history, writes } = setup()
+	const baseline = payload(0, { latitude: 17.430762, longitude: 121.764672, speed: 0 })
+	await service.ingestLocation(baseline)
+	const before = current()
+	const candidate = payload(40, { latitude: 17.430642, longitude: 121.764310, speed: 1, satellites: 20, position_valid: true })
+	for (let index = 0; index < 3; index += 1) {
+		const result = await service.ingestLocation(candidate)
+		assert.equal(result.accepted, false)
+		assert.equal(result.reason, 'gps_jump_pending')
+		assert.equal(result.historySampled, false)
+		assert.equal(result.personnel.location, before)
+	}
+	assert.equal(current(), before)
+	assert.equal(writes(), 1)
+	assert.equal(history.length, 1)
+	const recovered = payload(50, { latitude: 17.430753, longitude: 121.764648, speed: 0, satellites: 28 })
+	assert.equal((await service.ingestLocation(recovered)).accepted, true)
+	assert.equal(current().recordedAt.toISOString(), recovered.recorded_at)
+	assert.equal(history.length, 2)
+})
+
+it('accepts a corroborated relocation without writing the unconfirmed candidate into history', async () => {
+	const { service, payload, current, history } = setup()
+	await service.ingestLocation(payload(0, { speed: 0 }))
+	const relocation = { latitude: 17.43, longitude: 121.77, speed: 0 }
+	assert.equal((await service.ingestLocation(payload(40, relocation))).reason, 'gps_jump_pending')
+	assert.equal((await service.ingestLocation(payload(50, relocation))).accepted, true)
+	assert.deepEqual(current().location.coordinates, [121.77, 17.43])
+	assert.equal(history.length, 2)
+	assert.equal(history[1].recordedAt.toISOString(), payload(50).recorded_at)
+})
+
+it('leaves normal small GPS steps, identical fresh coordinates and vehicle movement responsive', async () => {
+	const { service, payload, current, history } = setup()
+	await service.ingestLocation(payload(0, { speed: 0 }))
+	const step = payload(10, { latitude: 17.420018, speed: 0 })
+	assert.equal((await service.ingestLocation(step)).accepted, true)
+	assert.equal((await service.ingestLocation({ ...step, recorded_at: payload(20).recorded_at })).accepted, true)
+	const vehicle = payload(30, { latitude: 17.421, speed: 36 })
+	assert.equal((await service.ingestLocation(vehicle)).accepted, true)
+	assert.equal(current().recordedAt.toISOString(), vehicle.recorded_at)
+	assert.equal(history.length, 4)
+})
+
+it('rejects poor GPS quality without affecting simulated readings', async () => {
+	const { service, payload, writes, history } = setup()
+	assert.equal((await service.ingestLocation(payload(0, { accuracy: 1000 }))).reason, 'poor_gps_quality')
+	assert.equal((await service.ingestLocation(payload(0, { satellites: 2 }))).reason, 'poor_gps_quality')
+	assert.equal(writes(), 0)
+	assert.equal(history.length, 0)
+	assert.equal((await service.ingestLocation(payload(0, { source: 'mock', accuracy: 1000 }))).accepted, true)
+})

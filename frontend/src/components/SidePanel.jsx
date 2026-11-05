@@ -58,7 +58,7 @@ function SidePanel({
         <ul className="mt-3 mb-0 ps-0 list-unstyled d-grid gap-2 overflow-auto">
           {personnel.length === 0 && (
             <li className="personnel-empty-state">
-              No active personnel with a current GPS fix.
+              No active personnel with a GPS location.
             </li>
           )}
           {personnel.map((member) => (

@@ -33,7 +33,7 @@ const LoginPage = lazy(routeLoaders.login)
 const MonitoringPage = lazy(routeLoaders.map)
 const PersonnelPage = lazy(routeLoaders.personnel)
 const ReportsPage = lazy(routeLoaders.reports)
-const ReportGpsHistoryPage = lazy(routeLoaders.gpsHistory)
+const PersonnelGpsHistoryPage = lazy(routeLoaders.gpsHistory)
 const SettingsPage = lazy(routeLoaders.settings)
 
 const withPageLoader = (page, fallback = <PageLoadingSkeleton />) => (
@@ -63,8 +63,9 @@ function AppRoutes() {
           <Route path="/assign-area" element={withPageLoader(<AssignAreaPage key="deployment-form" />)} />
           <Route path="/deployments" element={withPageLoader(<AssignAreaPage key="deployment-list" view="list" />)} />
           <Route path="/personnel" element={withPageLoader(<PersonnelPage />)} />
+          <Route path="/personnel/:personnelId/gps-history" element={withPageLoader(<PersonnelGpsHistoryPage />)} />
           <Route path="/reports" element={withPageLoader(<ReportsPage />)} />
-          <Route path="/reports/:reportId/gps-history" element={withPageLoader(<ReportGpsHistoryPage />)} />
+          <Route path="/reports/:reportId/gps-history" element={<Navigate to="/personnel" replace />} />
           <Route path="/settings" element={withPageLoader(<SettingsPage />)} />
         </Route>
       </Route>

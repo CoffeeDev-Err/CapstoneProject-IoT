@@ -111,3 +111,29 @@ it('shows individuals on zoom-in and releases their DOM and photos when clustere
   const mounted = fixture.markers.filter((marker) => marker.element.isConnected)
   expect(mounted[0].position).toEqual([121.7653, 17.5])
 })
+
+it('keeps the same clickable marker through an outage and animates when a newer fix arrives', () => {
+  const frames = []
+  vi.stubGlobal('requestAnimationFrame', (callback) => { frames.push(callback); return frames.length })
+  vi.stubGlobal('cancelAnimationFrame', vi.fn())
+  const selected = vi.fn()
+  const original = officer('a', { isVisibleOnMap: true })
+  const view = render(<PersonnelMap personnel={[original]} onSelectPersonnel={selected} />)
+  const marker = fixture.markers.find((item) => item.element.isConnected)
+  const stale = { ...original, isLocationStale: true, locationAgeSeconds: 600 }
+  view.rerender(<PersonnelMap personnel={[stale]} onSelectPersonnel={selected} />)
+  expect(marker.element.isConnected).toBe(true)
+  expect(marker.position).toEqual([original.longitude, original.latitude])
+  expect(frames).toHaveLength(0)
+  act(() => marker.element.click())
+  expect(selected).toHaveBeenLastCalledWith(stale)
+
+  const fresh = { ...original, latitude: 17.42708, locationRecordedAt: '2026-10-05T00:10:00Z', speed: 5 }
+  view.rerender(<PersonnelMap personnel={[fresh]} onSelectPersonnel={selected} />)
+  expect(marker.element.isConnected).toBe(true)
+  expect(frames.length).toBeGreaterThan(0)
+  act(() => frames.shift()(performance.now() + 1000))
+  expect(marker.position).toEqual([fresh.longitude, fresh.latitude])
+  act(() => marker.element.click())
+  expect(selected).toHaveBeenLastCalledWith(fresh)
+})

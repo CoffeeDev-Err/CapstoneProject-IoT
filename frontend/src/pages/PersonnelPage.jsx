@@ -11,7 +11,7 @@
  */
 
 import { useDeferredValue, useMemo, useState } from 'react'
-import { MapPin, Search, Users } from 'lucide-react'
+import { History, MapPin, Search, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { TableSkeletonRows } from '../components/LoadingSkeleton'
 import InitialsAvatar from '../components/InitialsAvatar'
@@ -209,6 +209,11 @@ function PersonnelPage() {
                   <span className="personnel-location"><MapPin aria-hidden="true" /><span>{officer.locationName || 'Unavailable'}</span></span>
                 </td>
                 <td className="personnel-actions">
+                  {!officer.isMockPersonnel && <button type="button" className="report-action-btn report-action-btn--secondary"
+                    aria-label={`View GPS history for ${officer.name}`}
+                    onClick={event => { event.stopPropagation(); navigate(`/personnel/${encodeURIComponent(officer.id)}/gps-history`) }}>
+                    <History aria-hidden="true" />View GPS history
+                  </button>}
                   <button
                     type="button"
                     className="report-action-btn report-action-btn--primary"
