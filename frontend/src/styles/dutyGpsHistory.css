@@ -1,17 +1,17 @@
 .duty-gps-history__panel { padding: 1.25rem; }
 .duty-gps-history .report-location-map__canvas { height: 55vh; min-height: 360px; }
 .duty-gps-history__filters { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
-.duty-gps-history__filters label { display: flex; flex-direction: column; gap: .4rem; font-size: .85rem; font-weight: 600; max-width: 100%; }
+.duty-gps-history__filters label { display: flex; flex-direction: column; gap: .4rem; font-size: var(--font-size-sm); font-weight: 600; max-width: 100%; }
 .duty-gps-history__filters input, .duty-gps-history__filters select { color: inherit; background: var(--bg-secondary, transparent); border: 1px solid var(--border-color, #64748b); border-radius: .5rem; padding: .65rem; max-width: 100%; color-scheme: light dark; }
-.duty-gps-history__note { color: var(--text-muted, #64748b); font-size: .9rem; }
+.duty-gps-history__note { color: var(--text-muted, #64748b); font-size: var(--font-size-sm); }
 .duty-gps-history__hours { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
 .duty-gps-hour { display: flex; flex-direction: column; text-align: left; gap: .4rem; background: transparent; color: inherit; border: 1px solid var(--border-color, #64748b); border-radius: .65rem; padding: .85rem; }
 .duty-gps-hour.is-selected { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
-.duty-gps-hour span { font-size: .85rem; }
+.duty-gps-hour span { font-size: var(--font-size-sm); }
 .duty-gps-history__details { padding: 1rem 0; }
 .duty-gps-history__road-option { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
 .duty-gps-marker { border: 2px solid white; border-radius: 50%; min-width: 32px; min-height: 32px; padding: 4px; background: #2563eb; color: white; font-weight: 700; box-shadow: 0 2px 6px #0005; cursor: pointer; }
-.duty-gps-popup-hour { display: block; width: 100%; border: 0; border-bottom: 1px solid #cbd5e1; color: #0f172a; background: white; padding: .5rem; text-align: left; font-size: .85rem; }
+.duty-gps-popup-hour { display: block; width: 100%; border: 0; border-bottom: 1px solid #cbd5e1; color: #0f172a; background: white; padding: .5rem; text-align: left; font-size: var(--font-size-sm); }
 .duty-gps-history .maplibregl-popup-content { max-height: 300px; overflow-y: auto; }
 @media (max-width: 600px) {
   .duty-gps-history__filters label { width: 100%; }
