@@ -16,6 +16,7 @@ const EXPECTED_MODEL_CONTRACTS = {
 	Deployment: ['deployments', 8],
 	Report: ['reports', 12],
 	Task: ['tasks', 5],
+	PersonnelAnnouncement: ['personnel_announcements', 1],
 	Notification: ['notifications', 6],
 	PushDevice: ['push_devices', 2],
 	PushDelivery: ['push_deliveries', 3],
