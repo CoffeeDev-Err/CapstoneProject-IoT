@@ -65,6 +65,25 @@ it('retains the exact report reference when opening an in-app validation alert',
   expect(result.current.navigationRequest).toMatchObject({ destination: 'Reports', referenceId: 'RPT-ONE' });
 });
 
+it('opens announcement details without treating it as a task or deployment', async () => {
+  const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });
+  const message = 'Attend the briefing.\nLocation: Station\nWhen: Immediately';
+  await act(() => result.current.openNotification({ ...notification, isRead: true,
+    title: 'Personnel announcement', message, referenceType: 'announcement' }));
+  expect(Alert.alert).toHaveBeenCalledWith('Personnel announcement', message);
+  expect(result.current.navigationRequest).toBeNull();
+});
+
+it('shows announcement details when its push notification is tapped', async () => {
+  const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });
+  const listener = jest.mocked(Notifications.addNotificationResponseReceivedListener).mock.calls[0][0];
+  await act(() => listener({ actionIdentifier: 'default', notification: { request: { content: {
+    title: 'Personnel announcement', body: 'Briefing at station. When: Immediately', data: { referenceType: 'announcement' },
+  } } } } as unknown as Notifications.NotificationResponse));
+  expect(Alert.alert).toHaveBeenCalledWith('Personnel announcement', 'Briefing at station. When: Immediately');
+  expect(result.current.navigationRequest).toBeNull();
+});
+
 it('keeps the deployment id when an in-app notification stores it in data', async () => {
   const { result } = await renderHook(useNotifications, { wrapper: NotificationProvider });
   await act(() => result.current.openNotification({

@@ -222,6 +222,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       };
       if (isDeploymentNotificationData(data)) requestDeploymentRefresh();
       if (data.notificationId && token) void updateReadState(data.notificationId);
+      if (data.referenceType === 'announcement') {
+        const content = response.notification.request.content;
+        Alert.alert(content.title || 'Personnel announcement', content.body || 'Open your notification inbox to view this announcement.');
+        refreshNotifications().catch(() => undefined);
+        return;
+      }
       setNavigationRequest({
         destination: data.destination || 'Map',
         referenceId: data.referenceId || data.assignmentId || data.reportId,
@@ -311,6 +317,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const openNotification = useCallback((notification: OfficerNotification) => {
     if (!notification.isRead) void updateReadState(notification.id);
+    if (notification.referenceType === 'announcement') {
+      Alert.alert(notification.title, notification.message);
+      return;
+    }
     setNavigationRequest({
       destination: destinationFor(notification),
       referenceId: notification.referenceId

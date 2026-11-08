@@ -1,5 +1,9 @@
 import { apiRequest } from './apiClient'
 
+export const sendPersonnelAnnouncement = (announcement) => apiRequest('/api/notifications/announcements', {
+  method: 'POST', body: JSON.stringify(announcement),
+})
+
 // The supervisor stream is resolved server-side from the authenticated session.
 // A recipient id is deliberately not sent: the API ignores one so that a
 // supervisor cannot address an individual officer's notifications.

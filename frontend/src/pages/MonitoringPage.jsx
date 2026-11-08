@@ -21,6 +21,8 @@ import { MonitoringContentSkeleton } from '../components/LoadingSkeleton'
 import ConfirmModal from '../components/ConfirmModal'
 import ProfileModal from '../components/ProfileModal'
 import SidePanel from '../components/SidePanel'
+import MapPersonnelToolbar from '../components/MapPersonnelToolbar'
+import AnnouncementDialog from '../components/AnnouncementDialog'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { useFeedback } from '../context/useFeedback'
 import { useDevelopmentMapPersonnel } from '../hooks/useDevelopmentMapPersonnel'
@@ -82,6 +84,7 @@ function MonitoringPage() {
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
+  const [announcementOpen, setAnnouncementOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
   const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false)
   const [taskActionBusy, setTaskActionBusy] = useState(false)
@@ -236,6 +239,11 @@ function MonitoringPage() {
         </aside>
         <Suspense fallback={<div className="map-panel map-chunk-loading h-100" role="status">Loading live map...</div>}>
           <PersonnelMap
+            toolbar={<MapPersonnelToolbar personnel={personnel} onAnnounce={() => setAnnouncementOpen(true)}
+              onSelectPersonnel={member => {
+                handleSelectPersonnel(member)
+                if (mapPersonnel.some(item => item.id === member.id)) setFollowedPersonnelId(member.id)
+              }} />}
             personnel={mapPersonnel}
             onSelectPersonnel={handleSelectPersonnel}
             followedPersonnelId={activeFollowedPersonnelId}
@@ -261,6 +269,10 @@ function MonitoringPage() {
         onLocate={() => handleLocatePersonnel(selectedPersonnel)}
         onCompleteTask={() => setCompletionConfirmOpen(true)}
       />
+      <AnnouncementDialog open={announcementOpen} onClose={() => setAnnouncementOpen(false)} onSent={announcement => {
+        showFeedback(`Announcement queued for ${announcement.recipientCount} police account${announcement.recipientCount === 1 ? '' : 's'}. It will be saved in their notification inboxes.`,
+          { type: 'success', title: 'Announcement accepted' })
+      }} />
       <ConfirmModal
         open={completionConfirmOpen}
         title="Complete backup request?"

@@ -36,6 +36,7 @@ const createNotificationRoutes = ({ authService, controller }) => {
 	router.delete('/devices', ...authenticatedOfficerOnly, asyncHandler(controller.unregisterPushDevice))
 
 	router.get('/', ...supervisorOnly, asyncHandler(controller.getNotifications))
+	router.post('/announcements', ...supervisorOnly, asyncHandler(controller.sendAnnouncement))
 	router.patch('/read-all', ...supervisorOnly, asyncHandler(controller.markAllRead))
 	router.patch('/:notificationId/read', ...supervisorOnly, asyncHandler(controller.markRead))
 	router.delete('/', ...supervisorOnly, asyncHandler(controller.clearNotifications))

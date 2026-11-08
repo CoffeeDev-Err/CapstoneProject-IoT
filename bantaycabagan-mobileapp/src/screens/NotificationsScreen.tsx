@@ -14,6 +14,7 @@ import type { OfficerNotification } from '../types/notifications';
 import { SheetFlatList } from '../components/SwipeDismissSheet';
 
 const iconFor = (notification: OfficerNotification): keyof typeof Icon.glyphMap => {
+  if (notification.referenceType === 'announcement') return 'campaign';
   if (notification.type === 'emergency') return 'campaign';
   if (notification.type === 'geofence') return 'location-off';
   if (notification.referenceType === 'deployment') return 'event';
@@ -223,7 +224,7 @@ export default function NotificationsScreen({
               </>
             ) : !isLoading && (
               <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                Deployment, backup, shift, report, and boundary alerts will appear here.
+                Announcements, deployment, backup, shift, report, and boundary alerts will appear here.
               </Text>
             )}
           </View>

@@ -3,7 +3,13 @@
 // delete any individual officer's notifications.
 const SUPERVISOR_RECIPIENT = 'supervisor'
 
-const createNotificationController = (notificationService) => ({
+const createNotificationController = (notificationService, announcementService) => ({
+	sendAnnouncement: async (req, res) => {
+		const announcement = await announcementService.submit(req.body, req.auth.user)
+		res.status(202).json({ success: true, announcement })
+		// The durable queue also resumes on startup and retries failed recipients.
+		void announcementService.runOnce().catch(error => console.error('Announcement queue failed:', error.name))
+	},
 	getMyNotifications: async (req, res) => {
 		const page = await notificationService.getNotificationPage(
 			req.auth.user.personnelId,

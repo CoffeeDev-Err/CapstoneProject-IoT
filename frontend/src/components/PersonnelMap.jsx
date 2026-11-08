@@ -203,6 +203,7 @@ function PersonnelMap({
   lastPersonnelSyncAt = '',
   onRetry,
   developmentPreviewCount = 0,
+  toolbar,
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -620,7 +621,8 @@ function PersonnelMap({
 
   if (!hasMapTilerWebApiKey) {
     return (
-      <section className="map-panel h-100">
+      <section className="map-panel map-panel--toolbar h-100">
+        {toolbar}
         <div className="map-config-state">
           <strong>Map configuration needed</strong>
           <span>Add VITE_MAPTILER_API_KEY to the frontend environment.</span>
@@ -630,7 +632,8 @@ function PersonnelMap({
   }
 
   return (
-    <section className="map-panel h-100">
+    <section className={`map-panel h-100${toolbar ? ' map-panel--toolbar' : ''}`}>
+      {toolbar}
       <div ref={containerRef} className="map-view" aria-label="Live personnel map" />
       <MapStyleControls
         mapMode={mapMode}

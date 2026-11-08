@@ -49,6 +49,8 @@ const createFlespiMqttService = require('./services/flespiMqttService')
 const createFlespiSyncService = require('./services/flespiSyncService')
 const gpsDeviceService = require('./services/gpsDeviceService')
 const notificationService = require('./services/notificationService')
+const { createAnnouncementService } = require('./services/announcementService')
+const createAnnouncementRuntime = require('./runtime/announcementRuntime')
 const { createPushDeliveryService } = require('./services/pushDeliveryService')
 const createOperationalService = require('./services/operationalService')
 const personnelService = require('./services/personnelService')
@@ -87,7 +89,8 @@ const auditController = createAuditController(auditService)
 const authController = createAuthController(authService)
 const barangayController = createBarangayController(barangayService)
 const gpsDeviceController = createGpsDeviceController(gpsDeviceService)
-const notificationController = createNotificationController(notificationService)
+const announcementService = createAnnouncementService({ models, io, deliverNotification: notificationService.deliverNotification })
+const notificationController = createNotificationController(notificationService, announcementService)
 const personnelController = createPersonnelController({ io, operationalService, personnelService })
 const systemController = createSystemController(flespiService, {
 	checkDatabase: async () => {
@@ -177,7 +180,10 @@ const pushDeliveryRuntime = createPushDeliveryRuntime({
 	isDatabaseReady: () => mongoose.connection.readyState === 1,
 })
 const unsubscribePushQueue = notificationService.onPushQueued(() => void pushDeliveryRuntime.tick())
+const announcementRuntime = createAnnouncementRuntime({ service: announcementService,
+	isDatabaseReady: () => mongoose.connection.readyState === 1 })
 server.on('close', () => {
+	announcementRuntime.stop()
 	unsubscribePushQueue()
 	pushDeliveryRuntime.stop()
 })
@@ -194,6 +200,7 @@ const start = async () => {
 		})
 		operationalRuntime.start()
 		pushDeliveryRuntime.start()
+		announcementRuntime.start()
 	} catch (error) {
 		console.error('Backend startup failed:', error)
 		process.exitCode = 1
