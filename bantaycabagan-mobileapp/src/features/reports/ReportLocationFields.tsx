@@ -18,6 +18,8 @@ export function ReportLocationFields({ form, isResolvingLocation, locationLookup
   onEditLocation, onOpenBarangays, onOpenMap, onUseCurrentGps }: Props) {
   const { colors } = useMobileTheme();
   const hasPoint = Number.isFinite(form.latitude) && Number.isFinite(form.longitude);
+  const canSelectBarangay = !isResolvingLocation && !form.barangay
+    && (hasPoint || Boolean(locationLookupMessage) || Boolean(form.location.trim()));
   const source = form.location_source === 'gps' ? 'Tracker GPS'
     : form.location_source === 'backup_request' ? 'Backup request location' : 'Selected incident point';
   const surface = { backgroundColor: colors.surfaceMuted, borderColor: colors.border };
@@ -47,14 +49,23 @@ export function ReportLocationFields({ form, isResolvingLocation, locationLookup
       <View style={styles.resultRow}>
         {isResolvingLocation && <ActivityIndicator color={colors.blue} accessibilityLabel="Identifying incident barangay" />}
         <Text accessibilityLiveRegion="polite" style={[styles.resultName, { color: colors.text }]}>
-          {isResolvingLocation ? 'Identifying barangay…' : form.barangay || (hasPoint ? 'Confirmation needed' : 'Choose an incident location')}
+          {isResolvingLocation ? 'Identifying barangay…' : form.barangay || (canSelectBarangay ? 'Barangay not identified' : 'Choose an incident location')}
         </Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Confirm or correct incident barangay"
-          onPress={onOpenBarangays} style={styles.correct}>
-          <Text style={[styles.link, { color: colors.blue }]}>{form.barangay ? 'Correct' : 'Confirm'}</Text>
-        </TouchableOpacity>
       </View>
-      <Text style={[styles.helper, { color: colors.textMuted }]}>{locationLookupMessage || 'The incident barangay is used for reports and analytics. If GPS or the map is unavailable, confirm it manually.'}</Text>
+      <Text style={[styles.helper, { color: colors.textMuted }]}>{locationLookupMessage || (form.barangay
+        ? 'This barangay will be used for reports and analytics.'
+        : canSelectBarangay
+          ? 'Select the barangay where the incident happened to continue.'
+          : 'The barangay is identified from your GPS or map pin. If these are unavailable, enter the exact place below to select it manually.')}</Text>
+      {!isResolvingLocation && Boolean(form.barangay) && <TouchableOpacity
+        accessibilityRole="button" accessibilityLabel="Incorrect barangay?"
+        onPress={onOpenBarangays} style={styles.correct}>
+        <Text style={[styles.link, { color: colors.blue }]}>Incorrect barangay?</Text>
+      </TouchableOpacity>}
+      {canSelectBarangay && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select barangay"
+        onPress={onOpenBarangays} style={[styles.selectBarangay, surface]}>
+        <Text style={[styles.actionTitle, { color: colors.blue }]}>Select barangay</Text>
+      </TouchableOpacity>}
     </View>
     <Text style={[styles.label, { color: colors.textMuted }]}>EXACT PLACE / LANDMARK</Text>
     <TextInput accessibilityLabel="Exact incident place or landmark" style={[styles.input, surface, { color: colors.text }]}
@@ -76,8 +87,9 @@ const styles = StyleSheet.create({
   result: { borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 12, marginVertical: 6 },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resultName: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 22 },
-  correct: { minHeight: 48, minWidth: 64, justifyContent: 'center', alignItems: 'center' },
-  link: { fontSize: 13, fontWeight: '700' },
+  correct: { minHeight: 44, minWidth: 48, alignSelf: 'flex-start', justifyContent: 'center' },
+  link: { fontSize: 12, lineHeight: 18 },
+  selectBarangay: { minHeight: 48, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 14, marginTop: 8, borderWidth: 1, borderRadius: 10 },
   label: { fontSize: 11, fontWeight: '700', lineHeight: 17 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, textAlignVertical: 'top' },
 });

@@ -192,6 +192,8 @@ function DeploymentList({
                             {formatDateTime(new Date(Date.parse(assignment.shiftStart) + block.offsetMinutes * 60000).toISOString())}
                             {' · '}{block.durationMinutes} minutes
                             {block.coverageType === 'custom' && ` · ${block.radiusMeters} m radius`}
+                            {block.coverageType === 'route' && ` · ${block.routeCorridorMeters ?? 100} m each side`}
+                            {block.coverageType === 'route' && (!block.geometry || (assignment.patrolMode !== 'walk' && !block.roadDirections)) && ' · Route warnings unavailable'}
                             {block.coverageType === 'barangay' && !block.geometry && ' · Boundary unavailable'}
                           </li>)}</ol>
                         </details>}

@@ -9,6 +9,23 @@ const personnel = [{ id: 'PNP-1', name: 'Officer One' }, { id: 'PNP-2', name: 'O
 beforeEach(() => { vi.mocked(apiRequest).mockResolvedValue({ vehicles: [{ id: 'car-1', name: 'Car 1', mode: 'car' }], weeks: [] }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
+it('saves a foot route with its chosen corridor allowance', async () => {
+  const onSave = vi.fn().mockResolvedValue(true)
+  const initial = { id: 'DEP-1', groupId: 'GRP-1', personnelId: 'PNP-1', deploymentType: 'route', patrolMode: 'walk',
+    shiftStart: '2026-11-11T00:00:00Z', shiftEnd: '2026-11-11T02:00:00Z', scheduleBlocks: [
+      { label: 'Market walk', durationMinutes: 120, offsetMinutes: 0, coverageType: 'route', routePoints: [
+        { latitude: 17.4305, longitude: 121.765 }, { latitude: 17.431, longitude: 121.766 },
+      ] },
+    ] }
+  render(<PatrolPlanner personnel={personnel} assignments={[initial]} initialGroup={[initial]} ready onSave={onSave} onCancel={vi.fn()} />)
+  const allowance = screen.getByLabelText('Allowed distance from route (meters, each side)')
+  expect(allowance).toHaveValue(100)
+  fireEvent.change(allowance, { target: { value: '175' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save patrol changes' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+  expect(onSave.mock.calls[0][0][0].scheduleBlocks[0].routeCorridorMeters).toBe(175)
+})
+
 it('creates an area duty with its incident-independent coverage and exact two-hour schedule', async () => {
   const onSave = vi.fn().mockResolvedValue(true)
   render(<PatrolPlanner personnel={personnel} assignments={[]} ready onSave={onSave} onCancel={vi.fn()} />)

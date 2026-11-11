@@ -126,7 +126,7 @@ export const replaceDeployments = async (assignments) => {
       ...(assignment.scheduleBlocks?.length && { scheduleBlocks: assignment.scheduleBlocks.map(block => ({
         label: block.label, offsetMinutes: block.offsetMinutes, durationMinutes: block.durationMinutes,
         coverageType: block.coverageType, barangay: block.barangay,
-        latitude: block.latitude, longitude: block.longitude, radiusMeters: block.radiusMeters, routePoints: block.routePoints,
+          latitude: block.latitude, longitude: block.longitude, radiusMeters: block.radiusMeters, routePoints: block.routePoints, routeCorridorMeters: block.routeCorridorMeters,
       })) }),
     })) }),
   })

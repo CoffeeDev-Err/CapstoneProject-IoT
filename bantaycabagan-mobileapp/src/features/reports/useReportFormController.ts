@@ -104,14 +104,14 @@ export function useReportFormController({
         location: current.location === fallbackName || !current.location ? detected.location : current.location }));
       setLocationLookupMessage(barangay
         ? 'Suggested from the incident point. Check it before submitting, especially near a boundary.'
-        : 'Barangay could not be identified. Confirm the incident barangay below.');
+        : 'Barangay could not be identified. Select the incident barangay below.');
     } catch {
       if (revision !== locationRevision.current) return;
       const barangay = getBarangayFromArea(fallbackName);
       setForm(current => ({ ...current, barangay }));
       setLocationLookupMessage(barangay
         ? 'Using the recorded GPS address. Check the barangay before submitting.'
-        : 'Location lookup unavailable. Your pin is saved; confirm the barangay to continue offline.');
+        : 'Location lookup unavailable. Your pin is saved; select the barangay to continue offline.');
     } finally {
       if (revision === locationRevision.current) setIsResolvingLocation(false);
     }

@@ -88,6 +88,9 @@ export function DeploymentDetailSheet({
             {currentBlock && <Detail icon="timer" label="Current schedule" value={`${currentBlock.label} · ${minutesLeft} minutes remaining`} />}
             {!!assignment.scheduleBlocks?.length && <Detail icon="timer" label="Travel allowance" value={`${assignment.transitionGraceMinutes ?? 10} minutes after a change of area before outside-coverage warnings`} />}
             {currentBlock?.coverageType === 'custom' && <Detail icon="map" label="Assigned coverage" value={`${currentBlock.radiusMeters} m radius`} />}
+            {currentBlock?.coverageType === 'route' && <Detail icon="map" label="Route coverage" value={currentBlock.geometry?.type === 'LineString' && (assignment.patrolMode === 'walk' || currentBlock.roadDirections)
+              ? `${currentBlock.routeCorridorMeters ?? 100} m on each side of the assigned route. GPS tolerance also applies.`
+              : 'Route boundary unavailable. Follow the assigned route; automatic route warnings are unavailable.'} />}
             {currentBlock?.coverageType === 'barangay' && <Detail icon="map" label="Barangay boundary" value={currentBlock.geometry ? 'PSA indicative boundary. Confirm local coverage with your supervisor.' : 'Boundary unavailable. Follow your assigned barangay; automatic boundary warnings are unavailable.'} />}
             {assignment.vehicleId && <Detail icon="directions-car" label="Vehicle" value={`${assignment.vehicleId.replaceAll('-', ' ')} · Week of ${assignment.vehicleCrew?.weekStart || ''}`} />}
             <Detail

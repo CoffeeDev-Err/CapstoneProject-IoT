@@ -26,7 +26,9 @@ const normalizePatrolSchedule = (assignment) => {
 		offsetMinutes += block.durationMinutes
 		if (assignment.deploymentType === 'route') {
 			if (!Array.isArray(block.routePoints) || block.routePoints.length < 2 || block.routePoints.length > 30) throw createValidationError('Set 2 to 30 route points in travel order.', 'scheduleBlocks')
-			return { ...result, coverageType: 'route', routePoints: block.routePoints.map(p => ({ ...point(p), label: String(p.label || '').trim().slice(0, 200) })), ...point(block.routePoints[0]) }
+			const routeCorridorMeters = block.routeCorridorMeters ?? 100
+			if (!Number.isFinite(routeCorridorMeters) || routeCorridorMeters < 50 || routeCorridorMeters > 1000) throw createValidationError('Choose a route allowance between 50 and 1,000 meters on each side.', 'scheduleBlocks')
+			return { ...result, coverageType: 'route', routeCorridorMeters, routePoints: block.routePoints.map(p => ({ ...point(p), label: String(p.label || '').trim().slice(0, 200) })), ...point(block.routePoints[0]) }
 		}
 		if (block.coverageType === 'barangay') {
 			const barangay = findCabaganBarangay(block.barangay)

@@ -9,7 +9,7 @@ import WeeklyVehicleAssignments from './WeeklyVehicleAssignments'
 import { weekFor, toPatrolLocalTime, patrolTime } from './patrolPlannerTime'
 import '../../styles/patrol-planner.css'
 
-const emptyBlock = () => ({ label: '', coverageType: 'custom', durationMinutes: 120, radiusMeters: 200, routePoints: [], barangay: '' })
+const emptyBlock = () => ({ label: '', coverageType: 'custom', durationMinutes: 120, radiusMeters: 200, routeCorridorMeters: 100, routePoints: [], barangay: '' })
 const displayTime = value => new Date(value).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })
 
 export default function PatrolPlanner({ personnel, assignments, initialGroup = [], saving, ready, onSave, onCancel }) {
@@ -96,6 +96,10 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
             <label>{type === 'route' ? 'Route name' : 'Area name'}<input required maxLength={200} value={block.label} placeholder={type === 'route' ? 'Ngarag → Cansan → Magassi' : 'Public market'} onChange={e => updateBlock(index, { label: e.target.value })} /></label>
             <label>Duration (minutes)<input required type="number" min={15} max={1440} step={1} value={block.durationMinutes} onChange={e => updateBlock(index, { durationMinutes: Number(e.target.value) })} /></label>
           </div>
+          {type === 'route' && <>
+            <label>Allowed distance from route (meters, each side)<input type="number" min={50} max={1000} value={block.routeCorridorMeters ?? 100} onChange={e => updateBlock(index, { routeCorridorMeters: Number(e.target.value) })} /></label>
+            <small>{mode === 'walk' ? 'Place points along the actual walking path, including its turns. Warnings follow that saved path.' : 'Warnings follow the saved road route. If road directions are unavailable, route warnings stay off until the route is saved with available directions.'} GPS tolerance and the travel allowance also apply.</small>
+          </>}
           {type === 'area' && <><div className="patrol-planner__modes">{[['barangay', 'Whole Barangay'], ['custom', 'Custom Area']].map(([value, label]) => <label key={value}><input type="radio" name={`coverage-${index}`} checked={block.coverageType === value} onChange={() => updateBlock(index, { coverageType: value, latitude: undefined, longitude: undefined, geometry: undefined, boundarySource: undefined })} />{label}</label>)}</div>
             {block.coverageType === 'barangay' ? <label>Barangay<select required value={block.barangay} onChange={e => updateBlock(index, { barangay: e.target.value, label: `Barangay ${e.target.value}`, geometry: undefined, boundarySource: undefined, latitude: undefined, longitude: undefined })}><option value="">Choose barangay</option>{CABAGAN_BARANGAYS.map(b => <option key={b}>{b}</option>)}</select></label>
               : <label>Coverage radius (meters)<input type="number" min={50} max={5000} value={block.radiusMeters} onChange={e => updateBlock(index, { radiusMeters: Number(e.target.value) })} /></label>}</>}

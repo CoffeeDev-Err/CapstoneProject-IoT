@@ -689,7 +689,7 @@ export default function ReportsScreen() {
       >
         <View style={[styles.modalHeader, isDark && themeStyles.border]}>
           <View>
-            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Confirm incident barangay</Text>
+            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Select incident barangay</Text>
             <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Where the incident happened, not your deployment area</Text>
           </View>
         </View>

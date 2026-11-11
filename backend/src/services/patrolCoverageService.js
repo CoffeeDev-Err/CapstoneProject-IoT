@@ -22,9 +22,18 @@ const segmentDistance = (point, a, b) => {
 	const t = Math.max(0, Math.min(1, (((point[0] - a[0]) * scale) * x + (point[1] - a[1]) * y) / (x*x + y*y || 1)))
 	return distanceInMeters(point, [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])])
 }
-const outsideCoverage = (block, coordinates, accuracy = 0) => {
+const outsideCoverage = (block, coordinates, accuracy = 0, patrolMode = '') => {
 	const margin = Math.max(50, accuracy)
 	if (block.coverageType === 'custom') return distanceInMeters(coordinates, [block.longitude, block.latitude]) > block.radiusMeters + margin
+	if (block.coverageType === 'route') {
+		// Vehicle waypoint guides may cut across buildings or bends. Only the
+		// saved road geometry, or an explicitly plotted foot path, defines coverage.
+		const points = block.geometry?.type === 'LineString' ? block.geometry.coordinates : null
+		if (!points || points.length < 2 || (patrolMode !== 'walk' && block.roadDirections !== true)
+			|| points.some(p => !Array.isArray(p) || p.length < 2 || !p.slice(0, 2).every(Number.isFinite))) return null
+		const allowance = (block.routeCorridorMeters ?? 100) + margin
+		return !points.slice(1).some((b, i) => segmentDistance(coordinates, points[i], b) <= allowance)
+	}
 	if (!block.geometry || block.coverageType !== 'barangay') return null
 	if (insideGeometry(...coordinates, block.geometry)) return false
 	const polygons = block.geometry.type === 'Polygon' ? [block.geometry.coordinates] : block.geometry.coordinates
@@ -40,7 +49,7 @@ const hydratePatrolGeometry = async (assignments, previousById) => {
 		for (const block of assignment.scheduleBlocks || []) {
 			if (block.coverageType !== 'route') continue
 			const old = previousById.get(assignment.id)?.scheduleBlocks?.find(b => JSON.stringify(b.routePoints) === JSON.stringify(block.routePoints))
-			if (old?.geometry && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) continue
+			if (old?.geometry && old.roadDirections === true && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) continue
 			const key = `${assignment.patrolMode}:${JSON.stringify(block.routePoints)}`
 			if (!routeRequests.has(key)) routeRequests.set(key, getPatrolDirections({ points: block.routePoints, mode: assignment.patrolMode }))
 		}
@@ -62,7 +71,7 @@ const hydratePatrolGeometry = async (assignments, previousById) => {
 				}
 			} else if (block.coverageType === 'route') {
 				const old = previousById.get(assignment.id)?.scheduleBlocks?.find(b => JSON.stringify(b.routePoints) === JSON.stringify(block.routePoints))
-				if (old?.geometry && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) {
+				if (old?.geometry && (assignment.patrolMode === 'walk' || old.roadDirections === true) && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) {
 					block.geometry = old.geometry; block.roadDirections = old.roadDirections
 				} else {
 					const route = await routeRequests.get(`${assignment.patrolMode}:${JSON.stringify(block.routePoints)}`)
@@ -101,7 +110,7 @@ const createPatrolCoverageService = ({ Deployment, CurrentLocation, deliverNotif
 		if (+new Date(location.recordedAt) < +new Date(deployment.shiftStart) + block.offsetMinutes * 60000) continue
 		const coordinates = location.location?.coordinates
 		if (!coordinates || !coordinates.every(Number.isFinite)) continue
-		const outside = outsideCoverage(block, coordinates, location.accuracy || 0)
+		const outside = outsideCoverage(block, coordinates, location.accuracy || 0, deployment.patrolMode)
 		if (outside === null) continue
 		const key = createHash('sha256').update(`${deployment.shiftStart.toISOString()}:${index}:${JSON.stringify(block)}`).digest('hex')
 		const previous = deployment.patrolCoverageState?.key === key ? deployment.patrolCoverageState : {}
@@ -113,10 +122,11 @@ const createPatrolCoverageService = ({ Deployment, CurrentLocation, deliverNotif
 			$set: { patrolCoverageState: { key, recordedAt: location.recordedAt, candidateCount: count, alerted } },
 		})
 		if (!result.modifiedCount || !alerted || previous.alerted) continue
-		await Promise.all([deliverNotification({ ...base, type: 'geofence', priority: 'high', title: 'Outside assigned patrol coverage',
-			message: `Your recent GPS readings are outside ${block.label}. Return to your coverage or contact your supervisor.`, dedupeKey: `patrol-out:${deployment.assignmentId}:${index}:${location.recordedAt.toISOString()}` }),
-			deliverNotification({ ...base, recipientId: 'supervisor', type: 'geofence', priority: 'high', title: 'Personnel outside assigned coverage',
-				message: `${deployment.personnelName} has moved outside ${block.label}.`, referenceType: 'personnel', referenceId: deployment.personnelId,
+		const route = block.coverageType === 'route'
+		await Promise.all([deliverNotification({ ...base, type: 'geofence', priority: 'high', title: route ? 'Outside assigned patrol route' : 'Outside assigned patrol coverage',
+			message: route ? `Your recent GPS readings are outside the allowed corridor of ${block.label}. Return to your assigned route or contact your supervisor.` : `Your recent GPS readings are outside ${block.label}. Return to your coverage or contact your supervisor.`, dedupeKey: `patrol-out:${deployment.assignmentId}:${index}:${location.recordedAt.toISOString()}` }),
+			deliverNotification({ ...base, recipientId: 'supervisor', type: 'geofence', priority: 'high', title: route ? 'Personnel outside assigned route' : 'Personnel outside assigned coverage',
+				message: `${deployment.personnelName} has moved outside ${route ? 'the allowed corridor of ' : ''}${block.label}.`, referenceType: 'personnel', referenceId: deployment.personnelId,
 				data: { destination: 'Map', personnelId: deployment.personnelId }, dedupeKey: `patrol-out:${deployment.assignmentId}:${index}:${location.recordedAt.toISOString()}` })])
 	}
 }

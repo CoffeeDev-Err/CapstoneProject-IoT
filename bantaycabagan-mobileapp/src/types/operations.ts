@@ -124,6 +124,7 @@ export type PatrolScheduleBlock = {
   latitude?: number;
   longitude?: number;
   radiusMeters?: number;
+  routeCorridorMeters?: number;
   routePoints?: { latitude: number; longitude: number; label?: string }[];
   geometry?: GeoJSON.Polygon | GeoJSON.MultiPolygon | GeoJSON.LineString | null;
   boundarySource?: string;

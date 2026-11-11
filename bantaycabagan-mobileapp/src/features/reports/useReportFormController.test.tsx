@@ -85,7 +85,7 @@ it('uses valid inside-Cabagan GPS even when the barangay follows a locality pref
 it('keeps valid coordinates when the address is unknown and the officer selects a barangay', async () => {
   const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [{ ...liveOfficer, locationName: 'GPS 17.43050, 121.76500' }] }));
   await act(() => result.current.useCurrentGpsSuggestion());
-  expect(result.current.locationLookupMessage).toContain('confirm the barangay');
+  expect(result.current.locationLookupMessage).toContain('select the barangay');
   await act(() => { result.current.selectBarangay('Catabayungan'); result.current.updateManualLocation('ISU entrance'); });
   expect(result.current.form).toMatchObject({ barangay: 'Catabayungan', location_source: 'gps', latitude: 17.4305, longitude: 121.765 });
 });
