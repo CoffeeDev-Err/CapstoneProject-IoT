@@ -29,6 +29,7 @@ const {
 	serializeTask,
 } = require('./domain')
 const { getOfficerPersonnelId, taskParticipantIds } = require('./access')
+const { deploymentContextAt } = require('../patrolSchedule')
 const { appendFilterCondition, findCursorPage } = require('./pagination')
 const { editValues, assertRevision, saveReport } = require('./reportEdits')
 
@@ -409,7 +410,7 @@ const createReportService = ({
 			throw createValidationError('Severity must be a whole number from 1 to 5.', 'severity')
 		}
 
-		const [matchedDeployment, currentLocation] = await Promise.all([
+		const [deploymentAtIncident, currentLocation] = await Promise.all([
 			Deployment.findOne({
 				personnelId: officer.id,
 				status: { $in: ['active', 'completed'] },
@@ -417,9 +418,11 @@ const createReportService = ({
 			}).select([
 				'patrolAreaId', 'patrolArea', 'deploymentType', 'coverageBarangayCodes',
 				'deploymentPointLabel', 'location',
+				'scheduleBlocks', 'shiftStart', 'shiftEnd',
 			].join(' ')).lean(),
 			CurrentLocation.findOne({ personnelId: officer.id }).lean(),
 		])
+		const matchedDeployment = deploymentContextAt(deploymentAtIncident, occurredAt)
 		const currentCoordinates = currentLocation?.location?.coordinates
 		const hasCurrentCoordinates = Array.isArray(currentCoordinates)
 			&& currentCoordinates.length === 2

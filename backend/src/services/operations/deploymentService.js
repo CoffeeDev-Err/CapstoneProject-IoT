@@ -27,6 +27,9 @@ const {
 const { getOfficerPersonnelId } = require('./access')
 const { appendFilterCondition } = require('./pagination')
 const { emitDeploymentCollection } = require('./events')
+const { normalizePatrolSchedule } = require('../patrolSchedule')
+const { validateVehicleDeployments } = require('../fleetService')
+const { hydratePatrolGeometry } = require('../patrolCoverageService')
 
 const formatDeploymentInstructionsText = (assignment) => {
 	const instructions = String(assignment.instructions || assignment.notes || '').trim()
@@ -57,6 +60,7 @@ const formatDeploymentNotificationMessage = ({ assignment, scheduled, scheduleTe
 }
 
 const normalizeDeploymentConfiguration = (assignment) => {
+  if (assignment.scheduleBlocks?.length) return normalizePatrolSchedule(assignment)
 	const patrolArea = findPatrolArea(assignment.patrolAreaId || assignment.patrolArea)
 	if (!patrolArea) {
 		validatePatrolArea(assignment.patrolArea)
@@ -122,7 +126,7 @@ const createDeploymentService = ({
 	publish,
 	clock = () => new Date(),
 }) => {
-	const { Deployment, Personnel } = models
+	const { Deployment, Personnel, FleetWeek } = models
 	const { emitPersonnelCollection, getPersonnelWithLocations } = personnelService
 	const { deliverNotification } = notificationService
 	const { recordAudit } = auditService
@@ -622,6 +626,8 @@ const createDeploymentService = ({
 			}
 		}
 
+		await validateVehicleDeployments(normalizedAssignments, FleetWeek)
+		await hydratePatrolGeometry(normalizedAssignments, previousById)
 		if (normalizedAssignments.length > 0) {
 			await Deployment.bulkWrite(normalizedAssignments.map((assignment) => {
 				const previous = previousById.get(assignment.id)
@@ -638,6 +644,10 @@ const createDeploymentService = ({
 					patrolArea: assignment.patrolArea,
 					deploymentType: assignment.deploymentType,
 					patrolMode: assignment.patrolMode,
+					scheduleBlocks: assignment.scheduleBlocks || [],
+					vehicleId: assignment.vehicleId || '',
+					vehicleCrew: assignment.vehicleCrew || null,
+					transitionGraceMinutes: assignment.transitionGraceMinutes ?? 10,
 					deploymentPointLabel: assignment.deploymentPointLabel,
 					shiftStart: assignment.shiftStart,
 					shiftEnd: assignment.shiftEnd,

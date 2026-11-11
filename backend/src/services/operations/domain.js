@@ -33,6 +33,7 @@ const isDeploymentCurrent = (deployment, now = new Date()) => (
 const deploymentSignature = (deployment) => createHash('sha256')
 	.update(JSON.stringify({
 		personnelId: deployment.personnelId,
+		...(deployment.scheduleBlocks?.length ? { scheduleBlocks: deployment.scheduleBlocks, vehicleId: deployment.vehicleId, vehicleCrew: deployment.vehicleCrew, transitionGraceMinutes: deployment.transitionGraceMinutes } : {}),
 		patrolAreaId: deployment.patrolAreaId,
 		patrolArea: deployment.patrolArea,
 		deploymentType: deployment.deploymentType || 'area',
@@ -48,6 +49,7 @@ const deploymentSignature = (deployment) => createHash('sha256')
 
 const deploymentNoticeSignature = (deployment) => createHash('sha256')
 	.update(JSON.stringify({
+		...(deployment.scheduleBlocks?.length ? { scheduleBlocks: deployment.scheduleBlocks, vehicleId: deployment.vehicleId, transitionGraceMinutes: deployment.transitionGraceMinutes } : {}),
 		personnelId: deployment.personnelId,
 		patrolAreaId: deployment.patrolAreaId,
 		patrolArea: deployment.patrolArea,
@@ -213,6 +215,10 @@ const serializeDeployment = (deployment, personnelById = new Map()) => {
 	)
 	return {
 		id: deployment.assignmentId,
+		scheduleBlocks: deployment.scheduleBlocks || [],
+		transitionGraceMinutes: deployment.transitionGraceMinutes ?? 10,
+		vehicleId: deployment.vehicleId || '',
+		vehicleCrew: deployment.vehicleCrew || null,
 		groupId: deployment.groupId,
 		personnelId: deployment.personnelId,
 		personnelName: personnelById.get(deployment.personnelId)?.fullName || deployment.personnelName,

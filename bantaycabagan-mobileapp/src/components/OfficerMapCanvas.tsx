@@ -18,6 +18,7 @@ export type OfficerMapCanvasHandle = {
 };
 
 export type OfficerMapCanvasProps = {
+  patrolCoverage?: GeoJSON.FeatureCollection;
   assignment?: DeploymentAssignment;
   backupZones?: BackupMapZone[];
   compassTop?: number;

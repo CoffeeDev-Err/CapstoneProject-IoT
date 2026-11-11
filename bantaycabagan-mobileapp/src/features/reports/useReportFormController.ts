@@ -5,6 +5,7 @@ import { Alert, AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { isCabaganBarangay } from '../../constants/cabaganBarangays';
 import { isInsideCabagan } from '../../constants/cabaganGeofence';
+import { resolveIncidentLocation } from '../../services/incidentLocationApi';
 import type {
   DeploymentAssignment,
   LivePersonnel,
@@ -60,6 +61,7 @@ const hasReportDraftContent = (form: ReportForm, evidencePhoto: ReportEvidenceIn
 );
 
 type Options = {
+  token?: string | null;
   currentPersonnelId: string;
   deployments: DeploymentAssignment[];
   personnel: LivePersonnel[];
@@ -69,6 +71,7 @@ type Options = {
 };
 
 export function useReportFormController({
+  token,
   currentPersonnelId,
   deployments,
   personnel,
@@ -80,6 +83,40 @@ export function useReportFormController({
   const [form, setForm] = useState(createEmptyReportForm);
   const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [locationLookupMessage, setLocationLookupMessage] = useState('');
+  const locationRevision = useRef(0);
+  const resetLocationLookup = () => {
+    locationRevision.current += 1;
+    setIsResolvingLocation(false);
+    setLocationLookupMessage('');
+  };
+
+  const detectIncidentBarangay = async (coordinates: { latitude: number; longitude: number }, fallbackName = '') => {
+    const revision = ++locationRevision.current;
+    setIsResolvingLocation(true);
+    setLocationLookupMessage('');
+    try {
+      const detected = await resolveIncidentLocation(coordinates, token);
+      if (revision !== locationRevision.current) return;
+      const barangay = isCabaganBarangay(detected.barangay) ? detected.barangay : '';
+      setForm(current => ({ ...current, barangay,
+        location: current.location === fallbackName || !current.location ? detected.location : current.location }));
+      setLocationLookupMessage(barangay
+        ? 'Suggested from the incident point. Check it before submitting, especially near a boundary.'
+        : 'Barangay could not be identified. Confirm the incident barangay below.');
+    } catch {
+      if (revision !== locationRevision.current) return;
+      const barangay = getBarangayFromArea(fallbackName);
+      setForm(current => ({ ...current, barangay }));
+      setLocationLookupMessage(barangay
+        ? 'Using the recorded GPS address. Check the barangay before submitting.'
+        : 'Location lookup unavailable. Your pin is saved; confirm the barangay to continue offline.');
+    } finally {
+      if (revision === locationRevision.current) setIsResolvingLocation(false);
+    }
+  };
+  useEffect(() => () => { locationRevision.current += 1; }, []);
   const [editTarget, setEditTarget] = useState<PoliceReport | null>(null);
   const [editReason, setEditReason] = useState('');
   const savingRef = useRef(false);
@@ -138,6 +175,7 @@ export function useReportFormController({
   }, [cancelScheduledDraftSave, currentPersonnelId]);
 
   const openSubmitForm = async (backupTask?: OperationalTask) => {
+    resetLocationLookup();
     cancelScheduledDraftSave();
     draftHydratedRef.current = false;
     setEditTarget(null);
@@ -147,7 +185,6 @@ export function useReportFormController({
       ...createEmptyReportForm(),
       occurred_at: new Date().toISOString(),
       assigned_area: assignedArea,
-      barangay: getBarangayFromArea(assignedArea),
       ...(backupTask ? backupReportFields(backupTask, assignedArea) : {}),
     };
     const backupContext = emptyForm.backup_context;
@@ -176,6 +213,9 @@ export function useReportFormController({
       } else {
         setForm(emptyForm);
         setEvidencePhoto(null);
+        if (typeof emptyForm.latitude === 'number' && typeof emptyForm.longitude === 'number') {
+          void detectIncidentBarangay({ latitude: emptyForm.latitude, longitude: emptyForm.longitude }, emptyForm.location);
+        }
       }
       draftHydratedRef.current = true;
       draftSaveErrorShownRef.current = false;
@@ -197,9 +237,15 @@ export function useReportFormController({
     }
     const assignedArea = selectPersonnelDeployment(deployments, currentPersonnelId)?.patrolArea || '';
     setForm((current) => ({ ...current, ...backupReportFields(task, assignedArea) }));
+    resetLocationLookup();
+    const fields = backupReportFields(task, assignedArea);
+    if (typeof fields.latitude === 'number' && typeof fields.longitude === 'number') {
+      void detectIncidentBarangay({ latitude: fields.latitude, longitude: fields.longitude }, fields.location);
+    }
   };
 
   const openEditForm = (report: PoliceReport) => {
+    resetLocationLookup();
     cancelScheduledDraftSave();
     draftHydratedRef.current = false;
     setEditTarget(report);
@@ -247,6 +293,7 @@ export function useReportFormController({
   }, [cancelScheduledDraftSave, persistDraftNow]);
 
   const closeReportForm = () => {
+    resetLocationLookup();
     setBarangayPickerVisible(false);
     setLocationPickerVisible(false);
     if (editTargetRef.current) {
@@ -383,6 +430,8 @@ export function useReportFormController({
   };
 
   const selectBarangay = (barangay: string) => {
+    resetLocationLookup();
+    setLocationLookupMessage('Barangay confirmed by you. It will be used for incident analytics.');
     setForm((current) => ({
       ...current,
       barangay,
@@ -393,7 +442,7 @@ export function useReportFormController({
     setForm((current) => ({
       ...current,
       location,
-      location_source: current.location_source === 'gps' ? 'gps' : 'manual',
+      location_source: current.location_source,
     }));
   };
 
@@ -407,11 +456,14 @@ export function useReportFormController({
     }
     setForm((current) => ({
       ...current,
+      barangay: '',
+      location: '',
       location_source: 'manual',
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
     }));
     setLocationPickerVisible(false);
+    void detectIncidentBarangay(coordinates);
   };
 
   const useCurrentGpsSuggestion = () => {
@@ -488,17 +540,15 @@ export function useReportFormController({
       latitude,
       longitude,
     }));
-    if (!detectedBarangay) {
-      setBarangayPickerVisible(true);
-      Alert.alert(
-        'Barangay confirmation needed',
-        'Current GPS coordinates were added, but the Cabagan barangay could not be identified. Select the correct barangay and verify the exact place or landmark.',
-      );
-    }
+    void detectIncidentBarangay({ latitude: latitude!, longitude: longitude! }, liveOfficer.locationName);
   };
 
   const handleSubmit = async (close: SheetClose) => {
     if (savingRef.current) return;
+    if (isResolvingLocation) {
+      Alert.alert('Checking incident location', 'Wait for the barangay lookup, or confirm the barangay manually.');
+      return;
+    }
     if (
       !form.title.trim()
       || !form.description.trim()
@@ -614,6 +664,8 @@ export function useReportFormController({
 
   return {
     barangayPickerVisible,
+    isResolvingLocation,
+    locationLookupMessage,
     chooseEvidenceCamera,
     closeReportForm,
     confirmCancelReportForm,

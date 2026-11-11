@@ -30,6 +30,8 @@ import { useOperationalContext } from '../context/OperationalContext';
 import { useMobileTheme } from '../context/ThemeContext';
 import type { LivePersonnel } from '../types/operations';
 import { useCurrentDeployment } from '../features/maps/useCurrentDeployment';
+import { usePatrolSchedule } from '../features/maps/usePatrolSchedule';
+import { useAuth } from '../context/AuthContext';
 import { WebMapFrame } from '../components/WebMapFrame';
 import {
   createMapPersonnel,
@@ -117,7 +119,10 @@ export default function OfficerMapScreen({
   const [mapMode, setMapMode] = useState<MapMode>('street');
   const [threeDEnabled, setThreeDEnabled] = useState(false);
   const [assignmentAcknowledgementPending, setAssignmentAcknowledgementPending] = useState(false);
-  const { assignment, refreshClock } = useCurrentDeployment(deployments);
+  const { assignment: baseAssignment, refreshClock } = useCurrentDeployment(deployments);
+  const { token } = useAuth();
+  const patrol = usePatrolSchedule(baseAssignment, currentOfficer, token);
+  const { assignment, mapAssignment } = patrol;
   const deploymentStyleLabel = assignment?.deploymentType === 'point'
     ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
     : assignment?.deploymentType === 'route'
@@ -261,7 +266,7 @@ export default function OfficerMapScreen({
     stopFollowing: handleStopFollowing,
     webMapRef,
   } = useMapSelectionController({
-    assignment,
+    assignment: mapAssignment,
     currentPersonnelId,
     mapMode,
     mapPersonnel,
@@ -279,10 +284,11 @@ export default function OfficerMapScreen({
   });
   const handleMapLoad = useCallback(() => {
     handleBaseMapLoad();
+    webMapRef.current?.contentWindow?.postMessage({ source: 'bantay-map-command', command: { type: 'patrol-coverage', features: patrol.features } }, '*');
     if (!pendingSelfFocus.current) return;
     pendingSelfFocus.current = false;
     setTimeout(() => focusCurrentOfficer(), 120);
-  }, [focusCurrentOfficer, handleBaseMapLoad]);
+  }, [focusCurrentOfficer, handleBaseMapLoad, webMapRef, patrol.features]);
   const handleOfficerMarkerPress = useCallback((officerId: string) => {
     setDeploymentDetailsOpen(false);
     setSelectedOfficerId(officerId);
@@ -294,7 +300,14 @@ export default function OfficerMapScreen({
     ? mapPersonnel.some((member) => member.id === selectedOfficer.id && member.emergencyActive)
     : false;
   const personnelRosterKey = mapPersonnel.map((member) => member.id).join('|');
-  const deploymentTarget = useMemo(() => resolveDeploymentMapTarget(assignment), [assignment]);
+  const deploymentTarget = useMemo(() => resolveDeploymentMapTarget(mapAssignment), [mapAssignment]);
+  useEffect(() => {
+    if (Platform.OS === 'web') webMapRef.current?.contentWindow?.postMessage({ source: 'bantay-map-command',
+      command: { type: 'patrol-coverage', features: patrol.features } }, '*');
+  }, [patrol.features, webMapRef]);
+  useEffect(() => {
+    if (patrol.previewNext) { const timer = setTimeout(focusDeployment, 160); return () => clearTimeout(timer); }
+  }, [patrol.previewNext, focusDeployment]);
   const canLocateCurrentOfficer = visiblePersonnel.some((member) => (
     isSamePersonnelId(member.id, currentPersonnelId)
     && member.isVisibleOnMap !== false
@@ -339,15 +352,16 @@ export default function OfficerMapScreen({
   const mapHtml = useMemo(() => createLeafletMapHtml({
     latitude: deploymentTarget.latitude,
     longitude: deploymentTarget.longitude,
-    deploymentPointLabel: assignment?.deploymentPointLabel,
-    deploymentType: assignment?.deploymentType,
+    deploymentPointLabel: mapAssignment?.deploymentPointLabel,
+    deploymentType: mapAssignment?.deploymentType,
     hasDeploymentPoint: deploymentTarget.hasExactPoint,
     deploymentFocusZoom: deploymentTarget.zoom,
     currentPersonnelId,
     isDark,
     mapPersonnel,
     backupZones,
-  }), [assignment, backupZones, currentPersonnelId, deploymentTarget, isDark, personnelRosterKey]);
+    patrolCoverage: patrol.features,
+  }), [mapAssignment, backupZones, currentPersonnelId, deploymentTarget, isDark, personnelRosterKey]);
   const handleConfirmAssignment = async () => {
     if (!assignment || assignmentAcknowledgementPending) return;
     setAssignmentAcknowledgementPending(true);
@@ -460,7 +474,8 @@ export default function OfficerMapScreen({
         ) : (
           <OfficerMapCanvas
             ref={nativeMapRef}
-            assignment={assignment}
+            assignment={mapAssignment}
+            patrolCoverage={patrol.features}
             backupZones={backupZones}
             compassTop={compassTop}
             currentPersonnelId={currentPersonnelId}
@@ -777,10 +792,21 @@ export default function OfficerMapScreen({
       {assignment && deploymentDetailsOpen && !selectedOfficer && (
         <DeploymentDetailSheet
           assignment={assignment}
+          currentBlock={patrol.block}
+          nextBlock={patrol.next}
+          minutesLeft={patrol.minutesLeft}
+          guidance={patrol.guidance}
+          onViewNext={() => { void patrol.viewNext(); setDeploymentDetailsOpen(false); }}
           onClose={() => setDeploymentDetailsOpen(false)}
           onViewMap={focusDeployment}
         />
       )}
+      {patrol.previewNext && !selectedOfficer && !deploymentDetailsOpen && <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, padding: 14, gap: 8, borderRadius: 12, backgroundColor: colors.surface }}>
+        <Text style={{ color: colors.text, fontWeight: '700' }}>Next: {patrol.next?.label}</Text>
+        <Text style={{ color: colors.textMuted }}>{patrol.guidance}</Text>
+        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => void patrol.viewNext()}><Text style={{ color: colors.blue }}>View next area / Refresh directions</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={patrol.closePreview}><Text style={{ color: colors.blue }}>Back to current coverage</Text></TouchableOpacity>
+      </View>}
       </View>
     </SafeAreaView>
   );

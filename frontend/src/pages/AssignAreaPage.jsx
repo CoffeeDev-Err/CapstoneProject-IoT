@@ -19,6 +19,7 @@ import { useDeploymentForm } from '../features/deployments/useDeploymentForm'
 import { useCachedPageData } from '../hooks/useCachedPageData'
 import DeploymentDialogs from '../features/deployments/DeploymentDialogs'
 import DeploymentPointModal from '../features/deployments/DeploymentPointModal'
+import PatrolPlanner from '../features/deployments/PatrolPlanner'
 import {
   coverageLabelFor,
   findPatrolArea,
@@ -597,6 +598,7 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   const handleEditAssignment = (assignment) => {
+    if (assignment.vehicleId) { handleEditGroup(resolveGroupId(assignment)); return }
     if (listOnly) {
       navigate('/assign-area', { state: { editAssignment: assignment } })
       return
@@ -762,7 +764,16 @@ function AssignAreaPage({ view = 'form' }) {
         </button>
       </header>
 
-      {!listOnly && (
+      {!listOnly && deploymentsReady && (!editingAssignmentId && !editingGroupId || assignmentForm.scheduleBlocks?.length > 0) && (
+        <PatrolPlanner key={editingGroupId || editingAssignmentId || 'new'}
+          personnel={personnelOptions.filter(p => !p.isMockPersonnel)} assignments={assignments}
+          initialGroup={editingGroupId ? assignments.filter(a => resolveGroupId(a) === editingGroupId)
+            : editingAssignmentId ? assignments.filter(a => a.id === editingAssignmentId) : []}
+          saving={isSaving} ready={deploymentsReady && !isDeploymentsLoading}
+          onSave={commitAssignments} onCancel={() => { setEditingAssignmentId(null); setEditingGroupId(null); resetAssignmentForm(); navigate('/deployments') }} />
+      )}
+
+      {!listOnly && (editingAssignmentId || editingGroupId) && !assignmentForm.scheduleBlocks?.length && (
       <div className="widget-card deployment-form-card slide-up mb-3">
         <h3 className="widget-title mb-3">Assign Personnel</h3>
 

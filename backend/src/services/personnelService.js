@@ -58,7 +58,12 @@ const { updateMockLocations } = createMockMovementService({
 	getPersonnelWithLocations,
 })
 
+const evaluatePatrolCoverage = require('./patrolCoverageService').createPatrolCoverageService({
+	Deployment, CurrentLocation, deliverNotification,
+})
+
 module.exports = {
+	evaluatePatrolCoverage,
 	getDutyGpsHistory: dutyHistoryService.getHistory,
 	emitPersonnelCollection,
 	evaluatePersonnelBattery,

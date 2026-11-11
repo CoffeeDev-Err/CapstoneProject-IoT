@@ -8,6 +8,7 @@ const createBarangayRoutes = ({ authService, controller }) => {
 
 	router.use(authenticate)
 	router.get('/', asyncHandler(controller.getBarangays))
+	router.get('/resolve-location', asyncHandler(controller.resolveIncidentLocation))
 	router.get('/:code', asyncHandler(controller.getBarangay))
 
 	return router

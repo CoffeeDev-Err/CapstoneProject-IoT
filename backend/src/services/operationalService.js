@@ -1,6 +1,7 @@
 const {
 	CurrentLocation,
 	Deployment,
+	FleetWeek,
 	LocationHistory,
 	Personnel,
 	Report,
@@ -77,7 +78,7 @@ const createOperationalService = ({ io, auditService }) => {
 	} = reportService
 	const deploymentService = createDeploymentService({
 		io,
-		models: { Deployment, Personnel },
+		models: { Deployment, Personnel, FleetWeek },
 		loadPersonnelMap,
 		personnelService: { emitPersonnelCollection, getPersonnelWithLocations },
 		notificationService: { createNotification, deliverNotification },

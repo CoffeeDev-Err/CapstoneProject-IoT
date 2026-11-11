@@ -276,6 +276,7 @@ function DeploymentPointMarker({
 
 const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProps>(({
   assignment,
+  patrolCoverage,
   backupZones = [],
   compassTop = 150,
   currentPersonnelId,
@@ -535,6 +536,13 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
             }}
           />
         </GeoJSONSource>
+
+        {patrolCoverage && <GeoJSONSource id="assigned-patrol-coverage" data={patrolCoverage}>
+          <Layer id="assigned-patrol-fill" type="fill" source="assigned-patrol-coverage" filter={['==', ['geometry-type'], 'Polygon']}
+            paint={{ 'fill-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'fill-opacity': 0.12 }} />
+          <Layer id="assigned-patrol-line" type="line" source="assigned-patrol-coverage"
+            paint={{ 'line-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'line-width': 3, 'line-dasharray': [3, 2] }} />
+        </GeoJSONSource>}
 
         {radiusFeatures.map(({ zone, response, arrival }) => (
           <React.Fragment key={`backup-zone-${zone.id}`}>

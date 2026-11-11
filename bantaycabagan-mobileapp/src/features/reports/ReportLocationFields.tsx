@@ -1,93 +1,83 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { mobileTheme } from '../../constants/mobileTheme';
 import { useMobileTheme } from '../../context/ThemeContext';
 import { REPORT_FIELD_LIMITS, type ReportForm } from './reportForm';
 
-type ReportLocationFieldsProps = {
+type Props = {
   form: ReportForm;
+  isResolvingLocation?: boolean;
+  locationLookupMessage?: string;
   onEditLocation: (value: string) => void;
   onOpenBarangays: () => void;
   onOpenMap: () => void;
   onUseCurrentGps: () => void;
 };
 
-export function ReportLocationFields({
-  form, onEditLocation, onOpenBarangays, onOpenMap, onUseCurrentGps,
-}: ReportLocationFieldsProps) {
-  const { colors, isDark } = useMobileTheme();
-  const inputSurface = isDark ? styles.floatingSurfaceDark : null;
-  const locationSource = form.location_source === 'gps'
-    ? "Officer's current GPS"
-    : form.location_source === 'backup_request'
-      ? 'GPS location recorded with backup request'
-    : typeof form.latitude === 'number' && typeof form.longitude === 'number'
-      ? 'Incident point pinned on map'
-      : 'Manually entered incident place';
-  return (
-    <>
-      <Text style={[styles.label, { color: colors.textMuted }]}>BARANGAY</Text>
-      <TouchableOpacity style={[styles.select, inputSurface]} onPress={onOpenBarangays}>
-        <Icon name="map" size={18} color={mobileTheme.purple} />
-        <Text style={[styles.fieldText, { color: form.barangay ? colors.text : colors.textMuted }]}>
-          {form.barangay || 'Select a Cabagan barangay'}
-        </Text>
-        <Icon name="keyboard-arrow-down" size={21} color={colors.textMuted} />
-      </TouchableOpacity>
-
-      <Text style={[styles.label, { color: colors.textMuted }]}>EXACT INCIDENT PLACE / LANDMARK</Text>
-      <TextInput style={[styles.input, inputSurface, { color: colors.text }]}
-        value={form.location} onChangeText={onEditLocation}
-        maxLength={REPORT_FIELD_LIMITS.location}
-        placeholder="Example: Anao Public Market entrance" placeholderTextColor={colors.textMuted} />
-      <View style={styles.assistRow}>
-        <View style={styles.source}>
-          <Icon name={form.location_source === 'gps' || form.location_source === 'backup_request' ? 'gps-fixed' : 'edit-location-alt'}
-            size={15} color={colors.textMuted} />
-          <Text style={[styles.sourceText, { color: colors.textMuted }]}>
-            {locationSource}
-          </Text>
+export function ReportLocationFields({ form, isResolvingLocation, locationLookupMessage,
+  onEditLocation, onOpenBarangays, onOpenMap, onUseCurrentGps }: Props) {
+  const { colors } = useMobileTheme();
+  const hasPoint = Number.isFinite(form.latitude) && Number.isFinite(form.longitude);
+  const source = form.location_source === 'gps' ? 'Tracker GPS'
+    : form.location_source === 'backup_request' ? 'Backup request location' : 'Selected incident point';
+  const surface = { backgroundColor: colors.surfaceMuted, borderColor: colors.border };
+  return <View style={styles.section}>
+    <Text style={[styles.heading, { color: colors.text }]}>Incident location</Text>
+    <Text style={[styles.helper, { color: colors.textMuted }]}>Choose where the incident happened, even if it is outside your assigned patrol area.</Text>
+    <View style={styles.actions}>
+      <TouchableOpacity accessibilityRole="button" onPress={onUseCurrentGps} style={[styles.action, surface]}>
+        <Icon name="my-location" size={21} color={colors.blue} />
+        <View style={styles.copy}>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>Use current GPS</Text>
+          <Text style={[styles.helper, { color: colors.textMuted }]}>I am at the incident location</Text>
         </View>
-        <TouchableOpacity style={[styles.gpsButton, inputSurface]} onPress={onUseCurrentGps}>
-          <Icon name="my-location" size={16} color={mobileTheme.purple} />
-          <Text style={styles.gpsText}>Use current GPS</Text>
+      </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" onPress={onOpenMap} style={[styles.action, surface]}>
+        <Icon name="add-location-alt" size={21} color={colors.blue} />
+        <View style={styles.copy}>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>Select on map</Text>
+          <Text style={[styles.helper, { color: colors.textMuted }]}>Pin the actual incident location</Text>
+        </View>
+        <Icon name="chevron-right" size={20} color={colors.textMuted} />
+      </TouchableOpacity>
+    </View>
+    {hasPoint && <Text style={[styles.coordinates, { color: colors.textMuted }]}>{source} · {form.latitude!.toFixed(6)}, {form.longitude!.toFixed(6)}</Text>}
+    <View style={[styles.result, { borderColor: colors.border }]}>
+      <Text style={[styles.label, { color: colors.textMuted }]}>INCIDENT BARANGAY</Text>
+      <View style={styles.resultRow}>
+        {isResolvingLocation && <ActivityIndicator color={colors.blue} accessibilityLabel="Identifying incident barangay" />}
+        <Text accessibilityLiveRegion="polite" style={[styles.resultName, { color: colors.text }]}>
+          {isResolvingLocation ? 'Identifying barangay…' : form.barangay || (hasPoint ? 'Confirmation needed' : 'Choose an incident location')}
+        </Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Confirm or correct incident barangay"
+          onPress={onOpenBarangays} style={styles.correct}>
+          <Text style={[styles.link, { color: colors.blue }]}>{form.barangay ? 'Correct' : 'Confirm'}</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={[styles.mapButton, inputSurface]} onPress={onOpenMap}>
-        <View style={styles.mapIcon}><Icon name="add-location-alt" size={20} color={mobileTheme.purple} /></View>
-        <View style={styles.mapCopy}>
-          <Text style={[styles.mapTitle, { color: colors.text }]}>Pick the incident point on map</Text>
-          <Text style={[styles.mapMeta, { color: colors.textMuted }]}>
-            {typeof form.latitude === 'number' && typeof form.longitude === 'number'
-              ? `${form.latitude.toFixed(6)}, ${form.longitude.toFixed(6)}`
-              : 'Recommended when the report is submitted after leaving the scene'}
-          </Text>
-        </View>
-        <Icon name="chevron-right" size={22} color={colors.textMuted} />
-      </TouchableOpacity>
-      <Text style={[styles.helper, { color: colors.textMuted }]}>
-        Verify the actual incident place. Your current position may be different if you submit later.
-      </Text>
-    </>
-  );
+      <Text style={[styles.helper, { color: colors.textMuted }]}>{locationLookupMessage || 'The incident barangay is used for reports and analytics. If GPS or the map is unavailable, confirm it manually.'}</Text>
+    </View>
+    <Text style={[styles.label, { color: colors.textMuted }]}>EXACT PLACE / LANDMARK</Text>
+    <TextInput accessibilityLabel="Exact incident place or landmark" style={[styles.input, surface, { color: colors.text }]}
+      value={form.location} onChangeText={onEditLocation} multiline
+      maxLength={REPORT_FIELD_LIMITS.location} placeholder="Example: Public market, main entrance"
+      placeholderTextColor={colors.textMuted} />
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  label: { marginTop: 14, marginBottom: 6, fontSize: 10, fontWeight: '800' },
-  select: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 7, elevation: 3 },
-  fieldText: { flex: 1, fontSize: 13, lineHeight: 18 },
-  input: { minHeight: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, fontSize: 13, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 7, elevation: 3 },
-  assistRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  source: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sourceText: { flex: 1, fontSize: 10 },
-  gpsButton: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: mobileTheme.purple, borderRadius: 18, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#312e81', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 2 },
-  gpsText: { color: mobileTheme.purple, fontSize: 10, fontWeight: '800' },
-  mapButton: { minHeight: 70, marginTop: 10, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, backgroundColor: mobileTheme.surfaceMuted, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.11, shadowRadius: 8, elevation: 3 },
-  mapIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: mobileTheme.purpleSoft },
-  mapCopy: { flex: 1 },
-  mapTitle: { fontSize: 12, fontWeight: '800' },
-  mapMeta: { marginTop: 3, fontSize: 9, lineHeight: 14 },
-  helper: { marginTop: 7, fontSize: 10, lineHeight: 15 },
-  floatingSurfaceDark: { borderColor: 'transparent', backgroundColor: '#101f38', shadowColor: '#000000', shadowOpacity: 0.36, elevation: 4 },
+  section: { marginTop: 20, gap: 8 },
+  heading: { fontSize: 16, fontWeight: '700' },
+  helper: { fontSize: 12, lineHeight: 18 },
+  actions: { gap: 8, marginTop: 4 },
+  action: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, borderWidth: 1 },
+  copy: { flex: 1, gap: 2 },
+  actionTitle: { fontSize: 14, fontWeight: '700' },
+  coordinates: { fontSize: 12, lineHeight: 18 },
+  result: { borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 12, marginVertical: 6 },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  resultName: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 22 },
+  correct: { minHeight: 48, minWidth: 64, justifyContent: 'center', alignItems: 'center' },
+  link: { fontSize: 13, fontWeight: '700' },
+  label: { fontSize: 11, fontWeight: '700', lineHeight: 17 },
+  input: { minHeight: 48, borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, textAlignVertical: 'top' },
 });

@@ -113,6 +113,7 @@ app.use('/api/analytics', createAnalyticsRoutes({ authService, controller: analy
 app.use('/api/audit-logs', createAuditRoutes({ authService, controller: auditController }))
 app.use('/api/auth', createAuthRoutes({ authService, controller: authController }))
 app.use('/api/barangays', createBarangayRoutes({ authService, controller: barangayController }))
+app.use('/api/patrol', require('./routes/patrolRoutes')({ authService, models }))
 app.use('/api/dashboard', createDashboardRoutes({ authService, controller: analyticsController }))
 app.use('/api/gps-devices', createGpsDeviceRoutes({ authService, controller: gpsDeviceController }))
 app.use('/api/locations', createLocationRoutes(personnelController))

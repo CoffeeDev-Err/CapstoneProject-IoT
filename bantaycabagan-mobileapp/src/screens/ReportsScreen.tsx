@@ -94,6 +94,7 @@ const dateRangeFor = (preset: ReportDatePreset) => {
 };
 
 export default function ReportsScreen() {
+  const { token } = useAuth();
   const [backupPickerVisible, setBackupPickerVisible] = useState(false);
   const { colors, isDark } = useMobileTheme();
   const {
@@ -120,6 +121,8 @@ export default function ReportsScreen() {
   } = useOperationalContext();
   const {
     barangayPickerVisible,
+    isResolvingLocation,
+    locationLookupMessage,
     chooseEvidenceCamera,
     closeReportForm,
     confirmCancelReportForm,
@@ -146,6 +149,7 @@ export default function ReportsScreen() {
     useCurrentGpsSuggestion,
     usePinnedLocation,
   } = useReportFormController({
+    token,
     currentPersonnelId,
     deployments,
     personnel,
@@ -153,7 +157,6 @@ export default function ReportsScreen() {
     submitReport,
     editReport,
   });
-  const { token } = useAuth();
   const route = useRoute<RouteProp<{
     Reports: {
       reportId?: string;
@@ -575,6 +578,8 @@ export default function ReportsScreen() {
 
             <ReportLocationFields
               form={form}
+              isResolvingLocation={isResolvingLocation}
+              locationLookupMessage={locationLookupMessage}
               onEditLocation={updateManualLocation}
               onOpenBarangays={() => setBarangayPickerVisible(true)}
               onOpenMap={() => {
@@ -684,8 +689,8 @@ export default function ReportsScreen() {
       >
         <View style={[styles.modalHeader, isDark && themeStyles.border]}>
           <View>
-            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Select Barangay</Text>
-            <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Official barangays of Cabagan only</Text>
+            <Text style={[styles.modalTitle, isDark && themeStyles.text]}>Confirm incident barangay</Text>
+            <Text style={[styles.modalSubtitle, isDark && themeStyles.muted]}>Where the incident happened, not your deployment area</Text>
           </View>
         </View>
         <FlatList

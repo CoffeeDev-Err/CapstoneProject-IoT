@@ -162,6 +162,7 @@ const resolveLocationName = async (latitudeValue, longitudeValue) => {
 }
 
 module.exports = {
+	scheduleRequest,
 	formatCoordinates,
 	getLocalLocationName,
 	resolveLocationName,

@@ -119,6 +119,7 @@ const createOperationalRuntime = ({
 			await evaluatePersonnelBattery({ io })
 			await evaluatePersonnelInactivity({ io })
 			await runGeofenceCheck()
+			await personnelService.evaluatePatrolCoverage?.({ io })
 			await operationalService.finalizeReportRouteSnapshots()
 		} catch (error) {
 			logger.error('Operational lifecycle check failed:', error.message)

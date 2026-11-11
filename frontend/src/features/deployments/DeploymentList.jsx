@@ -185,6 +185,17 @@ function DeploymentList({
                             : assignment.deploymentType === 'route'
                               ? `Route patrol${assignment.patrolMode ? ` · ${{ walk: 'Walk', car: 'Car', motorcycle: 'Motorcycle' }[assignment.patrolMode]}` : ''}` : 'Area patrol'}
                         </small>
+                        {assignment.scheduleBlocks?.length > 0 && <details className="assignment-schedule-details">
+                          <summary>{assignment.scheduleBlocks.length} scheduled {assignment.deploymentType === 'route' ? 'routes' : 'areas'}</summary>
+                          <ol>{assignment.scheduleBlocks.map((block, index) => <li key={index}>
+                            <strong>{block.label}</strong><br />
+                            {formatDateTime(new Date(Date.parse(assignment.shiftStart) + block.offsetMinutes * 60000).toISOString())}
+                            {' · '}{block.durationMinutes} minutes
+                            {block.coverageType === 'custom' && ` · ${block.radiusMeters} m radius`}
+                            {block.coverageType === 'barangay' && !block.geometry && ' · Boundary unavailable'}
+                          </li>)}</ol>
+                        </details>}
+                        {assignment.vehicleId && <small className="d-block">{assignment.vehicleId.replaceAll('-', ' ')}{assignment.vehicleCrew?.driverId === assignment.personnelId ? ' · Driver' : ''}</small>}
                       </td>
                       <td data-label="Instructions" className="assignment-instructions-cell">
                         <button
@@ -218,6 +229,8 @@ function DeploymentList({
                             type="button"
                             className="assignment-delete-btn"
                             onClick={() => onDeleteAssignment(assignment)}
+                            disabled={Boolean(assignment.vehicleId)}
+                            title={assignment.vehicleId ? 'Use the group menu to remove the complete vehicle deployment.' : undefined}
                           >
                             Delete
                           </button>

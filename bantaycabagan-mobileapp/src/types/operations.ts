@@ -115,7 +115,26 @@ export type ReportEvidenceInput = {
   captured_at: string;
 };
 
+export type PatrolScheduleBlock = {
+  label: string;
+  offsetMinutes: number;
+  durationMinutes: number;
+  coverageType: 'custom' | 'barangay' | 'route';
+  barangay?: string;
+  latitude?: number;
+  longitude?: number;
+  radiusMeters?: number;
+  routePoints?: { latitude: number; longitude: number; label?: string }[];
+  geometry?: GeoJSON.Polygon | GeoJSON.MultiPolygon | GeoJSON.LineString | null;
+  boundarySource?: string;
+  roadDirections?: boolean;
+};
+
 export type DeploymentAssignment = {
+  transitionGraceMinutes?: number;
+  scheduleBlocks?: PatrolScheduleBlock[];
+  vehicleId?: string;
+  vehicleCrew?: { weekStart: string; driverId: string; personnelIds: string[] } | null;
   id: string;
   groupId: string;
   personnelId: string;

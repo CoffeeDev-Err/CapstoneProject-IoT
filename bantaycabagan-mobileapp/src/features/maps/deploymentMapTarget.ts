@@ -31,6 +31,10 @@ const firstCatalogCenter = (assignment?: DeploymentAssignment) => {
 export const resolveDeploymentMapTarget = (
   assignment?: DeploymentAssignment,
 ): DeploymentMapTarget => {
+  if (assignment?.scheduleBlocks?.length && hasCoordinate(assignment.latitude) && hasCoordinate(assignment.longitude)) {
+    return { latitude: Number(assignment.latitude), longitude: Number(assignment.longitude),
+      hasExactPoint: assignment.hasDeploymentPoint !== false, zoom: assignment.hasDeploymentPoint === false ? 14 : 16 };
+  }
   if (assignment && hasCoordinate(assignment.latitude) && hasCoordinate(assignment.longitude)
     && assignment.hasDeploymentPoint !== false) {
     return {

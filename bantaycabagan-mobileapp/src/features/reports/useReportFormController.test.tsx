@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react-native';
 import { Alert, AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useReportFormController } from './useReportFormController';
+import { resolveIncidentLocation } from '../../services/incidentLocationApi';
+jest.mock('../../services/incidentLocationApi', () => ({ resolveIncidentLocation: jest.fn() }));
 import type { DeploymentAssignment, LivePersonnel, OperationalTask, PoliceReport } from '../../types/operations';
 import {
   clearReportDraft,
@@ -23,6 +25,7 @@ jest.mock('../../services/offlineReportQueue', () => ({
 const options = { currentPersonnelId: 'one', deployments: [], personnel: [], resolveReport: jest.fn(), submitReport: jest.fn() };
 beforeEach(() => {
   jest.resetAllMocks();
+  jest.mocked(resolveIncidentLocation).mockRejectedValue(new Error('Offline'));
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValue({ granted: true } as Awaited<ReturnType<typeof ImagePicker.requestCameraPermissionsAsync>>);
   jest.mocked(loadReportDraft).mockResolvedValue(null);
@@ -82,13 +85,29 @@ it('uses valid inside-Cabagan GPS even when the barangay follows a locality pref
 it('keeps valid coordinates when the address is unknown and the officer selects a barangay', async () => {
   const { result } = await renderHook(() => useReportFormController({ ...options, personnel: [{ ...liveOfficer, locationName: 'GPS 17.43050, 121.76500' }] }));
   await act(() => result.current.useCurrentGpsSuggestion());
-  expect(result.current.barangayPickerVisible).toBe(true);
-  expect(Alert.alert).toHaveBeenCalledWith(
-    'Barangay confirmation needed',
-    expect.stringContaining('Current GPS coordinates were added'),
-  );
+  expect(result.current.locationLookupMessage).toContain('confirm the barangay');
   await act(() => { result.current.selectBarangay('Catabayungan'); result.current.updateManualLocation('ISU entrance'); });
   expect(result.current.form).toMatchObject({ barangay: 'Catabayungan', location_source: 'gps', latitude: 17.4305, longitude: 121.765 });
+});
+
+it('detects the barangay from a new map pin and replaces the previous barangay', async () => {
+  jest.mocked(resolveIncidentLocation).mockResolvedValue({ latitude: 17.4305, longitude: 121.765,
+    barangay: 'Catabayungan', location: 'Eastern, Catabayungan, Cabagan' });
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(() => result.current.selectBarangay('Cubag'));
+  await act(() => result.current.usePinnedLocation({ latitude: 17.4305, longitude: 121.765 }));
+  expect(result.current.form.barangay).toBe('Catabayungan');
+});
+
+it('does not overwrite a manual correction when a delayed lookup finishes', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof resolveIncidentLocation>>) => void;
+  jest.mocked(resolveIncidentLocation).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const { result } = await renderHook(() => useReportFormController(options));
+  await act(() => result.current.usePinnedLocation({ latitude: 17.4305, longitude: 121.765 }));
+  await act(() => result.current.selectBarangay('Cubag'));
+  await act(() => finish({ latitude: 17.4305, longitude: 121.765, barangay: 'Centro', location: 'Centro' }));
+  expect(result.current.form.barangay).toBe('Cubag');
+  expect(result.current.isResolvingLocation).toBe(false);
 });
 it('uses an inside-Cabagan map pin and identifies it as a manual map selection', async () => {
   const { result } = await renderHook(() => useReportFormController(options));

@@ -1,9 +1,10 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { SwipeDismissCard } from '../../components/SwipeDismissSheet';
+import { SheetScrollView, SwipeDismissCard } from '../../components/SwipeDismissSheet';
 import { mobileTheme } from '../../constants/mobileTheme';
 import { useMobileTheme } from '../../context/ThemeContext';
-import type { DeploymentAssignment } from '../../types/operations';
+import type { DeploymentAssignment, PatrolScheduleBlock } from '../../types/operations';
 
 const deploymentTypeLabel = (assignment: DeploymentAssignment) => (
   assignment.deploymentType === 'point'
@@ -28,12 +29,20 @@ export function DeploymentDetailSheet({
   assignment,
   onClose,
   onViewMap,
+  currentBlock, nextBlock, minutesLeft, guidance, onViewNext,
 }: {
   assignment: DeploymentAssignment;
   onClose: () => void;
   onViewMap: () => void;
+  currentBlock?: PatrolScheduleBlock;
+  nextBlock?: PatrolScheduleBlock;
+  minutesLeft?: number;
+  guidance?: string;
+  onViewNext?: () => void;
 }) {
   const { colors } = useMobileTheme();
+  const { height } = useWindowDimensions();
+  const [showSchedule, setShowSchedule] = useState(false);
   const exactLocation = assignment.hasDeploymentPoint !== false
     && Number.isFinite(assignment.latitude)
     && Number.isFinite(assignment.longitude);
@@ -41,7 +50,7 @@ export function DeploymentDetailSheet({
   return (
     <SwipeDismissCard key={assignment.id} style={[styles.sheet, { backgroundColor: colors.surface }]} handleColor={colors.border} onClose={onClose}>
       {({ close }) => (
-        <View style={styles.content}>
+        <SheetScrollView style={{ maxHeight: height * 0.72 }} contentContainerStyle={styles.content}>
           <View style={styles.header}>
             <View style={styles.locationIcon}>
               <Icon name="location-on" size={25} color="#FFFFFF" />
@@ -75,13 +84,33 @@ export function DeploymentDetailSheet({
                 ? assignment.coverageBarangays.join(', ')
                 : assignment.patrolArea}
             />
-            <Detail icon="schedule" label="Shift" value={formatShift(assignment)} />
+            <Detail icon="schedule" label="Full duty" value={formatShift(assignment)} />
+            {currentBlock && <Detail icon="timer" label="Current schedule" value={`${currentBlock.label} · ${minutesLeft} minutes remaining`} />}
+            {!!assignment.scheduleBlocks?.length && <Detail icon="timer" label="Travel allowance" value={`${assignment.transitionGraceMinutes ?? 10} minutes after a change of area before outside-coverage warnings`} />}
+            {currentBlock?.coverageType === 'custom' && <Detail icon="map" label="Assigned coverage" value={`${currentBlock.radiusMeters} m radius`} />}
+            {currentBlock?.coverageType === 'barangay' && <Detail icon="map" label="Barangay boundary" value={currentBlock.geometry ? 'PSA indicative boundary. Confirm local coverage with your supervisor.' : 'Boundary unavailable. Follow your assigned barangay; automatic boundary warnings are unavailable.'} />}
+            {assignment.vehicleId && <Detail icon="directions-car" label="Vehicle" value={`${assignment.vehicleId.replaceAll('-', ' ')} · Week of ${assignment.vehicleCrew?.weekStart || ''}`} />}
             <Detail
               icon="notes"
               label="Instructions"
               value={assignment.notes?.trim() || 'No additional instructions.'}
             />
           </View>
+
+          {nextBlock && <View style={{ gap: 8 }}>
+            <Text style={{ color: colors.text }}>{minutesLeft !== undefined && minutesLeft <= 10 ? `Your schedule at ${currentBlock?.label} is ending soon. Prepare to move to ${nextBlock.label}.` : `Next: ${nextBlock.label}`}</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="View next area" onPress={onViewNext} style={[styles.viewMapButton, { backgroundColor: colors.blue }]}>
+              <Icon name="directions" size={19} color="#fff" /><Text style={styles.viewMapText}>View next area</Text>
+            </TouchableOpacity>
+            {!!guidance && <Text style={{ color: colors.textMuted }}>{guidance}</Text>}
+          </View>}
+          {!!assignment.scheduleBlocks?.length && <>
+            <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showSchedule }} style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setShowSchedule(!showSchedule)}>
+              <Text style={{ color: colors.blue }}>{showSchedule ? 'Hide' : 'View'} full duty schedule</Text>
+            </TouchableOpacity>
+            {showSchedule && assignment.scheduleBlocks.map((block, index) => <Detail key={index} icon="schedule" label={block.label}
+              value={`${new Date(Date.parse(assignment.shiftStart!) + block.offsetMinutes * 60000).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })} · ${block.durationMinutes} minutes`} />)}
+          </>}
 
           <TouchableOpacity
             accessibilityLabel="View deployment on map"
@@ -91,14 +120,14 @@ export function DeploymentDetailSheet({
             <Icon name="my-location" size={19} color="#FFFFFF" />
             <Text style={styles.viewMapText}>View on Map</Text>
           </TouchableOpacity>
-        </View>
+        </SheetScrollView>
       )}
     </SwipeDismissCard>
   );
 }
 
 function Detail({ icon, label, value }: {
-  icon: 'map' | 'notes' | 'place' | 'schedule';
+  icon: 'map' | 'notes' | 'place' | 'schedule' | 'timer' | 'directions-car';
   label: string;
   value: string;
 }) {

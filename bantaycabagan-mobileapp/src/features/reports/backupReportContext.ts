@@ -13,7 +13,7 @@ export function backupReportFields(task: OperationalTask, assignedArea: string):
     backup_task_id: task.id,
     occurred_at: task.created_at,
     assigned_area: task.assigned_area || assignedArea,
-    barangay: getBarangayFromArea(task.assigned_area || task.location || assignedArea),
+    barangay: getBarangayFromArea(task.location),
     location: task.location,
     location_source: usableLocation ? 'backup_request' : 'manual',
     latitude: usableLocation ? latitude : undefined,

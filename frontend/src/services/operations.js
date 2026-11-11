@@ -122,7 +122,13 @@ export const getManageableDeployments = () => (
 export const replaceDeployments = async (assignments) => {
   const payload = await apiRequest('/api/deployments', {
     method: 'PUT',
-    body: JSON.stringify({ assignments }),
+    body: JSON.stringify({ assignments: assignments.map(assignment => ({ ...assignment,
+      ...(assignment.scheduleBlocks?.length && { scheduleBlocks: assignment.scheduleBlocks.map(block => ({
+        label: block.label, offsetMinutes: block.offsetMinutes, durationMinutes: block.durationMinutes,
+        coverageType: block.coverageType, barangay: block.barangay,
+        latitude: block.latitude, longitude: block.longitude, radiusMeters: block.radiusMeters, routePoints: block.routePoints,
+      })) }),
+    })) }),
   })
   return payload.deployments
 }

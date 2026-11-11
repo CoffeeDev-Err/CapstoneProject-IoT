@@ -51,6 +51,8 @@ export const deploymentDetailsFrom = (source = {}) => {
     && Number.isFinite(latitude)
     && Number.isFinite(longitude)
   return {
+    scheduleBlocks: source.scheduleBlocks || [],
+    vehicleId: source.vehicleId || '',
     patrolAreaId: area.id,
     patrolArea: area.name,
     deploymentType: source.deploymentType || area.defaultDeploymentType,

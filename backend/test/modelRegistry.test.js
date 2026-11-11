@@ -21,6 +21,7 @@ const EXPECTED_MODEL_CONTRACTS = {
 	PushDevice: ['push_devices', 2],
 	PushDelivery: ['push_deliveries', 3],
 	AuditLog: ['audit_logs', 3],
+	FleetWeek: ['fleet_weeks', 1],
 }
 
 describe('model registry compatibility surface', () => {

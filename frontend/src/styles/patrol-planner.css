@@ -1,0 +1,33 @@
+.patrol-planner { max-width: 1180px; margin-inline: auto; color: var(--text-primary, #172b4d); }
+.patrol-planner header h3 { font-size: 1.4rem; margin: 0 0 8px; }
+.patrol-planner p,.patrol-planner small { color: var(--text-secondary, #475569); line-height: 1.5; }
+.patrol-planner form { display: grid; gap: 24px; }
+.patrol-planner fieldset { border: 0; padding: 0; min-width: 0; margin: 0; }
+.patrol-planner legend { float: none; font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; }
+.patrol-planner label { display: flex; flex-direction: column; gap: 7px; font-size: .9rem; font-weight: 600; }
+.patrol-planner input:not([type=checkbox]):not([type=radio]),.patrol-planner select,.patrol-planner textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 9px; background: var(--surface-card, #fff); color: inherit; min-height: 44px; }
+.patrol-planner button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border-color, #cbd5e1); background: var(--surface-muted, #f8fafc); color: inherit; }
+.patrol-planner button.report-generate-btn { background: var(--interactive-primary, #2563eb); color: white; border-color: transparent; }
+.patrol-planner button:focus-visible,.patrol-planner input:focus-visible,.patrol-planner select:focus-visible,.patrol-planner textarea:focus-visible { outline: 3px solid #3b82f6; outline-offset: 2px; }
+.patrol-planner button:disabled { opacity: .55; cursor: not-allowed; }
+.patrol-planner__styles { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.patrol-planner__styles button { justify-content: flex-start; padding: 18px; text-align: left; }
+.patrol-planner__styles button span { display: grid; gap: 5px; }
+.patrol-planner__styles button.is-active { border-color: #3b82f6; box-shadow: inset 0 0 0 1px #3b82f6; }
+.patrol-planner__timing,.patrol-planner__block-fields { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 14px; }
+.patrol-planner__timing small { grid-column: 1/-1; }
+.patrol-planner__blocks { padding: 0; list-style: none; display: grid; gap: 16px; }
+.patrol-planner__route-points { padding: 0; list-style: none; display: grid; gap: 10px; }
+.patrol-planner__blocks>li { border: 1px solid var(--border-color,#cbd5e1); border-left: 3px solid #3b82f6; border-radius: 10px; padding: 18px; display: grid; gap: 14px; }
+.patrol-planner__block-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.patrol-planner__modes { display: flex; gap: 20px; flex-wrap: wrap; }
+.patrol-planner__modes label,.patrol-planner__crew-list label { flex-direction: row; align-items: center; min-height: 44px; gap: 10px; }
+.patrol-planner__crew-list { max-height: 240px; overflow: auto; padding: 8px; }
+.patrol-planner__fleet { border-bottom: 1px solid var(--border-color,#cbd5e1); padding: 16px 0; margin-bottom: 24px; }
+.patrol-planner__fleet summary { cursor: pointer; padding: 8px 0; font-weight: 700; }
+.patrol-planner__fleet summary span { font-size: .85rem; font-weight: 400; margin-left: 12px; }
+.patrol-planner__vehicle-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-block: 16px; }
+.patrol-planner__vehicle-grid fieldset { padding: 14px; border: 1px solid var(--border-color,#cbd5e1); border-radius: 10px; }
+.patrol-planner__error { color: var(--danger, #b91c1c) !important; }
+.patrol-planner footer { display: flex; gap: 12px; }
+@media(max-width:700px) { .patrol-planner__styles,.patrol-planner__timing,.patrol-planner__block-fields,.patrol-planner__vehicle-grid { grid-template-columns: 1fr; } .patrol-planner__blocks>li { padding: 12px; } }

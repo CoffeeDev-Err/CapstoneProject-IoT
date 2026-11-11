@@ -6,6 +6,7 @@ import {
 } from './backupRadiusGeometry';
 
 type LeafletMapHtmlOptions = {
+  patrolCoverage?: GeoJSON.FeatureCollection;
   latitude?: number;
   longitude?: number;
   deploymentPointLabel?: string;
@@ -50,6 +51,7 @@ export const createLeafletMapHtml = ({
   isDark,
   mapPersonnel,
   backupZones = [],
+  patrolCoverage = { type: 'FeatureCollection', features: [] },
 }: LeafletMapHtmlOptions) => {
     const currentOfficerId = JSON.stringify(currentPersonnelId);
     const initialPersonnel = JSON.stringify(mapPersonnel);
@@ -302,8 +304,10 @@ export const createLeafletMapHtml = ({
               }
             };
 
+            let patrolLayer=L.geoJSON(${JSON.stringify(patrolCoverage)}, {style:feature=>({color:feature.properties.next?'#f59e0b':'#2563eb',weight:3,dashArray:'6 4',fillOpacity:.12})}).addTo(map);
             window.handleMapCommand=(command)=>{
               if(!command)return;
+              if(command.type==='patrol-coverage'){patrolLayer.clearLayers();patrolLayer.addData(command.features);}
               if(command.type==='update-personnel')window.updatePersonnel(command.personnel);
               if(command.type==='focus-deployment')window.focusDeployment();
               if(command.type==='focus-officer')window.focusOfficer(command.officerId);
