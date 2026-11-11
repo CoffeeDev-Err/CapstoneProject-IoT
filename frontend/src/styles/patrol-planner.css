@@ -1,10 +1,10 @@
 .patrol-planner { max-width: 1180px; margin-inline: auto; color: var(--text-primary, #172b4d); }
-.patrol-planner header h3 { font-size: 1.4rem; margin: 0 0 8px; }
+.patrol-planner header h3 { font-size: var(--font-size-2xl); margin: 0 0 8px; }
 .patrol-planner p,.patrol-planner small { color: var(--text-secondary, #475569); line-height: 1.5; }
 .patrol-planner form { display: grid; gap: 24px; }
 .patrol-planner fieldset { border: 0; padding: 0; min-width: 0; margin: 0; }
-.patrol-planner legend { float: none; font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; }
-.patrol-planner label { display: flex; flex-direction: column; gap: 7px; font-size: .9rem; font-weight: 600; }
+.patrol-planner legend { float: none; font-size: var(--font-size-lg); font-weight: 700; margin-bottom: 12px; }
+.patrol-planner label { display: flex; flex-direction: column; gap: 7px; font-size: var(--font-size-sm); font-weight: 600; }
 .patrol-planner input:not([type=checkbox]):not([type=radio]),.patrol-planner select,.patrol-planner textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 9px; background: var(--surface-card, #fff); color: inherit; min-height: 44px; }
 .patrol-planner button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border-color, #cbd5e1); background: var(--surface-muted, #f8fafc); color: inherit; }
 .patrol-planner button.report-generate-btn { background: var(--interactive-primary, #2563eb); color: white; border-color: transparent; }
@@ -25,7 +25,7 @@
 .patrol-planner__crew-list { max-height: 240px; overflow: auto; padding: 8px; }
 .patrol-planner__fleet { border-bottom: 1px solid var(--border-color,#cbd5e1); padding: 16px 0; margin-bottom: 24px; }
 .patrol-planner__fleet summary { cursor: pointer; padding: 8px 0; font-weight: 700; }
-.patrol-planner__fleet summary span { font-size: .85rem; font-weight: 400; margin-left: 12px; }
+.patrol-planner__fleet summary span { font-size: var(--font-size-sm); font-weight: 400; margin-left: 12px; }
 .patrol-planner__vehicle-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-block: 16px; }
 .patrol-planner__vehicle-grid fieldset { padding: 14px; border: 1px solid var(--border-color,#cbd5e1); border-radius: 10px; }
 .patrol-planner__error { color: var(--danger, #b91c1c) !important; }
