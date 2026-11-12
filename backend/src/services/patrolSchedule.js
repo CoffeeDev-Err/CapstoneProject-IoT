@@ -6,7 +6,7 @@ const { createValidationError } = require('../utils/operationalValidation')
 const normalizePatrolSchedule = (assignment) => {
 	const blocks = assignment.scheduleBlocks
 	const transitionGraceMinutes = assignment.transitionGraceMinutes ?? 10
-	if (!Number.isInteger(transitionGraceMinutes) || transitionGraceMinutes < 0 || transitionGraceMinutes > 60) throw createValidationError('Travel allowance must be 0 to 60 minutes.', 'transitionGraceMinutes')
+	if (!Number.isInteger(transitionGraceMinutes) || transitionGraceMinutes < 0 || transitionGraceMinutes > 60) throw createValidationError('Transition grace period must be 0 to 60 minutes.', 'transitionGraceMinutes')
 	if (!Array.isArray(blocks) || !blocks.length || blocks.length > 48) throw createValidationError('Add a patrol schedule with 1 to 48 blocks.', 'scheduleBlocks')
 	if (!['area', 'route'].includes(assignment.deploymentType)) throw createValidationError('Choose Area or Route Patrol.', 'deploymentType')
 	const mode = assignment.deploymentType === 'route' ? assignment.patrolMode : ''

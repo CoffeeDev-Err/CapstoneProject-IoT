@@ -113,11 +113,20 @@ export const completeTask = async (taskId) => {
 }
 
 export const getManageableDeployments = () => (
-  getCollection(
-    '/api/deployments?view=manageable&limit=100',
+  getPaginatedCollection(
+    '/api/deployments?view=manageable',
     'Unable to load current and scheduled deployments.',
   )
 )
+
+export const getDeploymentHistory = async () => (await Promise.all([
+  getPaginatedCollection('/api/deployments?status=completed', 'Unable to load completed deployments.'),
+  getPaginatedCollection('/api/deployments?status=cancelled', 'Unable to load cancelled deployments.'),
+])).flat()
+
+export const setDeploymentStatus = (assignmentId, status) => apiRequest(`/api/deployments/${encodeURIComponent(assignmentId)}/status`, {
+  method: 'PATCH', body: JSON.stringify({ status }), errorMessage: 'Unable to update deployment status.',
+})
 
 export const replaceDeployments = async (assignments) => {
   const payload = await apiRequest('/api/deployments', {

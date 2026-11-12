@@ -1,7 +1,9 @@
 import { Fragment, useState } from 'react'
-import { ChevronDown, FileText } from 'lucide-react'
+import { Eye, FileText } from 'lucide-react'
 import { TableSkeletonRows } from '../../components/LoadingSkeleton'
 import DeploymentInstructionsModal from './DeploymentInstructionsModal'
+import PatrolScheduleDialog from './PatrolScheduleDialog'
+import '../../styles/patrol-planner.css'
 import {
   DEPLOYMENT_LIST_VIEWS,
   formatDateTime,
@@ -13,6 +15,9 @@ function DeploymentList({
   assignments,
   deploymentSearch,
   deploymentViewCounts,
+  historyCount = 0,
+  historyError = false,
+  onRetryHistory,
   filteredGroupedAssignments,
   highlightedDeploymentId,
   isDeploymentsLoading,
@@ -21,16 +26,17 @@ function DeploymentList({
   onEditAssignment,
   onEditGroup,
   onSearchChange,
-  onToggleGroupMenu,
   onViewChange,
-  openGroupMenuId,
   visibleAssignments,
 }) {
   const [instructionsAssignment, setInstructionsAssignment] = useState(null)
+  const [viewing, setViewing] = useState(null)
+  const actionLabel = assignment => assignment.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'
+  const canAct = assignment => ['scheduled', 'active'].includes(assignment.status)
 
   return (
     <>
-      <div className="widget-card deployment-list-card slide-up overflow-auto no-scrollbar">
+      <div className="widget-card deployment-list-card patrol-theme slide-up overflow-auto no-scrollbar">
         <div className="assignment-list-header mb-3">
           <h3 className="widget-title mb-0">Assigned Deployment List</h3>
           <input
@@ -38,19 +44,29 @@ function DeploymentList({
             className="settings-input assignment-list-search"
             value={deploymentSearch}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search Deployment Information"
+            aria-label="Search deployments" placeholder="Search Deployment Information"
           />
         </div>
 
         <div
-          className="deployment-view-nav smooth-underline-control mb-3"
+          className="deployment-view-nav patrol-list-tabs mb-3"
           role="tablist"
           aria-label="Deployment list views"
-          style={{ '--smooth-underline-left': activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? '25%' : '75%' }}
+          onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+            const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')]
+            const index = tabs.indexOf(event.target)
+            if (index < 0) return
+            event.preventDefault()
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+            tabs[next].focus(); tabs[next].click()
+          }}
         >
           <button
             type="button"
             role="tab"
+            id="deployment-active-tab"
+            tabIndex={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? 0 : -1}
             aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW}
             aria-controls="deployment-list-panel"
             className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? ' deployment-view-tab--active' : ''}`}
@@ -62,6 +78,8 @@ function DeploymentList({
           <button
             type="button"
             role="tab"
+            id="deployment-scheduled-tab"
+            tabIndex={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? 0 : -1}
             aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER}
             aria-controls="deployment-list-panel"
             className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? ' deployment-view-tab--active' : ''}`}
@@ -70,10 +88,11 @@ function DeploymentList({
             Scheduled Later
             <span className="deployment-view-count">{deploymentViewCounts.scheduled}</span>
           </button>
+          <button type="button" role="tab" id="deployment-history-tab" tabIndex={activeDeploymentView === 'history' ? 0 : -1} aria-selected={activeDeploymentView === 'history'} aria-controls="deployment-list-panel" className={`deployment-view-tab${activeDeploymentView === 'history' ? ' deployment-view-tab--active' : ''}`} onClick={() => onViewChange('history')}>History <span className="deployment-view-count">{historyCount}</span></button>
         </div>
 
-        <div id="deployment-list-panel" role="tabpanel" className="deployment-list-panel">
-          {isDeploymentsLoading ? (
+        <div id="deployment-list-panel" role="tabpanel" aria-labelledby={activeDeploymentView === 'history' ? 'deployment-history-tab' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? 'deployment-scheduled-tab' : 'deployment-active-tab'} className="deployment-list-panel">
+          {historyError ? <div className="patrol-notice is-error" role="alert">Deployment history could not be loaded. <button type="button" onClick={onRetryHistory}>Retry history</button></div> : isDeploymentsLoading ? (
             <table className="personnel-table assignment-list-table table align-middle mb-0" aria-busy="true">
               <thead>
                 <tr className="assignment-group-table">
@@ -96,7 +115,7 @@ function DeploymentList({
             <p className="text-body-secondary mb-0 small">No deployment assignments yet.</p>
           ) : visibleAssignments.length === 0 ? (
             <p className="text-body-secondary mb-0 small">
-              {activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+              {activeDeploymentView === 'history' ? 'No completed or cancelled deployments.' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
                 ? 'No deployments are scheduled for later.'
                 : 'No deployments are active now.'}
             </p>
@@ -133,35 +152,8 @@ function DeploymentList({
                     </td>
                     <td className="assignment-group-actions-cell">
                       <div className="assignment-group-actions assignment-group-menu">
-                        <button
-                          type="button"
-                          className="assignment-group-menu-trigger"
-                          onClick={() => onToggleGroupMenu(group.groupId)}
-                          aria-expanded={openGroupMenuId === group.groupId}
-                          aria-haspopup="menu"
-                        >
-                          Group Actions
-                          <ChevronDown className="assignment-group-menu-trigger__chevron" aria-hidden="true" />
-                        </button>
-
-                        {openGroupMenuId === group.groupId && (
-                          <div className="assignment-group-menu-dropdown" role="menu">
-                            <button
-                              type="button"
-                              className="assignment-group-edit-btn"
-                              onClick={() => onEditGroup(group.groupId)}
-                            >
-                              Reassign Group
-                            </button>
-                            <button
-                              type="button"
-                              className="assignment-group-delete-btn"
-                              onClick={() => onDeleteGroup(group)}
-                            >
-                              Delete Group
-                            </button>
-                          </div>
-                        )}
+                        <button type="button" className="assignment-edit-btn" onClick={() => setViewing({ assignment: group.assignments[0], group: group.assignments, groupId: group.groupId })}><Eye size={15} /> View</button>
+                        {group.assignments.some(canAct) && <button type="button" className="assignment-delete-btn" onClick={() => onDeleteGroup(group)}>{actionLabel(group.assignments[0])}</button>}
                       </div>
                     </td>
                   </tr>
@@ -181,9 +173,9 @@ function DeploymentList({
                         <strong className="d-block assignment-personnel-name">{assignment.patrolArea}</strong>
                         <small className="assignment-personnel-rank">
                           {assignment.deploymentType === 'point'
-                            ? `Fixed post${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
+                            ? `Area patrol${assignment.deploymentPointLabel ? ` · ${assignment.deploymentPointLabel}` : ''}`
                             : assignment.deploymentType === 'route'
-                              ? `Route patrol${assignment.patrolMode ? ` · ${{ walk: 'Walk', car: 'Car', motorcycle: 'Motorcycle' }[assignment.patrolMode]}` : ''}` : 'Area patrol'}
+                              ? `Route patrol${assignment.patrolMode ? ` · ${{ walk: 'Foot', car: 'Car', motorcycle: 'Motorcycle' }[assignment.patrolMode]}` : ''}` : 'Area patrol'}
                         </small>
                         {assignment.scheduleBlocks?.length > 0 && <details className="assignment-schedule-details">
                           <summary>{assignment.scheduleBlocks.length} scheduled {assignment.deploymentType === 'route' ? 'routes' : 'areas'}</summary>
@@ -220,22 +212,8 @@ function DeploymentList({
                       <td data-label="Assigned At">{formatDateTime(assignment.assignedAt)}</td>
                       <td data-label="Actions" className="assignment-actions-cell">
                         <div className="assignment-table-actions">
-                          <button
-                            type="button"
-                            className="assignment-edit-btn"
-                            onClick={() => onEditAssignment(assignment)}
-                          >
-                            Reassign
-                          </button>
-                          <button
-                            type="button"
-                            className="assignment-delete-btn"
-                            onClick={() => onDeleteAssignment(assignment)}
-                            disabled={Boolean(assignment.vehicleId)}
-                            title={assignment.vehicleId ? 'Use the group menu to remove the complete vehicle deployment.' : undefined}
-                          >
-                            Delete
-                          </button>
+                          <button type="button" className="assignment-edit-btn" onClick={() => setViewing({ assignment, group: group.assignments, groupId: assignment.vehicleId ? group.groupId : null })}><Eye size={15} /> View</button>
+                          {canAct(assignment) && <button type="button" className="assignment-delete-btn" onClick={() => assignment.vehicleId ? onDeleteGroup(group) : onDeleteAssignment(assignment)}>{actionLabel(assignment)}</button>}
                         </div>
                       </td>
                     </tr>
@@ -247,6 +225,7 @@ function DeploymentList({
           )}
         </div>
       </div>
+      {viewing && <PatrolScheduleDialog assignment={viewing.assignment} group={viewing.group} onClose={() => setViewing(null)} onReassign={() => { const selected = viewing; setViewing(null); if (selected.groupId) onEditGroup(selected.groupId); else onEditAssignment(selected.assignment) }} />}
       <DeploymentInstructionsModal
         assignment={instructionsAssignment}
         onClose={() => setInstructionsAssignment(null)}

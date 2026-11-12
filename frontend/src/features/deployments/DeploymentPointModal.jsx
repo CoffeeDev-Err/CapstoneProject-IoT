@@ -9,7 +9,8 @@ import { isInsideCabagan } from '../../utils/cabaganGeofence'
 import { cabaganBoundaryFeature } from '../../utils/mapLibreLayers'
 import { useDocumentTheme } from '../../hooks/useDocumentTheme'
 import { coverageLabelFor } from './patrolAreaCatalog'
-import { patrolBarangayReferences } from './patrolReferenceCenters'
+import PatrolMapSearch from './PatrolMapSearch'
+import '../../styles/patrol-planner.css'
 import { apiRequest } from '../../services/apiClient'
 import { useAccessibleDialog } from '../../hooks/useAccessibleDialog'
 
@@ -47,22 +48,6 @@ function DeploymentPointModal({ area, initialPoint, onClose, onConfirm, visible,
     }).catch(() => { if (active) setBoundaryMessage('Boundary unavailable. Reference location only; outside-coverage alerts are unavailable. Reopen this map to retry.') })
     return () => { active = false }
   }, [readOnly, visible, barangay, savedGeometry])
-  const [search, setSearch] = useState('')
-  const [results, setResults] = useState([])
-  const [searching, setSearching] = useState(false)
-  const [searchMessage, setSearchMessage] = useState('')
-  const searchPlaces = async () => {
-    if (searching || search.trim().length < 2) return
-    setSearching(true); setSearchMessage('')
-    const local = patrolBarangayReferences.filter(a => a.name.toLowerCase().includes(search.trim().toLowerCase()))
-      .map(a => ({ label: `${a.name} (reference center; select the exact point)`, ...a.referenceCenter }))
-    try {
-      const payload = await apiRequest(`/api/patrol/places?q=${encodeURIComponent(search)}`)
-      setResults([...payload.places, ...local])
-      if (!payload.places.length) setSearchMessage('No exact place found. Select a barangay reference center, then pin the actual place.')
-    } catch { setResults(local); setSearchMessage('Place search unavailable. Use a barangay reference center or navigate the map.') }
-    finally { setSearching(false) }
-  }
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
@@ -187,7 +172,7 @@ function DeploymentPointModal({ area, initialPoint, onClose, onConfirm, visible,
         tabIndex={-1}
         aria-labelledby="deployment-point-title"
         aria-modal="true"
-        className="deployment-point-modal"
+        className="deployment-point-modal patrol-theme"
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
       >
@@ -201,17 +186,7 @@ function DeploymentPointModal({ area, initialPoint, onClose, onConfirm, visible,
           </button>
         </header>
 
-        {readOnly ? <p role="status" style={{ padding: '12px 20px' }}>{boundaryMessage}</p> : <div className="deployment-point-search" style={{ padding: '12px 20px' }}>
-          <label htmlFor="patrol-map-search">Find a street, place or barangay</label>
-          <div style={{ display: 'flex', gap: 8 }}><input id="patrol-map-search" className="settings-input" value={search}
-            onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void searchPlaces() } }} />
-            <button type="button" disabled={searching || search.trim().length < 2} onClick={searchPlaces}>{searching ? 'Searching…' : 'Search'}</button></div>
-          {searchMessage && <p role="status">{searchMessage}</p>}
-          {results.length > 0 && <ul style={{ maxHeight: 140, overflow: 'auto' }}>{results.map((result, index) => <li key={index}>
-            <button type="button" onClick={() => { mapRef.current?.flyTo({ center: [result.longitude, result.latitude], zoom: 16 }); setResults([]) }}>{result.label}</button>
-          </li>)}</ul>}
-          {routePoints && <small>The dashed line shows the selected point order. Confirm each actual road or walkway on the map.</small>}
-        </div>}
+        {readOnly ? <p role="status" className="patrol-notice">{boundaryMessage}</p> : <PatrolMapSearch onSelect={result => mapRef.current?.flyTo({ center: [result.longitude, result.latitude], zoom: 16 })} />}
 
         {hasMapTilerWebApiKey ? (
           <div className="deployment-point-map" ref={mapContainerRef} aria-label="Deployment point map" />

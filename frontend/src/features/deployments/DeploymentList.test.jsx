@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import DeploymentList from './DeploymentList'
 import { DEPLOYMENT_LIST_VIEWS } from './deploymentForm'
+vi.mock('./PatrolMap', () => ({ default: ({ onPoint }) => <div data-testid="view-map">{onPoint ? 'Editable' : 'Read-only map'}</div> }))
+afterEach(cleanup)
 
 const assignment = {
   id: 'DEP-001',
@@ -15,7 +17,7 @@ const assignment = {
   status: 'scheduled',
 }
 
-const renderList = () => render(
+const renderList = (props = {}) => render(
   <DeploymentList
     activeDeploymentView={DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER}
     assignments={[assignment]}
@@ -37,10 +39,28 @@ const renderList = () => render(
     onViewChange={vi.fn()}
     openGroupMenuId={null}
     visibleAssignments={[assignment]}
+    {...props}
   />
 )
 
 describe('DeploymentList instructions', () => {
+  it('moves between deployment views with the arrow keys', () => {
+    const onViewChange = vi.fn()
+    renderList({ onViewChange })
+    fireEvent.keyDown(screen.getByRole('tab', { name: /Scheduled Later/ }), { key: 'ArrowRight' })
+    expect(onViewChange).toHaveBeenCalledWith('history')
+    expect(screen.getByRole('tab', { name: /History/ })).toHaveFocus()
+  })
+  it('opens a read-only map and keeps Reassign inside the View dialog', () => {
+    renderList()
+    expect(screen.queryByRole('button', { name: 'Reassign' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Cancel deployment' })).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0])
+    const dialog = screen.getByRole('dialog', { name: 'Barangay Centro' })
+    expect(within(dialog).getByTestId('view-map')).toHaveTextContent('Read-only map')
+    expect(within(dialog).getByRole('button', { name: 'Reassign' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Edit area' })).toBeNull()
+  })
   it('opens the exact assignment instructions from the compact table icon', () => {
     renderList()
 

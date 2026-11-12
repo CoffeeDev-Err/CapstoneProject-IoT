@@ -25,6 +25,15 @@ export const schedulePosition = (assignment?: DeploymentAssignment, now = Date.n
   return assignment?.scheduleBlocks?.findIndex(b => elapsed >= b.offsetMinutes && elapsed < b.offsetMinutes + b.durationMinutes) ?? -1;
 };
 
+export function routeDistanceMeters(points: number[][]) {
+  return points.slice(1).reduce((sum, b, i) => {
+    const a = points[i], radians = Math.PI / 180;
+    const lat = (b[1] - a[1]) * radians, lon = (b[0] - a[0]) * radians;
+    const h = Math.sin(lat / 2) ** 2 + Math.cos(a[1] * radians) * Math.cos(b[1] * radians) * Math.sin(lon / 2) ** 2;
+    return sum + 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+  }, 0);
+}
+
 function blockFeature(block?: PatrolScheduleBlock): GeoJSON.Feature | null {
   if (!block) return null;
   if (block.coverageType === 'custom' && Number.isFinite(block.latitude) && Number.isFinite(block.longitude)) {
@@ -39,6 +48,7 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
   const [directions, setDirections] = useState<GeoJSON.LineString | null>(null);
   const [roadDirections, setRoadDirections] = useState(false);
   const [guidance, setGuidance] = useState('');
+  const [routeDuration, setRouteDuration] = useState<number | null>(null);
   const requestId = useRef(0);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10000);
@@ -49,7 +59,7 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
   const block = base?.scheduleBlocks?.[index];
   const next = base?.scheduleBlocks?.[index + 1];
   const scheduleKey = JSON.stringify([base?.id, base?.shiftStart, base?.patrolMode, base?.scheduleBlocks]);
-  useEffect(() => { requestId.current += 1; setPreviewNext(false); setDirections(null); setGuidance(''); }, [scheduleKey, index]);
+  useEffect(() => { requestId.current += 1; setPreviewNext(false); setDirections(null); setGuidance(''); setRouteDuration(null); }, [scheduleKey, index]);
   const assignment = useMemo(() => base && block ? { ...base, patrolArea: block.label,
     deploymentPointLabel: block.label, latitude: block.latitude ?? null, longitude: block.longitude ?? null,
     hasDeploymentPoint: block.coverageType !== 'barangay' && Number.isFinite(block.latitude),
@@ -62,26 +72,32 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
   const viewNext = async () => {
     if (!next) return;
     const revision = ++requestId.current;
-    setPreviewNext(true); setDirections(null); setRoadDirections(false);
+    setPreviewNext(true); setDirections(null); setRoadDirections(false); setRouteDuration(null);
     if (!Number.isFinite(officer.latitude) || !Number.isFinite(officer.longitude) || !Number.isFinite(next.latitude) || !Number.isFinite(next.longitude)) {
       setGuidance('A GPS position and destination point are needed for directions.'); return;
     }
     const source = { latitude: officer.latitude!, longitude: officer.longitude! };
     const target = { latitude: next.latitude!, longitude: next.longitude! };
-    if (!['car', 'motorcycle'].includes(base?.patrolMode || '')) {
-      setDirections({ type: 'LineString', coordinates: [[source.longitude, source.latitude], [target.longitude, target.latitude]] });
-      setGuidance('Direction guide to the next area; follow accessible roads and walkways.'); return;
-    }
-    setGuidance('Finding road directions…');
+    const mode = ['car', 'motorcycle'].includes(base?.patrolMode || '') ? base!.patrolMode : 'walk';
+    setGuidance(mode === 'walk' ? 'Finding walking directions…' : 'Finding road directions…');
     try {
       const { response, payload } = await requestJson(`${API_URL}/api/patrol/directions`, { method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ mode: base!.patrolMode, points: [source, target] }),
+        body: JSON.stringify({ mode, points: [source, target] }),
       }, 10000);
       if (revision !== requestId.current) return;
-      if (!response.ok || !payload.available) throw new Error();
-      setDirections(payload.geometry); setRoadDirections(true); setGuidance('Suggested road route. The remaining line updates with your tracker GPS.');
-    } catch { if (revision === requestId.current) setGuidance('Road directions unavailable. The next destination is still shown; tap View next area to retry.'); }
+      if (!response.ok || !payload.available || payload.geometry?.type !== 'LineString'
+        || !Array.isArray(payload.geometry.coordinates) || payload.geometry.coordinates.length < 2
+        || payload.geometry.coordinates.some((p: number[]) => !Array.isArray(p) || p.length < 2 || !p.slice(0, 2).every(Number.isFinite))) throw new Error();
+      setDirections(payload.geometry); setRoadDirections(true); setRouteDuration(Number.isFinite(payload.durationSeconds) ? payload.durationSeconds : null);
+      setGuidance(`Suggested ${mode === 'walk' ? 'walking' : 'road'} route. The remaining line updates with your tracker GPS.`);
+    } catch {
+      if (revision !== requestId.current) return;
+      if (mode === 'walk') {
+        setDirections({ type: 'LineString', coordinates: [[source.longitude, source.latitude], [target.longitude, target.latitude]] });
+        setGuidance('Direction guide to the next area; follow accessible roads and walkways. Walking route and ETA unavailable.');
+      } else setGuidance('Road directions unavailable. The next destination is still shown; tap View next area to retry.');
+    }
   };
   const progress = useMemo(() => directions && Number.isFinite(officer.longitude) && Number.isFinite(officer.latitude)
     ? roadDirections ? remainingRoute(directions.coordinates, [officer.longitude!, officer.latitude!])
@@ -101,7 +117,13 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
   const stale = officer.isLocationStale || !Number.isFinite(readingTime)
     || now - readingTime > (officer.locationStaleAfterSeconds || 60) * 1000;
   const directionMessage = progress?.offRoute ? 'Away from the suggested route. Tap View next area to refresh directions.' : guidance;
+  const remainingMeters = progress ? routeDistanceMeters(progress.coordinates) : null;
+  const totalMeters = directions ? routeDistanceMeters(directions.coordinates) : 0;
+  const etaMinutes = roadDirections && routeDuration !== null && remainingMeters !== null && totalMeters > 0 && !progress?.offRoute
+    ? Math.max(0, Math.ceil(routeDuration * remainingMeters / totalMeters / 60)) : null;
+  const distanceMessage = remainingMeters === null ? '' : `${remainingMeters >= 1000 ? `${(remainingMeters / 1000).toFixed(1)} km` : `${Math.round(remainingMeters)} m`} ${roadDirections ? 'remaining' : 'straight-line distance'}${etaMinutes !== null ? ` · About ${etaMinutes} min` : ''}. `;
   return { assignment, mapAssignment, features, block, next, index, minutesLeft, previewNext, viewNext,
-    guidance: previewNext && stale ? `Using your last known GPS location. ${directionMessage}` : directionMessage,
+    remainingMeters, etaMinutes,
+    guidance: previewNext && stale ? `Using your last known GPS location. ${distanceMessage}${directionMessage}` : `${distanceMessage}${directionMessage}`,
     closePreview: () => { requestId.current += 1; setPreviewNext(false); setDirections(null); setGuidance(''); } };
 }

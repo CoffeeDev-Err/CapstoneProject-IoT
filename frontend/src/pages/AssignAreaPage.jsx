@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, MapPin, Route, ShieldCheck } from 'lucide-react'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
-import { getManageableDeployments, replaceDeployments } from '../services/operations'
+import { getDeploymentHistory, getManageableDeployments, replaceDeployments, setDeploymentStatus } from '../services/operations'
 import { filterDeploymentGroupsByPrefix, matchesPrefixSearch } from '../utils/searchMatching'
 import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
 import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
@@ -78,6 +78,9 @@ function AssignAreaPage({ view = 'form' }) {
   )
   const [pendingDeleteAssignment, setPendingDeleteAssignment] = useState(null)
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
+  const [history, setHistory] = useState([])
+  const [historyState, setHistoryState] = useState('loading')
+  const lifecycleBusy = useRef(false)
   const [deploymentActionNoticeOpen, setDeploymentActionNoticeOpen] = useState(false)
   const [deploymentSearch, setDeploymentSearch] = useState('')
   const [highlightedDeploymentId, setHighlightedDeploymentId] = useState(null)
@@ -141,11 +144,20 @@ function AssignAreaPage({ view = 'form' }) {
   }, [setAssignments, showFeedback])
 
   useEffect(() => {
+    if (!listOnly) return undefined
+    let active = true
+    getDeploymentHistory().then(rows => { if (active) { setHistory(rows); setHistoryState('ready') } })
+      .catch(error => { if (active) { setHistoryState('error'); showFeedback(requestErrorMessage(error, { action: 'load deployment history' }), { type: 'error' }) } })
+    return () => { active = false }
+  }, [listOnly, showFeedback])
+
+  useEffect(() => {
     const requestedDeploymentId = listOnly ? location.state?.deploymentId : null
     if (!requestedDeploymentId || !deploymentsReady) return undefined
     let isCurrent = true
     let scrollTimer
-    const assignment = assignments.find((item) => (
+    if (historyState === 'loading') return undefined
+    const assignment = [...assignments, ...history].find((item) => (
       item.id === requestedDeploymentId || resolveGroupId(item) === requestedDeploymentId
     ))
     if (!assignment) {
@@ -159,7 +171,7 @@ function AssignAreaPage({ view = 'form' }) {
     queueMicrotask(() => {
       if (!isCurrent) return
       setActiveDeploymentView(
-        assignment.status === 'scheduled'
+        !['active', 'scheduled'].includes(assignment.status) ? 'history' : assignment.status === 'scheduled'
           ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
           : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW,
       )
@@ -174,7 +186,7 @@ function AssignAreaPage({ view = 'form' }) {
       isCurrent = false
       window.clearTimeout(scrollTimer)
     }
-  }, [assignments, deploymentsReady, listOnly, location.state?.deploymentId,
+  }, [assignments, history, historyState, deploymentsReady, listOnly, location.state?.deploymentId,
     location.state?.notificationRequestId, showFeedback])
 
   useEffect(() => {
@@ -260,11 +272,11 @@ function AssignAreaPage({ view = 'form' }) {
     return counts
   }, { active: 0, scheduled: 0 }), [assignments])
 
-  const visibleAssignments = useMemo(() => assignments.filter((assignment) => (
+  const visibleAssignments = useMemo(() => activeDeploymentView === 'history' ? history : assignments.filter((assignment) => (
     activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
       ? assignment.status === 'scheduled'
       : assignment.status === 'active'
-  )), [activeDeploymentView, assignments])
+  )), [activeDeploymentView, assignments, history])
 
   const groupedAssignments = useMemo(() => {
     const groupsMap = new Map()
@@ -646,24 +658,30 @@ function AssignAreaPage({ view = 'form' }) {
     showFeedback(`Reassigning the group in ${firstAssignment.patrolArea}. Update the details, then save.`, { type: 'info' })
   }
 
-  const handleDeleteAssignment = (assignmentId) => {
-    const assignmentToDelete = assignments.find((item) => item.id === assignmentId)
-
-    commitAssignments(
-      assignments.filter((item) => item.id !== assignmentId),
-      `${assignmentToDelete?.personnelName || 'Personnel'} removed from deployment assignments.`
-    )
-
-    if (editingAssignmentId === assignmentId) {
-      setEditingAssignmentId(null)
-      resetAssignmentForm()
+  const finishDeployments = async rows => {
+    if (lifecycleBusy.current) return
+    lifecycleBusy.current = true
+    setIsSaving(true)
+    let failed = false
+    try {
+      for (const row of rows) {
+        await setDeploymentStatus(row.id, row.status === 'scheduled' ? 'cancelled' : 'completed')
+      }
+      showFeedback('Deployment status updated. Operational history has been retained.', { type: 'success' })
+    } catch (error) {
+      failed = true
+      showFeedback(requestErrorMessage(error, { action: 'update deployment status', write: true }), { type: 'error' })
+    } finally {
+      try { setAssignments(await getManageableDeployments()); setHistory(await getDeploymentHistory()) }
+      catch (error) { failed = true; showFeedback(requestErrorMessage(error, { action: 'refresh deployments' }), { type: 'error' }) }
+      setIsSaving(false)
+      lifecycleBusy.current = false
     }
-
-    if (assignmentToDelete && editingGroupId && resolveGroupId(assignmentToDelete) === editingGroupId) {
-      setEditingGroupId(null)
-      resetAssignmentForm()
-    }
-
+    return !failed
+  }
+  const handleDeleteAssignment = assignmentId => {
+    const row = assignments.find(item => item.id === assignmentId)
+    if (row) return finishDeployments([row])
   }
 
   const handleRequestDeleteGroup = (group) => {
@@ -675,40 +693,18 @@ function AssignAreaPage({ view = 'form' }) {
     setOpenGroupMenuId((prev) => (prev === groupId ? null : groupId))
   }
 
-  const handleDeleteGroup = (groupId) => {
-    const groupAssignments = assignments.filter((assignment) => resolveGroupId(assignment) === groupId)
-
-    if (groupAssignments.length === 0) {
-      return
-    }
-
-    commitAssignments(
-      assignments.filter((assignment) => resolveGroupId(assignment) !== groupId),
-      `${groupAssignments.length} assignment(s) removed from ${groupAssignments[0].patrolArea}.`
-    )
-
-    if (editingGroupId === groupId) {
-      setEditingGroupId(null)
-      resetAssignmentForm()
-    }
-
-    if (editingAssignmentId && groupAssignments.some((assignment) => assignment.id === editingAssignmentId)) {
-      setEditingAssignmentId(null)
-      resetAssignmentForm()
-    }
-
-  }
+  const handleDeleteGroup = groupId => finishDeployments(assignments.filter(row => resolveGroupId(row) === groupId))
 
   const handleRequestDeleteAssignment = (assignment) => {
     setPendingDeleteAssignment(assignment)
   }
 
-  const handleConfirmDeleteAssignment = () => {
+  const handleConfirmDeleteAssignment = async () => {
     if (!pendingDeleteAssignment) {
       return
     }
 
-    handleDeleteAssignment(pendingDeleteAssignment.id)
+    await handleDeleteAssignment(pendingDeleteAssignment.id)
     setPendingDeleteAssignment(null)
   }
 
@@ -716,12 +712,12 @@ function AssignAreaPage({ view = 'form' }) {
     setPendingDeleteAssignment(null)
   }
 
-  const handleConfirmDeleteGroup = () => {
+  const handleConfirmDeleteGroup = async () => {
     if (!pendingDeleteGroup) {
       return
     }
 
-    handleDeleteGroup(pendingDeleteGroup.groupId)
+    await handleDeleteGroup(pendingDeleteGroup.groupId)
     setPendingDeleteGroup(null)
   }
 
@@ -745,7 +741,7 @@ function AssignAreaPage({ view = 'form' }) {
   }
 
   return (
-    <div className="page-container fade-in p-3 p-md-4">
+    <div className="page-container deployment-page fade-in p-3 p-md-4">
       <header className="page-header assignment-page-header mb-4">
         <div>
           <h2 className="page-title">{listOnly ? 'Assigned Deployments' : 'Deployment Management'}</h2>
@@ -770,7 +766,7 @@ function AssignAreaPage({ view = 'form' }) {
           initialGroup={editingGroupId ? assignments.filter(a => resolveGroupId(a) === editingGroupId)
             : editingAssignmentId ? assignments.filter(a => a.id === editingAssignmentId) : []}
           saving={isSaving} ready={deploymentsReady && !isDeploymentsLoading}
-          onSave={commitAssignments} onCancel={() => { setEditingAssignmentId(null); setEditingGroupId(null); resetAssignmentForm(); navigate('/deployments') }} />
+          onSave={commitAssignments} onCancel={result => { setEditingAssignmentId(null); setEditingGroupId(null); resetAssignmentForm(); navigate('/deployments', { state: result?.deploymentId ? { deploymentId: result.deploymentId } : null }) }} />
       )}
 
       {!listOnly && (editingAssignmentId || editingGroupId) && !assignmentForm.scheduleBlocks?.length && (
@@ -859,19 +855,11 @@ function AssignAreaPage({ view = 'form' }) {
               <div className="assignment-deployment-style__options">
                 <button
                   type="button"
-                  className={assignmentForm.deploymentType === 'area' ? 'is-active' : ''}
-                  onClick={() => handleDeploymentTypeChange('area')}
+                  className={assignmentForm.deploymentType !== 'route' ? 'is-active' : ''}
+                  onClick={() => { if (assignmentForm.deploymentType === 'route') handleDeploymentTypeChange('area') }}
                 >
                   <ShieldCheck aria-hidden="true" />
                   <span><strong>Area patrol</strong><small>Patrol throughout the selected coverage</small></span>
-                </button>
-                <button
-                  type="button"
-                  className={assignmentForm.deploymentType === 'point' ? 'is-active' : ''}
-                  onClick={() => handleDeploymentTypeChange('point')}
-                >
-                  <MapPin aria-hidden="true" />
-                  <span><strong>Fixed post</strong><small>Assign an exact point on the map</small></span>
                 </button>
                 <button
                   type="button"
@@ -999,11 +987,14 @@ function AssignAreaPage({ view = 'form' }) {
       {listOnly && (
         <DeploymentList
           activeDeploymentView={activeDeploymentView}
-          assignments={assignments}
+          assignments={activeDeploymentView === 'history' ? history : assignments}
           deploymentSearch={deploymentSearch}
           deploymentViewCounts={deploymentViewCounts}
+          historyCount={history.length}
           filteredGroupedAssignments={filteredGroupedAssignments}
-          isDeploymentsLoading={isDeploymentsLoading && !hasAssignments}
+          isDeploymentsLoading={activeDeploymentView === 'history' ? historyState === 'loading' : isDeploymentsLoading && !hasAssignments}
+          historyError={activeDeploymentView === 'history' && historyState === 'error'}
+          onRetryHistory={async () => { setHistoryState('loading'); try { setHistory(await getDeploymentHistory()); setHistoryState('ready') } catch { setHistoryState('error') } }}
           highlightedDeploymentId={highlightedDeploymentId}
           onDeleteAssignment={handleRequestDeleteAssignment}
           onDeleteGroup={handleRequestDeleteGroup}

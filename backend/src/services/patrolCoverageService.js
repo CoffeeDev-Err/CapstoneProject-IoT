@@ -45,11 +45,11 @@ const hydratePatrolGeometry = async (assignments, previousById) => {
 	let boundaries
 	const routeRequests = new Map()
 	for (const assignment of assignments) {
-		if (!['car', 'motorcycle'].includes(assignment.patrolMode)) continue
+		if (!['car', 'motorcycle', 'walk'].includes(assignment.patrolMode)) continue
 		for (const block of assignment.scheduleBlocks || []) {
 			if (block.coverageType !== 'route') continue
 			const old = previousById.get(assignment.id)?.scheduleBlocks?.find(b => JSON.stringify(b.routePoints) === JSON.stringify(block.routePoints))
-			if (old?.geometry && old.roadDirections === true && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) continue
+			if (old?.geometry && (old.roadDirections === true || assignment.patrolMode === 'walk') && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) continue
 			const key = `${assignment.patrolMode}:${JSON.stringify(block.routePoints)}`
 			if (!routeRequests.has(key)) routeRequests.set(key, getPatrolDirections({ points: block.routePoints, mode: assignment.patrolMode }))
 		}

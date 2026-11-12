@@ -1,9 +1,30 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { remainingRoute, schedulePosition, usePatrolSchedule } from './usePatrolSchedule';
+import { remainingRoute, routeDistanceMeters, schedulePosition, usePatrolSchedule } from './usePatrolSchedule';
 import type { DeploymentAssignment, LivePersonnel } from '../../types/operations';
 import { requestJson } from '../../services/requestJson';
 
 jest.mock('../../services/requestJson', () => ({ requestJson: jest.fn() }));
+
+it('updates the remaining routed distance and ETA as GPS advances, independently of marker animation', async () => {
+  const geometry = { type: 'LineString', coordinates: [[121.765, 17.43], [121.766, 17.43], [121.767, 17.43]] };
+  jest.mocked(requestJson).mockResolvedValueOnce({ response: { ok: true } as Response, payload: { available: true, geometry, durationSeconds: 600 } });
+  const base = { id: 'ROUTE-ETA', patrolMode: 'car', shiftStart: new Date(Date.now() - 60000).toISOString(), scheduleBlocks: [
+    { label: 'Market', offsetMinutes: 0, durationMinutes: 120 },
+    { label: 'Park', offsetMinutes: 120, durationMinutes: 120, latitude: 17.43, longitude: 121.767 },
+  ] } as DeploymentAssignment;
+  const officer = { latitude: 17.43, longitude: 121.765, locationRecordedAt: new Date().toISOString() } as LivePersonnel;
+  const view = await renderHook(({ current }: { current: LivePersonnel }) => usePatrolSchedule(base, current), { initialProps: { current: officer } });
+  await act(async () => { await view.result.current.viewNext(); });
+  const originalDistance = view.result.current.remainingMeters!;
+  expect(view.result.current.etaMinutes).toBe(10);
+  await view.rerender({ current: { ...officer, longitude: 121.766 } });
+  expect(view.result.current.remainingMeters!).toBeCloseTo(originalDistance / 2, 0);
+  expect(view.result.current.etaMinutes).toBeLessThanOrEqual(6);
+  expect(view.result.current.guidance).toContain('remaining');
+  expect(view.result.current.guidance).toContain('min');
+  expect(routeDistanceMeters([[121.765, 17.43]])).toBe(0);
+  await view.unmount();
+});
 
 it('keeps an area direction guide attached to the latest GPS fix on an indirect approach', async () => {
   const base = { id: 'AREA-1', shiftStart: new Date(Date.now() - 60000).toISOString(), scheduleBlocks: [

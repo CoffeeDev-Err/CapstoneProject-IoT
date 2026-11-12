@@ -17,22 +17,22 @@ export default function DeploymentDialogs({
     <>
       <ConfirmModal
         open={Boolean(pendingDeleteGroup)}
-        title="Delete Deployment Group?"
+        title={pendingDeleteGroup?.assignments[0]?.status === 'scheduled' ? 'Cancel deployment group?' : 'End deployment group?'}
         message={pendingDeleteGroup
-          ? `Delete all ${pendingDeleteGroup.assignments.length} assignment(s) under ${pendingDeleteGroup.patrolArea}? This cannot be undone.`
+          ? `Update all ${pendingDeleteGroup.assignments.length} assignment(s) under ${pendingDeleteGroup.patrolArea}? Personnel will be notified. Operational history will be retained.`
           : ''}
-        confirmLabel="Delete Group"
+        confirmLabel={pendingDeleteGroup?.assignments[0]?.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'}
         cancelLabel="Cancel"
         onConfirm={onConfirmDeleteGroup}
         onCancel={onCancelDeleteGroup}
       />
       <ConfirmModal
         open={Boolean(pendingDeleteAssignment)}
-        title="Delete Deployment Assignment?"
+        title={pendingDeleteAssignment?.status === 'scheduled' ? 'Cancel deployment?' : 'End deployment?'}
         message={pendingDeleteAssignment
-          ? `Delete ${pendingDeleteAssignment.id} for ${pendingDeleteAssignment.personnelName}? This cannot be undone.`
+          ? `Update ${pendingDeleteAssignment.id} for ${pendingDeleteAssignment.personnelName}? Personnel will be notified. Operational history will be retained.`
           : ''}
-        confirmLabel="Delete"
+        confirmLabel={pendingDeleteAssignment?.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'}
         cancelLabel="Cancel"
         onConfirm={onConfirmDeleteAssignment}
         onCancel={onCancelDeleteAssignment}

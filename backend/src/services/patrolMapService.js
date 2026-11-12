@@ -50,16 +50,19 @@ const searchPatrolPlaces = async (query) => {
 }
 
 const getPatrolDirections = async ({ points, mode } = {}) => {
-	if (!['car', 'motorcycle'].includes(mode)) return { available: false, message: 'Use the assigned foot-patrol points; vehicle directions are not walking directions.' }
+	if (!['car', 'motorcycle', 'walk'].includes(mode)) return { available: false, message: 'Choose a supported patrol travel mode.' }
+	if (mode === 'walk' && !process.env.OSRM_WALK_ROUTE_URL) return { available: false, message: 'Walking directions unavailable. Plot the actual walkway and its turns; vehicle directions are not walking directions.' }
 	if (!Array.isArray(points) || points.length < 2 || points.length > 30 || points.some(p => !p || !Number.isFinite(p.latitude) || !Number.isFinite(p.longitude) || !isInsideCabagan(p.latitude, p.longitude))) throw createValidationError('Choose 2 to 30 points within Cabagan.', 'points')
 	const coordinates = points.map(p => `${p.longitude},${p.latitude}`).join(';')
-	const endpoint = process.env.OSRM_ROUTE_URL || 'https://router.project-osrm.org/route/v1/driving'
+	const endpoint = mode === 'walk' ? process.env.OSRM_WALK_ROUTE_URL : process.env.OSRM_ROUTE_URL || 'https://router.project-osrm.org/route/v1/driving'
 	try {
 		const response = await fetch(`${endpoint}/${coordinates}?overview=full&geometries=geojson&steps=false`, { signal: AbortSignal.timeout(7000) })
 		const payload = await response.json()
 		const route = payload.routes?.[0]
 		if (!response.ok || payload.code !== 'Ok' || route?.geometry?.type !== 'LineString') throw new Error('Unavailable')
-		return { available: true, geometry: route.geometry, distanceMeters: route.distance }
+		if (!Array.isArray(route.geometry.coordinates) || route.geometry.coordinates.length < 2
+			|| route.geometry.coordinates.some(p => !Array.isArray(p) || p.length < 2 || !p.slice(0, 2).every(Number.isFinite))) throw new Error('Invalid route geometry')
+		return { available: true, geometry: route.geometry, distanceMeters: route.distance, durationSeconds: route.duration }
 	} catch { return { available: false, message: 'Road directions unavailable. The destination remains visible.' } }
 }
 module.exports = { loadBarangayBoundaries, searchPatrolPlaces, getPatrolDirections }

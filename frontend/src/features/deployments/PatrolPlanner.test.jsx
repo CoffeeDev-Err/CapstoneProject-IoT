@@ -1,56 +1,115 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import PatrolPlanner from './PatrolPlanner'
 import { apiRequest } from '../../services/apiClient'
 
 vi.mock('../../services/apiClient', () => ({ apiRequest: vi.fn() }))
-vi.mock('./DeploymentPointModal', () => ({ default: ({ onConfirm }) => <button type="button" onClick={() => onConfirm({ label: 'Market entrance', latitude: 17.4305, longitude: 121.765 })}>Confirm test map point</button> }))
-const personnel = [{ id: 'PNP-1', name: 'Officer One' }, { id: 'PNP-2', name: 'Officer Two' }]
-beforeEach(() => { vi.mocked(apiRequest).mockResolvedValue({ vehicles: [{ id: 'car-1', name: 'Car 1', mode: 'car' }], weeks: [] }) })
+vi.mock('./PatrolMap', () => ({ default: ({ onPoint, blocks }) => <div data-testid="patrol-map-data">{JSON.stringify(blocks)}{onPoint && <button type="button" onClick={() => onPoint({ latitude: 17.4305 + (blocks[0]?.routePoints?.length || 0) * 0.0002, longitude: 121.765 })}>Select map point</button>}</div> }))
+const personnel = [{ id: 'PNP-1', name: 'Officer One', rank: 'Patrolman' }, { id: 'PNP-2', name: 'Officer Two' }]
+const vehicles = [{ id: 'car-1', name: 'Car 1', mode: 'car' }, { id: 'car-2', name: 'Car 2', mode: 'car' }, { id: 'motorcycle-1', name: 'Motorcycle 1', mode: 'motorcycle' }]
+const area = { label: 'Market', durationMinutes: 120, offsetMinutes: 0, coverageType: 'custom', latitude: 17.4305, longitude: 121.765, radiusMeters: 200 }
+const initial = { id: 'DEP-1', groupId: 'GRP-1', personnelId: 'PNP-1', personnelName: 'Officer One', deploymentType: 'area', shiftStart: '2026-11-13T00:00:00Z', shiftEnd: '2026-11-13T02:00:00Z', scheduleBlocks: [area] }
+beforeEach(() => { vi.mocked(apiRequest).mockImplementation(async path => path === '/api/patrol/fleet' ? { vehicles, weeks: [] } : { available: false }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
+const setup = (props = {}) => { const onSave = vi.fn().mockResolvedValue(true); const onCancel = vi.fn(); render(<PatrolPlanner personnel={personnel} assignments={[]} ready onSave={onSave} onCancel={onCancel} {...props} />); return { onSave, onCancel } }
+const duty = (end = '2026-11-13T10:00') => { fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-11-13T08:00' } }); fireEvent.change(screen.getByLabelText('End'), { target: { value: end } }) }
+const addArea = label => { fireEvent.change(screen.getByLabelText('Area name'), { target: { value: label } }); fireEvent.click(screen.getByRole('button', { name: 'Select map point' })); fireEvent.click(screen.getByRole('button', { name: 'Save area' })) }
+const review = () => fireEvent.click(screen.getByRole('button', { name: 'Review patrol schedule' }))
 
-it('saves a foot route with its chosen corridor allowance', async () => {
-  const onSave = vi.fn().mockResolvedValue(true)
-  const initial = { id: 'DEP-1', groupId: 'GRP-1', personnelId: 'PNP-1', deploymentType: 'route', patrolMode: 'walk',
-    shiftStart: '2026-11-11T00:00:00Z', shiftEnd: '2026-11-11T02:00:00Z', scheduleBlocks: [
-      { label: 'Market walk', durationMinutes: 120, offsetMinutes: 0, coverageType: 'route', routePoints: [
-        { latitude: 17.4305, longitude: 121.765 }, { latitude: 17.431, longitude: 121.766 },
-      ] },
-    ] }
-  render(<PatrolPlanner personnel={personnel} assignments={[initial]} initialGroup={[initial]} ready onSave={onSave} onCancel={vi.fn()} />)
-  const allowance = screen.getByLabelText('Allowed distance from route (meters, each side)')
-  expect(allowance).toHaveValue(100)
-  fireEvent.change(allowance, { target: { value: '175' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Save patrol changes' }))
+it('saves an area only after review and clears the draft while retaining the saved coverage', async () => {
+  const { onSave, onCancel } = setup(); duty(); addArea('Public market')
+  expect(screen.getByLabelText('Area name')).toHaveValue('')
+  expect(screen.getByRole('button', { name: /1Public market/ })).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByTestId('patrol-map-data').textContent).not.toContain('17.4305')
+  fireEvent.click(screen.getByLabelText('Officer One')); review()
+  expect(screen.getByRole('dialog', { name: 'Review patrol schedule' })).toBeInTheDocument()
+  expect(onSave).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
-  expect(onSave.mock.calls[0][0][0].scheduleBlocks[0].routeCorridorMeters).toBe(175)
+  expect(onSave.mock.calls[0][0][0]).toMatchObject({ personnelId: 'PNP-1', shiftStart: '2026-11-13T00:00:00.000Z', shiftEnd: '2026-11-13T02:00:00.000Z', deploymentType: 'area', scheduleBlocks: [{ label: 'Public market', durationMinutes: 120, radiusMeters: 200, latitude: 17.4305 }] })
+  await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1))
+  expect(screen.getByLabelText('Area name')).toHaveValue('')
 })
 
-it('creates an area duty with its incident-independent coverage and exact two-hour schedule', async () => {
-  const onSave = vi.fn().mockResolvedValue(true)
-  render(<PatrolPlanner personnel={personnel} assignments={[]} ready onSave={onSave} onCancel={vi.fn()} />)
-  expect(screen.queryByText('Fixed post')).toBeNull()
-  fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-11-10T08:00' } })
-  fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-11-10T10:00' } })
-  fireEvent.change(screen.getByLabelText('Area name'), { target: { value: 'Market' } })
-  fireEvent.click(screen.getByText('Set coverage on map'))
-  fireEvent.click(screen.getByText('Confirm test map point'))
-  fireEvent.click(screen.getByLabelText('Officer One'))
-  fireEvent.click(screen.getByRole('button', { name: 'Save deployment' }))
+it('edits a foot route and preserves its existing identity and adjustable corridor', async () => {
+  const route = { ...initial, deploymentType: 'route', patrolMode: 'walk', scheduleBlocks: [{ ...area, coverageType: 'route', routePoints: [{ latitude: 17.4305, longitude: 121.765 }, { latitude: 17.431, longitude: 121.766 }] }] }
+  const { onSave } = setup({ assignments: [route], initialGroup: [route] })
+  fireEvent.click(screen.getByRole('button', { name: 'Edit route' }))
+  expect(screen.getByLabelText('Route name')).toHaveValue('Market')
+  fireEvent.change(screen.getByLabelText('Allowed distance from route (meters, each side)'), { target: { value: '175' } })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save route' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: 'Save route' })); review()
+  fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
-  expect(onSave.mock.calls[0][0][0]).toMatchObject({ personnelId: 'PNP-1', shiftStart: '2026-11-10T00:00:00.000Z',
-    shiftEnd: '2026-11-10T02:00:00.000Z', deploymentType: 'area', scheduleBlocks: [{ label: 'Market', durationMinutes: 120, radiusMeters: 200 }] })
+  expect(onSave.mock.calls[0][0][0]).toMatchObject({ id: 'DEP-1', groupId: 'GRP-1', scheduleBlocks: [{ routeCorridorMeters: 175 }] })
 })
 
-it('blocks a duty with unassigned hours and does not reset entered blocks when reselecting the style', async () => {
-  const onSave = vi.fn()
-  render(<PatrolPlanner personnel={personnel} assignments={[]} ready onSave={onSave} onCancel={vi.fn()} />)
+it('rejects unfilled duty and keeps the draft when the selected style is clicked again', async () => {
+  const { onSave } = setup(); duty('2026-11-13T12:00')
   fireEvent.change(screen.getByLabelText('Area name'), { target: { value: 'Market' } })
   fireEvent.click(screen.getByRole('button', { name: 'Area Patrol' }))
-  expect(screen.getByLabelText('Area name').value).toBe('Market')
-  fireEvent.click(screen.getByLabelText('Officer One'))
-  fireEvent.submit(screen.getByRole('button', { name: 'Save deployment' }).closest('form'))
-  expect(screen.getByRole('alert').textContent).toContain('fill the full duty exactly')
+  expect(screen.getByLabelText('Area name')).toHaveValue('Market')
+  review()
+  expect(screen.getByRole('alert')).toHaveTextContent('fill the full duty exactly')
   expect(onSave).not.toHaveBeenCalled()
   await waitFor(() => expect(apiRequest).toHaveBeenCalled())
+})
+
+it('reorders compact areas, recomputes their time order, and allows deletion from review', async () => {
+  const { onSave } = setup(); duty('2026-11-13T12:00'); addArea('Market'); addArea('Mall')
+  expect(screen.getByRole('button', { name: /1Market/ })).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(screen.getByRole('button', { name: 'Move block 2 up' }))
+  expect(screen.getByRole('button', { name: /1Mall/ })).toHaveTextContent('8:00 AM')
+  fireEvent.click(screen.getByLabelText('Officer One')); review()
+  const dialog = screen.getByRole('dialog', { name: 'Review patrol schedule' })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete block 1' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('button', { name: /1Mall/ })).toBeNull()
+  review(); expect(screen.getByRole('alert')).toHaveTextContent('fill the full duty exactly')
+  expect(onSave).not.toHaveBeenCalled()
+})
+
+it('offers remaining duty duration and blocks an unsaved map draft from review', async () => {
+  setup(); duty('2026-11-13T12:00')
+  fireEvent.change(screen.getByLabelText('Duration'), { target: { value: 'remaining' } })
+  expect(screen.getByText('240 minutes selected')).toBeInTheDocument()
+  addArea('Full duty market'); fireEvent.click(screen.getByLabelText('Officer One'))
+  fireEvent.change(screen.getByLabelText('Area name'), { target: { value: 'Unsaved' } }); review()
+  expect(screen.getByRole('alert')).toHaveTextContent('Save the current area')
+})
+
+it('loads a vehicle crew automatically and never asks for duplicate personnel selection', async () => {
+  vi.mocked(apiRequest).mockResolvedValue({ vehicles, weeks: [{ weekStart: '2026-11-09', crews: [{ vehicleId: 'car-1', driverId: 'PNP-1', personnelIds: ['PNP-1', 'PNP-2'] }] }] })
+  const route = { ...initial, deploymentType: 'route', patrolMode: 'car', vehicleId: 'car-1', scheduleBlocks: [{ ...area, coverageType: 'route', routePoints: [{ latitude: 17.4305, longitude: 121.765 }, { latitude: 17.431, longitude: 121.766 }] }] }
+  const { onSave } = setup({ assignments: [route], initialGroup: [route] })
+  await screen.findByText('Locked weekly crew')
+  expect(screen.queryByRole('checkbox')).toBeNull()
+  expect(screen.getByText('Driver')).toBeInTheDocument()
+  review(); fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalled())
+  expect(onSave.mock.calls[0][0].map(a => a.personnelId)).toEqual(['PNP-1', 'PNP-2'])
+  expect(onSave.mock.calls[0][0].every(a => a.vehicleId === 'car-1')).toBe(true)
+})
+
+it('prevents deployment without a locked vehicle crew and opens the crew manager on demand', async () => {
+  setup(); duty(); fireEvent.click(screen.getByRole('button', { name: 'Route Patrol' })); fireEvent.click(screen.getByRole('button', { name: 'Car Patrol' }))
+  await screen.findByRole('option', { name: 'Car 1' }); fireEvent.change(screen.getByLabelText('Vehicle'), { target: { value: 'car-1' } })
+  expect(screen.getByRole('button', { name: 'Review patrol schedule' })).toBeDisabled()
+  expect(screen.queryByRole('dialog')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Set up weekly crew' }))
+  expect(screen.getByRole('dialog', { name: 'Weekly vehicle crews' })).toBeInTheDocument()
+})
+
+it('builds and clears a foot route while retaining saved points in their new order', async () => {
+  const { onSave } = setup(); duty(); fireEvent.click(screen.getByRole('button', { name: 'Route Patrol' }))
+  fireEvent.change(screen.getByLabelText('Route name'), { target: { value: 'Market walkway' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Select map point' })); fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Move route point 2 up' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save route' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: 'Save route' }))
+  expect(screen.getByLabelText('Route name')).toHaveValue('')
+  expect(screen.queryByRole('button', { name: 'Remove route point 1' })).toBeNull()
+  fireEvent.click(screen.getByLabelText('Officer One')); review(); fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalled())
+  expect(onSave.mock.calls[0][0][0].scheduleBlocks[0].routePoints[0].latitude).toBeCloseTo(17.4307)
 })

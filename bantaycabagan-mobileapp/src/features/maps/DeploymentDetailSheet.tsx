@@ -86,7 +86,7 @@ export function DeploymentDetailSheet({
             />
             <Detail icon="schedule" label="Full duty" value={formatShift(assignment)} />
             {currentBlock && <Detail icon="timer" label="Current schedule" value={`${currentBlock.label} · ${minutesLeft} minutes remaining`} />}
-            {!!assignment.scheduleBlocks?.length && <Detail icon="timer" label="Travel allowance" value={`${assignment.transitionGraceMinutes ?? 10} minutes after a change of area before outside-coverage warnings`} />}
+            {!!assignment.scheduleBlocks?.length && <Detail icon="timer" label="Transition grace period" value={`${assignment.transitionGraceMinutes ?? 10} minutes after a change of area before outside-coverage warnings. Does not extend the duty.`} />}
             {currentBlock?.coverageType === 'custom' && <Detail icon="map" label="Assigned coverage" value={`${currentBlock.radiusMeters} m radius`} />}
             {currentBlock?.coverageType === 'route' && <Detail icon="map" label="Route coverage" value={currentBlock.geometry?.type === 'LineString' && (assignment.patrolMode === 'walk' || currentBlock.roadDirections)
               ? `${currentBlock.routeCorridorMeters ?? 100} m on each side of the assigned route. GPS tolerance also applies.`
