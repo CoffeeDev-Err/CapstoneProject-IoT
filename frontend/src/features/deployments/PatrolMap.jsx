@@ -8,14 +8,16 @@ import { cabaganBoundaryFeature } from '../../utils/mapLibreLayers'
 import { blockTimeLabel, circleGeometry, routeIsEnforced } from './patrolScheduleView'
 
 // Saved road/walking paths and assignment transitions use separate sources.
-export default function PatrolMap({ blocks = [], type = 'area', mode = '', start, onPoint, focus, selectedIndex, context = '' }) {
+export default function PatrolMap({ blocks = [], type = 'area', mode = '', start, onPoint, focus, selectedIndex, context = '', autoFit = true, onSelectBlock, children }) {
   const container = useRef(null)
   const mapRef = useRef(null)
   const pointCallback = useRef(onPoint)
+  const selectCallback = useRef(onSelectBlock)
   const [loaded, setLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
   const isDark = useDocumentTheme()
   useEffect(() => { pointCallback.current = onPoint }, [onPoint])
+  useEffect(() => { selectCallback.current = onSelectBlock }, [onSelectBlock])
   useEffect(() => {
     if (!container.current || !hasMapTilerWebApiKey) return undefined
     let map
@@ -42,14 +44,14 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
     const features = [], transitions = [], markers = []
     const bounds = new maplibregl.LngLatBounds()
     const centers = []
-    const addMarker = (coordinates, number, title, isCurrent = false) => {
+    const addMarker = (coordinates, number, title, isCurrent = false, blockIndex) => {
       if (!coordinates.every(Number.isFinite)) return
       bounds.extend(coordinates)
       const el = document.createElement('button')
       el.type = 'button'; el.className = `patrol-map-marker${isCurrent ? ' is-current' : ''}`; el.textContent = String(number); el.setAttribute('aria-label', title)
       const detail = document.createElement('div'); detail.textContent = title
       const popup = new maplibregl.Popup({ offset: 20 }).setDOMContent(detail)
-      el.addEventListener('click', event => { event.stopPropagation(); popup.setLngLat(coordinates).addTo(map) })
+      el.addEventListener('click', event => { event.stopPropagation(); selectCallback.current?.(blockIndex); popup.setLngLat(coordinates).addTo(map) })
       markers.push(new maplibregl.Marker({ element: el }).setLngLat(coordinates).setPopup(popup).addTo(map))
     }
     blocks.forEach((block, index) => {
@@ -78,7 +80,7 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
         }
         if (Number.isFinite(block.latitude) && Number.isFinite(block.longitude)) {
           const center = [block.longitude, block.latitude]
-          addMarker(center, index + 1, title, selectedIndex === index); centers.push({ first: center, last: center })
+          addMarker(center, index + 1, title, selectedIndex === index, index); centers.push({ first: center, last: center })
         }
       }
     })
@@ -101,14 +103,15 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
         new maplibregl.Popup().setLngLat(event.lngLat).setDOMContent(detail).addTo(map)
       })
     }
-    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 55, maxZoom: 16, duration: 0 })
+    if (autoFit && !bounds.isEmpty()) map.fitBounds(bounds, { padding: 55, maxZoom: 16, duration: 0 })
     return () => markers.forEach(marker => marker.remove())
-  }, [blocks, type, mode, start, loaded, selectedIndex, context])
+  }, [blocks, type, mode, start, loaded, selectedIndex, context, autoFit])
   useEffect(() => {
     if (loaded && focus) mapRef.current?.flyTo({ center: [focus.longitude, focus.latitude], zoom: 16 })
   }, [loaded, focus])
   return <div className="patrol-map" aria-label={onPoint ? 'Patrol configuration map' : 'Read-only patrol schedule map'}>
     {hasMapTilerWebApiKey ? <><div className="patrol-map__canvas" ref={container} />{!loaded && !mapError && <div className="patrol-map__empty" role="status">Loading patrol map…</div>}{mapError && <p className="patrol-map__error patrol-notice is-warning" role="status">{mapError}</p>}</> : <div className="patrol-map__empty" role="status">Map configuration is unavailable. Add the MapTiler web key to display the map.</div>}
+    {children}
     <div className="patrol-map__legend"><span>● Coverage / saved path</span><span>┄ Assignment sequence</span></div>
   </div>
 }

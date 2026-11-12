@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState } from 'react'
+import { createElement, useEffect, useId, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Car, Check, ClipboardCheck, Clock3, Footprints, LockKeyhole, MapPin, Plus, Route, ShieldCheck, Trash2, Users } from 'lucide-react'
 import { apiRequest } from '../../services/apiClient'
 import { CABAGAN_BARANGAYS } from '../../constants/cabaganBarangays'
@@ -8,6 +8,7 @@ import ConfirmModal from '../../components/ConfirmModal'
 import WeeklyVehicleAssignments from './WeeklyVehicleAssignments'
 import PatrolMap from './PatrolMap'
 import PatrolMapSearch from './PatrolMapSearch'
+import PatrolAreaScheduleBuilder from './PatrolAreaScheduleBuilder'
 import PatrolPersonnelSelect from './PatrolPersonnelSelect'
 import PatrolDurationControl from './PatrolDurationControl'
 import PatrolScheduleTimeline from './PatrolScheduleTimeline'
@@ -16,6 +17,11 @@ import usePatrolDraftCoverage from './usePatrolDraftCoverage'
 import { blockOffset, blockTimeLabel, emptyPatrolBlock, hasBlockCoverage, moveItem } from './patrolScheduleView'
 import { weekFor, toPatrolLocalTime, patrolTime } from './patrolPlannerTime'
 import '../../styles/patrol-planner.css'
+
+const focusPlannerControl = control => {
+  control?.focus()
+  control?.scrollIntoView?.({ block: 'center', inline: 'nearest' })
+}
 
 export default function PatrolPlanner({ personnel, assignments, initialGroup = [], saving, ready, onSave, onCancel }) {
   const initial = initialGroup[0]
@@ -26,6 +32,8 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const [start, setStart] = useState(() => toPatrolLocalTime(initial?.shiftStart || new Date()))
   const [end, setEnd] = useState(() => toPatrolLocalTime(initial?.shiftEnd || new Date(Date.now() + 8 * 3600000)))
   const [blocks, setBlocks] = useState(initial?.scheduleBlocks || [])
+  const [areaDirty, setAreaDirty] = useState(false)
+  const areaBuilderRef = useRef(null)
   const [draft, setDraft] = useState(emptyPatrolBlock)
   const [editing, setEditing] = useState(null)
   const [expanded, setExpanded] = useState(initial ? 0 : null)
@@ -40,10 +48,17 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const [review, setReview] = useState(false)
   const [switchType, setSwitchType] = useState(null)
   const [error, setError] = useState('')
+  const [draftError, setDraftError] = useState(null)
+  const [draftNotice, setDraftNotice] = useState('')
   const [focus, setFocus] = useState(null)
   const [routesLoading, setRoutesLoading] = useState(false)
   const [coordinates, setCoordinates] = useState({ latitude: '', longitude: '' })
   const nameRef = useRef(null)
+  const endRef = useRef(null)
+  const configRef = useRef(null)
+  const draftErrorRef = useRef(null)
+  const errorRef = useRef(null)
+  const feedbackId = useId()
   const savingRef = useRef(false)
   const routingRevision = useRef(0)
   const coverage = usePatrolDraftCoverage(draft, type, mode)
@@ -64,33 +79,57 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const selectedIds = vehicleMode ? crew?.personnelIds || [] : ids
   const minutes = blocks.reduce((total, b) => total + Number(b.durationMinutes), 0)
   const dutyMinutes = Math.round((patrolTime(end) - patrolTime(start)) / 60000)
+  const dutyError = !Number.isFinite(dutyMinutes) ? 'Choose both duty start and end dates.'
+    : dutyMinutes <= 0 ? 'Duty end must be after the start.'
+      : dutyMinutes > 1440 ? `This duty is ${dutyMinutes / 60} hours. The maximum is 24 hours; adjust the start or end.` : ''
   const draftOffset = editing === null ? minutes : blockOffset(blocks, editing)
   const available = dutyMinutes - minutes + (editing === null ? 0 : Number(blocks[editing]?.durationMinutes || 0))
-  const update = patch => { setDraft(current => ({ ...current, ...patch })); setError('') }
-  const clearDraft = (remaining = dutyMinutes - minutes) => { setDraft(emptyPatrolBlock(remaining)); setEditing(null); setCoordinates({ latitude: '', longitude: '' }); setFocus(null); setError('') }
+  useEffect(() => {
+    if (!draftError) return
+    if (configRef.current) configRef.current.open = true
+    focusPlannerControl(draftError.field === 'name' ? nameRef.current : draftErrorRef.current)
+  }, [draftError])
+  useEffect(() => { if (error) focusPlannerControl(errorRef.current) }, [error])
+  const showDraftError = (message, field) => { setDraftNotice(''); setDraftError({ message, field }); return false }
+  const focusDraft = () => { if (configRef.current) configRef.current.open = true; focusPlannerControl(nameRef.current) }
+  const update = patch => { setDraft(current => ({ ...current, ...patch })); setError(''); setDraftError(null); setDraftNotice('') }
+  const clearDraft = (remaining = dutyMinutes - minutes) => { setDraft(emptyPatrolBlock(remaining)); setEditing(null); setCoordinates({ latitude: '', longitude: '' }); setFocus(null); setError(''); setDraftError(null); setDraftNotice('') }
   const selectPoint = point => {
-    if (!isInsideCabagan(point.latitude, point.longitude)) return setError('Choose a location inside the Cabagan boundary.')
+    if (!isInsideCabagan(point.latitude, point.longitude)) return showDraftError('Choose a location inside the Cabagan boundary.')
     if (type === 'route') {
-      if (draft.routePoints.length >= 30) return setError('A route supports a maximum of 30 points.')
+      if (draft.routePoints.length >= 30) return showDraftError('A route supports a maximum of 30 points.')
       update({ routePoints: [...draft.routePoints, { ...point, label: point.label || `Point ${draft.routePoints.length + 1}` }], geometry: null, roadDirections: false })
     } else update({ latitude: point.latitude, longitude: point.longitude })
   }
   const saveBlock = () => {
+    if (dutyError) { focusPlannerControl(endRef.current); return false }
     const resolved = { ...draft, ...(coverage.loading ? {} : coverage), coverageType: type === 'route' ? 'route' : draft.coverageType, label: draft.label.trim() }
     delete resolved.key; delete resolved.loading; delete resolved.message
-    if (coverage.loading) return setError('Wait for the map coverage to finish loading.')
-    if (!hasBlockCoverage(resolved, type)) return setError('Name the block and select its barangay, map coverage or at least two route points.')
-    if (!Number.isInteger(draft.durationMinutes) || draft.durationMinutes < 15 || draft.durationMinutes > 1440) return setError('Choose a duration between 15 minutes and 24 hours.')
-    if (type === 'area' && draft.coverageType === 'custom' && (!Number.isFinite(draft.radiusMeters) || draft.radiusMeters < 50 || draft.radiusMeters > 5000)) return setError('Coverage radius must be 50 to 5,000 meters.')
-    if (type === 'route' && (!Number.isFinite(draft.routeCorridorMeters) || draft.routeCorridorMeters < 50 || draft.routeCorridorMeters > 1000)) return setError('The route corridor must be 50 to 1,000 meters on each side.')
+    if (!resolved.label) return showDraftError(type === 'area' ? 'Enter an area name before saving.' : 'Enter a route name before saving.', 'name')
+    if (coverage.loading) return showDraftError('Wait for the map coverage to finish loading.')
+    if (!hasBlockCoverage(resolved, type)) return showDraftError(type === 'route' ? 'Select at least two route points on the map before saving.' : draft.coverageType === 'barangay' ? 'Choose a barangay before saving this area.' : 'Select the area location on the map or enter exact coordinates before saving.')
+    if (!Number.isInteger(draft.durationMinutes) || draft.durationMinutes < 15 || draft.durationMinutes > 1440) return showDraftError('Choose a duration between 15 minutes and 24 hours.')
+    if (draft.durationMinutes > available) return showDraftError(`Only ${Math.max(0, available)} minutes remain in this duty. Shorten this block or adjust the duty hours.`)
+    if (editing === null && blocks.length >= 48) return showDraftError('A duty supports a maximum of 48 saved blocks.')
+    if (type === 'area' && draft.coverageType === 'custom' && (!Number.isFinite(draft.radiusMeters) || draft.radiusMeters < 50 || draft.radiusMeters > 5000)) return showDraftError('Coverage radius must be 50 to 5,000 meters.')
+    if (type === 'route' && (!Number.isFinite(draft.routeCorridorMeters) || draft.routeCorridorMeters < 50 || draft.routeCorridorMeters > 1000)) return showDraftError('The route corridor must be 50 to 1,000 meters on each side.')
     const next = editing === null ? [...blocks, resolved] : blocks.map((b, i) => i === editing ? resolved : b)
     setBlocks(next); setExpanded(editing ?? next.length - 1)
     clearDraft(dutyMinutes - next.reduce((total, b) => total + Number(b.durationMinutes), 0))
+    setDraftNotice(`${resolved.label} ${editing === null ? 'added to' : 'updated in'} this duty schedule. Review and deploy when the full schedule is ready.`)
+    return true
   }
-  const editBlock = index => { setReview(false); setEditing(index); setDraft({ ...emptyPatrolBlock(), ...blocks[index] }); setExpanded(index); setError(''); nameRef.current?.focus() }
-  const deleteBlock = index => { setBlocks(current => current.filter((_, i) => i !== index)); setExpanded(null); clearDraft(); setReview(false) }
-  const reorderBlock = (from, to) => { setBlocks(current => moveItem(current, from, to)); setExpanded(to); clearDraft() }
-  const changeType = value => { routingRevision.current += 1; setRoutesLoading(false); setType(value); setBlocks([]); clearDraft(dutyMinutes); setExpanded(null); setSwitchType(null) }
+  const addNextBlock = () => {
+    if (dutyError) { focusPlannerControl(endRef.current); return }
+    const hasDraft = editing !== null || draft.label.trim() || draft.routePoints.length || Number.isFinite(draft.latitude) || draft.barangay
+    if (hasDraft && !saveBlock()) return
+    if (!hasDraft) { clearDraft(); setDraftNotice(`Name the next ${type}, select its coverage and save it to this duty schedule.`) }
+    focusDraft()
+  }
+  const editBlock = index => { setReview(false); if (type === 'area') { areaBuilderRef.current?.edit(index); return }; setEditing(index); setDraft({ ...emptyPatrolBlock(), ...blocks[index] }); setExpanded(index); setError(''); setDraftError(null); setDraftNotice(''); focusDraft() }
+  const deleteBlock = index => { setReview(false); if (type === 'area') { areaBuilderRef.current?.remove(index); return }; setBlocks(current => current.filter((_, i) => i !== index)); setExpanded(null); clearDraft() }
+  const reorderBlock = (from, to) => { if (type === 'area') { setReview(false); areaBuilderRef.current?.move(from, to); return }; setBlocks(current => moveItem(current, from, to)); setExpanded(to); clearDraft() }
+  const changeType = value => { routingRevision.current += 1; setRoutesLoading(false); setType(value); setBlocks([]); setAreaDirty(false); clearDraft(dutyMinutes); setExpanded(null); setSwitchType(null) }
   const changeMode = async value => {
     if (value === mode) return
     const revision = ++routingRevision.current
@@ -109,6 +148,7 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const validate = () => {
     if (!ready) return 'Wait for deployments to load before saving.'
     if (routesLoading) return 'Wait for the saved routes to update for this travel mode.'
+    if (type === 'area' && areaDirty) return 'Save all selected areas before reviewing the patrol schedule.'
     if (!Number.isFinite(dutyMinutes) || dutyMinutes <= 0 || dutyMinutes > 1440 || minutes !== dutyMinutes) return 'Schedule durations must fill the full duty exactly (maximum 24 hours).'
     if (draft.label.trim() || draft.routePoints.length || Number.isFinite(draft.latitude) || editing !== null) return `Save the current ${type} or clear its selection before reviewing.`
     if (!blocks.length || blocks.some(b => !hasBlockCoverage(b, type))) return 'Save at least one configured schedule block.'
@@ -137,7 +177,7 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
     try {
       const next = buildAssignments()
       if (await onSave([...assignments.filter(a => !initialGroup.some(old => old.id === a.id)), ...next], initial ? 'Patrol deployment updated. Affected personnel have been notified.' : 'Patrol deployment saved.')) {
-        setBlocks([]); clearDraft(); setIds([]); setVehicleId(''); setNotes(''); setReview(false); onCancel({ deploymentId: next[0].id })
+        setBlocks([]); areaBuilderRef.current?.reset(); clearDraft(); setIds([]); setVehicleId(''); setNotes(''); setReview(false); onCancel({ deploymentId: next[0].id })
       }
     } finally { savingRef.current = false }
   }
@@ -146,16 +186,26 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const scheduleComplete = minutes === dutyMinutes && minutes > 0
   return <section className="patrol-planner patrol-theme">
     <header className="patrol-planner__header"><div><span className="patrol-eyebrow"><ShieldCheck size={16} /> Patrol operations</span><h3>{initial ? 'Reassign patrol deployment' : 'Plan a patrol duty'}</h3><p>Set the duty. Build the schedule on the map. Deploy your team.</p></div><span className="patrol-badge">Philippine time · UTC+8</span></header>
-    <form onSubmit={event => { event.preventDefault(); const message = validate(); setError(message); if (!message) setReview(true) }}>
+    <form onSubmit={event => {
+      event.preventDefault()
+      if (dutyError) { focusPlannerControl(endRef.current); return }
+      const message = validate()
+      setError(message)
+      if (!message) setReview(true)
+    }}>
       <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step">01</span><div><h4>Patrol style & duty</h4><p>One duty, with consecutive area or route blocks.</p></div></div>
-        <fieldset className="patrol-style-selector"><legend className="visually-hidden">Deployment style</legend>{[['area', 'Area Patrol', 'Cover a barangay or a custom area', ShieldCheck], ['route', 'Route Patrol', 'Follow a road or walking path', Route]].map(([value, label, hint, icon]) => <button type="button" key={value} aria-label={label} aria-pressed={type === value} className={type === value ? 'is-active' : ''} onClick={() => { if (type !== value) { if (blocks.length || draft.label || draft.routePoints.length || Number.isFinite(draft.latitude)) setSwitchType(value); else changeType(value) } }}>{createElement(icon, { size: 23 })}<span><strong>{label}</strong><small>{hint}</small></span>{type === value && <Check size={17} />}</button>)}</fieldset>
+        <fieldset className="patrol-style-selector"><legend className="visually-hidden">Deployment style</legend>{[['area', 'Area Patrol', 'Cover a barangay or a custom area', ShieldCheck], ['route', 'Route Patrol', 'Follow a road or walking path', Route]].map(([value, label, hint, icon]) => <button type="button" key={value} aria-label={label} aria-pressed={type === value} className={type === value ? 'is-active' : ''} onClick={() => { if (type !== value) { if (areaDirty || blocks.length || draft.label || draft.routePoints.length || Number.isFinite(draft.latitude)) setSwitchType(value); else changeType(value) } }}>{createElement(icon, { size: 23 })}<span><strong>{label}</strong><small>{hint}</small></span>{type === value && <Check size={17} />}</button>)}</fieldset>
         {type === 'route' && <fieldset className="patrol-mode-selector"><legend>Travel mode</legend>{[['walk', 'Foot Patrol', Footprints], ['motorcycle', 'Motorcycle Patrol', Route], ['car', 'Car Patrol', Car]].map(([value, label, icon]) => <button type="button" key={value} aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => { void changeMode(value) }}>{createElement(icon, { size: 16 })}{label}</button>)}</fieldset>}
-        <div className="patrol-two-columns patrol-duty"><label>Start<input required type="datetime-local" value={start} onChange={e => setStart(e.target.value)} /></label><label>End<input required type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} /></label></div>
+        <div className="patrol-two-columns patrol-duty"><label>Start<input required type="datetime-local" value={start} onChange={e => { setStart(e.target.value); setError('') }} /></label><label>End<input ref={endRef} required type="datetime-local" aria-invalid={Boolean(dutyError)} aria-describedby={`${feedbackId}-duty`} value={end} onChange={e => { setEnd(e.target.value); setError('') }} /></label></div>
+        <p id={`${feedbackId}-duty`} role={dutyError ? 'alert' : undefined} className={dutyError ? 'patrol-notice is-error' : undefined}>{dutyError || 'One duty can last up to 24 hours. Saved block durations must fill it exactly.'}</p>
       </section>
-      <section className="patrol-panel patrol-schedule-panel"><div className="patrol-section-heading"><span className="patrol-step is-gold">02</span><div><h4>Build the {type} schedule</h4><p>Two hours per block by default. Use one full-duty block for a fixed assignment.</p></div><span className={`patrol-badge ${scheduleComplete ? 'is-valid' : 'is-warning'}`} role="status"><Clock3 size={14} />{minutes} / {Number.isFinite(dutyMinutes) ? dutyMinutes : '—'} min</span></div>
-        <div className="patrol-workspace"><div className="patrol-workspace__map"><PatrolMapSearch onSelect={setFocus} /><PatrolMap blocks={[preview]} type={type} mode={mode} start={patrolTime(start)} focus={focus} onPoint={type === 'route' || draft.coverageType === 'custom' ? selectPoint : undefined} /><p className="patrol-map-caption">{type === 'route' ? 'Select start, intermediate stops and destination in order. Add points at actual road or walkway turns.' : draft.coverageType === 'barangay' ? 'Whole barangay coverage uses the administrative boundary when available.' : 'Search a place or barangay, then tap the exact location to set coverage.'}</p></div>
-          <details className="patrol-workspace__config" open><summary><MapPin size={16} />{editing === null ? `New ${type}` : `Edit ${type} ${editing + 1}`} configuration</summary><div className="patrol-workspace__fields">
-            <label>{type === 'route' ? 'Route name' : 'Area name'}<input ref={nameRef} maxLength={200} value={draft.label} placeholder={type === 'route' ? 'Centro to public market' : 'Public market'} onChange={e => update({ label: e.target.value })} /></label>
+      <section className="patrol-panel patrol-schedule-panel"><div className="patrol-section-heading"><span className="patrol-step is-gold">02</span><div><h4>Build the {type} schedule</h4><p>Two hours per block by default. Use one full-duty block for a fixed assignment.</p></div>{type === 'route' && <span className={`patrol-badge ${scheduleComplete ? 'is-valid' : 'is-warning'}`} role="status"><Clock3 size={14} />{minutes} / {Number.isFinite(dutyMinutes) ? dutyMinutes : '—'} min</span>}</div>
+        {type === 'area' ? <PatrolAreaScheduleBuilder ref={areaBuilderRef} initialBlocks={blocks} start={patrolTime(start)} dutyMinutes={dutyMinutes} dutyError={dutyError} graceMinutes={graceMinutes} onGraceChange={setGraceMinutes} onDirtyChange={setAreaDirty} onCommit={next => { setBlocks(next); setAreaDirty(false); setError('') }} /> : <>
+        <div className="patrol-workspace"><div className="patrol-workspace__map"><PatrolMapSearch onSelect={setFocus} /><PatrolMap blocks={[preview]} type={type} mode={mode} start={patrolTime(start)} autoFit={false} focus={focus} onPoint={type === 'route' || draft.coverageType === 'custom' ? selectPoint : undefined} /><p className="patrol-map-caption">{type === 'route' ? 'Select start, intermediate stops and destination in order. Add points at actual road or walkway turns.' : draft.coverageType === 'barangay' ? 'Whole barangay coverage uses the administrative boundary when available.' : 'Search a place or barangay, then tap the exact location to set coverage.'}</p></div>
+          <details ref={configRef} className="patrol-workspace__config" open><summary><MapPin size={16} />{editing === null ? `New ${type}` : `Edit ${type} ${editing + 1}`} configuration</summary><div className="patrol-workspace__fields">
+            <div className="patrol-draft-name"><label>{type === 'route' ? 'Route name' : 'Area name'} (required)<input ref={nameRef} aria-label={type === 'route' ? 'Route name' : 'Area name'} aria-required="true" aria-invalid={draftError?.field === 'name'} aria-describedby={draftError?.field === 'name' ? `${feedbackId}-draft` : undefined} maxLength={200} value={draft.label} placeholder={type === 'route' ? 'e.g. Centro to public market' : 'e.g. Public market'} onChange={e => update({ label: e.target.value })} /></label>
+              {draftError?.field === 'name' && <p id={`${feedbackId}-draft`} role="alert" className="patrol-notice is-error">{draftError.message}</p>}
+            </div>
             <div className="patrol-tinted-panel patrol-time-summary"><Clock3 size={17} /><div><strong>{scheduleComplete && editing === null ? 'Duty fully scheduled' : blockTimeLabel(patrolTime(start), draft, draftOffset)}</strong><small>{scheduleComplete && editing === null ? 'Review the schedule or edit a saved block' : 'Computed from the duty and saved blocks'}</small></div></div>
             <PatrolDurationControl key={`${editing ?? 'new'}-${blocks.length}`} value={draft.durationMinutes} remaining={available} onChange={durationMinutes => update({ durationMinutes })} />
             {type === 'area' ? <><fieldset className="patrol-coverage-selector"><legend>Coverage type</legend>{[['barangay', 'Whole Barangay'], ['custom', 'Custom Area']].map(([value, label]) => <label key={value}><input type="radio" name="patrol-coverage" checked={draft.coverageType === value} onChange={() => update({ coverageType: value, latitude: undefined, longitude: undefined, geometry: null, barangay: '' })} />{label}</label>)}</fieldset>
@@ -164,14 +214,16 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
               : <><label>Allowed distance from route (meters, each side)<input type="number" min={50} max={1000} value={draft.routeCorridorMeters ?? 100} onChange={e => update({ routeCorridorMeters: Number(e.target.value) })} /></label><ol className="patrol-route-points">{draft.routePoints.map((point, index) => <li key={index}><span className="patrol-step">{index + 1}</span><label><span className="visually-hidden">Route point {index + 1} label</span><input maxLength={200} value={point.label || ''} placeholder={index === 0 ? 'Start' : `Point ${index + 1}`} onChange={e => update({ routePoints: draft.routePoints.map((p, i) => i === index ? { ...p, label: e.target.value } : p) })} /><small>{point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</small></label><div className="patrol-route-points__actions"><button type="button" aria-label={`Move route point ${index + 1} up`} disabled={index === 0} onClick={() => update({ routePoints: moveItem(draft.routePoints, index, index - 1) })}><ArrowUp size={13} /></button><button type="button" aria-label={`Move route point ${index + 1} down`} disabled={index === draft.routePoints.length - 1} onClick={() => update({ routePoints: moveItem(draft.routePoints, index, index + 1) })}><ArrowDown size={13} /></button><button type="button" aria-label={`Remove route point ${index + 1}`} onClick={() => update({ routePoints: draft.routePoints.filter((_, i) => i !== index) })}><Trash2 size={13} /></button></div></li>)}</ol></>}
             <label>Transition grace period (minutes)<input type="number" min={0} max={60} value={graceMinutes} onChange={e => setGraceMinutes(Number(e.target.value))} /></label><small>The number of minutes allowed to move to the next area or route before outside-coverage warnings begin. It does not extend the duty or any block.</small>
             {coverage.message && <p role="status" className={`patrol-notice ${coverage.loading ? '' : preview.geometry ? 'is-valid' : 'is-warning'}`}>{coverage.message}</p>}
-            {type === 'area' && Number.isFinite(draft.latitude) && <div className="patrol-location-summary"><MapPin size={16} /><span>{draft.latitude.toFixed(6)}, {draft.longitude.toFixed(6)}<small>{draft.radiusMeters} m radius · Selection saved with this block</small></span></div>}
+            {type === 'area' && Number.isFinite(draft.latitude) && <div className="patrol-location-summary"><MapPin size={16} /><span>{draft.latitude.toFixed(6)}, {draft.longitude.toFixed(6)}<small>{draft.radiusMeters} m radius · Draft selection. Select Save area to add it to the schedule.</small></span></div>}
             {(type === 'route' || draft.coverageType === 'custom') && <details className="patrol-coordinate-entry"><summary>Enter exact coordinates</summary><div className="patrol-two-columns"><label>Latitude<input type="number" step="any" value={coordinates.latitude} onChange={e => setCoordinates(c => ({ ...c, latitude: e.target.value }))} /></label><label>Longitude<input type="number" step="any" value={coordinates.longitude} onChange={e => setCoordinates(c => ({ ...c, longitude: e.target.value }))} /></label></div><button type="button" disabled={!coordinates.latitude || !coordinates.longitude} onClick={() => selectPoint({ latitude: Number(coordinates.latitude), longitude: Number(coordinates.longitude) })}><MapPin size={14} />Use coordinates</button></details>}
             <div className="patrol-draft-actions"><button type="button" onClick={() => clearDraft()}>Clear current {type === 'route' ? 'route' : 'selection'}</button><button type="button" className="patrol-primary" disabled={coverage.loading || editing === null && (blocks.length >= 48 || scheduleComplete)} onClick={saveBlock}><Check size={16} />Save {type}</button></div>
+            {draftError && draftError.field !== 'name' && <p ref={draftErrorRef} id={`${feedbackId}-draft`} tabIndex={-1} role="alert" className="patrol-notice is-error">{draftError.message}</p>}
           </div></details></div>
-        <div className="patrol-saved-schedule">{routesLoading && <p role="status" className="patrol-notice">Updating saved routes for the selected travel mode…</p>}<div className="patrol-section-heading"><h4>Saved {type === 'area' ? 'areas' : 'routes'} <span className="patrol-badge">{blocks.length}</span></h4><button type="button" disabled={blocks.length >= 48 || scheduleComplete} onClick={() => { if (editing !== null || draft.label.trim() || draft.routePoints.length || Number.isFinite(draft.latitude)) return setError(`Save the current ${type} or clear its selection before adding another.`); clearDraft(); nameRef.current?.focus() }}><Plus size={16} />Add next {type}</button></div>
+        <div className="patrol-saved-schedule">{draftNotice && <p role="status" className="patrol-notice is-valid">{draftNotice}</p>}{routesLoading && <p role="status" className="patrol-notice">Updating saved routes for the selected travel mode…</p>}<div className="patrol-section-heading"><h4>Saved {type === 'area' ? 'areas' : 'routes'} <span className="patrol-badge">{blocks.length}</span></h4><button type="button" disabled={coverage.loading || blocks.length >= 48 || scheduleComplete} onClick={addNextBlock}><Plus size={16} />Add next {type}</button></div>
           {blocks.length ? <PatrolScheduleTimeline blocks={blocks} start={patrolTime(start)} type={type} mode={mode} expanded={expanded} onExpand={setExpanded} onEdit={editBlock} onDelete={deleteBlock} onMove={reorderBlock} /> : <div className="patrol-empty"><MapPin size={22} /><strong>Your schedule starts here</strong><p>Configure the first {type} on the map, then select Save {type}.</p></div>}
           {minutes > dutyMinutes && <p className="patrol-notice is-warning">The schedule exceeds the duty by {minutes - dutyMinutes} minutes. Edit a duration before reviewing.</p>}
         </div>
+        </>}
       </section>
       <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step is-teal">03</span><div><h4>{vehicleMode ? 'Vehicle & weekly crew' : 'Assign personnel'}</h4><p>{vehicleMode ? 'Select a vehicle to load its locked crew automatically.' : 'Choose the officers assigned to this complete duty.'}</p></div>{vehicleMode ? <Car size={20} /> : <Users size={20} />}</div>
         {vehicleMode ? <><div className="patrol-section-heading"><label className="patrol-vehicle-select">Vehicle<select aria-label="Vehicle" value={vehicleId} onChange={e => setVehicleId(e.target.value)}><option value="">Choose assigned vehicle</option>{fleet.vehicles.filter(v => v.mode === mode).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label><button type="button" onClick={() => setCrewOpen(true)} disabled={fleetLoading || Boolean(fleetError)}><Car size={16} />Manage weekly vehicle crews</button></div>
@@ -180,7 +232,7 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
           : <PatrolPersonnelSelect personnel={personnel} ids={ids} onChange={setIds} />}
       </section>
       <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step">04</span><div><h4>Deployment instructions</h4><p>Brief the team before they begin their duty.</p></div></div><label><span className="visually-hidden">Instructions</span><textarea maxLength={1000} rows={3} placeholder="Priorities, checkpoints and instructions for the assigned team…" value={notes} onChange={e => setNotes(e.target.value)} /></label><small>{notes.length} / 1,000 characters</small></section>
-      {error && <p role="alert" className="patrol-notice is-error">{error}</p>}
+      {error && <p ref={errorRef} tabIndex={-1} role="alert" className="patrol-notice is-error">{error}</p>}
       <footer className="patrol-planner__footer"><span><ShieldCheck size={17} />Review all coverage and duty hours before deploying.</span><div>{initial && <button type="button" disabled={saving} onClick={onCancel}>Cancel changes</button>}<button className="patrol-primary" type="submit" disabled={saving || !ready || vehicleMode && !crew}><ClipboardCheck size={17} />Review patrol schedule</button></div></footer>
     </form>
     {crewOpen && <WeeklyVehicleAssignments fleet={fleet} personnel={personnel} initialWeek={weekStart} initialVehicle={vehicleId} onSaved={loadFleet} onClose={() => setCrewOpen(false)} />}

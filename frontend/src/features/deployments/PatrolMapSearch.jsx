@@ -33,7 +33,7 @@ export default function PatrolMapSearch({ onSelect }) {
     <label htmlFor={id}>Find a street, place or barangay</label>
     <div className="patrol-map-search__control">
       <Search size={18} aria-hidden="true" />
-      <input id={id} type="search" autoComplete="off" maxLength={120} value={query} placeholder="Search within Cabagan…"
+      <input id={id} type="text" inputMode="search" autoComplete="off" maxLength={120} value={query} placeholder="Search within Cabagan…"
         role="combobox" aria-expanded={results.length > 0} aria-controls={`${id}-results`} aria-autocomplete="list"
         aria-activedescendant={active >= 0 ? `${id}-result-${active}` : undefined}
         onChange={e => { ++request.current; setQuery(e.target.value); setResults([]); setMessage(''); setLoading(false); setActive(-1) }}

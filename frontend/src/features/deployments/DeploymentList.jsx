@@ -49,7 +49,7 @@ function DeploymentList({
         </div>
 
         <div
-          className="deployment-view-nav patrol-list-tabs mb-3"
+          className="patrol-list-tabs mb-3"
           role="tablist"
           aria-label="Deployment list views"
           onKeyDown={event => {
@@ -111,9 +111,7 @@ function DeploymentList({
                 <TableSkeletonRows columns={9} rows={5} label="Loading deployments" />
               </tbody>
             </table>
-          ) : assignments.length === 0 ? (
-            <p className="text-body-secondary mb-0 small">No deployment assignments yet.</p>
-          ) : visibleAssignments.length === 0 ? (
+          ) : assignments.length === 0 || visibleAssignments.length === 0 ? (
             <p className="text-body-secondary mb-0 small">
               {activeDeploymentView === 'history' ? 'No completed or cancelled deployments.' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
                 ? 'No deployments are scheduled for later.'

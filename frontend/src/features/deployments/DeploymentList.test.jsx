@@ -44,6 +44,12 @@ const renderList = (props = {}) => render(
 )
 
 describe('DeploymentList instructions', () => {
+  it('shows the selected view empty state even when history has existing assignments', () => {
+    renderList({ assignments: [], visibleAssignments: [], filteredGroupedAssignments: [], deploymentViewCounts: { active: 0, scheduled: 0 }, historyCount: 98 })
+    expect(screen.getByText('No deployments are scheduled for later.')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /History 98/ })).toBeInTheDocument()
+    expect(screen.queryByText('No deployment assignments yet.')).toBeNull()
+  })
   it('moves between deployment views with the arrow keys', () => {
     const onViewChange = vi.fn()
     renderList({ onViewChange })
