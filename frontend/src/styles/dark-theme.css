@@ -380,7 +380,7 @@
 }
 
 [data-theme="dark"] .priority-recommendation {
-  background: var(--bg-secondary);
+  background: var(--surface-selected);
 }
 
 [data-theme="dark"] .priority-level--critical {

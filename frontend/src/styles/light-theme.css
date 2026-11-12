@@ -233,7 +233,6 @@
 :root:not([data-theme="dark"]) .stat-card,
 :root:not([data-theme="dark"]) .widget-card,
 :root:not([data-theme="dark"]) .map-panel,
-:root:not([data-theme="dark"]) .barangay-analytics,
 :root:not([data-theme="dark"]) .personnel-roster-card,
 :root:not([data-theme="dark"]) .report-list-panel,
 :root:not([data-theme="dark"]) .account-management-card {

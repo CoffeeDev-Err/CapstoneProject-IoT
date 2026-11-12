@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { BarChart3, ClipboardCheck, MapPin, ShieldCheck, Siren, Users } from 'lucide-react'
 import {
   DEPLOYMENT_PRIORITY_WEIGHTS,
 } from '../utils/barangayAnalytics'
@@ -63,7 +64,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
   const highestActivityBarangay = metricRanking[0]
 
   return (
-    <section className="widget-card slide-up barangay-analytics">
+    <section className="slide-up barangay-analytics">
       <header className="barangay-analytics__header">
         <div>
           <h3 className="widget-title mb-0">Barangay operational analytics</h3>
@@ -73,17 +74,20 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
       </header>
 
       <div className="barangay-analytics__summary">
-        <div>
+        <div className="analytics-summary-card">
+          <MapPin className="analytics-summary-card__icon" aria-hidden="true" />
           <span>Highest activity</span>
           <strong>{highestActivityBarangay?.barangay || '-'}</strong>
           <small>{getMetricValue(highestActivityBarangay || {}, metric)} {metric === 'incidents' ? 'incidents' : 'reports'}</small>
         </div>
-        <div>
+        <div className="analytics-summary-card">
+          <ClipboardCheck className="analytics-summary-card__icon" aria-hidden="true" />
           <span>Validated incidents</span>
           <strong>{analytics.totalValidatedIncidents}</strong>
           <small>{analytics.periodLabel}</small>
         </div>
-        <div>
+        <div className={`analytics-summary-card ${analytics.highPriorityBarangays > 0 ? 'is-alert' : 'is-clear'}`}>
+          <Siren className="analytics-summary-card__icon" aria-hidden="true" />
           <span>High priority areas</span>
           <strong>{analytics.highPriorityBarangays}</strong>
           <small>High or Critical</small>
@@ -94,7 +98,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
         <section className="barangay-activity-section" aria-labelledby="barangay-activity-title">
           <div className="barangay-analytics__section-header">
             <div>
-              <h4 id="barangay-activity-title">Reports by barangay</h4>
+              <h4 id="barangay-activity-title"><BarChart3 aria-hidden="true" />Reports by barangay</h4>
               <span>Sorted from highest to lowest activity</span>
             </div>
 
@@ -133,6 +137,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
                   type="button"
                   className={`barangay-bar-row ${selectedBarangay?.barangay === barangay.barangay ? 'is-selected' : ''}`}
                   onClick={() => setSelectedBarangayName(barangay.barangay)}
+                  aria-pressed={selectedBarangay?.barangay === barangay.barangay}
                   aria-label={`${barangay.barangay}: ${value} ${metric}`}
                 >
                   <span className="barangay-bar-row__label">{barangay.barangay}</span>
@@ -149,7 +154,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
         <section id="barangay-priority-section" tabIndex={-1} className="barangay-priority-section" aria-labelledby="barangay-priority-title">
           <div className="barangay-analytics__section-header">
             <div>
-              <h4 id="barangay-priority-title">Deployment priority</h4>
+              <h4 id="barangay-priority-title"><ShieldCheck aria-hidden="true" />Deployment priority</h4>
               <span>Weighted operational indicators</span>
             </div>
           </div>
@@ -166,6 +171,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
                 type="button"
                 className={`barangay-priority-row ${selectedBarangay?.barangay === barangay.barangay ? 'is-selected' : ''}`}
                 onClick={() => setSelectedBarangayName(barangay.barangay)}
+                aria-pressed={selectedBarangay?.barangay === barangay.barangay}
               >
                 <span className="barangay-priority-row__rank">{index + 1}</span>
                 <span className="barangay-priority-row__name">
@@ -193,11 +199,21 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
               <span className={`priority-level priority-level--${selectedBarangay.priorityLevel.toLowerCase()}`}>
                 {selectedBarangay.priorityLevel}
               </span>
-              <strong>{selectedBarangay.priorityScore}<small>/100</small></strong>
             </div>
           </header>
 
           <div className="barangay-drilldown__content">
+            <div className="priority-score-card">
+              <h5>Priority score</h5>
+              <div className="priority-score-meter">
+                <svg viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                  <circle className="priority-score-meter__track" cx="60" cy="60" r="48" />
+                  {selectedBarangay.priorityScore > 0 && <circle className="priority-score-meter__value" cx="60" cy="60" r="48" pathLength="100" strokeDasharray={`${selectedBarangay.priorityScore} 100`} />}
+                </svg>
+                <strong>{selectedBarangay.priorityScore}<small>/100</small></strong>
+              </div>
+              <p>Weighted operational indicators</p>
+            </div>
             <div className="priority-breakdown">
               <h5>Priority score breakdown</h5>
               {SCORE_BREAKDOWN_ITEMS.map((item) => {
@@ -224,19 +240,23 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
-              <div className="priority-recommendation">
-                <span>Suggested action</span>
-                <p>{selectedBarangay.recommendation}</p>
-              </div>
+            </div>
+          </div>
+
+          <div className="priority-callouts">
+            <div className={`priority-coverage ${selectedBarangay.availablePersonnel < selectedBarangay.requiredPersonnel ? 'has-gap' : 'is-covered'}`}>
+              <span><Users aria-hidden="true" />{selectedBarangay.availablePersonnel < selectedBarangay.requiredPersonnel ? 'Personnel coverage gap' : 'Personnel coverage'}</span>
+              <strong>{selectedBarangay.availablePersonnel} available <small>of {selectedBarangay.requiredPersonnel} required</small></strong>
+            </div>
+            <div className="priority-recommendation">
+              <span>Suggested action</span>
+              <p>{selectedBarangay.recommendation}</p>
             </div>
           </div>
 
           <footer className="barangay-drilldown__footer">
-            <span>
-              Coverage: {selectedBarangay.availablePersonnel} available of {selectedBarangay.requiredPersonnel} required
-            </span>
-            <button className="report-action-btn" onClick={() => onViewReports?.(selectedBarangay.barangay)}>View reports from this barangay &rarr;</button>
             <small>Advisory score only. Final deployment remains with the supervisor.</small>
+            <button type="button" className="report-action-btn report-action-btn--primary" onClick={() => onViewReports?.(selectedBarangay.barangay)}>View reports from this barangay &rarr;</button>
           </footer>
         </section>
       )}

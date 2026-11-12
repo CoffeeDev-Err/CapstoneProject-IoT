@@ -124,8 +124,11 @@
 :root .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle,.nav-sidebar__sublink):is(:hover,:focus-visible) { background: transparent; color: var(--app-text); transform: none; }
 :root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__group-toggle--active,.nav-sidebar__sublink--active),
 :root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__group-toggle--active,.nav-sidebar__sublink--active):hover { background: transparent; color: var(--app-text); transform: none; }
-:root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__link:hover,.nav-sidebar__link:focus-visible) .nav-sidebar__label { text-decoration: underline; text-decoration-color: var(--app-accent); text-decoration-thickness: 2px; text-underline-offset: 6px; overflow: visible; }
-:root .nav-sidebar--collapsed :is(.nav-sidebar__link--active,.nav-sidebar__link:hover,.nav-sidebar__link:focus-visible)::after { content: ''; position: absolute; bottom: 3px; left: 50%; width: 18px; height: 2px; border-radius: 2px; background: var(--app-accent); transform: translateX(-50%); }
+:root .nav-sidebar .nav-sidebar__label { position: relative; overflow: visible; text-decoration: none; }
+:root .nav-sidebar .nav-sidebar__label::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: var(--app-accent); transform: scaleX(0); transform-origin: left; opacity: 0; transition: transform 220ms cubic-bezier(.22,1,.36,1), opacity 160ms ease; }
+:root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__link:hover,.nav-sidebar__link:focus-visible) .nav-sidebar__label::after { transform: scaleX(1); opacity: 1; }
+:root .nav-sidebar--collapsed .nav-sidebar__link::after { content: ''; position: absolute; bottom: 3px; left: 50%; width: 18px; height: 1px; background: var(--app-accent); transform: translateX(-50%) scaleX(0); opacity: 0; transition: transform 220ms cubic-bezier(.22,1,.36,1), opacity 160ms ease; }
+:root .nav-sidebar--collapsed :is(.nav-sidebar__link--active,.nav-sidebar__link:hover,.nav-sidebar__link:focus-visible)::after { transform: translateX(-50%) scaleX(1); opacity: 1; }
 :root .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle)::before { display: none; }
 :root .nav-sidebar:not(.nav-sidebar--collapsed) .nav-sidebar__label { white-space: nowrap; overflow-wrap: normal; }
 :root .nav-sidebar .nav-sidebar__toggle { background: var(--app-card); color: var(--app-secondary); box-shadow: none; }
@@ -142,16 +145,54 @@
 :root .global-feedback--info { background: var(--app-action); border-color: var(--app-accent); }
 ::selection { background: var(--app-selected); color: var(--app-accent-text); }
 
-/* Pill selections keep their dark text; only inactive tabs turn white on hover. */
+/* One pill slides behind the existing buttons; selection handlers stay unchanged. */
 :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) { border-radius: 999px; background: var(--app-elevated); }
-:root :is(.analytics-segmented-control,.account-view-nav)::before,
 :root :is(.analytics-segmented-control,.account-view-nav)::after { display: none; }
-:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button { border: 1px solid transparent; border-radius: 999px; color: var(--app-secondary); }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button { border: 1px solid transparent; border-radius: 999px; color: var(--app-secondary); transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease; }
 :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:hover,
 :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:focus-visible { background: var(--app-elevated); color: var(--app-tab-hover-text); border-color: var(--app-secondary); }
 :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:is(.is-active,.account-view-tab--active,[aria-pressed=true]),
-:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:is(.is-active,.account-view-tab--active,[aria-pressed=true]):hover { background: var(--app-tab-active); color: var(--app-tab-text); border-color: var(--app-tab-border); }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:is(.is-active,.account-view-tab--active,[aria-pressed=true]):hover { background: transparent; color: var(--app-tab-text); border-color: transparent; box-shadow: none; }
 :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:focus-visible { outline: 3px solid var(--app-accent); outline-offset: 2px; }
+
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch,.deployment-page .patrol-list-tabs) {
+  --selection-count: 2;
+  --selection-index: 0;
+  --selection-gap: 0.25rem;
+  --selection-inset: 0.25rem;
+  position: relative;
+  isolation: isolate;
+}
+:root :is(.analytics-segmented-control,.patrol-list-tabs):has(> button:nth-child(3)) { --selection-count: 3; }
+:root .layout-root .history-view-switch { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); --selection-gap: 3px; --selection-inset: 3px; }
+:root .deployment-page .patrol-list-tabs { --selection-gap: 5px; --selection-inset: 4px; }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch,.patrol-list-tabs):has(> button:nth-child(2):is(.is-active,.account-view-tab--active,[aria-pressed=true],[aria-selected=true])) { --selection-index: 1; }
+:root :is(.analytics-segmented-control,.patrol-list-tabs):has(> button:nth-child(3):is(.is-active,[aria-selected=true])) { --selection-index: 2; }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch,.deployment-page .patrol-list-tabs)::before {
+  content: '';
+  display: block;
+  position: absolute;
+  z-index: 0;
+  top: var(--selection-inset);
+  bottom: var(--selection-inset);
+  left: var(--selection-inset);
+  width: calc((100% - 2 * var(--selection-inset) - (var(--selection-count) - 1) * var(--selection-gap)) / var(--selection-count));
+  border: 1px solid var(--app-tab-border);
+  border-radius: 999px;
+  background: var(--app-tab-active);
+  box-shadow: 0 1px 4px #0002;
+  transform: translateX(calc(var(--selection-index) * (100% + var(--selection-gap))));
+  transition: transform 260ms cubic-bezier(.22,1,.36,1), background-color 180ms ease, border-color 180ms ease;
+  pointer-events: none;
+}
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch,.patrol-list-tabs) > button { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root .nav-sidebar .nav-sidebar__label::after,
+  :root .nav-sidebar--collapsed .nav-sidebar__link::after,
+  :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch,.deployment-page .patrol-list-tabs)::before,
+  :root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch,.patrol-list-tabs) > button { transition: none; }
+}
 
 :root input[type="checkbox"],
 :root input[type="radio"] { accent-color: var(--app-action); }

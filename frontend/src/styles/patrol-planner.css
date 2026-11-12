@@ -194,10 +194,10 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .deployment-page .assignment-table-actions { flex-wrap:wrap; }
 .deployment-page .assignment-deployment-style__options { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .deployment-page .patrol-list-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; width:min(100%,640px); gap:5px; padding:4px; border:1px solid var(--patrol-border); border-radius:999px; background:var(--patrol-muted); }
-.deployment-page .patrol-list-tabs .deployment-view-tab { min-width:0; flex-wrap:wrap; white-space:normal; overflow-wrap:anywhere; border-radius:999px; text-transform:none; letter-spacing:0; background:transparent; color:var(--patrol-secondary); border-color:transparent; }
+.deployment-page .patrol-list-tabs .deployment-view-tab { min-width:0; flex-wrap:wrap; white-space:normal; overflow-wrap:anywhere; border-radius:999px; text-transform:none; letter-spacing:0; background:transparent; color:var(--patrol-secondary); border-color:transparent; transition:color 180ms ease,background-color 180ms ease,border-color 180ms ease; }
 .deployment-page .patrol-list-tabs .deployment-view-tab:not([aria-selected=true]):is(:hover,:focus-visible) { color:var(--patrol-tab-hover-text); border-color:var(--patrol-secondary); background:var(--patrol-muted); }
 .deployment-page .patrol-list-tabs .deployment-view-count { flex-shrink:0; }
-.deployment-page .patrol-list-tabs .deployment-view-tab[aria-selected=true] { background:var(--patrol-tab-active); color:var(--patrol-tab-text); border:1px solid var(--patrol-tab-border); box-shadow:0 1px 4px #0002; }
+.deployment-page .patrol-list-tabs .deployment-view-tab[aria-selected=true] { background:transparent; color:var(--patrol-tab-text); border:1px solid transparent; box-shadow:none; }
 .deployment-page .deployment-list-card button.assignment-edit-btn { color:var(--patrol-text); background:var(--patrol-surface); border-color:var(--patrol-border); }
 .deployment-page .deployment-list-card button.assignment-edit-btn:hover { color:var(--patrol-text); background:var(--patrol-muted); border-color:var(--patrol-secondary); }
 /* Legacy page controls and Bootstrap tables consume the same local palette. */
