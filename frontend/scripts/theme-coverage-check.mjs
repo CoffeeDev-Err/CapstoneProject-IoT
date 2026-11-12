@@ -23,8 +23,8 @@ for (const selector of [
   )
 }
 
-assert.match(lightThemeSource, /scrollbar-color:\s*#285681 #eef3f8/,
-  'Light mode must use the compact navy scrollbar treatment')
+assert.match(lightThemeSource, /scrollbar-color:\s*var\(--scrollbar-thumb\) var\(--scrollbar-track\)/,
+  'Light-mode scrollbars must follow the shared palette')
 assert.match(lightThemeSource, /::-webkit-scrollbar-button[\s\S]*width:\s*0;[\s\S]*height:\s*0;/,
   'Light-mode scrollbars must remove native arrow buttons')
 

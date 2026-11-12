@@ -5,7 +5,7 @@
   isolation: isolate;
   min-height: 100vh;
   overflow: hidden;
-  background: #080f1f;
+  background: var(--app-input);
   color: #f8fafc;
 }
 
@@ -13,7 +13,7 @@
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  background: #132442;
+  background: var(--app-input);
 }
 
 .login-accent--top {
@@ -31,7 +31,7 @@
   width: min(600px, 52vw);
   height: 210px;
   border-top-left-radius: 180px;
-  background: #0b2d63;
+  background: var(--app-input);
   transform: rotate(-3deg);
 }
 
@@ -57,7 +57,7 @@
 
 .login-intro__eyebrow {
   margin: 0 0 1.25rem;
-  color: #245fa8;
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.11em;
@@ -77,14 +77,14 @@
 
 .login-intro__description {
   margin: 1.6rem 0 0;
-  color: #52637d;
+  color: var(--text-secondary);
   font-size: var(--font-size-fluid-intro);
   line-height: 1.75;
 }
 
 .login-intro__access-note {
   margin: 1.6rem 0 0;
-  color: #6a7890;
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -127,7 +127,7 @@
 
 .login-brand div > span {
   margin-top: 0.25rem;
-  color: #93a4bd;
+  color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }
 
@@ -136,9 +136,9 @@
   min-width: 0;
   box-sizing: border-box;
   padding: 2.25rem;
-  border: 1px solid #22314a;
+  border: 1px solid var(--surface-border);
   border-radius: 8px;
-  background: #0b1528;
+  background: var(--app-input);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
 }
 
@@ -152,7 +152,7 @@
 
 .login-badge {
   margin-bottom: 0.75rem;
-  color: #6ca5ff;
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -170,12 +170,12 @@
 }
 
 .login-copy-title span {
-  color: #6ca5ff;
+  color: var(--color-accent-text);
 }
 
 .login-copy-subtitle {
   margin: 0.7rem 0 0;
-  color: #9eabc0;
+  color: var(--text-secondary);
   font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.6;
@@ -195,7 +195,7 @@
 .login-label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #aebbd0;
+  color: var(--text-secondary);
   font-size: var(--font-size-sm);
   font-weight: 700;
 }
@@ -204,10 +204,10 @@
   width: 100%;
   min-height: 54px;
   box-sizing: border-box;
-  border: 1px solid #2a3a56;
+  border: 1px solid var(--surface-border);
   border-radius: 8px;
   padding: 0.9rem 1rem;
-  background: #0e1a30;
+  background: var(--app-input);
   color: #f8fafc;
   font-weight: 600;
   transition: border-color var(--transition-base), box-shadow var(--transition-base), background var(--transition-base);
@@ -218,10 +218,10 @@
 }
 
 .login-input:focus {
-  border-color: #4e8cff;
+  border-color: var(--interactive-primary);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(78, 140, 255, 0.18);
-  background: #101f38;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+  background: var(--app-input);
   color: #ffffff;
 }
 
@@ -264,7 +264,7 @@
   border-radius: 50%;
   padding: 0;
   background: transparent;
-  color: #93a4bd;
+  color: var(--text-secondary);
   transform: translateY(-50%);
   cursor: pointer;
 }
@@ -353,23 +353,23 @@
   min-width: 0;
   height: 58px;
   box-sizing: border-box;
-  border: 1px solid #2a3a56;
+  border: 1px solid var(--surface-border);
   border-radius: 9px;
   padding: 0;
-  background: #0e1a30;
+  background: var(--app-input);
   color: #f8fafc;
   font-size: var(--font-size-xl);
   font-weight: 800;
   text-align: center;
-  caret-color: #6ca5ff;
+  caret-color: var(--app-accent);
   transition: border-color var(--transition-base), box-shadow var(--transition-base), background var(--transition-base);
 }
 
 .verification-code-digit:focus {
-  border-color: #4e8cff;
+  border-color: var(--interactive-primary);
   outline: none;
-  background: #101f38;
-  box-shadow: 0 0 0 3px rgba(78, 140, 255, 0.18);
+  background: var(--app-input);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
 .verification-code-inputs--invalid .verification-code-digit {
@@ -385,7 +385,7 @@
 .auth-modal .verification-code-digit:focus {
   border-color: var(--color-primary);
   background: var(--bg-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 14%, transparent);
 }
 
 .auth-modal .verification-code-inputs--invalid .verification-code-digit {
@@ -394,7 +394,7 @@
 
 .password-requirements {
   margin: -0.25rem 0 0;
-  color: var(--text-secondary, #9eabc0);
+  color: var(--text-secondary, var(--text-secondary));
   font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.45;
@@ -416,9 +416,9 @@
 }
 
 .auth-success {
-  border: 1px solid #1e3a5f;
-  background: #172554;
-  color: #bfdbfe;
+  border: 1px solid var(--app-accent);
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
 }
 
 .auth-loading-screen {
@@ -466,7 +466,7 @@
 .auth-modal__step {
   display: block;
   margin-bottom: 0.35rem;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -491,8 +491,8 @@
 }
 
 .auth-modal__close:hover {
-  background: #eff6ff;
-  color: var(--color-primary);
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
 }
 
 .auth-modal form {
@@ -519,7 +519,7 @@
 
 .auth-field input:focus {
   border-color: var(--color-primary);
-  outline: 3px solid rgba(37, 99, 235, 0.12);
+  outline: 3px solid color-mix(in srgb, var(--app-accent) 12%, transparent);
 }
 
 .auth-password-control {
@@ -552,7 +552,7 @@
 .auth-password-toggle:focus-visible {
   outline: none;
   background: var(--bg-secondary);
-  color: var(--color-primary);
+  color: var(--color-accent-text);
 }
 
 .auth-password-toggle svg {
@@ -575,7 +575,7 @@
     max-width: none;
     margin-inline: -1.25rem;
     padding: 2.5rem 1.25rem;
-    background: #f6f9ff;
+    background: var(--surface-selected);
   }
 
   .login-intro h1,
@@ -636,9 +636,9 @@
 
   .login-form-card {
     padding: 1.5rem 1.15rem;
-    border: 1px solid #22314a;
+    border: 1px solid var(--surface-border);
     border-radius: 8px;
-    background: #0b1528;
+    background: var(--app-input);
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
   }
 

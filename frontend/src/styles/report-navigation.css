@@ -1,7 +1,7 @@
 .stat-card.stat-card--action { width: 100%; text-align: left; font: inherit; cursor: pointer; transition: border-color 160ms, box-shadow 160ms; }
-.stat-card--action:hover { border-color: var(--color-primary); box-shadow: 0 4px 16px rgba(36,107,253,.14); }
+.stat-card--action:hover { border-color: var(--color-primary); box-shadow: 0 4px 16px color-mix(in srgb, var(--app-accent) 14%, transparent); }
 .stat-card--action:focus-visible, .report-action-btn:focus-visible, .analytics-download-menu button:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
-.stat-card__action { display: block; margin-top: .9rem; color: var(--color-primary); font-size: var(--font-size-sm); text-decoration: underline; text-underline-offset: 3px; }
+.stat-card__action { display: block; margin-top: .9rem; color: var(--color-accent-text); font-size: var(--font-size-sm); text-decoration: underline; text-underline-offset: 3px; }
 .report-list-controls { flex-wrap: wrap; }
 .report-filter { min-width: 130px; }
 .report-action-btn--danger-outline { color: #c53030; border: 1px solid #c53030; background: transparent; }

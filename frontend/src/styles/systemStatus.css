@@ -15,15 +15,15 @@
 .system-status-banner button, .system-recovery button {
   flex-shrink: 0;
   padding: 9px 16px;
-  border: 1px solid #2864e8;
+  border: 1px solid var(--interactive-primary, #7c3aed);
   border-radius: 8px;
-  background: #2864e8;
+  background: var(--interactive-primary, #7c3aed);
   color: #fff;
   font: inherit;
   cursor: pointer;
 }
 .system-status-banner button:disabled, .system-recovery button:disabled { opacity: .65; cursor: wait; }
-.system-status-banner button:focus-visible, .system-recovery button:focus-visible { outline: 3px solid #72a7ff; outline-offset: 3px; }
+.system-status-banner button:focus-visible, .system-recovery button:focus-visible { outline: 3px solid var(--focus-ring, #a78bfa); outline-offset: 3px; }
 .system-recovery {
   min-height: 100dvh;
   display: grid;

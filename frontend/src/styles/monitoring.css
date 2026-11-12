@@ -74,7 +74,7 @@
 .side-panel-collapse-btn:hover {
   background: #e7eef8;
   border-color: var(--color-primary-light);
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
   transform: scale(1.05);
   box-shadow: var(--shadow-sm);
 }
@@ -294,7 +294,7 @@
 
 .list-item-btn:hover small,
 .list-item-btn:hover .list-item-info .text-body-secondary {
-  color: #dbeafe !important;
+  color: var(--color-accent-text) !important;
 }
 
 .list-item-btn small {
@@ -350,7 +350,7 @@
   gap: 0.6rem;
   max-width: min(70%, 430px);
   padding: 0.45rem 0.55rem 0.45rem 0.75rem;
-  border: 1px solid rgba(147, 197, 253, 0.55);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 55%, transparent);
   border-radius: 999px;
   background: rgba(7, 19, 38, 0.9);
   color: #e2e8f0;
@@ -372,7 +372,7 @@
   padding: 0.2rem 0.7rem;
   border: 0;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--interactive-primary);
   color: #fff;
   font-size: var(--font-size-xs);
   font-weight: 800;
@@ -420,8 +420,8 @@
 }
 
 .map-style-button:hover {
-  background: #eff6ff;
-  color: var(--color-primary-dark);
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
 }
 
 .map-style-button:active {
@@ -619,7 +619,7 @@
   padding: 0.35rem 0.9rem;
   border: 0;
   border-radius: 8px;
-  background: #2563eb;
+  background: var(--interactive-primary);
   color: #fff;
   font-weight: 800;
   cursor: pointer;
@@ -676,7 +676,7 @@
 
 .map-view .maplibregl-ctrl-group button:not(:disabled):hover,
 .report-location-map__canvas .maplibregl-ctrl-group button:not(:disabled):hover {
-  background: #eff6ff;
+  background: var(--surface-selected);
 }
 
 .map-view .maplibregl-ctrl-group button:not(:disabled):hover .maplibregl-ctrl-icon,
@@ -714,7 +714,7 @@
 }
 
 .maptiler-credit:hover {
-  color: #1d4ed8;
+  color: var(--color-accent-text);
 }
 
 .maptiler-credit img {

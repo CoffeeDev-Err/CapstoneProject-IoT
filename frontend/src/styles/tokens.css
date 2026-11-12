@@ -25,7 +25,7 @@
   --font-size-fluid-intro: clamp(1rem, 1.6vw, 1.15rem);
   --font-size-fluid-section: clamp(1.8rem, 3.2vw, 2.65rem);
 
-  --sidebar-w: 248px;
+  --sidebar-w: 272px;
   --sidebar-w-collapsed: 60px;
   --sidebar-bg: #0f172a;
   --sidebar-border: #1e293b;
@@ -55,7 +55,7 @@
   --color-danger-soft: #fef2f2;
   --color-danger-border: #fecaca;
 
-  /* Operational colors are semantic; navigation and active controls stay blue. */
+  /* Operational/map colors remain independent of the application accent. */
   --color-operation: #7c3aed;
   --color-operation-soft: #ede9fe;
   --color-operation-strong: #5b21b6;

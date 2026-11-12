@@ -1,22 +1,21 @@
 /*
  * LIGHT MODE SURFACE SYSTEM
  *
- * This layer intentionally changes surfaces, dividers, and elevation only.
- * Brand blue, active navigation, semantic status colors, content, and layout
- * remain unchanged. Dark mode continues to be defined in dark-theme.css.
+ * Component surface treatments. Shared colors are supplied by app-theme.css;
+ * operational status colors and existing layouts remain independent.
  */
 
 :root:not([data-theme="dark"]) {
   --sidebar-bg: #ffffff;
-  --sidebar-border: #e8eef5;
-  --sidebar-active-bg: #edf4ff;
-  --sidebar-active-color: #1d4ed8;
+  --sidebar-border: var(--surface-border);
+  --sidebar-active-bg: var(--surface-selected);
+  --sidebar-active-color: var(--interactive-primary-hover);
 
   --bg-primary: #ffffff;
   --bg-secondary: #f6fbfc;
   --bg-tertiary: #f0f4f8;
-  --border-color: #dfe7f0;
-  --border-color-light: #edf2f7;
+  --border-color: var(--surface-border);
+  --border-color-light: var(--surface-border);
   --text-primary: #10233f;
   --text-secondary: #52657d;
   --text-tertiary: #71839a;
@@ -32,7 +31,7 @@
    track that belongs with the light surface system. */
 :root:not([data-theme="dark"]),
 :root:not([data-theme="dark"]) *:not(.no-scrollbar) {
-  scrollbar-color: #285681 #eef3f8;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   scrollbar-width: thin;
 }
 
@@ -44,19 +43,19 @@
 
 :root:not([data-theme="dark"])::-webkit-scrollbar-track,
 :root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-track {
-  background: #eef3f8;
+  background: var(--scrollbar-track);
 }
 
 :root:not([data-theme="dark"])::-webkit-scrollbar-thumb,
 :root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-thumb {
-  border: 2px solid #eef3f8;
+  border: 2px solid var(--scrollbar-track);
   border-radius: 999px;
-  background: #285681;
+  background: var(--scrollbar-thumb);
 }
 
 :root:not([data-theme="dark"])::-webkit-scrollbar-thumb:hover,
 :root:not([data-theme="dark"]) *:not(.no-scrollbar)::-webkit-scrollbar-thumb:hover {
-  background: #356fa6;
+  background: var(--scrollbar-thumb-hover);
 }
 
 :root:not([data-theme="dark"])::-webkit-scrollbar-button,
@@ -95,20 +94,20 @@
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__section-title {
-  color: #4f6d8d;
+  color: var(--text-secondary);
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__link,
 :root:not([data-theme="dark"]) .nav-sidebar__group-toggle,
 :root:not([data-theme="dark"]) .nav-sidebar__sublink {
-  color: #285681;
+  color: var(--color-accent-text);
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__link:hover,
 :root:not([data-theme="dark"]) .nav-sidebar__group-toggle:hover,
 :root:not([data-theme="dark"]) .nav-sidebar__sublink:hover {
-  background: #f6f9ff;
-  color: var(--color-primary-dark);
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
   transform: translateX(3px);
 }
 
@@ -134,16 +133,16 @@
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__toggle {
-  border-color: #bfd0e1;
+  border-color: var(--surface-border);
   background: #eef4fa;
-  color: #285681;
+  color: var(--color-accent-text);
   box-shadow: 0 2px 8px rgba(40, 86, 129, 0.1);
 }
 
 :root:not([data-theme="dark"]) .nav-sidebar__toggle:hover {
-  border-color: #285681;
+  border-color: var(--interactive-primary-hover);
   background: #e2ecf6;
-  color: #193f65;
+  color: var(--color-accent-text);
 }
 
 :root:not([data-theme="dark"]) .top-bar {
@@ -165,9 +164,9 @@
 }
 
 :root:not([data-theme="dark"]) .icon-btn:hover {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: var(--color-primary-dark);
+  background: var(--surface-selected);
+  border-color: var(--app-accent);
+  color: var(--color-accent-text);
 }
 
 :root:not([data-theme="dark"]) .notification-dot {
@@ -184,7 +183,7 @@
 }
 
 :root:not([data-theme="dark"]) .supervisor-avatar {
-  border-color: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, var(--interactive-primary));
 }
 
 :root:not([data-theme="dark"]) .notification-dropdown,
@@ -213,7 +212,7 @@
 }
 
 :root:not([data-theme="dark"]) .notification-search input {
-  border-color: #d8e2ed;
+  border-color: var(--surface-border);
   background: #f8fafc;
   color: var(--text-primary);
 }
@@ -244,7 +243,7 @@
 
 :root:not([data-theme="dark"]) .stat-card:hover,
 :root:not([data-theme="dark"]) .widget-card:hover {
-  border-color: #d5e4f7;
+  border-color: var(--surface-border);
   box-shadow: var(--shadow-md);
 }
 
@@ -276,7 +275,7 @@
 :root:not([data-theme="dark"]) .report-filter select,
 :root:not([data-theme="dark"]) .form-control,
 :root:not([data-theme="dark"]) .form-select {
-  border-color: #d8e2ed;
+  border-color: var(--surface-border);
   background: #ffffff;
   color: var(--text-primary);
   box-shadow: 0 1px 2px rgba(31, 55, 86, 0.025);
@@ -289,8 +288,8 @@
 :root:not([data-theme="dark"]) .report-filter select:hover,
 :root:not([data-theme="dark"]) .form-control:hover,
 :root:not([data-theme="dark"]) .form-select:hover {
-  border-color: #b9d2ef;
-  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.06);
+  border-color: var(--surface-border);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--app-accent) 6%, transparent);
 }
 
 :root:not([data-theme="dark"]) .settings-input:focus,
@@ -302,7 +301,7 @@
 :root:not([data-theme="dark"]) .form-select:focus {
   border-color: var(--color-primary);
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 12%, transparent);
 }
 
 :root:not([data-theme="dark"]) .assignment-form .settings-input:focus {
@@ -314,7 +313,7 @@
 }
 
 :root:not([data-theme="dark"]) ::placeholder {
-  color: #98a6b8;
+  color: var(--text-secondary);
 }
 
 :root:not([data-theme="dark"]) .assignment-form .assignment-area-picker .settings-input {
@@ -383,15 +382,15 @@
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__close {
-  border-color: #d8e2ed;
+  border-color: var(--surface-border);
   color: var(--text-tertiary);
   background: #f8fafc;
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__close:hover {
-  border-color: #bfdbfe;
-  color: var(--color-primary-dark);
-  background: #eff6ff;
+  border-color: var(--app-accent);
+  color: var(--color-accent-text);
+  background: var(--surface-selected);
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__identity h3 {
@@ -399,7 +398,7 @@
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__identity p {
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__status,
@@ -447,8 +446,8 @@
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__request-action {
-  color: var(--color-primary-dark);
-  background: #eff6ff;
+  color: var(--color-accent-text);
+  background: var(--surface-selected);
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__responders {
@@ -461,7 +460,7 @@
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__responders .is-responding {
-  color: #2563eb;
+  color: var(--color-accent-text);
 }
 
 :root:not([data-theme="dark"]) .profile-map-card__responders .is-arrived {
@@ -475,7 +474,7 @@
 :root:not([data-theme="dark"]) .deployment-form-card,
 :root:not([data-theme="dark"]) .deployment-list-card {
   --deployment-navy: var(--text-primary);
-  --deployment-navy-soft: #1e3a5f;
+  --deployment-navy-soft: var(--surface-selected);
   --deployment-blue: var(--color-primary);
   --deployment-blue-dark: var(--color-primary-dark);
   --deployment-blue-soft: #eaf2ff;
@@ -495,7 +494,7 @@
 }
 
 :root:not([data-theme="dark"]) .assignment-mode-options {
-  border-color: #bfd0e1;
+  border-color: var(--surface-border);
   background: #f3f7fb;
   box-shadow: inset 0 0 0 1px rgba(40, 86, 129, 0.04), var(--shadow-xs);
 }
@@ -559,18 +558,16 @@
 
 /* Login and recovery surfaces use the same light-mode language. */
 :root:not([data-theme="dark"]) .login-page {
-  background:
-    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.12), transparent 27rem),
-    linear-gradient(145deg, #f8fbff 0%, #eef4fc 100%);
+  background: var(--app-page);
   color: var(--text-primary);
 }
 
 :root:not([data-theme="dark"]) .login-accent--top {
-  background: #eaf2ff;
+  background: var(--surface-selected);
 }
 
 :root:not([data-theme="dark"]) .login-accent--bottom {
-  background: #dbeafe;
+  background: var(--surface-selected);
 }
 
 :root:not([data-theme="dark"]) .login-brand strong,
@@ -606,7 +603,7 @@
     margin: 0;
     padding: 0.9rem 1rem;
     border-bottom: 1px solid var(--border-color-light);
-    background: linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+    background: linear-gradient(135deg, #ffffff 0%, var(--surface-selected) 100%);
   }
 
   :root:not([data-theme="dark"]) .login-form-card {
@@ -630,7 +627,7 @@
 :root:not([data-theme="dark"]) .login-input,
 :root:not([data-theme="dark"]) .auth-field input,
 :root:not([data-theme="dark"]) .verification-code-digit {
-  border-color: #d8e2ed;
+  border-color: var(--surface-border);
   background: #ffffff;
   color: var(--text-primary);
   border-radius: 10px;
@@ -641,7 +638,7 @@
 :root:not([data-theme="dark"]) .verification-code-digit:focus {
   border-color: var(--color-primary);
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 12%, transparent);
   color: var(--text-primary);
 }
 
@@ -673,7 +670,7 @@
 }
 
 :root:not([data-theme="dark"]) .login-text-action {
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
 }
 
 :root:not([data-theme="dark"]) .login-submit-btn {
@@ -707,7 +704,7 @@
   left: var(--smooth-underline-left);
   width: var(--smooth-selection-width);
   border-radius: 9px;
-  background: #dbeafe;
+  background: var(--surface-selected);
   pointer-events: none;
   transform: translateX(-50%);
   transition:

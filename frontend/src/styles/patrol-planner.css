@@ -1,19 +1,9 @@
-/* Scoped Deployment palette. Portal dialogs own their tokens; shared chrome follows only these pages. */
-.patrol-theme,.deployment-page,body:has(.deployment-page) {
-  --patrol-page:#f5f5fa; --patrol-sidebar:#ffffff; --patrol-surface:#ffffff; --patrol-muted:#f2f0f7; --patrol-input:#ffffff;
-  --patrol-text:#202131; --patrol-secondary:#626375; --patrol-border:#dedce8;
-  --patrol-accent:#7c3aed; --patrol-accent-soft:#f1ebff; --patrol-accent-text:#6d28d9;
-  --patrol-action:#6d28d9; --patrol-action-hover:#5b21b6; --patrol-focus:#8b5cf6;
-  --patrol-tab-active:#ffffff; --patrol-tab-text:#202131; --patrol-tab-border:#7c3aed;
+/* Deployment-specific semantic feedback; shared surfaces come from app-theme.css. */
+.patrol-theme,.deployment-page {
   --patrol-green:#126943; --patrol-green-soft:#edf8f1; --patrol-amber:#85530c; --patrol-amber-soft:#fff7e8;
   --patrol-red:#b42335; --patrol-red-soft:#fff0f2; --patrol-teal:#0f766e; --patrol-teal-soft:#edf8f6;
 }
-[data-theme="dark"] .patrol-theme,[data-theme="dark"] .deployment-page,[data-theme="dark"] body:has(.deployment-page) {
-  --patrol-page:#111827; --patrol-sidebar:#13151e; --patrol-surface:#222838; --patrol-muted:#2b3245; --patrol-input:#1b2030;
-  --patrol-text:#f3f4f6; --patrol-secondary:#9ca3af; --patrol-border:#353c50;
-  --patrol-accent:#8b5cf6; --patrol-accent-soft:#312647; --patrol-accent-text:#a78bfa;
-  --patrol-action:#7c3aed; --patrol-action-hover:#6d28d9; --patrol-focus:#a78bfa;
-  --patrol-tab-active:#f3f4f6; --patrol-tab-text:#202131; --patrol-tab-border:#353c50;
+[data-theme="dark"] :is(.patrol-theme,.deployment-page) {
   --patrol-green:#7ce3ab; --patrol-green-soft:#14352b; --patrol-amber:#edc77d; --patrol-amber-soft:#3d3221;
   --patrol-red:#ffadb8; --patrol-red-soft:#3b202b; --patrol-teal:#87d8cf; --patrol-teal-soft:#183936;
 }
@@ -205,6 +195,7 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .deployment-page .assignment-deployment-style__options { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .deployment-page .patrol-list-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; width:min(100%,640px); gap:5px; padding:4px; border:1px solid var(--patrol-border); border-radius:999px; background:var(--patrol-muted); }
 .deployment-page .patrol-list-tabs .deployment-view-tab { min-width:0; flex-wrap:wrap; white-space:normal; overflow-wrap:anywhere; border-radius:999px; text-transform:none; letter-spacing:0; background:transparent; color:var(--patrol-secondary); border-color:transparent; }
+.deployment-page .patrol-list-tabs .deployment-view-tab:not([aria-selected=true]):is(:hover,:focus-visible) { color:var(--patrol-tab-hover-text); border-color:var(--patrol-secondary); background:var(--patrol-muted); }
 .deployment-page .patrol-list-tabs .deployment-view-count { flex-shrink:0; }
 .deployment-page .patrol-list-tabs .deployment-view-tab[aria-selected=true] { background:var(--patrol-tab-active); color:var(--patrol-tab-text); border:1px solid var(--patrol-tab-border); box-shadow:0 1px 4px #0002; }
 .deployment-page .deployment-list-card button.assignment-edit-btn { color:var(--patrol-text); background:var(--patrol-surface); border-color:var(--patrol-border); }
@@ -231,43 +222,6 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .deployment-page .deployment-list-card .assignment-delete-btn { background:var(--patrol-red-soft); color:var(--patrol-red); border-color:var(--patrol-border); }
 .deployment-page .deployment-list-card .assignment-delete-btn:hover { background:var(--patrol-red-soft); color:var(--patrol-red); border-color:var(--patrol-red); }
 .deployment-page .deployment-list-card input:focus { border-color:var(--patrol-accent); box-shadow:0 0 0 3px var(--patrol-accent-soft); }
-/* Chrome remains scoped to Deployment routes, including the mobile web drawer. */
-.layout-root:has(.deployment-page) {
-  --color-primary:var(--patrol-action); --color-primary-dark:var(--patrol-action-hover); --color-primary-light:var(--patrol-accent-text);
-  --text-primary:var(--patrol-text); --text-secondary:var(--patrol-secondary); --text-tertiary:var(--patrol-secondary);
-  --bg-primary:var(--patrol-surface); --bg-secondary:var(--patrol-page); --bg-tertiary:var(--patrol-muted);
-  --surface-shell:var(--patrol-page); --surface-primary:var(--patrol-surface); --surface-secondary:var(--patrol-muted); --surface-muted:var(--patrol-muted); --surface-selected:var(--patrol-accent-soft);
-  --surface-border:var(--patrol-border); --border-color:var(--patrol-border); --border-color-light:var(--patrol-border);
-  --color-info:var(--patrol-accent-text); --color-info-soft:var(--patrol-accent-soft); --color-info-strong:var(--patrol-accent-text); --color-info-border:var(--patrol-border);
-  --bs-secondary-color:var(--patrol-secondary); --bs-body-color:var(--patrol-text);
-  --sidebar-bg:var(--patrol-sidebar); --sidebar-border:var(--patrol-border); --sidebar-active-bg:var(--patrol-action); --sidebar-active-color:#fff;
-  --focus-ring:var(--patrol-focus); background:var(--patrol-page);
-}
-.layout-root:has(.deployment-page) .layout-body { background:var(--patrol-page); }
-.layout-root:has(.deployment-page) .nav-sidebar { background:var(--patrol-sidebar); border-color:var(--patrol-border); box-shadow:none; }
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__brand,.nav-sidebar__toggle) { border-color:var(--patrol-border); }
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__brand-name,.nav-sidebar__brand-geo) { color:var(--patrol-text); }
-.layout-root:has(.deployment-page) .nav-sidebar .nav-sidebar__brand-sentri { color:var(--patrol-accent-text); }
-.layout-root:has(.deployment-page) .nav-sidebar .nav-sidebar__section-title { color:var(--patrol-secondary); }
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle,.nav-sidebar__sublink) { color:var(--patrol-secondary); }
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle,.nav-sidebar__sublink):hover { background:var(--patrol-muted); color:var(--patrol-text); transform:none; }
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__group-toggle--active,.nav-sidebar__sublink--active),
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__group-toggle--active,.nav-sidebar__sublink--active):hover { background:var(--patrol-action); color:#fff; border-radius:999px; transform:none; }
-.layout-root:has(.deployment-page) .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle)::before { display:none; }
-.layout-root:has(.deployment-page) .nav-sidebar:not(.nav-sidebar--collapsed) .nav-sidebar__label { white-space:normal; text-overflow:clip; }
-.layout-root:has(.deployment-page) .nav-sidebar .nav-sidebar__toggle { background:var(--patrol-surface); color:var(--patrol-secondary); box-shadow:none; }
-.layout-root:has(.deployment-page) .nav-sidebar .nav-sidebar__toggle:hover { background:var(--patrol-muted); color:var(--patrol-text); }
-.layout-root:has(.deployment-page) .layout-body .top-bar { background:var(--patrol-sidebar); border-color:var(--patrol-border); box-shadow:none; }
-.layout-root:has(.deployment-page) .top-bar :is(h1,h2) { color:var(--patrol-text); }
-.layout-root:has(.deployment-page) .top-bar p { color:var(--patrol-secondary); }
-.layout-root:has(.deployment-page) .top-bar .icon-btn { color:var(--patrol-secondary); }
-.layout-root:has(.deployment-page) .top-bar .icon-btn:hover { background:var(--patrol-muted); color:var(--patrol-accent-text); }
-.layout-root:has(.deployment-page) .top-bar .profile-avatar-fallback { background:var(--patrol-action); color:#fff; }
-.layout-root:has(.deployment-page) .top-bar .notification-dot { background:var(--patrol-accent); box-shadow:0 0 0 2px var(--patrol-sidebar); }
-.layout-root:has(.deployment-page) .system-status-banner button { background:var(--patrol-action); border-color:var(--patrol-action); }
-.layout-root:has(.deployment-page) .system-status-banner button:hover:not(:disabled) { background:var(--patrol-action-hover); border-color:var(--patrol-action-hover); }
-.layout-root:has(.deployment-page) .system-status-banner button:focus-visible { outline-color:var(--patrol-focus); }
-body:has(.deployment-page) .global-feedback--info { background:var(--patrol-action); border-color:var(--patrol-accent); }
 /* Deployment portal dialogs sit outside the route shell. */
 body:has(.deployment-page) .confirm-modal[role=dialog] { background:var(--patrol-surface); border-color:var(--patrol-border); color:var(--patrol-text); }
 body:has(.deployment-page) .confirm-modal :is(.confirm-modal__title,h3) { color:var(--patrol-text); }

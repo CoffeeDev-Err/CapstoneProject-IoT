@@ -60,12 +60,12 @@
 
 .analytics-segmented-control button:hover {
   background: color-mix(in srgb, var(--color-primary) 9%, transparent);
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
 }
 
 .analytics-segmented-control button.is-active {
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
   box-shadow: none;
 }
 
@@ -192,11 +192,11 @@
 }
 
 .barangay-bar-row:hover {
-  background: #eff6ff;
+  background: var(--surface-selected);
 }
 
 .barangay-bar-row.is-selected {
-  background: #dbeafe;
+  background: var(--surface-selected);
   color: var(--text-primary);
 }
 
@@ -267,11 +267,11 @@
 }
 
 .barangay-priority-row:hover {
-  background: #eff6ff;
+  background: var(--surface-selected);
 }
 
 .barangay-priority-row.is-selected {
-  background: #dbeafe;
+  background: var(--surface-selected);
 }
 
 .barangay-priority-row__rank {

@@ -1,0 +1,177 @@
+/* Shared web palette. Loaded after legacy theme layers and inherited by portals.
+   Operational map colors are intentionally independent of these UI tokens. */
+:root {
+  color-scheme: light;
+  --app-page: #f5f5fa;
+  --app-chrome: #ffffff;
+  --app-card: #ffffff;
+  --app-elevated: #f2f0f7;
+  --app-input: #ffffff;
+  --app-text: #202131;
+  --app-secondary: #626375;
+  --app-border: #dedce8;
+  --app-accent: #8b5cf6;
+  --app-accent-text: #6d28d9;
+  --app-selected: #f1ebff;
+  --app-action: #6d28d9;
+  --app-action-hover: #5b21b6;
+  --app-tab-active: #ffffff;
+  --app-tab-text: #202131;
+  --app-tab-border: #7c3aed;
+  --app-tab-hover-text: #5b21b6;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-page: #111827;
+  --app-chrome: #1d2231;
+  --app-card: #222838;
+  --app-elevated: #2b3245;
+  --app-input: #1b2030;
+  --app-text: #f3f4f6;
+  --app-secondary: #aab0be;
+  --app-border: #353c50;
+  --app-accent: #8b5cf6;
+  --app-accent-text: #c4b5fd;
+  --app-selected: #312647;
+  --app-action: #7c3aed;
+  --app-action-hover: #6d28d9;
+  --app-tab-active: #f3f4f6;
+  --app-tab-text: #202131;
+  --app-tab-border: #353c50;
+  --app-tab-hover-text: #ffffff;
+}
+
+/* Compatibility names keep existing features and lazy-loaded styles in sync. */
+:root,
+:root:not([data-theme="dark"]),
+:root[data-theme="dark"] {
+  --sidebar-bg: var(--app-chrome);
+  --sidebar-border: var(--app-border);
+  --sidebar-active-bg: transparent;
+  --sidebar-active-color: var(--app-text);
+  --color-primary: var(--app-action);
+  --color-primary-light: var(--app-accent-text);
+  --color-primary-dark: var(--app-action-hover);
+  --color-primary-soft: var(--app-selected);
+  --color-accent: var(--app-accent);
+  --color-accent-text: var(--app-accent-text);
+  --color-info: var(--app-accent-text);
+  --color-info-soft: var(--app-selected);
+  --color-info-strong: var(--app-accent-text);
+  --color-info-border: var(--app-border);
+  --interactive-primary: var(--app-action);
+  --interactive-primary-hover: var(--app-action-hover);
+  --interactive-focus-shadow: color-mix(in srgb, var(--app-accent) 22%, transparent);
+  --focus-ring: var(--app-accent);
+  --text-primary: var(--app-text);
+  --text-secondary: var(--app-secondary);
+  --text-tertiary: var(--app-secondary);
+  --text-muted: var(--app-secondary);
+  --bg-primary: var(--app-card);
+  --bg-secondary: var(--app-page);
+  --bg-tertiary: var(--app-elevated);
+  --surface-page: var(--app-page);
+  --surface-shell: var(--app-page);
+  --surface-card: var(--app-card);
+  --surface-muted: var(--app-elevated);
+  --surface-selected: var(--app-selected);
+  --surface-border: var(--app-border);
+  --border-color: var(--app-border);
+  --border-color-light: var(--app-border);
+  --border-strong: var(--app-secondary);
+  --scrollbar-track: var(--app-page);
+  --scrollbar-thumb: #747184;
+  --scrollbar-thumb-hover: var(--app-accent);
+  --bs-body-color: var(--app-text);
+  --bs-body-bg: var(--app-page);
+  --bs-secondary-color: var(--app-secondary);
+  --bs-border-color: var(--app-border);
+  --bs-primary: var(--app-action);
+  --bs-primary-rgb: 124, 58, 237;
+  --bs-link-color: var(--app-accent-text);
+  --bs-link-hover-color: var(--app-accent-text);
+  --patrol-page: var(--app-page);
+  --patrol-sidebar: var(--app-chrome);
+  --patrol-surface: var(--app-card);
+  --patrol-muted: var(--app-elevated);
+  --patrol-input: var(--app-input);
+  --patrol-text: var(--app-text);
+  --patrol-secondary: var(--app-secondary);
+  --patrol-border: var(--app-border);
+  --patrol-accent: var(--app-accent);
+  --patrol-accent-soft: var(--app-selected);
+  --patrol-accent-text: var(--app-accent-text);
+  --patrol-action: var(--app-action);
+  --patrol-action-hover: var(--app-action-hover);
+  --patrol-focus: var(--app-accent);
+  --patrol-tab-active: var(--app-tab-active);
+  --patrol-tab-text: var(--app-tab-text);
+  --patrol-tab-border: var(--app-tab-border);
+  --patrol-tab-hover-text: var(--app-tab-hover-text);
+}
+
+/* The same shell is used on every route, including the mobile web drawer. */
+:root .layout-root,
+:root .layout-body { background: var(--app-page); color: var(--app-text); }
+:root .nav-sidebar,
+:root .layout-body .top-bar { background: var(--app-chrome); border-color: var(--app-border); box-shadow: none; }
+:root .nav-sidebar :is(.nav-sidebar__brand,.nav-sidebar__toggle) { border-color: var(--app-border); }
+:root .nav-sidebar :is(.nav-sidebar__brand-name,.nav-sidebar__brand-geo) { color: var(--app-text); }
+:root .nav-sidebar .nav-sidebar__brand-sentri { color: var(--app-accent-text); }
+:root .nav-sidebar .nav-sidebar__section-title { color: var(--app-secondary); }
+:root .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle,.nav-sidebar__sublink) { color: var(--app-secondary); }
+:root .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle,.nav-sidebar__sublink):is(:hover,:focus-visible) { background: transparent; color: var(--app-text); transform: none; }
+:root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__group-toggle--active,.nav-sidebar__sublink--active),
+:root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__group-toggle--active,.nav-sidebar__sublink--active):hover { background: transparent; color: var(--app-text); transform: none; }
+:root .nav-sidebar :is(.nav-sidebar__link--active,.nav-sidebar__link:hover,.nav-sidebar__link:focus-visible) .nav-sidebar__label { text-decoration: underline; text-decoration-color: var(--app-accent); text-decoration-thickness: 2px; text-underline-offset: 6px; overflow: visible; }
+:root .nav-sidebar--collapsed :is(.nav-sidebar__link--active,.nav-sidebar__link:hover,.nav-sidebar__link:focus-visible)::after { content: ''; position: absolute; bottom: 3px; left: 50%; width: 18px; height: 2px; border-radius: 2px; background: var(--app-accent); transform: translateX(-50%); }
+:root .nav-sidebar :is(.nav-sidebar__link,.nav-sidebar__group-toggle)::before { display: none; }
+:root .nav-sidebar:not(.nav-sidebar--collapsed) .nav-sidebar__label { white-space: nowrap; overflow-wrap: normal; }
+:root .nav-sidebar .nav-sidebar__toggle { background: var(--app-card); color: var(--app-secondary); box-shadow: none; }
+:root .nav-sidebar .nav-sidebar__toggle:hover { background: var(--app-elevated); color: var(--app-text); }
+:root .top-bar :is(h1,h2) { color: var(--app-text); }
+:root .top-bar p,
+:root .top-bar .icon-btn { color: var(--app-secondary); }
+:root .top-bar .icon-btn:hover { background: var(--app-elevated); color: var(--app-accent-text); }
+:root .top-bar .profile-avatar-fallback { background: var(--app-action); color: #fff; }
+:root .top-bar .notification-dot { background: var(--app-accent); box-shadow: 0 0 0 2px var(--app-chrome); }
+.system-status-banner button { background: var(--app-action); border-color: var(--app-action); }
+.system-status-banner button:hover:not(:disabled) { background: var(--app-action-hover); border-color: var(--app-action-hover); }
+.system-status-banner button:focus-visible { outline-color: var(--app-accent); }
+:root .global-feedback--info { background: var(--app-action); border-color: var(--app-accent); }
+::selection { background: var(--app-selected); color: var(--app-accent-text); }
+
+/* Pill selections keep their dark text; only inactive tabs turn white on hover. */
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) { border-radius: 999px; background: var(--app-elevated); }
+:root :is(.analytics-segmented-control,.account-view-nav)::before,
+:root :is(.analytics-segmented-control,.account-view-nav)::after { display: none; }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button { border: 1px solid transparent; border-radius: 999px; color: var(--app-secondary); }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:hover,
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:focus-visible { background: var(--app-elevated); color: var(--app-tab-hover-text); border-color: var(--app-secondary); }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:is(.is-active,.account-view-tab--active,[aria-pressed=true]),
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:is(.is-active,.account-view-tab--active,[aria-pressed=true]):hover { background: var(--app-tab-active); color: var(--app-tab-text); border-color: var(--app-tab-border); }
+:root :is(.analytics-segmented-control,.account-view-nav,.history-view-switch) button:focus-visible { outline: 3px solid var(--app-accent); outline-offset: 2px; }
+
+:root input[type="checkbox"],
+:root input[type="radio"] { accent-color: var(--app-action); }
+:root :is(input,textarea)::placeholder { color: var(--app-secondary); opacity: 1; }
+:root .form-check-input:checked { background-color: var(--app-action); border-color: var(--app-action); }
+:root .btn-primary { --bs-btn-bg: var(--app-action); --bs-btn-border-color: var(--app-action); --bs-btn-hover-bg: var(--app-action-hover); --bs-btn-hover-border-color: var(--app-action-hover); --bs-btn-active-bg: var(--app-action-hover); --bs-btn-active-border-color: var(--app-action-hover); }
+:root .stat-card__change.down { background: var(--color-danger-soft); color: var(--color-danger-strong); }
+:root .settings-hint { color: var(--app-secondary); }
+:root .page-subtitle { color: var(--app-secondary); }
+:root .initials-avatar { background: var(--app-action); color: #fff; }
+:root .stat-card__signal--info { background: var(--app-selected); color: var(--app-accent-text); }
+
+/* Authentication uses the same palette; all field/recovery behavior is unchanged. */
+:root .login-page { background: var(--app-page); color: var(--app-text); }
+:root .login-accent { background: var(--app-selected); }
+:root .login-card { background: var(--app-card); border-color: var(--app-border); }
+:root :is(.login-intro h1,.login-brand strong,.login-copy-title,.login-label) { color: var(--app-text); }
+:root :is(.login-intro__description,.login-intro__access-note,.login-brand div > span,.login-copy-subtitle) { color: var(--app-secondary); }
+:root :is(.login-badge,.login-copy-title span,.login-text-action) { color: var(--app-accent-text); }
+:root .login-input { background: var(--app-input); color: var(--app-text); border-color: var(--app-border); }
+:root .login-submit-btn { background: var(--app-action); color: #fff; }
+:root .login-submit-btn:not(:disabled):hover { background: var(--app-action-hover); }
+:root .login-submit-btn:disabled { background: var(--app-elevated); color: var(--app-secondary); border-color: var(--app-border); }

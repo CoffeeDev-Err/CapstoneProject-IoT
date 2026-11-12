@@ -278,7 +278,7 @@
   --smooth-underline-left: 25%;
   --smooth-underline-width: calc(50% - 0.75rem);
   --smooth-underline-bottom: 0.24rem;
-  --smooth-underline-color: var(--color-primary, #2563eb);
+  --smooth-underline-color: var(--color-primary, var(--interactive-primary));
 }
 
 .smooth-underline-control::after {
@@ -312,8 +312,8 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 10px;
-  background: var(--color-primary-soft, #dbeafe);
-  color: var(--color-primary, #2563eb);
+  background: var(--color-primary-soft, var(--surface-selected));
+  color: var(--color-accent-text);
 }
 
 .action-notice-modal__icon svg {
@@ -375,7 +375,7 @@
 }
 
 .select-control:focus-within .select-control__icon {
-  color: var(--interactive-primary);
+  color: var(--color-accent-text);
 }
 
 .select-control > select:disabled + .select-control__icon {

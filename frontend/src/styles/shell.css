@@ -69,7 +69,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 1px solid rgba(96, 165, 250, 0.24);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 24%, transparent);
   border-radius: 11px;
   background: #102a4c;
   box-shadow: 0 5px 14px rgba(15, 42, 76, 0.16);
@@ -106,7 +106,7 @@
   font-size: var(--font-size-brand-sentri);
   font-weight: 600;
   letter-spacing: -0.035em;
-  color: #124a93;
+  color: var(--color-accent-text);
 }
 
 
@@ -206,16 +206,16 @@
   width: 4px;
   height: calc(100% - 0.9rem);
   border-radius: 999px;
-  background: linear-gradient(180deg, #93c5fd 0%, #2563eb 100%);
+  background: linear-gradient(180deg, var(--surface-selected) 0%, var(--interactive-primary) 100%);
   transform: translateY(-50%) scaleY(0.2);
   transform-origin: center;
   opacity: 0;
-  box-shadow: 0 0 0 rgba(37, 99, 235, 0);
+  box-shadow: 0 0 0 color-mix(in srgb, var(--app-accent) 0%, transparent);
   transition: transform 0.5s ease, opacity 0.2s ease, box-shadow 0.28s ease;
 }
 
 .nav-sidebar__link:hover {
-  background: rgba(37, 99, 235, 0.28);
+  background: color-mix(in srgb, var(--app-accent) 28%, transparent);
   color: #e2e8f0;
   transform: translateX(3px);
 }
@@ -223,7 +223,7 @@
 .nav-sidebar__link:hover::before {
   opacity: 1;
   transform: translateY(-50%) scaleY(1);
-  box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--app-accent) 30%, transparent);
 }
 
 .nav-sidebar__link--active {
@@ -240,7 +240,7 @@
 .nav-sidebar__link--active::before {
   opacity: 1;
   transform: translateY(-50%) scaleY(1);
-  box-shadow: 0 0 14px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--app-accent) 45%, transparent);
 }
 
 .nav-sidebar__icon {
@@ -281,7 +281,7 @@
   width: max-content;
   max-width: min(220px, calc(100vw - var(--sidebar-w-collapsed) - 32px));
   padding: 0.55rem 0.75rem;
-  border: 1px solid rgba(96, 165, 250, 0.34);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 34%, transparent);
   border-radius: 10px;
   background:
     linear-gradient(135deg, rgba(30, 58, 100, 0.98), rgba(15, 23, 42, 0.98));
@@ -312,8 +312,8 @@
   left: -5px;
   width: 9px;
   height: 9px;
-  border-bottom: 1px solid rgba(96, 165, 250, 0.34);
-  border-left: 1px solid rgba(96, 165, 250, 0.34);
+  border-bottom: 1px solid color-mix(in srgb, var(--app-accent) 34%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--app-accent) 34%, transparent);
   background: #1d3962;
   transform: translateY(-50%) rotate(45deg);
 }
@@ -362,16 +362,16 @@
   width: 4px;
   height: calc(100% - 0.9rem);
   border-radius: 999px;
-  background: linear-gradient(180deg, #93c5fd 0%, #2563eb 100%);
+  background: linear-gradient(180deg, var(--surface-selected) 0%, var(--interactive-primary) 100%);
   transform: translateY(-50%) scaleY(0.2);
   transform-origin: center;
   opacity: 0;
-  box-shadow: 0 0 0 rgba(37, 99, 235, 0);
+  box-shadow: 0 0 0 color-mix(in srgb, var(--app-accent) 0%, transparent);
   transition: transform 0.5s ease, opacity 0.2s ease, box-shadow 0.28s ease;
 }
 
 .nav-sidebar__group-toggle:hover {
-  background: rgba(37, 99, 235, 0.28);
+  background: color-mix(in srgb, var(--app-accent) 28%, transparent);
   color: #e2e8f0;
   transform: translateX(3px);
 }
@@ -379,7 +379,7 @@
 .nav-sidebar__group-toggle:hover::before {
   opacity: 1;
   transform: translateY(-50%) scaleY(1);
-  box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--app-accent) 30%, transparent);
 }
 
 .nav-sidebar__group-toggle--active {
@@ -396,7 +396,7 @@
 .nav-sidebar__group-toggle--active::before {
   opacity: 1;
   transform: translateY(-50%) scaleY(1);
-  box-shadow: 0 0 14px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--app-accent) 45%, transparent);
 }
 
 /* Active navigation is indicated by its soft pill background, not a side rail. */
@@ -452,13 +452,13 @@
 }
 
 .nav-sidebar__sublink:hover {
-  background: rgba(37, 99, 235, 0.28);
+  background: color-mix(in srgb, var(--app-accent) 28%, transparent);
   color: #e2e8f0;
 }
 
 .nav-sidebar__sublink--active {
-  background: rgba(37, 99, 235, 0.32);
-  color: #93c5fd;
+  background: color-mix(in srgb, var(--app-accent) 32%, transparent);
+  color: var(--color-accent-text);
   font-weight: 500;
 }
 
@@ -508,8 +508,8 @@
 
 .nav-sidebar__toggle:hover {
   background: #20314f;
-  border-color: rgba(147, 197, 253, 0.45);
-  color: #dbeafe;
+  border-color: color-mix(in srgb, var(--app-accent) 45%, transparent);
+  color: var(--color-accent-text);
 }
 
 .nav-sidebar__toggle svg {

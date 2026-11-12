@@ -42,13 +42,13 @@
 
 .settings-input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 10%, transparent);
   background: var(--bg-primary);
 }
 
 .settings-input--error {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent);
 }
 
 .account-form {
@@ -100,12 +100,12 @@
 
 .account-view-tab:hover {
   background: color-mix(in srgb, var(--color-primary) 9%, transparent);
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
 }
 
 .account-view-tab--active {
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
   box-shadow: none;
 }
 
@@ -220,7 +220,7 @@
 }
 
 .account-rank-trigger.is-open .account-rank-trigger__icon {
-  color: var(--interactive-primary);
+  color: var(--color-accent-text);
   transform: rotate(180deg);
 }
 
@@ -410,7 +410,7 @@
   border-color: var(--color-primary-dark);
   background: var(--color-primary);
   transform: none;
-  box-shadow: 0 8px 18px -12px rgba(37, 99, 235, 0.8);
+  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--app-accent) 80%, transparent);
 }
 
 .account-action-btn:disabled,
@@ -424,7 +424,7 @@
 .account-feedback {
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
-  border: 1px solid #93c5fd;
+  border: 1px solid var(--app-accent);
   background: var(--surface-selected);
   color: var(--interactive-primary-hover);
   font-size: var(--font-size-sm);
@@ -538,7 +538,7 @@
 }
 
 .account-table-btn:focus-visible {
-  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 40%, transparent);
   outline-offset: 2px;
 }
 

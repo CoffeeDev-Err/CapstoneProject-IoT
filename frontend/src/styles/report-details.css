@@ -75,8 +75,8 @@
 }
 
 .report-detail-drawer__close:hover {
-  background: #eff6ff;
-  color: var(--color-primary);
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
 }
 
 .report-detail-drawer__close svg {
@@ -177,7 +177,7 @@
 }
 
 .report-detail-section__header a {
-  color: #2563eb;
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
   font-weight: 750;
   text-decoration: none;
@@ -357,14 +357,14 @@
 }
 
 .report-map-dot--start {
-  background: #2563eb;
+  background: var(--interactive-primary);
 }
 
 .report-map-line {
   width: 18px;
   height: 3px;
   border-radius: 2px;
-  background: #2563eb;
+  background: var(--interactive-primary);
 }
 
 .report-route-history {
@@ -404,10 +404,10 @@
   justify-content: center;
   gap: 0.4rem;
   padding: 0.45rem 0.7rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--interactive-primary);
   border-radius: 7px;
   background: var(--bg-primary);
-  color: #2563eb;
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
   font-weight: 750;
   cursor: pointer;
@@ -416,7 +416,7 @@
 
 .report-route-history__button:hover:not(:disabled) {
   background: var(--bg-primary);
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
 }
 
 .report-route-history__button:disabled {
@@ -448,7 +448,7 @@
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.85rem;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   font-size: var(--font-size-sm);
   font-weight: 750;
   text-decoration: none;
@@ -492,7 +492,7 @@
 }
 .report-route-layers legend { float: none; width: auto; font-size: var(--font-size-xs); font-weight: 700; padding: 0 0.3rem; }
 .report-route-layers label { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.report-route-layers input { accent-color: #2563eb; }
+.report-route-layers input { accent-color: var(--interactive-primary); }
 .report-map-sample-details { line-height: 1.5; font-size: var(--font-size-xs); color: var(--text-primary); }
 .report-location-map .maplibregl-popup-content { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); }
 .report-location-map .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--bg-primary); }
@@ -511,8 +511,8 @@
   margin-top: 0.65rem;
   padding: 0.6rem 0.7rem;
   border-radius: 6px;
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
   line-height: 1.45;
 }
@@ -740,13 +740,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   font-weight: 750;
   text-decoration: none;
 }
 
 .report-evidence__viewer-link:hover {
-  color: var(--color-primary-dark);
+  color: var(--color-accent-text);
 }
 
 .report-evidence__viewer-link svg {
@@ -763,7 +763,7 @@
 
 [data-theme="dark"] .report-review-panel {
   border-color: #334155;
-  background: #0f172a;
+  background: var(--app-input);
 }
 
 .report-review-panel__heading {
@@ -796,8 +796,8 @@
 }
 
 .report-review-status--validated {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
 }
 
 .report-review-status--rejected {
@@ -834,8 +834,8 @@
 }
 
 .report-review-button--validate {
-  border-color: #2563eb;
-  background: #2563eb;
+  border-color: var(--interactive-primary);
+  background: var(--interactive-primary);
   color: #fff;
 }
 
@@ -862,9 +862,9 @@
 }
 
 .report-review-button--validate:disabled {
-  border-color: #bfdbfe;
-  background: #dbeafe;
-  color: #2563eb;
+  border-color: var(--app-accent);
+  background: var(--surface-selected);
+  color: var(--color-accent-text);
 }
 
 .report-review-button--reject:disabled {
@@ -875,7 +875,7 @@
 
 .report-review-feedback {
   margin: 0.75rem 0 0;
-  color: #60a5fa;
+  color: var(--color-accent-text);
   font-size: var(--font-size-xs);
 }
 

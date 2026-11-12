@@ -44,8 +44,8 @@
   overflow-y: auto;
   padding: 1rem;
   color: #e8eef8;
-  background: #111c31;
-  border: 1px solid #2b3b55;
+  background: var(--app-input);
+  border: 1px solid var(--surface-border);
   border-radius: 14px;
   box-shadow: 0 18px 45px rgba(2, 6, 23, 0.4);
   pointer-events: auto;
@@ -65,17 +65,17 @@
   height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid #34445e;
+  border: 1px solid var(--surface-border);
   border-radius: 8px;
-  color: #9eacc0;
-  background: #17243a;
+  color: var(--text-secondary);
+  background: var(--app-input);
   cursor: pointer;
 }
 
 .profile-map-card__close:hover {
   color: #ffffff;
-  border-color: #4c6080;
-  background: #17243a;
+  border-color: var(--surface-border);
+  background: var(--app-input);
 }
 
 .profile-map-card__header {
@@ -89,10 +89,10 @@
   flex: 0 0 auto;
   width: 56px;
   height: 56px;
-  border: 2px solid #3b82f6;
+  border: 2px solid var(--interactive-primary);
   border-radius: 50%;
   object-fit: cover;
-  background: #22304a;
+  background: var(--app-input);
 }
 
 .profile-map-card__identity {
@@ -112,7 +112,7 @@
 
 .profile-map-card__identity p {
   margin: 0.12rem 0 0.28rem;
-  color: #7db1ff;
+  color: var(--color-accent-text);
   font-size: var(--font-size-sm);
   font-weight: 700;
   text-transform: uppercase;
@@ -131,8 +131,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  background: var(--interactive-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 12%, transparent);
 }
 
 .profile-map-card__location {
@@ -142,9 +142,9 @@
   gap: 0.65rem;
   margin-top: 0.9rem;
   padding: 0.75rem 0;
-  border-top: 1px solid #2c3b53;
-  border-bottom: 1px solid #2c3b53;
-  color: #8db5f3;
+  border-top: 1px solid var(--surface-border);
+  border-bottom: 1px solid var(--surface-border);
+  color: var(--color-accent-text);
 }
 
 .profile-map-card__location > div {
@@ -154,7 +154,7 @@
 .profile-map-card__location span,
 .profile-map-card__location small {
   display: block;
-  color: #8f9db2;
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -187,19 +187,19 @@
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  background: #2563eb;
+  background: var(--interactive-primary);
   font-size: var(--font-size-xs);
   font-weight: 700;
   cursor: pointer;
 }
 
 .profile-map-card__locate:hover {
-  background: #2563eb;
+  background: var(--interactive-primary);
 }
 
 .profile-map-card__locate:disabled {
-  color: #7e8ba0;
-  background: #26344a;
+  color: var(--text-secondary);
+  background: var(--app-input);
   cursor: not-allowed;
 }
 
@@ -216,11 +216,11 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   column-gap: 0.4rem;
-  color: #7187a7;
+  color: var(--text-secondary);
 }
 
 .profile-map-card__metric span {
-  color: #8f9db2;
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -263,7 +263,7 @@
 
 .profile-modal .rank {
   margin: 0.35rem 0 1.25rem;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   font-weight: 700;
   font-size: var(--font-size-sm);
   text-transform: uppercase;
@@ -448,7 +448,7 @@
 .profile-map-card__request {
   margin-top: 0.75rem;
   padding: 0.7rem;
-  border: 1px solid #2c3b53;
+  border: 1px solid var(--surface-border);
   border-radius: 10px;
   background: #0d1728;
 }
@@ -466,8 +466,8 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #93c5fd;
-  background: rgba(37, 99, 235, 0.2);
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--app-accent) 20%, transparent);
 }
 
 .profile-map-card__request-heading small,
@@ -477,7 +477,7 @@
 
 .profile-map-card__request-heading small,
 .profile-map-card__request-grid dt {
-  color: #8f9db2;
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -492,8 +492,8 @@
 .profile-map-card__request-status {
   padding: 0.2rem 0.45rem;
   border-radius: 999px;
-  color: #bfdbfe;
-  background: rgba(37, 99, 235, 0.2);
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--app-accent) 20%, transparent);
   font-size: var(--font-size-xs);
   font-weight: 750;
   text-transform: capitalize;
@@ -536,17 +536,17 @@
   width: 100%;
   min-height: 34px;
   margin-top: 0.65rem;
-  border: 1px solid #3b82f6;
+  border: 1px solid var(--interactive-primary);
   border-radius: 8px;
-  color: #dbeafe;
-  background: rgba(37, 99, 235, 0.16);
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--app-accent) 16%, transparent);
   font-size: var(--font-size-xs);
   font-weight: 750;
   cursor: pointer;
 }
 
 .profile-map-card__request-action:hover {
-  background: rgba(37, 99, 235, 0.28);
+  background: color-mix(in srgb, var(--app-accent) 28%, transparent);
 }
 
 .profile-map-card__request-action:disabled {
@@ -562,7 +562,7 @@
   border: 1px solid #25344b;
   border-radius: 8px;
   list-style: none;
-  background: #111c31;
+  background: var(--app-input);
 }
 
 .profile-map-card__responders li {
@@ -589,7 +589,7 @@
 }
 
 .profile-map-card__responders .is-responding {
-  color: #93c5fd;
+  color: var(--color-accent-text);
 }
 
 .profile-map-card__responders .is-arrived {
@@ -598,7 +598,7 @@
 
 .profile-map-card__request-note {
   margin: 0.4rem 0 0;
-  color: #8f9db2;
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
   line-height: 1.4;
   text-align: center;
