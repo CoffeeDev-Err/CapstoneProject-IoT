@@ -742,9 +742,9 @@ function AssignAreaPage({ view = 'form' }) {
 
   return (
     <div className="page-container deployment-page fade-in p-3 p-md-4">
-      <header className="page-header assignment-page-header mb-4">
+      <header className="page-header assignment-page-header">
         <div>
-          <h2 className="page-title">{listOnly ? 'Assigned Deployments' : 'Deployment Management'}</h2>
+          <h2 className="page-title">{listOnly ? 'Assigned Deployments' : editingAssignmentId || editingGroupId ? 'Reassign patrol deployment' : 'Deployment Management'}</h2>
           <p className="page-subtitle">
             {listOnly
               ? 'Search and manage active or scheduled personnel assignments'
@@ -761,7 +761,7 @@ function AssignAreaPage({ view = 'form' }) {
       </header>
 
       {!listOnly && deploymentsReady && (!editingAssignmentId && !editingGroupId || assignmentForm.scheduleBlocks?.length > 0) && (
-        <PatrolPlanner key={editingGroupId || editingAssignmentId || 'new'}
+        <PatrolPlanner embedded key={editingGroupId || editingAssignmentId || 'new'}
           personnel={personnelOptions.filter(p => !p.isMockPersonnel)} assignments={assignments}
           initialGroup={editingGroupId ? assignments.filter(a => resolveGroupId(a) === editingGroupId)
             : editingAssignmentId ? assignments.filter(a => a.id === editingAssignmentId) : []}

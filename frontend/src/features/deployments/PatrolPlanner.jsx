@@ -23,7 +23,7 @@ const focusPlannerControl = control => {
   control?.scrollIntoView?.({ block: 'center', inline: 'nearest' })
 }
 
-export default function PatrolPlanner({ personnel, assignments, initialGroup = [], saving, ready, onSave, onCancel }) {
+export default function PatrolPlanner({ personnel, assignments, initialGroup = [], saving, ready, onSave, onCancel, embedded = false }) {
   const initial = initialGroup[0]
   const [groupId] = useState(() => initial?.groupId || createDeploymentId('GRP'))
   const [recordPrefix] = useState(() => createDeploymentId('DEP'))
@@ -185,7 +185,7 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const preview = { ...draft, ...(coverage.loading ? {} : coverage), offsetMinutes: draftOffset }
   const scheduleComplete = minutes === dutyMinutes && minutes > 0
   return <section className="patrol-planner patrol-theme">
-    <header className="patrol-planner__header"><div><span className="patrol-eyebrow"><ShieldCheck size={16} /> Patrol operations</span><h3>{initial ? 'Reassign patrol deployment' : 'Plan a patrol duty'}</h3><p>Set the duty. Build the schedule on the map. Deploy your team.</p></div><span className="patrol-badge">Philippine time · UTC+8</span></header>
+    {!embedded && <header className="patrol-planner__header"><div><span className="patrol-eyebrow"><ShieldCheck size={16} /> Patrol operations</span><h3>{initial ? 'Reassign patrol deployment' : 'Plan a patrol duty'}</h3><p>Set the duty. Build the schedule on the map. Deploy your team.</p></div></header>}
     <form onSubmit={event => {
       event.preventDefault()
       if (dutyError) { focusPlannerControl(endRef.current); return }
@@ -193,7 +193,7 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
       setError(message)
       if (!message) setReview(true)
     }}>
-      <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step">01</span><div><h4>Patrol style & duty</h4><p>One duty, with consecutive area or route blocks.</p></div></div>
+      <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step">01</span><div><h4>Patrol style & duty</h4><p>One duty, with consecutive area or route blocks.</p></div><span className="patrol-badge">Philippine time · UTC+8</span></div>
         <fieldset className="patrol-style-selector"><legend className="visually-hidden">Deployment style</legend>{[['area', 'Area Patrol', 'Cover a barangay or a custom area', ShieldCheck], ['route', 'Route Patrol', 'Follow a road or walking path', Route]].map(([value, label, hint, icon]) => <button type="button" key={value} aria-label={label} aria-pressed={type === value} className={type === value ? 'is-active' : ''} onClick={() => { if (type !== value) { if (areaDirty || blocks.length || draft.label || draft.routePoints.length || Number.isFinite(draft.latitude)) setSwitchType(value); else changeType(value) } }}>{createElement(icon, { size: 23 })}<span><strong>{label}</strong><small>{hint}</small></span>{type === value && <Check size={17} />}</button>)}</fieldset>
         {type === 'route' && <fieldset className="patrol-mode-selector"><legend>Travel mode</legend>{[['walk', 'Foot Patrol', Footprints], ['motorcycle', 'Motorcycle Patrol', Route], ['car', 'Car Patrol', Car]].map(([value, label, icon]) => <button type="button" key={value} aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => { void changeMode(value) }}>{createElement(icon, { size: 16 })}{label}</button>)}</fieldset>}
         <div className="patrol-two-columns patrol-duty"><label>Start<input required type="datetime-local" value={start} onChange={e => { setStart(e.target.value); setError('') }} /></label><label>End<input ref={endRef} required type="datetime-local" aria-invalid={Boolean(dutyError)} aria-describedby={`${feedbackId}-duty`} value={end} onChange={e => { setEnd(e.target.value); setError('') }} /></label></div>
@@ -225,13 +225,15 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
         </div>
         </>}
       </section>
-      <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step is-teal">03</span><div><h4>{vehicleMode ? 'Vehicle & weekly crew' : 'Assign personnel'}</h4><p>{vehicleMode ? 'Select a vehicle to load its locked crew automatically.' : 'Choose the officers assigned to this complete duty.'}</p></div>{vehicleMode ? <Car size={20} /> : <Users size={20} />}</div>
-        {vehicleMode ? <><div className="patrol-section-heading"><label className="patrol-vehicle-select">Vehicle<select aria-label="Vehicle" value={vehicleId} onChange={e => setVehicleId(e.target.value)}><option value="">Choose assigned vehicle</option>{fleet.vehicles.filter(v => v.mode === mode).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label><button type="button" onClick={() => setCrewOpen(true)} disabled={fleetLoading || Boolean(fleetError)}><Car size={16} />Manage weekly vehicle crews</button></div>
+      <div className="patrol-team-instructions">
+      <section className="patrol-panel patrol-team-panel"><div className="patrol-section-heading"><span className="patrol-step is-teal">03</span><div><h4>{vehicleMode ? 'Vehicle & weekly crew' : 'Assign personnel'}</h4><p>{vehicleMode ? 'Select a vehicle to load its locked crew automatically.' : 'Choose the officers assigned to this complete duty.'}</p></div>{vehicleMode ? <Car size={20} /> : <Users size={20} />}</div>
+        {vehicleMode ? <><div className="patrol-vehicle-controls"><label className="patrol-vehicle-select">Vehicle<select aria-label="Vehicle" value={vehicleId} onChange={e => setVehicleId(e.target.value)}><option value="">Choose assigned vehicle</option>{fleet.vehicles.filter(v => v.mode === mode).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label><button type="button" onClick={() => setCrewOpen(true)} disabled={fleetLoading || Boolean(fleetError)}><Car size={16} />Manage weekly vehicle crews</button></div>
           <p>Week starting {weekStart || '—'} · Monday–Sunday</p>{fleetLoading && <p role="status">Loading vehicle crews…</p>}{fleetError && <p role="alert" className="patrol-notice is-error">Vehicle assignments unavailable. <button type="button" onClick={() => { void loadFleet().catch(() => {}) }}>Retry</button></p>}
-          {crew ? <div className="patrol-tinted-panel"><span className="patrol-badge is-valid"><LockKeyhole size={14} />Locked weekly crew</span><ul className="patrol-crew-summary">{crew.personnelIds.map(id => <li key={id}><strong>{personnel.find(p => p.id === id)?.name || id}</strong><span>{crew.driverId === id ? 'Driver' : 'Crew'}</span></li>)}</ul></div> : !fleetLoading && vehicleId && <div className="patrol-notice is-warning">This vehicle has no locked weekly crew. <button type="button" onClick={() => setCrewOpen(true)}>Set up weekly crew</button></div>}</>
+          {crew ? <div className="patrol-tinted-panel"><span className="patrol-badge is-valid"><LockKeyhole size={14} />Locked weekly crew</span><ul className="patrol-crew-summary">{crew.personnelIds.map(id => <li key={id}><strong>{personnel.find(p => p.id === id)?.name || id}</strong><span>{crew.driverId === id ? 'Driver' : 'Crew'}</span></li>)}</ul></div> : !fleetLoading && vehicleId && <div className="patrol-notice is-warning patrol-crew-warning"><span>This vehicle has no locked weekly crew.</span><button type="button" onClick={() => setCrewOpen(true)}>Set up weekly crew</button></div>}</>
           : <PatrolPersonnelSelect personnel={personnel} ids={ids} onChange={setIds} />}
       </section>
-      <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step">04</span><div><h4>Deployment instructions</h4><p>Brief the team before they begin their duty.</p></div></div><label><span className="visually-hidden">Instructions</span><textarea maxLength={1000} rows={3} placeholder="Priorities, checkpoints and instructions for the assigned team…" value={notes} onChange={e => setNotes(e.target.value)} /></label><small>{notes.length} / 1,000 characters</small></section>
+      <section className="patrol-panel patrol-instructions-panel"><div className="patrol-section-heading"><span className="patrol-step">04</span><div><h4>Deployment instructions</h4><p>Brief the team before they begin their duty.</p></div></div><label><span className="visually-hidden">Instructions</span><textarea maxLength={1000} rows={5} placeholder="Priorities, checkpoints and instructions for the assigned team…" value={notes} onChange={e => setNotes(e.target.value)} /></label><small>{notes.length} / 1,000 characters</small></section>
+      </div>
       {error && <p ref={errorRef} tabIndex={-1} role="alert" className="patrol-notice is-error">{error}</p>}
       <footer className="patrol-planner__footer"><span><ShieldCheck size={17} />Review all coverage and duty hours before deploying.</span><div>{initial && <button type="button" disabled={saving} onClick={onCancel}>Cancel changes</button>}<button className="patrol-primary" type="submit" disabled={saving || !ready || vehicleMode && !crew}><ClipboardCheck size={17} />Review patrol schedule</button></div></footer>
     </form>
