@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, MapPin, Route, ShieldCheck } from 'lucide-react'
 import { useFeedback } from '../context/useFeedback'
 import { usePersonnelContext } from '../context/usePersonnelContext'
-import { getDeploymentHistory, getManageableDeployments, replaceDeployments, setDeploymentStatus } from '../services/operations'
+import { getDeploymentHistoryPage, getManageableDeployments, replaceDeployments, setDeploymentStatus } from '../services/operations'
 import { filterDeploymentGroupsByPrefix, matchesPrefixSearch } from '../utils/searchMatching'
 import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
 import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
@@ -80,6 +80,12 @@ function AssignAreaPage({ view = 'form' }) {
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState(null)
   const [history, setHistory] = useState([])
   const [historyState, setHistoryState] = useState('loading')
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyLimit, setHistoryLimit] = useState(10)
+  const [historyRevision, setHistoryRevision] = useState(0)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 })
+  const handledDeploymentRequest = useRef('')
   const lifecycleBusy = useRef(false)
   const [deploymentActionNoticeOpen, setDeploymentActionNoticeOpen] = useState(false)
   const [deploymentSearch, setDeploymentSearch] = useState('')
@@ -146,48 +152,46 @@ function AssignAreaPage({ view = 'form' }) {
   useEffect(() => {
     if (!listOnly) return undefined
     let active = true
-    getDeploymentHistory().then(rows => { if (active) { setHistory(rows); setHistoryState('ready') } })
+    const controller = new AbortController()
+    getDeploymentHistoryPage({ page: historyPage, limit: historyLimit, search: activeDeploymentView === 'history' ? deferredDeploymentSearch : '', signal: controller.signal }).then(result => { if (active) { if (historyPage > result.pagination.totalPages) { setHistoryPage(result.pagination.totalPages); return }; setHistory(result.data); setHistoryPagination(result.pagination); setHistoryTotal(result.historyTotal); setHistoryState('ready') } })
       .catch(error => { if (active) { setHistoryState('error'); showFeedback(requestErrorMessage(error, { action: 'load deployment history' }), { type: 'error' }) } })
-    return () => { active = false }
-  }, [listOnly, showFeedback])
+    return () => { active = false; controller.abort() }
+  }, [listOnly, showFeedback, historyPage, historyLimit, historyRevision, activeDeploymentView, deferredDeploymentSearch])
 
   useEffect(() => {
     const requestedDeploymentId = listOnly ? location.state?.deploymentId : null
     if (!requestedDeploymentId || !deploymentsReady) return undefined
+    const requestKey = `${requestedDeploymentId}:${location.state?.notificationRequestId || ''}`
+    if (handledDeploymentRequest.current === requestKey) return undefined
     let isCurrent = true
-    let scrollTimer
     if (historyState === 'loading') return undefined
     const assignment = [...assignments, ...history].find((item) => (
       item.id === requestedDeploymentId || resolveGroupId(item) === requestedDeploymentId
     ))
-    if (!assignment) {
-      showFeedback('The referenced deployment is no longer active or scheduled.', {
-        type: 'info',
-        title: 'Deployment not found',
-      })
-      return undefined
-    }
-
-    queueMicrotask(() => {
+    const focusAssignment = target => {
       if (!isCurrent) return
+      handledDeploymentRequest.current = requestKey
+      if (!target) { showFeedback('The referenced deployment could not be found.', { type: 'info', title: 'Deployment not found' }); return }
       setActiveDeploymentView(
-        !['active', 'scheduled'].includes(assignment.status) ? 'history' : assignment.status === 'scheduled'
+        !['active', 'scheduled'].includes(target.status) ? 'history' : target.status === 'scheduled'
           ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
           : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW,
       )
-      setDeploymentSearch(assignment.id)
-      setHighlightedDeploymentId(assignment.id)
-      scrollTimer = window.setTimeout(() => {
-        document.querySelector(`[data-deployment-id="${assignment.id}"]`)
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 100)
-    })
-    return () => {
-      isCurrent = false
-      window.clearTimeout(scrollTimer)
+      setDeploymentSearch(target.id)
+      setHistoryPage(1)
+      setHighlightedDeploymentId(target.id)
     }
+    if (assignment) queueMicrotask(() => focusAssignment(assignment))
+    else getDeploymentHistoryPage({ page: 1, limit: 10, search: requestedDeploymentId }).then(result => focusAssignment(result.data.find(item => item.id === requestedDeploymentId || resolveGroupId(item) === requestedDeploymentId))).catch(() => focusAssignment(null))
+    return () => { isCurrent = false }
   }, [assignments, history, historyState, deploymentsReady, listOnly, location.state?.deploymentId,
     location.state?.notificationRequestId, showFeedback])
+
+  useEffect(() => {
+    if (!highlightedDeploymentId || historyState === 'loading') return undefined
+    const timer = window.setTimeout(() => document.querySelector(`[data-deployment-id="${highlightedDeploymentId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150)
+    return () => window.clearTimeout(timer)
+  }, [highlightedDeploymentId, historyState, history])
 
   useEffect(() => {
     if (listOnly || !location.state) return
@@ -299,8 +303,8 @@ function AssignAreaPage({ view = 'form' }) {
   }, [visibleAssignments])
 
   const filteredGroupedAssignments = useMemo(() => {
-    return filterDeploymentGroupsByPrefix(groupedAssignments, deferredDeploymentSearch)
-  }, [deferredDeploymentSearch, groupedAssignments])
+    return activeDeploymentView === 'history' ? groupedAssignments : filterDeploymentGroupsByPrefix(groupedAssignments, deferredDeploymentSearch)
+  }, [activeDeploymentView, deferredDeploymentSearch, groupedAssignments])
 
   useEffect(() => {
     if (!isPatrolAreaOpen) {
@@ -672,7 +676,7 @@ function AssignAreaPage({ view = 'form' }) {
       failed = true
       showFeedback(requestErrorMessage(error, { action: 'update deployment status', write: true }), { type: 'error' })
     } finally {
-      try { setAssignments(await getManageableDeployments()); setHistory(await getDeploymentHistory()) }
+      try { setAssignments(await getManageableDeployments()); setHistoryState('loading'); setHistoryRevision(value => value + 1) }
       catch (error) { failed = true; showFeedback(requestErrorMessage(error, { action: 'refresh deployments' }), { type: 'error' }) }
       setIsSaving(false)
       lifecycleBusy.current = false
@@ -990,20 +994,24 @@ function AssignAreaPage({ view = 'form' }) {
           assignments={activeDeploymentView === 'history' ? history : assignments}
           deploymentSearch={deploymentSearch}
           deploymentViewCounts={deploymentViewCounts}
-          historyCount={history.length}
+          historyCount={historyTotal}
+          historyPagination={historyPagination}
+          onHistoryPageChange={page => { setHistoryPage(page); setHistoryState('loading') }}
+          onHistoryLimitChange={limit => { setHistoryLimit(limit); setHistoryPage(1); setHistoryState('loading') }}
           filteredGroupedAssignments={filteredGroupedAssignments}
           isDeploymentsLoading={activeDeploymentView === 'history' ? historyState === 'loading' : isDeploymentsLoading && !hasAssignments}
           historyError={activeDeploymentView === 'history' && historyState === 'error'}
-          onRetryHistory={async () => { setHistoryState('loading'); try { setHistory(await getDeploymentHistory()); setHistoryState('ready') } catch { setHistoryState('error') } }}
+          onRetryHistory={() => { setHistoryState('loading'); setHistoryRevision(value => value + 1) }}
           highlightedDeploymentId={highlightedDeploymentId}
           onDeleteAssignment={handleRequestDeleteAssignment}
           onDeleteGroup={handleRequestDeleteGroup}
           onEditAssignment={handleEditAssignment}
           onEditGroup={handleEditGroup}
-          onSearchChange={setDeploymentSearch}
+          onSearchChange={value => { setDeploymentSearch(value); if (activeDeploymentView === 'history') { setHistoryPage(1); setHistoryState('loading') } }}
           onToggleGroupMenu={handleToggleGroupMenu}
           onViewChange={(nextView) => {
             setActiveDeploymentView(nextView)
+            if (nextView !== activeDeploymentView) { setHistoryPage(1); setHistoryState('loading') }
             setOpenGroupMenuId(null)
           }}
           openGroupMenuId={openGroupMenuId}

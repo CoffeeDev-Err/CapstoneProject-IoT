@@ -10,6 +10,8 @@ const normalizePatrolSchedule = (assignment) => {
 	if (!Array.isArray(blocks) || !blocks.length || blocks.length > 48) throw createValidationError('Add a patrol schedule with 1 to 48 blocks.', 'scheduleBlocks')
 	if (!['area', 'route'].includes(assignment.deploymentType)) throw createValidationError('Choose Area or Route Patrol.', 'deploymentType')
 	const mode = assignment.deploymentType === 'route' ? assignment.patrolMode : ''
+	const areaTravelMode = assignment.deploymentType === 'area' ? assignment.areaTravelMode : undefined
+	if (areaTravelMode !== undefined && !['', 'walk', 'car', 'motorcycle'].includes(areaTravelMode)) throw createValidationError('Choose Foot, Car or Motorcycle for travel between areas.', 'areaTravelMode')
 	if (assignment.deploymentType === 'route' && !['walk', 'car', 'motorcycle'].includes(mode)) throw createValidationError('Choose Foot, Motorcycle or Car Patrol.', 'patrolMode')
 	let offsetMinutes = 0
 	const codes = new Set()
@@ -46,7 +48,7 @@ const normalizePatrolSchedule = (assignment) => {
 	const vehicleId = ['car', 'motorcycle'].includes(mode) ? String(assignment.vehicleId || '') : ''
 	if (['car', 'motorcycle'].includes(mode) && !vehicleId) throw createValidationError('Select the vehicle and its weekly crew.', 'vehicleId')
 	return { patrolAreaId: 'scheduled-patrol', patrolArea: first.label, deploymentType: assignment.deploymentType,
-		patrolMode: mode, coverageBarangayCodes: [...codes], deploymentPointLabel: first.label,
+		patrolMode: mode, ...(areaTravelMode ? { areaTravelMode } : {}), coverageBarangayCodes: [...codes], deploymentPointLabel: first.label,
 		latitude: first.latitude ?? null, longitude: first.longitude ?? null, scheduleBlocks, vehicleId, transitionGraceMinutes }
 }
 

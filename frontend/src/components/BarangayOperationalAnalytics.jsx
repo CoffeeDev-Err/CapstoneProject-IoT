@@ -121,7 +121,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
             </div>
           </div>
 
-          <div key={`${period}-${metric}`} className="barangay-bar-list">
+          <div key={`${period}-${metric}`} className="barangay-bar-list" tabIndex={0} role="region" aria-label="Reports by barangay ranking">
             {metricRanking.length === 0 && (
               <div className="barangay-analytics__empty">
                 No {metric === 'incidents' ? 'validated incidents' : 'submitted reports'} for this period.
@@ -159,7 +159,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
             </div>
           </div>
 
-          <div className="barangay-priority-list">
+          <div className="barangay-priority-list" tabIndex={0} role="region" aria-label="Deployment priority ranking">
             {analytics.barangays.length === 0 && (
               <div className="barangay-analytics__empty">
                 No barangay report activity for this period.

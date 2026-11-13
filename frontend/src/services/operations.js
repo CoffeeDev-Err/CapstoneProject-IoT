@@ -124,6 +124,15 @@ export const getDeploymentHistory = async () => (await Promise.all([
   getPaginatedCollection('/api/deployments?status=cancelled', 'Unable to load cancelled deployments.'),
 ])).flat()
 
+export const getDeploymentHistoryPage = async ({ page = 1, limit = 10, search = '', signal } = {}) => {
+  const query = new URLSearchParams({ view: 'history', page: String(page), limit: String(limit) })
+  if (search.trim()) query.set('search', search.trim())
+  const payload = await apiRequest(`/api/deployments?${query}`, { signal, errorMessage: 'Unable to load deployment history.' })
+  return { data: payload.data || [], pagination: payload.pagination || { page, limit, total: 0, totalPages: 1 }, historyTotal: payload.historyTotal ?? payload.pagination?.total ?? 0 }
+}
+
+export const getDeploymentHistoryGroup = groupId => getPaginatedCollection(`/api/deployments?view=history&group_id=${encodeURIComponent(groupId)}`, 'Unable to load this deployment group.')
+
 export const setDeploymentStatus = (assignmentId, status) => apiRequest(`/api/deployments/${encodeURIComponent(assignmentId)}/status`, {
   method: 'PATCH', body: JSON.stringify({ status }), errorMessage: 'Unable to update deployment status.',
 })

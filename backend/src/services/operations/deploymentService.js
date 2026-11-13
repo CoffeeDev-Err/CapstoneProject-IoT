@@ -344,15 +344,19 @@ const createDeploymentService = ({
 		if (officerPersonnelId) filter.personnelId = officerPersonnelId
 		else if (query.personnel_id) filter.personnelId = String(query.personnel_id)
 		if (query.barangay) filter.barangayCode = normalizeBarangayCode(query.barangay)
+		if (query.group_id) filter.groupId = String(query.group_id)
 		if (query.view === 'manageable') {
 			filter.status = MANAGEABLE_DEPLOYMENT_STATUSES.includes(query.status)
 				? query.status
 				: { $in: MANAGEABLE_DEPLOYMENT_STATUSES }
+		} else if (query.view === 'history') {
+			filter.status = { $in: ['completed', 'cancelled'] }
 		} else if (DEPLOYMENT_STATUSES.includes(query.status)) {
 			filter.status = query.status
 		} else {
 			filter.status = 'active'
 		}
+		const historyFilter = { ...filter }
 		if (query.search) {
 			buildPrefixSearchConditions(query.search, [
 				'assignmentId',
@@ -364,13 +368,14 @@ const createDeploymentService = ({
 				'patrolArea',
 			]).forEach((condition) => appendFilterCondition(filter, condition))
 		}
-		const [documents, total] = await Promise.all([
+		const [documents, total, historyTotal] = await Promise.all([
 			Deployment.find(filter)
 				.sort({ assignedAt: -1, _id: -1 })
 				.skip(pagination.skip)
 				.limit(pagination.limit)
 				.lean(),
 			Deployment.countDocuments(filter),
+			query.view === 'history' && query.search ? Deployment.countDocuments(historyFilter) : Promise.resolve(null),
 		])
 		const personnelById = await loadPersonnelMap(
 			documents.map((deployment) => deployment.personnelId),
@@ -380,6 +385,7 @@ const createDeploymentService = ({
 				serializeDeployment(deployment, personnelById)
 			)),
 			pagination: createPaginationMeta({ ...pagination, total }),
+			...(query.view === 'history' ? { historyTotal: historyTotal ?? total } : {}),
 		}
 	}
 
@@ -644,6 +650,7 @@ const createDeploymentService = ({
 					patrolArea: assignment.patrolArea,
 					deploymentType: assignment.deploymentType,
 					patrolMode: assignment.patrolMode,
+					areaTravelMode: assignment.deploymentType === 'area' ? assignment.areaTravelMode || previous?.areaTravelMode || '' : '',
 					scheduleBlocks: assignment.scheduleBlocks || [],
 					vehicleId: assignment.vehicleId || '',
 					vehicleCrew: assignment.vehicleCrew || null,

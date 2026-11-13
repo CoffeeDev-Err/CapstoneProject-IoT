@@ -6,9 +6,10 @@ import { getMapTilerWebStyleUrl, hasMapTilerWebApiKey } from '../../services/map
 import { useDocumentTheme } from '../../hooks/useDocumentTheme'
 import { cabaganBoundaryFeature } from '../../utils/mapLibreLayers'
 import { blockTimeLabel, circleGeometry, routeIsEnforced } from './patrolScheduleView'
+import useRouteDirections from './useRouteDirections'
 
 // Saved road/walking paths and assignment transitions use separate sources.
-export default function PatrolMap({ blocks = [], type = 'area', mode = '', start, onPoint, focus, selectedIndex, context = '', autoFit = true, onSelectBlock, children }) {
+export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaTravelMode = '', start, onPoint, focus, selectedIndex, context = '', autoFit = true, onSelectBlock, children }) {
   const container = useRef(null)
   const mapRef = useRef(null)
   const pointCallback = useRef(onPoint)
@@ -16,6 +17,11 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
   const [loaded, setLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
   const isDark = useDocumentTheme()
+  const areaPoints = type === 'area' && areaTravelMode && blocks.length >= 2 && blocks.every(block => Number.isFinite(block.latitude) && Number.isFinite(block.longitude)) ? blocks.map(({ latitude, longitude }) => ({ latitude, longitude })) : []
+  const areaPaths = []
+  for (let i = 0; i < areaPoints.length - 1; i += 29) areaPaths.push(areaPoints.slice(i, i + 30))
+  const directions = useRouteDirections(areaPaths, areaTravelMode)
+  const suggestedFeatures = directions.results.filter(result => result.available).map(result => ({ type: 'Feature', properties: {}, geometry: result.geometry }))
   useEffect(() => { pointCallback.current = onPoint }, [onPoint])
   useEffect(() => { selectCallback.current = onSelectBlock }, [onSelectBlock])
   useEffect(() => {
@@ -40,7 +46,7 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
   }, [isDark])
   useEffect(() => {
     const map = mapRef.current
-    if (!loaded || !map) return undefined
+    if (!loaded || !map || !map.getSource('municipality')) return undefined
     const features = [], transitions = [], markers = []
     const bounds = new maplibregl.LngLatBounds()
     const centers = []
@@ -70,7 +76,7 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
             bounds.extend([p[0] + longitudeMargin, p[1] + latitudeMargin])
           })
         }
-        points.forEach((point, pointIndex) => addMarker([point.longitude, point.latitude], `${index + 1}.${pointIndex + 1}`, `${title} · ${point.label || `Point ${pointIndex + 1}`}`, selectedIndex === index))
+        points.forEach((point, pointIndex) => addMarker([point.longitude, point.latitude], `${index + 1}.${pointIndex + 1}`, `${title} · ${point.label || `Point ${pointIndex + 1}`}`, selectedIndex === index, index))
         if (points.length) centers.push({ first: [points[0].longitude, points[0].latitude], last: [points.at(-1).longitude, points.at(-1).latitude] })
       } else {
         const geometry = block.coverageType === 'barangay' ? block.geometry : Number.isFinite(block.latitude) && Number.isFinite(block.longitude) ? circleGeometry(block.latitude, block.longitude, block.radiusMeters || 200) : null
@@ -87,10 +93,13 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
     centers.slice(1).forEach((center, index) => transitions.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [centers[index].last, center.first] } }))
     const data = { type: 'FeatureCollection', features }
     const transitionData = { type: 'FeatureCollection', features: transitions }
-    if (map.getSource('patrol-blocks')) { map.getSource('patrol-blocks').setData(data); map.getSource('patrol-transitions').setData(transitionData) }
+    const suggestedData = { type: 'FeatureCollection', features: suggestedFeatures }
+    if (suggestedFeatures.length === areaPaths.length && areaPaths.length > 0) transitionData.features = []
+    if (map.getSource('patrol-blocks')) { map.getSource('patrol-blocks').setData(data); map.getSource('patrol-transitions').setData(transitionData); map.getSource('patrol-area-directions').setData(suggestedData) }
     else {
       map.addSource('patrol-blocks', { type: 'geojson', data })
       map.addSource('patrol-transitions', { type: 'geojson', data: transitionData })
+      map.addSource('patrol-area-directions', { type: 'geojson', data: suggestedData })
       map.addLayer({ id: 'patrol-area-fill', type: 'fill', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.14 } })
       map.addLayer({ id: 'patrol-area-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'line-color': '#2563eb', 'line-width': 2 } })
       // Meter corridor converted to pixels at this map latitude and zoom.
@@ -98,6 +107,7 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
       map.addLayer({ id: 'patrol-route-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 4 } })
       map.addLayer({ id: 'patrol-guide-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'guide'], paint: { 'line-color': '#64748b', 'line-width': 2, 'line-dasharray': [2, 2] } })
       map.addLayer({ id: 'patrol-transition-line', type: 'line', source: 'patrol-transitions', paint: { 'line-color': '#2563eb', 'line-width': 2, 'line-dasharray': [3, 3] } })
+      map.addLayer({ id: 'patrol-area-directions-line', type: 'line', source: 'patrol-area-directions', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 4 } })
       for (const layer of ['patrol-area-fill', 'patrol-route-line']) map.on('click', layer, event => {
         const detail = document.createElement('div'); detail.textContent = event.features[0].properties.title
         new maplibregl.Popup().setLngLat(event.lngLat).setDOMContent(detail).addTo(map)
@@ -105,13 +115,14 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', start
     }
     if (autoFit && !bounds.isEmpty()) map.fitBounds(bounds, { padding: 55, maxZoom: 16, duration: 0 })
     return () => markers.forEach(marker => marker.remove())
-  }, [blocks, type, mode, start, loaded, selectedIndex, context, autoFit])
+  }, [blocks, type, mode, start, loaded, selectedIndex, context, autoFit, suggestedFeatures, areaPaths.length])
   useEffect(() => {
     if (loaded && focus) mapRef.current?.flyTo({ center: [focus.longitude, focus.latitude], zoom: 16 })
   }, [loaded, focus])
   return <div className="patrol-map" aria-label={onPoint ? 'Patrol configuration map' : 'Read-only patrol schedule map'}>
     {hasMapTilerWebApiKey ? <><div className="patrol-map__canvas" ref={container} />{!loaded && !mapError && <div className="patrol-map__empty" role="status">Loading patrol map…</div>}{mapError && <p className="patrol-map__error patrol-notice is-warning" role="status">{mapError}</p>}</> : <div className="patrol-map__empty" role="status">Map configuration is unavailable. Add the MapTiler web key to display the map.</div>}
     {children}
+    {areaPaths.length > 0 && <div className="patrol-map__directions" role="status">{directions.loading ? 'Loading suggested path…' : suggestedFeatures.length === areaPaths.length ? `Suggested ${areaTravelMode === 'walk' ? 'walking' : areaTravelMode === 'motorcycle' ? 'motorcycle (driving profile)' : 'driving'} path · follows area order` : 'Suggested path unavailable. Dashed lines show order only.'}{!directions.loading && suggestedFeatures.length !== areaPaths.length && <button type="button" onClick={directions.retry}>Retry</button>}</div>}
     <div className="patrol-map__legend"><span>● Coverage / saved path</span><span>┄ Assignment sequence</span></div>
   </div>
 }

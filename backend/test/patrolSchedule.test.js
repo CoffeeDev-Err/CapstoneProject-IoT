@@ -8,6 +8,21 @@ const mall = { label: 'Mall', durationMinutes: 120, coverageType: 'custom', lati
 const park = { ...mall, label: 'Park', latitude: 17.431 }
 const duty = { deploymentType: 'area', shiftStart: start, shiftEnd: end, status: 'active', scheduleBlocks: [mall, park] }
 
+it('validates and retains area travel modes without changing area coverage or requiring a vehicle crew', () => {
+	const { serializeDeployment, deploymentSignature } = require('../src/services/operations/domain')
+	for (const areaTravelMode of ['walk', 'car', 'motorcycle']) {
+		const normalized = normalizePatrolSchedule({ ...duty, areaTravelMode })
+		assert.equal(normalized.areaTravelMode, areaTravelMode)
+		assert.equal(normalized.patrolMode, '')
+		assert.equal(normalized.vehicleId, '')
+		assert.deepEqual(normalized.scheduleBlocks, normalizePatrolSchedule(duty).scheduleBlocks)
+		assert.equal(outsideCoverage(normalized.scheduleBlocks[0], [121.765, 17.4305], 10), false)
+		assert.equal(serializeDeployment({ ...normalized, shiftStart: new Date(start), shiftEnd: new Date(end) }).areaTravelMode, areaTravelMode)
+	}
+	assert.notEqual(deploymentSignature({ ...duty, areaTravelMode: 'walk' }), deploymentSignature({ ...duty, areaTravelMode: 'car' }))
+	assert.throws(() => normalizePatrolSchedule({ ...duty, areaTravelMode: 'aircraft' }), /travel between areas/)
+})
+
 it('keeps two-hour areas under one duty and switches at the exact boundary', () => {
 	const normalized = { ...duty, ...normalizePatrolSchedule(duty) }
 	assert.equal(normalized.scheduleBlocks[1].offsetMinutes, 120)

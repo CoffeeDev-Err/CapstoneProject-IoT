@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DeploymentList from './DeploymentList'
 import { DEPLOYMENT_LIST_VIEWS } from './deploymentForm'
+import { getDeploymentHistoryGroup } from '../../services/operations'
+vi.mock('../../services/operations', () => ({ getDeploymentHistoryGroup: vi.fn() }))
 vi.mock('./PatrolMap', () => ({ default: ({ onPoint }) => <div data-testid="view-map">{onPoint ? 'Editable' : 'Read-only map'}</div> }))
 afterEach(cleanup)
 
@@ -44,6 +46,27 @@ const renderList = (props = {}) => render(
 )
 
 describe('DeploymentList instructions', () => {
+  it('loads the full archive group when its members span multiple history pages', async () => {
+    vi.mocked(getDeploymentHistoryGroup).mockResolvedValue([{ ...assignment, status: 'completed' }, { ...assignment, id: 'DEP-002', personnelName: 'Officer Two', status: 'completed' }])
+    renderList({ activeDeploymentView: 'history', filteredGroupedAssignments: [{ groupId: 'GROUP-001', patrolArea: assignment.patrolArea, assignments: [{ ...assignment, status: 'completed' }] }] })
+    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0])
+    const dialog = await screen.findByRole('dialog', { name: 'Barangay Centro' })
+    expect(within(dialog).getByText('Officer Two')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Reassign/ })).toBeNull()
+    expect(getDeploymentHistoryGroup).toHaveBeenCalledWith('GROUP-001')
+  })
+  it('numbers history records across pages without counting group headings and delegates page changes', () => {
+    const onPage = vi.fn(), onLimit = vi.fn()
+    renderList({ activeDeploymentView: 'history', historyCount: 106, historyPagination: { page: 2, limit: 10, total: 106 }, onHistoryPageChange: onPage, onHistoryLimitChange: onLimit })
+    expect(screen.getByText('11', { selector: 'td' })).toBeInTheDocument()
+    expect(screen.getByText('11–20 of 106 history records')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'History records page 2' }))
+    expect(onPage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'History records next page' }))
+    expect(onPage).toHaveBeenCalledWith(3)
+    fireEvent.change(screen.getByLabelText('History records per page'), { target: { value: '25' } })
+    expect(onLimit).toHaveBeenCalledWith(25)
+  })
   it('shows the selected view empty state even when history has existing assignments', () => {
     renderList({ assignments: [], visibleAssignments: [], filteredGroupedAssignments: [], deploymentViewCounts: { active: 0, scheduled: 0 }, historyCount: 98 })
     expect(screen.getByText('No deployments are scheduled for later.')).toBeInTheDocument()

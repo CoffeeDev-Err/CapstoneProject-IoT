@@ -66,6 +66,7 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .patrol-area-numbers button { min-width:38px; flex-shrink:0; }
 .patrol-add-barangay { padding:0 14px 10px; background:var(--patrol-surface); }
 .patrol-map:has(.patrol-area-numbers) .patrol-map__error { top:76px; }
+.patrol-map__directions { position:absolute; left:10px; right:10px; bottom:34px; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border:1px solid var(--patrol-border); border-radius:8px; background:var(--patrol-surface); color:var(--patrol-text); font-size:var(--font-size-xs); box-shadow:0 2px 7px #0002; }
 .patrol-map-search { padding:14px; position:relative; background:var(--patrol-surface); z-index:2; }
 .patrol-map-search > label { display:block; margin-bottom:7px; }
 .patrol-map-search__control { display:flex; gap:9px; align-items:center; border:1px solid var(--patrol-border); background:var(--patrol-input); border-radius:9px; padding:4px 4px 4px 11px; }
@@ -137,9 +138,10 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .patrol-theme .patrol-route-points__actions button { padding:3px; min-height:24px; }
 .patrol-personnel { display:grid; gap:10px; }
 .patrol-personnel__search { position:relative; }
+.patrol-personnel__toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(130px,.6fr); gap:10px; align-items:center; }
 .patrol-personnel__search > svg { position:absolute; top:12px; left:11px; color:var(--patrol-secondary); }
 .patrol-theme .patrol-personnel__search input[type=search] { padding-left:35px; }
-.patrol-personnel__chips { display:flex; flex-wrap:wrap; gap:7px; }
+.patrol-personnel__chips { display:flex; flex-wrap:wrap; gap:7px; max-height:100px; overflow-y:auto; }
 .patrol-personnel__chips > span { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:4px 6px 4px 10px; background:var(--patrol-accent-soft); color:var(--patrol-accent-text); font-size:var(--font-size-xs); }
 .patrol-theme .patrol-personnel__chips button { background:transparent; padding:3px; min-height:24px; border:0; color:inherit; }
 .patrol-personnel__list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; max-height:270px; overflow-y:auto; padding:3px; }
@@ -198,17 +200,21 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .deployment-page .patrol-list-tabs .deployment-view-tab:not([aria-selected=true]):is(:hover,:focus-visible) { color:var(--patrol-tab-hover-text); border-color:var(--patrol-secondary); background:var(--patrol-muted); }
 .deployment-page .patrol-list-tabs .deployment-view-count { flex-shrink:0; }
 .deployment-page .patrol-list-tabs .deployment-view-tab[aria-selected=true] { background:transparent; color:var(--patrol-tab-text); border:1px solid transparent; box-shadow:none; }
-.deployment-page .deployment-list-card button.assignment-edit-btn { color:var(--patrol-text); background:var(--patrol-surface); border-color:var(--patrol-border); }
-.deployment-page .deployment-list-card button.assignment-edit-btn:hover { color:var(--patrol-text); background:var(--patrol-muted); border-color:var(--patrol-secondary); }
+.deployment-page .deployment-list-card button.assignment-edit-btn { color:var(--patrol-accent-text); background:var(--app-action-tint); border-color:var(--app-accent-border); transition:background-color 180ms ease,border-color 180ms ease,color 180ms ease; }
+.deployment-page .deployment-list-card button.assignment-edit-btn:is(:hover,:focus-visible) { color:var(--patrol-tab-hover-text); background:var(--app-action-tint-hover); border-color:var(--app-accent-border-hover); }
+.deployment-page .deployment-list-card button.assignment-edit-btn:focus-visible { outline:2px solid var(--patrol-focus); outline-offset:2px; }
 /* Legacy page controls and Bootstrap tables consume the same local palette. */
 .deployment-page .page-title { color:var(--patrol-text); }
 .deployment-page .page-subtitle { color:var(--patrol-secondary); }
 .deployment-page .assignment-page-link { background:var(--patrol-action); border-color:var(--patrol-action); color:#fff; }
 .deployment-page .assignment-page-link:hover { background:var(--patrol-action-hover); border-color:var(--patrol-action-hover); color:#fff; }
 .deployment-page .assignment-page-link:focus-visible { outline:3px solid var(--patrol-focus); outline-offset:3px; }
-.deployment-page .deployment-list-card .assignment-list-table { --bs-table-bg:transparent; --bs-table-color:var(--patrol-text); --bs-table-border-color:var(--patrol-border); --bs-table-hover-bg:var(--patrol-muted); }
+:root .deployment-page .deployment-list-card table.assignment-list-table { --bs-table-bg:transparent; --bs-table-color:var(--patrol-text); --bs-table-border-color:var(--patrol-border); --bs-table-hover-bg:color-mix(in srgb,var(--patrol-accent) 6%,var(--patrol-surface)); }
 .deployment-page .assignment-list-table :is(th,.assignment-group-cell,.assignment-group-actions-cell) { background:var(--patrol-muted); border-color:var(--patrol-border); }
-.deployment-page .assignment-list-table .personnel-row:hover { background:var(--patrol-muted); }
+.deployment-page .assignment-list-table tbody td { transition:background-color 180ms ease; }
+.deployment-page .assignment-list-table .personnel-row:is(:hover,:focus-within) { background:transparent; }
+.deployment-page .assignment-list-table .personnel-row:not(.deployment-row--highlighted):is(:hover,:focus-within) td { background:var(--bs-table-hover-bg); }
+.deployment-page .assignment-list-table .assignment-group-row:is(:hover,:focus-within) td { background:color-mix(in srgb,var(--patrol-accent) 6%,var(--patrol-muted)); }
 .deployment-page .assignment-list-table .deployment-row--highlighted td { background:var(--patrol-accent-soft); box-shadow:inset 0 1px var(--patrol-accent),inset 0 -1px var(--patrol-accent); }
 .deployment-page .assignment-list-table .deployment-row--highlighted td:first-child { box-shadow:inset 3px 0 var(--patrol-accent),inset 0 1px var(--patrol-accent),inset 0 -1px var(--patrol-accent); }
 .deployment-page .assignment-list-table :is(.assignment-group-label,.assignment-personnel-name,.personnel-badge) { color:var(--patrol-text); }
@@ -254,6 +260,7 @@ body:has(.deployment-page) .confirm-modal .confirm-btn--primary:hover { backgrou
   .deployment-page .assignment-list-table .assignment-instructions-cell { width:auto; text-align:left; }
 }
 @media (max-width:600px) {
+  .patrol-personnel__toolbar { grid-template-columns:1fr; }
   .patrol-planner__header { align-items:flex-start; flex-direction:column; gap:10px; }
   .patrol-style-selector,.patrol-two-columns,.patrol-workspace__fields,.patrol-personnel__list { grid-template-columns:1fr; }
   .patrol-panel { padding:13px; }
@@ -273,3 +280,7 @@ body:has(.deployment-page) .confirm-modal .confirm-btn--primary:hover { backgrou
   .patrol-planner__footer > div { flex-wrap:wrap; }
 }
 @media (prefers-reduced-motion:reduce) { .patrol-theme * { transition:none !important; animation:none !important; } }
+@media (prefers-reduced-motion:reduce) {
+  .deployment-page .deployment-list-card button.assignment-edit-btn,
+  .deployment-page .assignment-list-table tbody td { transition:none; }
+}

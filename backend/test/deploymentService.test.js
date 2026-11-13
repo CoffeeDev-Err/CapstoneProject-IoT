@@ -105,6 +105,29 @@ const createService = ({ Deployment, Personnel, published = [], audits = [] }) =
 	clock: () => new Date(),
 })
 
+it('paginates completed and cancelled history together with stable ordering and officer-scoped search totals', async () => {
+	const filters = [], counts = [], calls = {}
+	const Deployment = {
+		find: filter => {
+			filters.push(filter)
+			const query = { sort: value => { calls.sort = value; return query }, skip: value => { calls.skip = value; return query }, limit: value => { calls.limit = value; return query }, lean: async () => [] }
+			return query
+		},
+		countDocuments: async filter => { counts.push(filter); return filter.$and ? 23 : 106 },
+	}
+	const service = createService({ Deployment })
+	const result = await service.listDeployments({ view: 'history', page: 2, limit: 10, search: 'Market', group_id: 'GROUP-001' }, { role: 'officer', personnelId: 'PNP-001' })
+	assert.deepEqual(filters[0].status, { $in: ['completed', 'cancelled'] })
+	assert.equal(filters[0].personnelId, 'PNP-001')
+	assert.equal(filters[0].groupId, 'GROUP-001')
+	assert.deepEqual(calls.sort, { assignedAt: -1, _id: -1 })
+	assert.equal(calls.skip, 10); assert.equal(calls.limit, 10)
+	assert.equal(result.pagination.total, 23); assert.equal(result.pagination.totalPages, 3)
+	assert.equal(result.historyTotal, 106)
+	assert.equal(counts[1].personnelId, 'PNP-001')
+	assert.equal(counts[1].$and, undefined)
+})
+
 it('identifies a conflicting scheduled shift without cancelling or saving either deployment', async () => {
 	let writes = 0
 	const service = createService({

@@ -1,8 +1,10 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { Eye, FileText } from 'lucide-react'
 import { TableSkeletonRows } from '../../components/LoadingSkeleton'
 import DeploymentInstructionsModal from './DeploymentInstructionsModal'
 import PatrolScheduleDialog from './PatrolScheduleDialog'
+import PaginationControls from '../../components/PaginationControls'
+import { getDeploymentHistoryGroup } from '../../services/operations'
 import '../../styles/patrol-planner.css'
 import {
   DEPLOYMENT_LIST_VIEWS,
@@ -16,6 +18,9 @@ function DeploymentList({
   deploymentSearch,
   deploymentViewCounts,
   historyCount = 0,
+  historyPagination,
+  onHistoryPageChange,
+  onHistoryLimitChange,
   historyError = false,
   onRetryHistory,
   filteredGroupedAssignments,
@@ -31,8 +36,22 @@ function DeploymentList({
 }) {
   const [instructionsAssignment, setInstructionsAssignment] = useState(null)
   const [viewing, setViewing] = useState(null)
+  const [loadingGroup, setLoadingGroup] = useState(null)
+  const [groupError, setGroupError] = useState('')
+  const groupRequest = useRef(0)
+  const changeView = next => { groupRequest.current += 1; setLoadingGroup(null); setGroupError(''); setViewing(null); onViewChange(next) }
   const actionLabel = assignment => assignment.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'
   const canAct = assignment => ['scheduled', 'active'].includes(assignment.status)
+  const rowNumbers = new Map(filteredGroupedAssignments.flatMap(group => group.assignments).map((assignment, index) => [assignment.id, ((historyPagination?.page || 1) - 1) * (historyPagination?.limit || 10) + index + 1]))
+  const viewGroup = async (group, assignment = group.assignments[0]) => {
+    if (activeDeploymentView !== 'history') { setViewing({ assignment, group: group.assignments, groupId: group.groupId }); return }
+    if (loadingGroup) return
+    const request = ++groupRequest.current
+    setLoadingGroup(group.groupId); setGroupError('')
+    try { const rows = await getDeploymentHistoryGroup(group.groupId); if (request === groupRequest.current) setViewing({ assignment, group: rows.length ? rows : group.assignments, groupId: group.groupId }) }
+    catch (error) { if (request === groupRequest.current) setGroupError(error.message) }
+    finally { if (request === groupRequest.current) setLoadingGroup(null) }
+  }
 
   return (
     <>
@@ -43,7 +62,7 @@ function DeploymentList({
             type="search"
             className="settings-input assignment-list-search"
             value={deploymentSearch}
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={(event) => { groupRequest.current += 1; setLoadingGroup(null); setGroupError(''); onSearchChange(event.target.value) }}
             aria-label="Search deployments" placeholder="Search Deployment Information"
           />
         </div>
@@ -70,7 +89,7 @@ function DeploymentList({
             aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW}
             aria-controls="deployment-list-panel"
             className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW ? ' deployment-view-tab--active' : ''}`}
-            onClick={() => onViewChange(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)}
+            onClick={() => changeView(DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW)}
           >
             Active Now
             <span className="deployment-view-count">{deploymentViewCounts.active}</span>
@@ -83,20 +102,21 @@ function DeploymentList({
             aria-selected={activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER}
             aria-controls="deployment-list-panel"
             className={`deployment-view-tab${activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? ' deployment-view-tab--active' : ''}`}
-            onClick={() => onViewChange(DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER)}
+            onClick={() => changeView(DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER)}
           >
             Scheduled Later
             <span className="deployment-view-count">{deploymentViewCounts.scheduled}</span>
           </button>
-          <button type="button" role="tab" id="deployment-history-tab" tabIndex={activeDeploymentView === 'history' ? 0 : -1} aria-selected={activeDeploymentView === 'history'} aria-controls="deployment-list-panel" className={`deployment-view-tab${activeDeploymentView === 'history' ? ' deployment-view-tab--active' : ''}`} onClick={() => onViewChange('history')}>History <span className="deployment-view-count">{historyCount}</span></button>
+          <button type="button" role="tab" id="deployment-history-tab" tabIndex={activeDeploymentView === 'history' ? 0 : -1} aria-selected={activeDeploymentView === 'history'} aria-controls="deployment-list-panel" className={`deployment-view-tab${activeDeploymentView === 'history' ? ' deployment-view-tab--active' : ''}`} onClick={() => changeView('history')}>History <span className="deployment-view-count">{historyCount}</span></button>
         </div>
 
         <div id="deployment-list-panel" role="tabpanel" aria-labelledby={activeDeploymentView === 'history' ? 'deployment-history-tab' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? 'deployment-scheduled-tab' : 'deployment-active-tab'} className="deployment-list-panel">
+          {groupError && <p role="alert" className="patrol-notice is-error">{groupError}</p>}
           {historyError ? <div className="patrol-notice is-error" role="alert">Deployment history could not be loaded. <button type="button" onClick={onRetryHistory}>Retry history</button></div> : isDeploymentsLoading ? (
             <table className="personnel-table assignment-list-table table align-middle mb-0" aria-busy="true">
               <thead>
                 <tr className="assignment-group-table">
-                  <th>Assignment ID</th>
+                  {activeDeploymentView === 'history' && <th scope="col">#</th>}<th>Assignment ID</th>
                   <th>Personnel</th>
                   <th>Patrol Area</th>
                   <th>Instructions</th>
@@ -108,12 +128,12 @@ function DeploymentList({
                 </tr>
               </thead>
               <tbody>
-                <TableSkeletonRows columns={9} rows={5} label="Loading deployments" />
+                <TableSkeletonRows columns={activeDeploymentView === 'history' ? 10 : 9} rows={5} label="Loading deployments" />
               </tbody>
             </table>
           ) : assignments.length === 0 || visibleAssignments.length === 0 ? (
             <p className="text-body-secondary mb-0 small">
-              {activeDeploymentView === 'history' ? 'No completed or cancelled deployments.' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+              {activeDeploymentView === 'history' ? deploymentSearch.trim() ? 'No history records matched your search.' : 'No completed or cancelled deployments.' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
                 ? 'No deployments are scheduled for later.'
                 : 'No deployments are active now.'}
             </p>
@@ -125,7 +145,7 @@ function DeploymentList({
             <table className="personnel-table assignment-list-table table align-middle mb-0">
             <thead>
               <tr className="assignment-group-table">
-                <th>Assignment ID</th>
+                {activeDeploymentView === 'history' && <th scope="col">#</th>}<th>Assignment ID</th>
                 <th>Personnel</th>
                 <th>Patrol Area</th>
                 <th>Instructions</th>
@@ -140,17 +160,17 @@ function DeploymentList({
               {filteredGroupedAssignments.map((group) => (
                 <Fragment key={group.groupId}>
                   <tr className="assignment-group-row">
-                    <td colSpan={8} className="assignment-group-cell">
+                    <td colSpan={activeDeploymentView === 'history' ? 9 : 8} className="assignment-group-cell">
                       <div className="assignment-group-content">
                         <strong className="assignment-group-label">{group.patrolArea}</strong>
                         <small className="assignment-group-meta">
-                          {group.assignments.length} personnel assigned in this deployment group
+                          {group.assignments.length} personnel {activeDeploymentView === 'history' ? 'shown in this group on this page' : 'assigned in this deployment group'}
                         </small>
                       </div>
                     </td>
                     <td className="assignment-group-actions-cell">
                       <div className="assignment-group-actions assignment-group-menu">
-                        <button type="button" className="assignment-edit-btn" onClick={() => setViewing({ assignment: group.assignments[0], group: group.assignments, groupId: group.groupId })}><Eye size={15} /> View</button>
+                        <button type="button" className="assignment-edit-btn" disabled={loadingGroup === group.groupId} onClick={() => { void viewGroup(group) }}><Eye size={15} />{loadingGroup === group.groupId ? 'Loading…' : 'View'}</button>
                         {group.assignments.some(canAct) && <button type="button" className="assignment-delete-btn" onClick={() => onDeleteGroup(group)}>{actionLabel(group.assignments[0])}</button>}
                       </div>
                     </td>
@@ -162,6 +182,7 @@ function DeploymentList({
                       data-deployment-id={assignment.id}
                       className={`personnel-row${assignment.id === highlightedDeploymentId ? ' deployment-row--highlighted' : ''}`}
                     >
+                      {activeDeploymentView === 'history' && <td data-label="#">{rowNumbers.get(assignment.id)}</td>}
                       <td data-label="Assignment ID" className="personnel-badge">{assignment.id}</td>
                       <td data-label="Personnel">
                         <strong className="d-block assignment-personnel-name">{assignment.personnelName}</strong>
@@ -210,7 +231,7 @@ function DeploymentList({
                       <td data-label="Assigned At">{formatDateTime(assignment.assignedAt)}</td>
                       <td data-label="Actions" className="assignment-actions-cell">
                         <div className="assignment-table-actions">
-                          <button type="button" className="assignment-edit-btn" onClick={() => setViewing({ assignment, group: group.assignments, groupId: assignment.vehicleId ? group.groupId : null })}><Eye size={15} /> View</button>
+                          <button type="button" className="assignment-edit-btn" onClick={() => { if (assignment.vehicleId && activeDeploymentView === 'history') { void viewGroup(group, assignment) } else setViewing({ assignment, group: group.assignments, groupId: assignment.vehicleId ? group.groupId : null }) }}><Eye size={15} /> View</button>
                           {canAct(assignment) && <button type="button" className="assignment-delete-btn" onClick={() => assignment.vehicleId ? onDeleteGroup(group) : onDeleteAssignment(assignment)}>{actionLabel(assignment)}</button>}
                         </div>
                       </td>
@@ -222,6 +243,7 @@ function DeploymentList({
             </table>
           )}
         </div>
+        {activeDeploymentView === 'history' && historyPagination && !historyError && <PaginationControls label="History records" page={historyPagination.page} limit={historyPagination.limit} total={historyPagination.total} disabled={isDeploymentsLoading || Boolean(loadingGroup)} onPageChange={onHistoryPageChange} onLimitChange={onHistoryLimitChange} />}
       </div>
       {viewing && <PatrolScheduleDialog assignment={viewing.assignment} group={viewing.group} onClose={() => setViewing(null)} onReassign={() => { const selected = viewing; setViewing(null); if (selected.groupId) onEditGroup(selected.groupId); else onEditAssignment(selected.assignment) }} />}
       <DeploymentInstructionsModal

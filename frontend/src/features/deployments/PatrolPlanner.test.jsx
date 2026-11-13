@@ -187,6 +187,73 @@ it('allows three two-hour areas when the duty spans six hours', async () => {
   await waitFor(() => expect(apiRequest).toHaveBeenCalled())
 })
 
+it('selects three route blocks for six hours and saves all their ordered points once', async () => {
+  const { onSave } = setup(); duty('2026-11-13T14:00')
+  fireEvent.click(screen.getByRole('button', { name: 'Route Patrol' }))
+  expect(screen.queryByRole('button', { name: 'Add next route' })).toBeNull()
+  expect(screen.getAllByRole('button', { name: /Go to route/ })).toHaveLength(3)
+  for (let i = 1; i <= 3; i++) {
+    fireEvent.click(screen.getByRole('button', { name: `Go to route ${i}: Route ${i}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+    if (i < 3) expect(screen.getByRole('button', { name: 'Save routes' })).toBeDisabled()
+  }
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save routes' })).toBeEnabled())
+  review(); expect(screen.getByRole('alert')).toHaveTextContent('Save all selected routes')
+  fireEvent.click(screen.getByRole('button', { name: 'Save routes' }))
+  fireEvent.click(screen.getByLabelText('Officer One')); review()
+  fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+  expect(onSave.mock.calls[0][0][0].scheduleBlocks.map(block => [block.offsetMinutes, block.durationMinutes, block.routePoints.length])).toEqual([[0, 120, 2], [120, 120, 2], [240, 120, 2]])
+}, 15000)
+
+it('offers the full six-hour duty for a single route and retains its points after duty changes', async () => {
+  setup(); duty('2026-11-13T14:00')
+  fireEvent.click(screen.getByRole('button', { name: 'Route Patrol' }))
+  fireEvent.change(screen.getByLabelText('Duration'), { target: { value: 'remaining' } })
+  expect(screen.getByText('360 minutes selected')).toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: /Go to route/ })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+  duty('2026-11-13T16:00')
+  expect(screen.getAllByRole('button', { name: /Go to route/ })).toHaveLength(2)
+  expect(screen.getByRole('button', { name: 'Remove route point 2' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save routes' })).toBeDisabled()
+  await waitFor(() => expect(apiRequest).toHaveBeenCalled())
+})
+
+it('keeps the other routes when deleting or reordering and never discards configured points when shortening duty', async () => {
+  setup(); duty('2026-11-13T14:00'); fireEvent.click(screen.getByRole('button', { name: 'Route Patrol' }))
+  for (let i = 1; i <= 3; i++) {
+    fireEvent.click(screen.getByRole('button', { name: `Go to route ${i}: Route ${i}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+    fireEvent.change(screen.getByLabelText('Route name'), { target: { value: ['First', 'Second', 'Third'][i - 1] } })
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Go to route 2: Second' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete block 2' }))
+  expect(screen.queryByRole('button', { name: /Go to route.*Second/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Go to route 2: Third' }))
+  expect(screen.getByRole('button', { name: 'Remove route point 2' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Move block 2 up' }))
+  expect(screen.getByRole('button', { name: 'Go to route 1: Third' })).toHaveAttribute('aria-pressed', 'true')
+  duty()
+  expect(screen.getByRole('button', { name: 'Go to route 1: Third' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Go to route 2: First' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save routes' })).toBeDisabled()
+  await waitFor(() => expect(apiRequest).toHaveBeenCalled())
+}, 15000)
+
+it('retains the area travel mode in review and the deployment payload', async () => {
+  const { onSave } = setup(); duty(); addArea('Market')
+  fireEvent.change(screen.getByLabelText('Travel between areas'), { target: { value: 'motorcycle' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save areas' }))
+  fireEvent.click(screen.getByLabelText('Officer One')); review()
+  fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+  expect(onSave.mock.calls[0][0][0]).toMatchObject({ deploymentType: 'area', patrolMode: '', areaTravelMode: 'motorcycle', vehicleId: '' })
+})
+
 it('preserves a previously saved mixed schedule during editing', async () => {
   const existing = { ...initial, shiftEnd: '2026-11-13T04:00:00Z', scheduleBlocks: [area, { label: 'Barangay Ugad', coverageType: 'barangay', barangay: 'Ugad', durationMinutes: 120, offsetMinutes: 120 }] }
   setup({ assignments: [existing], initialGroup: [existing] })
@@ -216,11 +283,11 @@ it('saves an area only after review and clears the draft while retaining the sav
 it('edits a foot route and preserves its existing identity and adjustable corridor', async () => {
   const route = { ...initial, deploymentType: 'route', patrolMode: 'walk', scheduleBlocks: [{ ...area, coverageType: 'route', routePoints: [{ latitude: 17.4305, longitude: 121.765 }, { latitude: 17.431, longitude: 121.766 }] }] }
   const { onSave } = setup({ assignments: [route], initialGroup: [route] })
-  fireEvent.click(screen.getByRole('button', { name: 'Edit route' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Go to route 1: Market' }))
   expect(screen.getByLabelText('Route name')).toHaveValue('Market')
   fireEvent.change(screen.getByLabelText('Allowed distance from route (meters, each side)'), { target: { value: '175' } })
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Save route' })).toBeEnabled())
-  fireEvent.click(screen.getByRole('button', { name: 'Save route' })); review()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save routes' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: 'Save routes' })); review()
   fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
   expect(onSave.mock.calls[0][0][0]).toMatchObject({ id: 'DEP-1', groupId: 'GRP-1', scheduleBlocks: [{ routeCorridorMeters: 175 }] })
@@ -288,10 +355,10 @@ it('builds and clears a foot route while retaining saved points in their new ord
   fireEvent.change(screen.getByLabelText('Route name'), { target: { value: 'Market walkway' } })
   fireEvent.click(screen.getByRole('button', { name: 'Select map point' })); fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
   fireEvent.click(screen.getByRole('button', { name: 'Move route point 2 up' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Save route' })).toBeEnabled())
-  fireEvent.click(screen.getByRole('button', { name: 'Save route' }))
-  expect(screen.getByLabelText('Route name')).toHaveValue('')
-  expect(screen.queryByRole('button', { name: 'Remove route point 1' })).toBeNull()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save routes' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: 'Save routes' }))
+  expect(screen.getByLabelText('Route name')).toHaveValue('Market walkway')
+  expect(screen.getByRole('button', { name: 'Remove route point 1' })).toBeInTheDocument()
   fireEvent.click(screen.getByLabelText('Officer One')); review(); fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
   await waitFor(() => expect(onSave).toHaveBeenCalled())
   expect(onSave.mock.calls[0][0][0].scheduleBlocks[0].routePoints[0].latitude).toBeCloseTo(17.4307)
