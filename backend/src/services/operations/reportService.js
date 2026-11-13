@@ -413,7 +413,7 @@ const createReportService = ({
 		const [deploymentAtIncident, currentLocation] = await Promise.all([
 			Deployment.findOne({
 				personnelId: officer.id,
-				status: { $in: ['active', 'completed'] },
+				$or: [{ status: { $in: ['active', 'completed'] } }, { status: 'ended_early', endedAt: { $gt: occurredAt } }],
 				$and: activeShiftConditions(occurredAt),
 			}).select([
 				'patrolAreaId', 'patrolArea', 'deploymentType', 'coverageBarangayCodes',

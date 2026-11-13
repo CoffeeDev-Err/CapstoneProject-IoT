@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import PatrolPlanner from './PatrolPlanner'
 import { apiRequest } from '../../services/apiClient'
@@ -10,11 +10,57 @@ const vehicles = [{ id: 'car-1', name: 'Car 1', mode: 'car' }, { id: 'car-2', na
 const area = { label: 'Market', durationMinutes: 120, offsetMinutes: 0, coverageType: 'custom', latitude: 17.4305, longitude: 121.765, radiusMeters: 200 }
 const initial = { id: 'DEP-1', groupId: 'GRP-1', personnelId: 'PNP-1', personnelName: 'Officer One', deploymentType: 'area', shiftStart: '2026-11-13T00:00:00Z', shiftEnd: '2026-11-13T02:00:00Z', scheduleBlocks: [area] }
 beforeEach(() => { vi.mocked(apiRequest).mockImplementation(async path => path === '/api/patrol/fleet' ? { vehicles, weeks: [] } : { available: false }) })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.clearAllMocks() })
 const setup = (props = {}) => { const onSave = vi.fn().mockResolvedValue(true); const onCancel = vi.fn(); render(<PatrolPlanner personnel={personnel} assignments={[]} ready onSave={onSave} onCancel={onCancel} {...props} />); return { onSave, onCancel } }
-const duty = (end = '2026-11-13T10:00') => { fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-11-13T08:00' } }); fireEvent.change(screen.getByLabelText('End'), { target: { value: end } }) }
+const pickTime = (label, value) => {
+  const [date, time] = value.split('T'), [year, month, day] = date.split('-').map(Number), [hour, minute] = time.split(':').map(Number)
+  fireEvent.click(screen.getByRole('button', { name: label, exact: true }))
+  const dialog = screen.getByRole('dialog', { name: label, exact: true })
+  const dateLabel = new Intl.DateTimeFormat('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(year, month - 1, day))
+  fireEvent.click(within(dialog).getByRole('button', { name: `Choose ${dateLabel}` }))
+  fireEvent.change(within(dialog).getByLabelText(`${label} hour`), { target: { value: String(hour % 12 || 12) } })
+  fireEvent.change(within(dialog).getByLabelText(`${label} minute`), { target: { value: String(minute) } })
+  fireEvent.change(within(dialog).getByLabelText(`${label} period`), { target: { value: hour >= 12 ? 'PM' : 'AM' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+}
+const duty = (end = '2026-11-13T10:00') => { pickTime('Start', '2026-11-13T08:00'); pickTime('End', end) }
 const addArea = label => { fireEvent.click(screen.getByRole('button', { name: 'Select map point' })); fireEvent.change(screen.getByLabelText('Area name'), { target: { value: label } }) }
 const review = () => fireEvent.click(screen.getByRole('button', { name: 'Review patrol schedule' }))
+
+it('follows minute changes in Start Now, preserves duration and areas, and freezes Schedule for Later', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-11-13T08:56:40Z'))
+  setup()
+  await act(async () => {})
+  addArea('Market')
+  expect(screen.getByRole('button', { name: 'Start', exact: true })).toHaveTextContent('4:56 PM')
+  expect(screen.getByRole('button', { name: 'End', exact: true })).toHaveTextContent('14/11/2026 12:56 AM')
+  await act(async () => { vi.advanceTimersByTime(20_000) })
+  expect(screen.getByRole('button', { name: 'Start', exact: true })).toHaveTextContent('4:57 PM')
+  expect(screen.getByRole('button', { name: 'End', exact: true })).toHaveTextContent('14/11/2026 12:57 AM')
+  expect(screen.getByRole('button', { name: 'Go to area 1: Market' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('radio', { name: /Schedule for Later/ }))
+  const start = screen.getByRole('button', { name: 'Start', exact: true }).textContent
+  const end = screen.getByRole('button', { name: 'End', exact: true }).textContent
+  await act(async () => { vi.advanceTimersByTime(60_000) })
+  expect(screen.getByRole('button', { name: 'Start', exact: true })).toHaveTextContent(start)
+  expect(screen.getByRole('button', { name: 'End', exact: true })).toHaveTextContent(end)
+})
+
+it('schedules a future duty explicitly while preserving selected areas and their durations', async () => {
+  const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-13T00:00:00Z'))
+  try {
+    const { onSave } = setup(); duty('2026-11-13T12:00'); addArea('Market'); addArea('Park')
+    fireEvent.click(screen.getByRole('button', { name: 'Save areas' }))
+    fireEvent.click(screen.getByRole('radio', { name: /Schedule for Later/ }))
+    expect(screen.getAllByRole('button', { name: /Go to area/ })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Start', exact: true })).toHaveTextContent('13/11/2026 9:00 AM')
+    fireEvent.click(screen.getByLabelText('Officer One')); review()
+    fireEvent.click(screen.getByRole('button', { name: 'Save scheduled deployment' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(onSave.mock.calls[0][0][0]).toMatchObject({ status: 'scheduled', shiftStart: '2026-11-13T01:00:00.000Z', shiftEnd: '2026-11-13T05:00:00.000Z' })
+  } finally { now.mockRestore() }
+}, 15000)
 
 it('selects two areas without per-area saves, then saves the complete schedule once', async () => {
   const { onSave } = setup(); duty('2026-11-13T12:00')
@@ -71,7 +117,7 @@ it('keeps selected areas when correcting overlong duty hours and validates radiu
   fireEvent.change(screen.getByLabelText('Coverage radius (meters)'), { target: { value: '250' } })
   expect(screen.getByRole('button', { name: 'Save areas' })).toBeEnabled()
   await waitFor(() => expect(apiRequest).toHaveBeenCalled())
-})
+}, 15000)
 
 it('adds multiple whole barangays automatically and retains boundary fallback safeguards', async () => {
   const { onSave } = setup(); duty('2026-11-13T12:00')
@@ -108,8 +154,8 @@ it('preserves locations when a coverage change is cancelled and prevents acciden
   fireEvent.change(screen.getByLabelText('Coverage type'), { target: { value: 'barangay' } })
   fireEvent.click(screen.getByRole('button', { name: 'Replace selected areas' }))
   expect(screen.queryByRole('button', { name: /Go to area/ })).toBeNull()
-  expect(screen.getByLabelText('Start')).toHaveValue('2026-11-13T08:00')
-  expect(screen.getByLabelText('End')).toHaveValue('2026-11-13T12:00')
+  expect(screen.getByRole('button', { name: 'Start', exact: true })).toHaveTextContent('13/11/2026 8:00 AM')
+  expect(screen.getByRole('button', { name: 'End', exact: true })).toHaveTextContent('13/11/2026 12:00 PM')
   fireEvent.change(screen.getByLabelText('Barangay'), { target: { value: 'Ugad' } })
   expect(screen.queryByRole('button', { name: 'Select map point' })).toBeNull()
   expect(screen.getByTestId('patrol-map-data').textContent).not.toContain('"coverageType":"custom"')
@@ -244,14 +290,14 @@ it('keeps the other routes when deleting or reordering and never discards config
   await waitFor(() => expect(apiRequest).toHaveBeenCalled())
 }, 15000)
 
-it('retains the area travel mode in review and the deployment payload', async () => {
+it('suggests road paths automatically without a travel-mode selector or changing area coverage', async () => {
   const { onSave } = setup(); duty(); addArea('Market')
-  fireEvent.change(screen.getByLabelText('Travel between areas'), { target: { value: 'motorcycle' } })
+  expect(screen.queryByLabelText('Travel between areas')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Save areas' }))
   fireEvent.click(screen.getByLabelText('Officer One')); review()
   fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
-  expect(onSave.mock.calls[0][0][0]).toMatchObject({ deploymentType: 'area', patrolMode: '', areaTravelMode: 'motorcycle', vehicleId: '' })
+  expect(onSave.mock.calls[0][0][0]).toMatchObject({ deploymentType: 'area', patrolMode: '', areaTravelMode: 'car', vehicleId: '' })
 })
 
 it('preserves a previously saved mixed schedule during editing', async () => {

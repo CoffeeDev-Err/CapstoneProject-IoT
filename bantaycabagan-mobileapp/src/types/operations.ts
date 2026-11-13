@@ -154,7 +154,10 @@ export type DeploymentAssignment = {
   assignedAt: string;
   latitude: number | null;
   longitude: number | null;
-  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled' | 'ended_early';
+  endedAt?: string;
+  endedBy?: string;
+  endReason?: 'scheduled_end' | 'supervisor_ended' | 'cancelled_before_start';
   isCurrentShift: boolean;
   acknowledged: boolean;
   acknowledgedAt?: string;

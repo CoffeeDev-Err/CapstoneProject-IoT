@@ -53,7 +53,12 @@ export default function DashboardActivityModal({ kind, onClose }) {
         {result.error && <div role="alert">{result.error}<button className="report-action-btn" onClick={() => setRetry((value) => value + 1)}>Retry</button></div>}
         {!result.loading && !result.error && result.rows.length === 0 && <p>No {isTasks ? 'active backup requests' : 'unresolved incidents'}.</p>}
         {result.rows.map((row) => <article className="activity-record" key={row.id}>
-          <h4>{row.title || row.id}</h4>
+          <div className="activity-record__heading"><h4>{row.title || row.id}</h4>
+            <div className="activity-record__actions">{isTasks ? <>
+              <button className="report-action-btn" onClick={() => open('/map', { taskId: row.id, notificationRequestId: Date.now() })}>View on Map</button>
+              <button className="report-action-btn report-action-btn--primary" onClick={() => open('/map', { taskId: row.id, notificationRequestId: Date.now() })}>Open Request</button>
+            </> : <button className="report-action-btn report-action-btn--primary" onClick={() => open(`/reports?report=${encodeURIComponent(row.id)}`)}>View Report</button>}</div>
+          </div>
           <dl>
             <div><dt>{isTasks ? 'Request ID' : 'Report ID'}</dt><dd>{row.id}</dd></div>
             <div><dt>{isTasks ? 'Requester' : 'Officer'}</dt><dd>{isTasks ? row.requester_name : row.officer}</dd></div>
@@ -63,10 +68,6 @@ export default function DashboardActivityModal({ kind, onClose }) {
             {isTasks ? <div><dt>Responders {(row.responders || []).length}/3</dt><dd>{(row.responders || []).map((r) => [r.rank, r.name].filter(Boolean).join(' ')).join(', ') || 'None yet'}</dd></div>
               : <div><dt>Severity</dt><dd>{row.severity}/5</dd></div>}
           </dl>
-          <div className="activity-record__actions">{isTasks ? <>
-            <button className="report-action-btn" onClick={() => open('/map', { taskId: row.id, notificationRequestId: Date.now() })}>View on Map</button>
-            <button className="report-action-btn report-action-btn--primary" onClick={() => open('/map', { taskId: row.id, notificationRequestId: Date.now() })}>Open Request</button>
-          </> : <button className="report-action-btn report-action-btn--primary" onClick={() => open(`/reports?report=${encodeURIComponent(row.id)}`)}>View Report</button>}</div>
         </article>)}
       </div>
       <footer><button ref={closeRef} className="report-action-btn report-action-btn--danger-outline" onClick={onClose}>Close</button></footer>

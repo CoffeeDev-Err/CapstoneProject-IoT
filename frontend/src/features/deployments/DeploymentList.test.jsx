@@ -83,7 +83,8 @@ describe('DeploymentList instructions', () => {
   it('opens a read-only map and keeps Reassign inside the View dialog', () => {
     renderList()
     expect(screen.queryByRole('button', { name: 'Reassign' })).toBeNull()
-    expect(screen.getAllByRole('button', { name: 'Cancel deployment' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Cancel deployment', exact: true })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Cancel deployment for Officer One' })).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0])
     const dialog = screen.getByRole('dialog', { name: 'Barangay Centro' })
     expect(within(dialog).getByTestId('view-map')).toHaveTextContent('Read-only map')
@@ -98,5 +99,20 @@ describe('DeploymentList instructions', () => {
     expect(screen.getByRole('dialog', { name: 'Instructions' })).toBeInTheDocument()
     expect(screen.getByText('Monitor the eastern checkpoint.')).toBeInTheDocument()
     expect(screen.getByText(/Officer One.*Barangay Centro/)).toBeInTheDocument()
+  })
+  it('keeps the full locked crew and group action when a search matches only one officer', () => {
+    const onDeleteGroup = vi.fn(), onDeleteAssignment = vi.fn()
+    const first = { ...assignment, groupId: 'GROUP-001', personnelId: 'PNP-001', vehicleId: 'car-1', vehicleCrew: { driverId: 'PNP-001' } }
+    const second = { ...first, id: 'DEP-002', personnelId: 'PNP-002', personnelName: 'Officer Two' }
+    renderList({ assignments: [first, second], visibleAssignments: [first, second], deploymentSearch: 'Officer One', onDeleteGroup, onDeleteAssignment, filteredGroupedAssignments: [{ groupId: 'GROUP-001', patrolArea: first.patrolArea, assignments: [first], totalAssignments: 2 }] })
+    expect(screen.getByText(/2 personnel assigned.*1 match your search/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel deployment for Officer One' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel deployment', exact: true }))
+    expect(onDeleteGroup.mock.calls[0][0].assignments).toHaveLength(2)
+    expect(onDeleteAssignment).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'View deployment for Officer One' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Officer Two')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Reassign vehicle group' })).toBeInTheDocument()
   })
 })

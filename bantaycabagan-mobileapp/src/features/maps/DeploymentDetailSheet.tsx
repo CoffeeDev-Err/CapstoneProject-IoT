@@ -20,8 +20,8 @@ const formatShift = (assignment: DeploymentAssignment) => {
   const validStart = start && !Number.isNaN(start.getTime());
   const validEnd = end && !Number.isNaN(end.getTime());
   if (!validStart && !validEnd) return 'Current active shift';
-  const date = validStart ? start.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  const time = (value: Date) => value.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+  const date = validStart ? start.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const time = (value: Date) => value.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' });
   return `${date}${validStart ? ` · ${time(start)}` : ''}${validEnd ? ` – ${time(end)}` : ''}`;
 };
 
@@ -29,7 +29,7 @@ export function DeploymentDetailSheet({
   assignment,
   onClose,
   onViewMap,
-  currentBlock, nextBlock, minutesLeft, guidance, onViewNext,
+  currentBlock, nextBlock, minutesLeft, guidance, onViewNext, onViewBlock, currentIndex = -1,
 }: {
   assignment: DeploymentAssignment;
   onClose: () => void;
@@ -39,6 +39,8 @@ export function DeploymentDetailSheet({
   minutesLeft?: number;
   guidance?: string;
   onViewNext?: () => void;
+  onViewBlock?: (index: number) => void;
+  currentIndex?: number;
 }) {
   const { colors } = useMobileTheme();
   const { height } = useWindowDimensions();
@@ -102,8 +104,8 @@ export function DeploymentDetailSheet({
 
           {nextBlock && <View style={{ gap: 8 }}>
             <Text style={{ color: colors.text }}>{minutesLeft !== undefined && minutesLeft <= 10 ? `Your schedule at ${currentBlock?.label} is ending soon. Prepare to move to ${nextBlock.label}.` : `Next: ${nextBlock.label}`}</Text>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="View next area" onPress={onViewNext} style={[styles.viewMapButton, { backgroundColor: colors.blue }]}>
-              <Icon name="directions" size={19} color="#fff" /><Text style={styles.viewMapText}>View next area</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`View next ${assignment.deploymentType === 'route' ? 'route' : 'area'}`} onPress={onViewNext} style={[styles.viewMapButton, { backgroundColor: colors.blue }]}>
+              <Icon name="directions" size={19} color="#fff" /><Text style={styles.viewMapText}>View next {assignment.deploymentType === 'route' ? 'route' : 'area'}</Text>
             </TouchableOpacity>
             {!!guidance && <Text style={{ color: colors.textMuted }}>{guidance}</Text>}
           </View>}
@@ -111,8 +113,11 @@ export function DeploymentDetailSheet({
             <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showSchedule }} style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setShowSchedule(!showSchedule)}>
               <Text style={{ color: colors.blue }}>{showSchedule ? 'Hide' : 'View'} full duty schedule</Text>
             </TouchableOpacity>
-            {showSchedule && assignment.scheduleBlocks.map((block, index) => <Detail key={index} icon="schedule" label={block.label}
-              value={`${new Date(Date.parse(assignment.shiftStart!) + block.offsetMinutes * 60000).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })} · ${block.durationMinutes} minutes`} />)}
+            {showSchedule && assignment.scheduleBlocks.map((block, index) => <TouchableOpacity key={index} accessibilityRole="button" accessibilityLabel={`Preview my patrol block ${index + 1}: ${block.label}`} onPress={() => onViewBlock?.(index)}
+              style={{ minHeight: 52, padding: 10, borderRadius: 9, borderWidth: 1, borderColor: index === currentIndex ? colors.blue : colors.border, backgroundColor: index === currentIndex ? colors.blueSoft : colors.surface }}>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{index + 1}. {block.label}{index === currentIndex ? ' · Current' : ''}</Text>
+              <Text style={{ color: colors.textMuted, marginTop: 4 }}>{new Date(Date.parse(assignment.shiftStart!) + block.offsetMinutes * 60000).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })} – {new Date(Date.parse(assignment.shiftStart!) + (block.offsetMinutes + block.durationMinutes) * 60000).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })} · {block.durationMinutes} min</Text>
+            </TouchableOpacity>)}
           </>}
 
           <TouchableOpacity

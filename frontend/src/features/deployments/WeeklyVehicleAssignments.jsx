@@ -1,3 +1,4 @@
+import SelectControl from "../../components/SelectControl"
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Car, LockKeyhole, X } from 'lucide-react'
@@ -34,10 +35,10 @@ export default function WeeklyVehicleAssignments({ fleet, personnel, onSaved, on
       <div className="patrol-dialog__body">
         <p>Monday–Sunday, Philippine time. Saving locks the crew and driver for that week. Personnel rotate the following week.</p>
         <div className="patrol-two-columns"><label>Week starting Monday<input type="date" value={weekStart} disabled={saving} onChange={e => { setWeekStart(e.target.value); reset() }} /></label>
-          <label>Vehicle<select aria-label="Vehicle" value={vehicleId} disabled={saving} onChange={e => { setVehicleId(e.target.value); reset() }}><option value="">Choose vehicle</option>{fleet.vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label></div>
+          <label>Vehicle<SelectControl aria-label="Vehicle" value={vehicleId} disabled={saving} onChange={e => { setVehicleId(e.target.value); reset() }}><option value="">Choose vehicle</option>{fleet.vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</SelectControl></label></div>
         {crew ? <div className="patrol-tinted-panel"><span className="patrol-badge is-valid"><LockKeyhole size={14} /> Locked for this week</span><ul className="patrol-crew-summary">{crew.personnelIds.map(id => <li key={id}><strong>{name(id)}</strong><span>{crew.driverId === id ? 'Driver' : 'Crew'}</span></li>)}</ul></div>
           : <><PatrolPersonnelSelect personnel={personnel} ids={ids} disabled={saving} disabledIds={saved?.crews.flatMap(c => c.personnelIds) || []} onChange={next => { setIds(next); if (!next.includes(driverId)) setDriverId('') }} />
-            <label>Driver<select aria-label="Driver" value={driverId} disabled={saving} onChange={e => setDriverId(e.target.value)}><option value="">Choose from selected crew</option>{ids.map(id => <option key={id} value={id}>{name(id)}</option>)}</select></label></>}
+            <label>Driver<SelectControl aria-label="Driver" value={driverId} disabled={saving} onChange={e => setDriverId(e.target.value)}><option value="">Choose from selected crew</option>{ids.map(id => <option key={id} value={id}>{name(id)}</option>)}</SelectControl></label></>}
         <div className="patrol-fleet-summary"><h4>Other vehicles this week</h4>{fleet.vehicles.filter(v => v.id !== vehicleId).map(v => {
           const other = saved?.crews.find(c => c.vehicleId === v.id)
           return <div key={v.id}><span>{v.name}</span><small>{other ? `${other.personnelIds.map(name).join(', ')} · Locked` : 'Not configured'}</small></div>

@@ -111,7 +111,10 @@ describe('report duty assignment snapshot', () => {
 
 		const report = await service.submitReport(basePayload)
 
-		assert.deepEqual(deploymentQuery.status, { $in: ['active', 'completed'] })
+		assert.deepEqual(deploymentQuery.$or, [
+			{ status: { $in: ['active', 'completed'] } },
+			{ status: 'ended_early', endedAt: { $gt: new Date(basePayload.occurred_at) } },
+		])
 		assert.equal(deploymentQuery.$and[0].$or[2].shiftStart.$lte.toISOString(), basePayload.occurred_at)
 		assert.equal(createdReport.assignedArea, 'Cabagan Public Market Zone')
 		assert.equal(createdReport.assignedAreaType, 'point')

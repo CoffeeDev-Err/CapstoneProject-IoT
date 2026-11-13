@@ -10,7 +10,8 @@ export default function PatrolScheduleTimeline({ blocks, start, type, mode, expa
     </button>
     {expanded === index && <div className="patrol-timeline__details"><p>{type === 'route' && `${patrolModeLabel(mode)} · `}{blockCoverageSummary(block, type)}</p>
       {block.coverageType === 'barangay' && !block.geometry && <small className="patrol-notice is-warning">Reference location only. Outside-coverage alerts require an available barangay boundary.</small>}
-      {type === 'route' && !routeIsEnforced(block, mode) && mode !== 'walk' && <small className="patrol-notice is-warning">Road directions unavailable. Route warnings cannot be enforced for this block.</small>}
+      {type === 'route' && (block.routePoints?.length || 0) < 2 && <small className="patrol-notice">Select at least two map points to configure this route.</small>}
+      {type === 'route' && (block.routePoints?.length || 0) >= 2 && !routeIsEnforced(block, mode) && mode !== 'walk' && <small className="patrol-notice is-warning">Road directions unavailable. Route warnings cannot be enforced for this block.</small>}
       {onEdit && <div className="patrol-timeline__actions"><button type="button" onClick={() => onEdit(index)}><Pencil size={14} />Edit {type}</button>
         <button type="button" aria-label={`Move block ${index + 1} up`} disabled={index === 0} onClick={() => onMove(index, index - 1)}><ArrowUp size={15} /></button>
         <button type="button" aria-label={`Move block ${index + 1} down`} disabled={index === blocks.length - 1} onClick={() => onMove(index, index + 1)}><ArrowDown size={15} /></button>

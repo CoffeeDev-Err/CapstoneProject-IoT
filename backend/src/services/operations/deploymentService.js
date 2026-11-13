@@ -30,6 +30,7 @@ const { emitDeploymentCollection } = require('./events')
 const { normalizePatrolSchedule } = require('../patrolSchedule')
 const { validateVehicleDeployments } = require('../fleetService')
 const { hydratePatrolGeometry } = require('../patrolCoverageService')
+const { deploymentTransition, deploymentEndNotice } = require('./deploymentLifecycle')
 
 const formatDeploymentInstructionsText = (assignment) => {
 	const instructions = String(assignment.instructions || assignment.notes || '').trim()
@@ -184,7 +185,7 @@ const createDeploymentService = ({
 		]
 		const completed = await Deployment.updateMany(
 			{ status: { $in: MANAGEABLE_DEPLOYMENT_STATUSES }, shiftEnd: { $ne: null, $lte: now } },
-			{ $set: { status: 'completed' } },
+			{ $set: { status: 'completed', endReason: 'scheduled_end', endedBy: 'system' } },
 		)
 		const activated = await Deployment.updateMany(
 			{
@@ -215,13 +216,27 @@ const createDeploymentService = ({
 			|| onDutyUpdate.modifiedCount > 0
 			|| offDutyUpdate.modifiedCount > 0
 		if (completed.modifiedCount > 0) {
-			await Promise.all(completingDeployments.map((deployment) => recordAudit({
-				actor: { role: 'system' },
-				action: 'deployment.completed',
-				entityType: 'deployment',
-				entityId: deployment.assignmentId,
-				changes: { personnelId: deployment.personnelId, status: { from: deployment.status, to: 'completed' } },
-			})))
+			// Re-read winners so a concurrent early end never receives a completion notice.
+			const finished = await Deployment.find({
+				assignmentId: { $in: completingDeployments.map(deployment => deployment.assignmentId) },
+				status: 'completed', endReason: 'scheduled_end',
+			}).lean()
+			await Promise.all(finished.map(async (deployment) => {
+				await deliverNotification({
+					io, recipientId: deployment.personnelId, type: 'deployment',
+					...deploymentEndNotice(deployment), referenceType: 'deployment',
+					referenceId: deployment.assignmentId, priority: 'normal',
+					data: { destination: 'Tasks', assignmentId: deployment.assignmentId },
+					dedupeKey: `deployment:${deployment.assignmentId}:status:completed`,
+				})
+				return recordAudit({
+					actor: { role: 'system' },
+					action: 'deployment.completed',
+					entityType: 'deployment',
+					entityId: deployment.assignmentId,
+					changes: { personnelId: deployment.personnelId, status: { from: completingDeployments.find(row => row.assignmentId === deployment.assignmentId)?.status, to: 'completed' }, endedAt: deployment.shiftEnd },
+				})
+			}))
 		}
 		if (activated.modifiedCount > 0) {
 			await Promise.all(activatingDeployments.map((deployment) => recordAudit({
@@ -350,7 +365,7 @@ const createDeploymentService = ({
 				? query.status
 				: { $in: MANAGEABLE_DEPLOYMENT_STATUSES }
 		} else if (query.view === 'history') {
-			filter.status = { $in: ['completed', 'cancelled'] }
+			filter.status = { $in: ['completed', 'cancelled', 'ended_early'] }
 		} else if (DEPLOYMENT_STATUSES.includes(query.status)) {
 			filter.status = query.status
 		} else {
@@ -411,18 +426,23 @@ const createDeploymentService = ({
 				body: { success: false, message: 'Invalid deployment status.' },
 			}
 		}
+		const previous = await Deployment.findOne({ assignmentId })
+		if (!previous) return createNotFoundResult('Deployment')
+		const transition = deploymentTransition(previous, status, clock(), actor)
+		if (transition.error) return { status: 409, body: { success: false, message: transition.error } }
+		if (transition.unchanged) return { status: 200, body: { success: true, deployment: serializeDeployment(previous, await loadPersonnelMap([previous.personnelId])) } }
 		const deployment = await Deployment.findOneAndUpdate(
-			{ assignmentId },
-			{ $set: { status } },
-			{ returnDocument: 'after' },
+			{ assignmentId, status: previous.status, ...(previous.updatedAt ? { updatedAt: previous.updatedAt } : {}) },
+			{ $set: transition.update },
+			{ returnDocument: 'after', runValidators: true },
 		)
-		if (!deployment) return createNotFoundResult('Deployment')
+		if (!deployment) return { status: 409, body: { success: false, message: 'This deployment changed. Refresh before trying again.' } }
 		await recordAudit({
 			actor,
 			action: 'deployment.status_updated',
 			entityType: 'deployment',
 			entityId: deployment.assignmentId,
-			changes: { personnelId: deployment.personnelId, status },
+			changes: { personnelId: deployment.personnelId, status: { from: previous.status, to: deployment.status }, endedAt: deployment.endedAt, endedBy: deployment.endedBy },
 		})
 		const reconciliation = await reconcileDeploymentShifts({ broadcast: false })
 		const [activeDeployments, personnel] = await Promise.all([
@@ -434,16 +454,13 @@ const createDeploymentService = ({
 		await deliverNotification({
 			io,
 			recipientId: deployment.personnelId,
-			type: status === 'cancelled' ? 'warning' : 'deployment',
-			title: status === 'cancelled' ? 'Deployment Cancelled' : 'Deployment Status Updated',
-			message: status === 'cancelled'
-				? `Your deployment at ${deployment.patrolArea} has been cancelled.`
-				: `Your deployment at ${deployment.patrolArea} is now ${status}.`,
+			type: ['cancelled', 'ended_early'].includes(deployment.status) ? 'warning' : 'deployment',
+			...deploymentEndNotice(deployment),
 			referenceType: 'deployment',
 			referenceId: deployment.assignmentId,
-			priority: status === 'cancelled' ? 'high' : 'normal',
-			data: { destination: status === 'active' ? 'Map' : 'Tasks', assignmentId },
-			dedupeKey: `deployment:${assignmentId}:status:${status}`,
+			priority: ['cancelled', 'ended_early'].includes(deployment.status) ? 'high' : 'normal',
+			data: { destination: deployment.status === 'active' ? 'Map' : 'Tasks', assignmentId },
+			dedupeKey: `deployment:${assignmentId}:status:${deployment.status}`,
 		})
 		emitDeploymentCollection({
 			io,
@@ -621,6 +638,14 @@ const createDeploymentService = ({
 		const previousById = new Map(
 			previousDeployments.map((deployment) => [deployment.assignmentId, deployment]),
 		)
+		if (normalizedAssignments.some(assignment => {
+			const previous = previousById.get(assignment.id)
+			return previous && !MANAGEABLE_DEPLOYMENT_STATUSES.includes(previous.status)
+		})) {
+			const error = new Error('A deployment in this form has already ended. Refresh before creating or editing a duty.')
+			error.status = 409
+			throw error
+		}
 		for (const assignment of normalizedAssignments) {
 			if (assignment.deploymentType !== 'route' || assignment.patrolMode) continue
 			const previous = previousById.get(assignment.id)

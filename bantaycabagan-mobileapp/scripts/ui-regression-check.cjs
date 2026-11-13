@@ -238,7 +238,7 @@ assert.match(
 );
 assert.match(
   reportLocationSource,
-  /Officer's current GPS[\s\S]*Incident point pinned on map[\s\S]*Manually entered incident place/,
+  /I am at the incident location[\s\S]*Pin the actual incident location[\s\S]*enter the exact place below to select it manually/,
   'The report form must explain how the incident location was selected',
 );
 assert.match(
@@ -248,8 +248,8 @@ assert.match(
 );
 assert.match(
   reportLocationSource,
-  /select: \{[\s\S]*borderColor: 'transparent'[\s\S]*input: \{[\s\S]*borderColor: 'transparent'[\s\S]*mapButton: \{[\s\S]*borderColor: 'transparent'[\s\S]*floatingSurfaceDark:/,
-  'Submit Report location controls must retain the floating treatment in both themes',
+  /const surface = \{ backgroundColor: colors\.surfaceMuted, borderColor: colors\.border \}[\s\S]*onPress=\{onUseCurrentGps\}[\s\S]*surface[\s\S]*onPress=\{onOpenMap\}[\s\S]*surface[\s\S]*accessibilityLabel="Exact incident place or landmark"[\s\S]*surface/,
+  'GPS, map and exact-place controls must share theme-aware surfaces and borders',
 );
 assert.match(
   reportEvidenceSource,

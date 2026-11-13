@@ -1,7 +1,9 @@
+import SelectControl from "../../components/SelectControl"
 import { createElement, useEffect, useRef, useState } from 'react'
 import { Car, Check, ClipboardCheck, Footprints, LockKeyhole, Route, ShieldCheck, Users } from 'lucide-react'
 import { apiRequest } from '../../services/apiClient'
-import { createDeploymentId } from './deploymentForm'
+import { createDeploymentId, DEPLOYMENT_MODES } from './deploymentForm'
+import { DateTimePickerField, DeploymentTimingSelector } from './DeploymentScheduleFields'
 import ConfirmModal from '../../components/ConfirmModal'
 import WeeklyVehicleAssignments from './WeeklyVehicleAssignments'
 import PatrolAreaScheduleBuilder from './PatrolAreaScheduleBuilder'
@@ -11,6 +13,7 @@ import PatrolScheduleDialog from './PatrolScheduleDialog'
 import { blockOffset, hasBlockCoverage } from './patrolScheduleView'
 import { weekFor, toPatrolLocalTime, patrolTime } from './patrolPlannerTime'
 import '../../styles/patrol-planner.css'
+import '../../styles/deployment-form.css'
 
 export default function PatrolPlanner({ personnel, assignments, initialGroup = [], saving, ready, onSave, onCancel, embedded = false }) {
   const initial = initialGroup[0]
@@ -18,7 +21,9 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const [recordPrefix] = useState(() => createDeploymentId('DEP'))
   const [type, setType] = useState(initial?.deploymentType || 'area')
   const [mode, setMode] = useState(initial?.patrolMode || 'walk')
-  const [areaTravelMode, setAreaTravelMode] = useState(initial?.areaTravelMode || 'walk')
+  const areaTravelMode = 'car'
+  const [timing, setTiming] = useState(() => initial?.shiftStart && Date.parse(initial.shiftStart) > Date.now() ? DEPLOYMENT_MODES.SCHEDULE_LATER : DEPLOYMENT_MODES.START_NOW)
+  const [followClock, setFollowClock] = useState(!initial)
   const [start, setStart] = useState(() => toPatrolLocalTime(initial?.shiftStart || new Date()))
   const [end, setEnd] = useState(() => toPatrolLocalTime(initial?.shiftEnd || new Date(Date.now() + 8 * 3600000)))
   const [blocks, setBlocks] = useState(initial?.scheduleBlocks || [])
@@ -57,11 +62,35 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
   const minutes = blocks.reduce((sum, block) => sum + Number(block.durationMinutes), 0)
   const dutyMinutes = Math.round((patrolTime(end) - patrolTime(start)) / 60000)
   const dutyError = !Number.isFinite(dutyMinutes) ? 'Choose both duty start and end dates.' : dutyMinutes <= 0 ? 'Duty end must be after the start.' : dutyMinutes > 1440 ? `This duty is ${dutyMinutes / 60} hours. The maximum is 24 hours; adjust the start or end.` : ''
+  useEffect(() => {
+    if (initial || timing !== DEPLOYMENT_MODES.START_NOW || !followClock || saving) return undefined
+    const sync = () => {
+      const current = toPatrolLocalTime(new Date(Date.now()))
+      if (current === start || savingRef.current) return
+      const duration = Math.round((patrolTime(end) - patrolTime(start)) / 60000)
+      if (!Number.isFinite(duration) || duration <= 0 || duration > 1440) return
+      setStart(current)
+      setEnd(toPatrolLocalTime(new Date(+patrolTime(current) + duration * 60000)))
+    }
+    const timer = window.setInterval(sync, 1000)
+    document.addEventListener('visibilitychange', sync)
+    window.addEventListener('focus', sync)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', sync); window.removeEventListener('focus', sync) }
+  }, [initial, timing, followClock, saving, start, end])
+  const changeTiming = next => {
+    setTiming(next)
+    setFollowClock(next === DEPLOYMENT_MODES.START_NOW)
+    const nextStart = toPatrolLocalTime(new Date(Date.now() + (next === DEPLOYMENT_MODES.SCHEDULE_LATER ? 3600000 : 0)))
+    setStart(nextStart)
+    setEnd(toPatrolLocalTime(new Date(+patrolTime(nextStart) + (dutyMinutes > 0 && dutyMinutes <= 1440 ? dutyMinutes : 480) * 60000)))
+    setError('')
+  }
   const changeType = value => { setType(value); setBlocks([]); setScheduleDirty(false); setSwitchType(null); setError('') }
   const validate = () => {
     if (!ready) return 'Wait for deployments to load before saving.'
     if (scheduleDirty) return `Save all selected ${type === 'area' ? 'areas' : 'routes'} before reviewing the patrol schedule.`
     if (dutyError || minutes !== dutyMinutes) return 'Schedule durations must fill the full duty exactly (maximum 24 hours).'
+    if (timing === DEPLOYMENT_MODES.SCHEDULE_LATER && +patrolTime(start) <= Date.now()) return 'Choose a future start for Schedule for Later, or switch to Start Now.'
     if (!blocks.length || blocks.some(block => !hasBlockCoverage(block, type))) return 'Save at least one configured schedule block.'
     if (vehicleMode && (!crew || fleetLoading || fleetError)) return 'Set up the locked weekly crew for this vehicle before deployment.'
     if (vehicleMode && weekFor(new Date(+patrolTime(end) - 1)) !== weekStart) return 'Keep the complete vehicle duty within its locked Monday–Sunday crew assignment.'
@@ -69,14 +98,16 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
     if (!Number.isInteger(graceMinutes) || graceMinutes < 0 || graceMinutes > 60) return 'Transition grace period must be 0 to 60 minutes.'
     return ''
   }
-  const buildAssignments = () => selectedIds.map(id => {
+  const buildAssignments = (latest = false) => selectedIds.map(id => {
+    const savedStart = latest && followClock && !initial && timing === DEPLOYMENT_MODES.START_NOW ? toPatrolLocalTime(new Date(Date.now())) : start
+    const savedEnd = savedStart === start ? end : toPatrolLocalTime(new Date(+patrolTime(savedStart) + dutyMinutes * 60000))
     const prior = initialGroup.find(a => a.personnelId === id)
     const member = personnel.find(p => p.id === id)
     return { id: prior?.id || `${recordPrefix}-${id}`, groupId, personnelId: id, personnelName: member?.name || prior?.personnelName || id, rank: member?.rank || prior?.rank || '',
       deploymentType: type, patrolMode: type === 'route' ? mode : '', ...(type === 'area' ? { areaTravelMode } : {}), vehicleId: vehicleMode ? vehicleId : '', vehicleCrew: vehicleMode ? crew : undefined,
       scheduleBlocks: blocks.map((block, i) => ({ ...block, offsetMinutes: blockOffset(blocks, i), durationMinutes: Number(block.durationMinutes) })),
       patrolArea: blocks[0]?.label || '', patrolAreaId: 'scheduled-patrol', notes, transitionGraceMinutes: graceMinutes,
-      shiftStart: patrolTime(start).toISOString(), shiftEnd: patrolTime(end).toISOString(), status: +patrolTime(start) > Date.now() ? 'scheduled' : 'active' }
+      shiftStart: patrolTime(savedStart).toISOString(), shiftEnd: patrolTime(savedEnd).toISOString(), status: +patrolTime(savedStart) > Date.now() ? 'scheduled' : 'active' }
   })
   const save = async () => {
     if (savingRef.current) return
@@ -84,7 +115,7 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
     if (message) { setReview(false); setError(message); return }
     savingRef.current = true
     try {
-      const next = buildAssignments()
+      const next = buildAssignments(true)
       if (await onSave([...assignments.filter(a => !initialGroup.some(old => old.id === a.id)), ...next], initial ? 'Patrol deployment updated. Affected personnel have been notified.' : 'Patrol deployment saved.')) {
         setBlocks([]); builder.current?.reset(); setIds([]); setVehicleId(''); setNotes(''); setReview(false); onCancel({ deploymentId: next[0].id })
       }
@@ -98,14 +129,15 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
       <section className="patrol-panel"><div className="patrol-section-heading"><span className="patrol-step">01</span><div><h4>Patrol style & duty</h4><p>One duty, with consecutive area or route blocks.</p></div><span className="patrol-badge">Philippine time · UTC+8</span></div>
         <fieldset className="patrol-style-selector"><legend className="visually-hidden">Deployment style</legend>{[['area', 'Area Patrol', 'Cover a barangay or a custom area', ShieldCheck], ['route', 'Route Patrol', 'Follow a road or walking path', Route]].map(([value, label, hint, icon]) => <button type="button" key={value} aria-label={label} aria-pressed={type === value} className={type === value ? 'is-active' : ''} onClick={() => { if (type !== value) { if (scheduleDirty || blocks.length) setSwitchType(value); else changeType(value) } }}>{createElement(icon, { size: 23 })}<span><strong>{label}</strong><small>{hint}</small></span>{type === value && <Check size={17} />}</button>)}</fieldset>
         {type === 'route' && <fieldset className="patrol-mode-selector"><legend>Travel mode</legend>{[['walk', 'Foot Patrol', Footprints], ['motorcycle', 'Motorcycle Patrol', Route], ['car', 'Car Patrol', Car]].map(([value, label, icon]) => <button type="button" key={value} aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => { if (mode !== value) { setMode(value); setVehicleId(''); setError('') } }}>{createElement(icon, { size: 16 })}{label}</button>)}</fieldset>}
-        <div className="patrol-two-columns patrol-duty"><label>Start<input required type="datetime-local" value={start} onChange={e => { setStart(e.target.value); setError('') }} /></label><label>End<input ref={endRef} required type="datetime-local" aria-invalid={Boolean(dutyError)} value={end} onChange={e => { setEnd(e.target.value); setError('') }} /></label></div>
+        <DeploymentTimingSelector mode={timing} onChange={changeTiming} />
+        <div className="patrol-two-columns patrol-duty"><label><span>Start</span><DateTimePickerField ariaLabel="Start" value={start} onChange={value => { setFollowClock(false); setStart(value); setTiming(value && +patrolTime(value) > Date.now() ? DEPLOYMENT_MODES.SCHEDULE_LATER : DEPLOYMENT_MODES.START_NOW); setError('') }} /></label><label><span>End</span><DateTimePickerField ref={endRef} align="right" ariaLabel="End" invalid={Boolean(dutyError)} value={end} onChange={value => { setEnd(value); setError('') }} /></label></div>
         <p role={dutyError ? 'alert' : undefined} className={dutyError ? 'patrol-notice is-error' : undefined}>{dutyError || 'One duty can last up to 24 hours. Saved block durations must fill it exactly.'}</p>
       </section>
       <section className="patrol-panel patrol-schedule-panel"><div className="patrol-section-heading"><span className="patrol-step is-gold">02</span><div><h4>Build the {type} schedule</h4><p>Two hours per block by default. Use one full-duty block for a fixed assignment.</p></div></div>
-        {type === 'area' ? <PatrolAreaScheduleBuilder {...scheduleProps} travelMode={areaTravelMode} onTravelModeChange={setAreaTravelMode} /> : <PatrolRouteScheduleBuilder {...scheduleProps} mode={mode} />}
+        {type === 'area' ? <PatrolAreaScheduleBuilder {...scheduleProps} travelMode={areaTravelMode} /> : <PatrolRouteScheduleBuilder {...scheduleProps} mode={mode} />}
       </section>
       <div className="patrol-team-instructions"><section className="patrol-panel patrol-team-panel"><div className="patrol-section-heading"><span className="patrol-step is-teal">03</span><div><h4>{vehicleMode ? 'Vehicle & weekly crew' : 'Assign personnel'}</h4><p>{vehicleMode ? 'Select a vehicle to load its locked crew automatically.' : 'Choose the officers assigned to this complete duty.'}</p></div>{vehicleMode ? <Car size={20} /> : <Users size={20} />}</div>
-        {vehicleMode ? <><div className="patrol-vehicle-controls"><label className="patrol-vehicle-select">Vehicle<select aria-label="Vehicle" value={vehicleId} onChange={e => setVehicleId(e.target.value)}><option value="">Choose assigned vehicle</option>{fleet.vehicles.filter(v => v.mode === mode).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label><button type="button" onClick={() => setCrewOpen(true)} disabled={fleetLoading || Boolean(fleetError)}><Car size={16} />Manage weekly vehicle crews</button></div>
+        {vehicleMode ? <><div className="patrol-vehicle-controls"><label className="patrol-vehicle-select">Vehicle<SelectControl aria-label="Vehicle" value={vehicleId} onChange={e => setVehicleId(e.target.value)}><option value="">Choose assigned vehicle</option>{fleet.vehicles.filter(v => v.mode === mode).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</SelectControl></label><button type="button" onClick={() => setCrewOpen(true)} disabled={fleetLoading || Boolean(fleetError)}><Car size={16} />Manage weekly vehicle crews</button></div>
           <p>Week starting {weekStart || '—'} · Monday–Sunday</p>{fleetLoading && <p role="status">Loading vehicle crews…</p>}{fleetError && <p role="alert" className="patrol-notice is-error">Vehicle assignments unavailable. <button type="button" onClick={() => { void loadFleet().catch(() => {}) }}>Retry</button></p>}
           {crew ? <div className="patrol-tinted-panel"><span className="patrol-badge is-valid"><LockKeyhole size={14} />Locked weekly crew</span><ul className="patrol-crew-summary">{crew.personnelIds.map(id => <li key={id}><strong>{personnel.find(p => p.id === id)?.name || id}</strong><span>{crew.driverId === id ? 'Driver' : 'Crew'}</span></li>)}</ul></div> : !fleetLoading && vehicleId && <div className="patrol-notice is-warning patrol-crew-warning"><span>This vehicle has no locked weekly crew.</span><button type="button" onClick={() => setCrewOpen(true)}>Set up weekly crew</button></div>}</>
           : <PatrolPersonnelSelect personnel={personnel} ids={ids} onChange={setIds} />}

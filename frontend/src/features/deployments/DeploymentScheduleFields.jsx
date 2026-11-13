@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import SelectControl from "../../components/SelectControl"
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import {
   DEPLOYMENT_MODES,
@@ -51,15 +53,18 @@ const fullDateLabel = ({ year, month, day }) => new Intl.DateTimeFormat('en-PH',
   month: 'long', day: 'numeric', year: 'numeric',
 }).format(new Date(year, month - 1, day))
 
-function DateTimePickerField({
-  align = 'left', ariaLabel, describedBy, invalid, maximum, minimum, onChange, value,
+export function DateTimePickerField({
+  align = 'left', ariaLabel, describedBy, invalid, maximum, minimum, onChange, value, ref,
 }) {
   const initial = parseLocalValue(value) || parseLocalValue(minimum) || parseLocalValue(getCurrentDateTimeLocalValue())
   const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState({})
   const [visibleMonth, setVisibleMonth] = useState({ year: initial.year, month: initial.month })
   const wrapperRef = useRef(null)
   const triggerRef = useRef(null)
-  const pickerId = `assignment-${ariaLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-picker`
+  const pickerRef = useRef(null)
+  const uniqueId = useId()
+  const pickerId = `assignment-${uniqueId}-picker`
   const selected = parseLocalValue(value)
   const minimumParts = parseLocalValue(minimum)
   const maximumParts = parseLocalValue(maximum)
@@ -68,7 +73,8 @@ function DateTimePickerField({
   useEffect(() => {
     if (!open) return undefined
     const closeOnOutsidePointer = (event) => {
-      if (!wrapperRef.current?.contains(event.target)) setOpen(false)
+      const owner = event.target.closest?.('[data-select-owner]')?.dataset.selectOwner
+      if (!wrapperRef.current?.contains(event.target) && !pickerRef.current?.contains(event.target) && !(owner && pickerRef.current?.contains(document.getElementById(owner)))) setOpen(false)
     }
     const closeOnEscape = (event) => {
       if (event.key !== 'Escape') return
@@ -77,9 +83,16 @@ function DateTimePickerField({
     }
     document.addEventListener('pointerdown', closeOnOutsidePointer)
     document.addEventListener('keydown', closeOnEscape)
+    const closeOnScroll = event => {
+      if (!pickerRef.current?.contains(event.target) && !event.target.closest?.('.select-control__menu')) setOpen(false)
+    }
+    window.addEventListener('scroll', closeOnScroll, true)
+    window.addEventListener('resize', closeOnScroll)
     return () => {
       document.removeEventListener('pointerdown', closeOnOutsidePointer)
       document.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('scroll', closeOnScroll, true)
+      window.removeEventListener('resize', closeOnScroll)
     }
   }, [open])
 
@@ -108,7 +121,15 @@ function DateTimePickerField({
   const openPicker = () => {
     const next = selected || minimumParts || fallback
     setVisibleMonth({ year: next.year, month: next.month })
+    const box = triggerRef.current.getBoundingClientRect()
+    const width = Math.min(344, window.innerWidth - 24)
+    const below = window.innerHeight - box.bottom - 12, above = box.top - 12
+    const upward = below < 380 && above > below
+    setPosition({ position: 'fixed', zIndex: 31000, width, left: Math.max(12, Math.min(align === 'right' ? box.right - width : box.left, window.innerWidth - width - 12)),
+      right: 'auto', maxHeight: Math.max(160, upward ? above : below), overflowY: 'auto',
+      ...(upward ? { bottom: window.innerHeight - box.top + 6, top: 'auto' } : { top: box.bottom + 6, bottom: 'auto' }) })
     setOpen((current) => !current)
+    if (!open) requestAnimationFrame(() => pickerRef.current?.querySelector('.is-selected, .assignment-calendar-day:not(:disabled)')?.focus({ preventScroll: true }))
   }
 
   const changeMonth = (offset) => {
@@ -141,7 +162,7 @@ function DateTimePickerField({
   return (
     <div className={`assignment-datetime-picker assignment-datetime-picker--${align}`} ref={wrapperRef}>
       <button
-        ref={triggerRef}
+        ref={node => { triggerRef.current = node; if (typeof ref === 'function') ref(node); else if (ref) ref.current = node }}
         type="button"
         className="settings-input w-100 assignment-datetime-trigger"
         aria-label={ariaLabel}
@@ -156,8 +177,8 @@ function DateTimePickerField({
         <CalendarDays aria-hidden="true" />
       </button>
 
-      {open && (
-        <section id={pickerId} className="assignment-datetime-popover" role="dialog" aria-label={ariaLabel}>
+      {open && createPortal(
+        <section ref={pickerRef} id={pickerId} className="assignment-datetime-popover" role="dialog" aria-label={ariaLabel} style={position}>
           <header className="assignment-calendar-header">
             <button type="button" aria-label="Previous month" disabled={monthUnavailable(-1)} onClick={() => changeMonth(-1)}>
               <ChevronLeft aria-hidden="true" />
@@ -197,34 +218,34 @@ function DateTimePickerField({
             <Clock3 aria-hidden="true" />
             <label>
               <span>Hour</span>
-              <select aria-label={`${ariaLabel} hour`} value={displayHour}
+              <SelectControl aria-label={`${ariaLabel} hour`} value={displayHour}
                 onChange={(event) => updateTime({ hour12: event.target.value })}>
                 {HOURS.map((hour) => <option key={hour} value={hour}>{pad(hour)}</option>)}
-              </select>
+              </SelectControl>
             </label>
             <span aria-hidden="true">:</span>
             <label>
               <span>Minute</span>
-              <select aria-label={`${ariaLabel} minute`} value={displayMinute}
+              <SelectControl aria-label={`${ariaLabel} minute`} value={displayMinute}
                 onChange={(event) => updateTime({ minute: event.target.value })}>
                 {MINUTES.map((minute) => <option key={minute} value={minute}>{pad(minute)}</option>)}
-              </select>
+              </SelectControl>
             </label>
             <label>
               <span>Period</span>
-              <select aria-label={`${ariaLabel} period`} value={displayPeriod}
+              <SelectControl aria-label={`${ariaLabel} period`} value={displayPeriod}
                 onChange={(event) => updateTime({ period: event.target.value })}>
                 <option value="AM">AM</option>
                 <option value="PM">PM</option>
-              </select>
+              </SelectControl>
             </label>
           </div>
 
           <footer className="assignment-datetime-actions">
             <button type="button" onClick={() => onChange('')} disabled={!value}>Clear</button>
-            <button type="button" className="is-primary" onClick={() => setOpen(false)}>Done</button>
+            <button type="button" className="is-primary" onClick={() => { setOpen(false); triggerRef.current?.focus() }}>Done</button>
           </footer>
-        </section>
+        </section>, document.body
       )}
     </div>
   )
@@ -241,7 +262,7 @@ export function DeploymentTimingSelector({ disabled, mode, onChange }) {
       >
         <label className={`assignment-mode-option${startsNow ? ' is-active' : ''}`}>
           <input type="radio" name="deployment-mode" value={DEPLOYMENT_MODES.START_NOW}
-            checked={startsNow} onChange={() => onChange(DEPLOYMENT_MODES.START_NOW)} />
+              checked={startsNow} onChange={() => onChange(DEPLOYMENT_MODES.START_NOW)} onClick={() => { if (startsNow) onChange(DEPLOYMENT_MODES.START_NOW) }} />
           <span><strong>Start Now</strong><small>Begin using the current date and time.</small></span>
         </label>
         <label className={`assignment-mode-option${startsNow ? '' : ' is-active'}`}>

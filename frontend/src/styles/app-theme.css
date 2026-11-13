@@ -49,6 +49,21 @@
 }
 
 /* Compatibility names keep existing features and lazy-loaded styles in sync. */
+.select-control > select { appearance: none; -webkit-appearance: none; background-image: none !important; padding-inline-end: 2.6rem !important; cursor: pointer; }
+.select-control > select:disabled { cursor: not-allowed; }
+.select-control__icon { right: 1rem; width: 16px; height: 16px; transition: color 160ms ease, transform 160ms ease; }
+.select-control:has(select[aria-expanded="true"]) .select-control__icon { transform: translateY(-50%) rotate(180deg); color: var(--app-accent-text); }
+.select-control__menu { z-index: 32000; overflow-y: auto; overscroll-behavior: contain; padding: 5px; border: 1px solid var(--app-border); border-radius: 10px; background: var(--app-card); color: var(--app-text); box-shadow: 0 12px 32px #0003; font-size: var(--font-size-sm); scrollbar-gutter: stable; }
+.select-control__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 8px 10px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; transition: background-color 140ms ease; }
+.select-control__option svg { flex-shrink: 0; color: var(--app-accent-text); }
+.select-control__option[aria-selected="true"] { color: var(--app-accent-text); background: var(--app-selected); font-weight: 600; }
+.select-control__option[data-highlighted="true"] { background: var(--app-elevated); }
+.select-control__option[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.assignment-datetime-popover { --deployment-navy: var(--app-text); --deployment-text-muted: var(--app-secondary); --deployment-blue: var(--app-action); --deployment-blue-dark: var(--app-action-hover); --deployment-border: var(--app-border); --deployment-surface-muted: var(--app-elevated); --deployment-blue-surface: var(--app-selected); }
+.assignment-datetime-popover .assignment-calendar-day.is-selected { background: var(--app-action); color: #fff; border-color: var(--app-action); }
+.assignment-datetime-popover .assignment-datetime-actions .is-primary { background: var(--app-action); color: #fff; border-color: var(--app-action); border-radius: 7px; }
+@media (prefers-reduced-motion: reduce) { .select-control__icon, .select-control__option { transition: none; } }
+
 :root,
 :root:not([data-theme="dark"]),
 :root[data-theme="dark"] {

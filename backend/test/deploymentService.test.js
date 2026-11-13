@@ -117,7 +117,7 @@ it('paginates completed and cancelled history together with stable ordering and 
 	}
 	const service = createService({ Deployment })
 	const result = await service.listDeployments({ view: 'history', page: 2, limit: 10, search: 'Market', group_id: 'GROUP-001' }, { role: 'officer', personnelId: 'PNP-001' })
-	assert.deepEqual(filters[0].status, { $in: ['completed', 'cancelled'] })
+	assert.deepEqual(filters[0].status, { $in: ['completed', 'cancelled', 'ended_early'] })
 	assert.equal(filters[0].personnelId, 'PNP-001')
 	assert.equal(filters[0].groupId, 'GROUP-001')
 	assert.deepEqual(calls.sort, { assignedAt: -1, _id: -1 })
@@ -149,6 +149,22 @@ it('identifies a conflicting scheduled shift without cancelling or saving either
 		assert.match(error.message, /Assigned Deployments/)
 		return true
 	})
+	assert.equal(writes, 0)
+})
+
+it('rejects a stale planner save that would reopen an ended duty without writing any deployment', async () => {
+	let writes = 0
+	const service = createService({
+		Deployment: {
+			find: () => ({ lean: async () => [{ assignmentId: 'DEP-ENDED', status: 'ended_early' }] }),
+			bulkWrite: async () => { writes++ }, updateMany: async () => { writes++ },
+		},
+		Personnel: { find: () => ({ select: () => ({ lean: async () => [{ personnelId: 'PNP-001', fullName: 'Officer One' }] }) }) },
+	})
+	await assert.rejects(service.replaceDeployments([{
+		id: 'DEP-ENDED', personnelId: 'PNP-001', patrolAreaId: 'barangay-anao', deploymentType: 'area',
+		status: 'active', shiftStart: new Date(Date.now() - 60_000), shiftEnd: new Date(Date.now() + 3_600_000),
+	}]), error => error.status === 409 && /already ended/.test(error.message))
 	assert.equal(writes, 0)
 })
 
@@ -255,6 +271,7 @@ describe('deployment reconciliation', () => {
 		const deploymentFindResults = [
 			[{ assignmentId: 'DEP-A', personnelId: 'PNP-001' }],
 			[{ assignmentId: 'DEP-B', personnelId: 'PNP-002' }],
+			[{ assignmentId: 'DEP-B', personnelId: 'PNP-002', status: 'completed', endReason: 'scheduled_end' }],
 		]
 		const deploymentUpdates = []
 		const personnelUpdates = []

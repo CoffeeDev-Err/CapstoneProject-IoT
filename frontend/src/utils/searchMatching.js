@@ -63,6 +63,7 @@ export const filterDeploymentGroupsByPrefix = (groups = [], query = '') => {
 
     return [{
       ...group,
+      totalAssignments: group.totalAssignments || group.assignments.length,
       patrolArea: matchingPatrolAreas.length === 1 ? matchingPatrolAreas[0] : group.patrolArea,
       assignments: matchingAssignments,
     }]

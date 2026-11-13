@@ -5,6 +5,23 @@ import { requestJson } from '../../services/requestJson';
 
 jest.mock('../../services/requestJson', () => ({ requestJson: jest.fn() }));
 
+it('previews any own numbered area without changing active coverage and requests an automatic road guide', async () => {
+  const geometry = { type: 'LineString', coordinates: [[121.765, 17.43], [121.768, 17.432]] };
+  jest.mocked(requestJson).mockResolvedValueOnce({ response: { ok: true } as Response, payload: { available: true, geometry } });
+  const base = { id: 'OWN', deploymentType: 'area', shiftStart: new Date(Date.now() - 60000).toISOString(), scheduleBlocks: [0, 1, 2].map(i => ({ label: `Area ${i + 1}`, coverageType: 'custom', radiusMeters: 200, latitude: 17.43 + i * 0.001, longitude: 121.765 + i * 0.001, offsetMinutes: i * 120, durationMinutes: 120 })) } as DeploymentAssignment;
+  const officer = { latitude: 17.43, longitude: 121.765, locationRecordedAt: new Date().toISOString() } as LivePersonnel;
+  const view = await renderHook(() => usePatrolSchedule(base, officer, 'test-token'));
+  await act(async () => { await view.result.current.viewBlock(2); });
+  expect(view.result.current.index).toBe(0);
+  expect(view.result.current.previewBlock?.label).toBe('Area 3');
+  expect(view.result.current.features.features.filter(f => f.properties?.kind === 'marker').map(f => f.properties?.label)).toEqual(['1', '3']);
+  expect(JSON.parse(jest.mocked(requestJson).mock.calls.at(-1)![1]!.body as string).mode).toBe('car');
+  await act(async () => { view.result.current.closePreview(); });
+  expect(view.result.current.previewNext).toBe(false);
+  expect(view.result.current.features.features.filter(f => f.properties?.kind === 'marker').map(f => f.properties?.label)).toEqual(['1']);
+  await view.unmount();
+});
+
 it('updates the remaining routed distance and ETA as GPS advances, independently of marker animation', async () => {
   const geometry = { type: 'LineString', coordinates: [[121.765, 17.43], [121.766, 17.43], [121.767, 17.43]] };
   jest.mocked(requestJson).mockResolvedValueOnce({ response: { ok: true } as Response, payload: { available: true, geometry, durationSeconds: 600 } });
@@ -63,7 +80,7 @@ it('discards late road directions after the assigned destination changes', async
   });
   expect(view.result.current.previewNext).toBe(false);
   expect(view.result.current.next?.label).toBe('Gym');
-  expect(view.result.current.features.features).toHaveLength(1);
+  expect(view.result.current.features.features.map(f => f.properties?.kind)).toEqual(['coverage', 'marker']);
   await view.unmount();
   jest.useRealTimers();
 });

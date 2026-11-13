@@ -28,6 +28,7 @@ import {
   type StyleSpecification,
 } from '@maplibre/maplibre-react-native';
 import Svg, { Path, SvgUri } from 'react-native-svg';
+import { patrolCoverageBounds } from '../features/maps/patrolCoverageGeometry';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import {
   BACKUP_ARRIVAL_RADIUS_METERS,
@@ -371,6 +372,11 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
 
   useImperativeHandle(ref, () => ({
     focusDeployment: () => {
+      const bounds = patrolCoverageBounds(patrolCoverage);
+      if (bounds && (bounds[0] !== bounds[2] || bounds[1] !== bounds[3])) {
+        cameraRef.current?.fitBounds(bounds, { padding: { top: 220, right: 35, bottom: 240, left: 35 }, duration: 720, easing: 'ease' });
+        return;
+      }
       cameraRef.current?.flyTo({
         center: deploymentCenter,
         zoom: Math.min(
@@ -538,10 +544,16 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         </GeoJSONSource>
 
         {patrolCoverage && <GeoJSONSource id="assigned-patrol-coverage" data={patrolCoverage}>
-          <Layer id="assigned-patrol-fill" type="fill" source="assigned-patrol-coverage" filter={['==', ['geometry-type'], 'Polygon']}
+          <Layer id="assigned-patrol-fill" type="fill" source="assigned-patrol-coverage" filter={['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]]}
             paint={{ 'fill-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'fill-opacity': 0.12 }} />
-          <Layer id="assigned-patrol-line" type="line" source="assigned-patrol-coverage"
-            paint={{ 'line-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'line-width': 3, 'line-dasharray': [3, 2] }} />
+          <Layer id="assigned-patrol-line" type="line" source="assigned-patrol-coverage" filter={['all', ['!=', ['get', 'kind'], 'corridor'], ['!=', ['get', 'kind'], 'transition'], ['!=', ['geometry-type'], 'Point']]}
+            paint={{ 'line-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'line-width': 3 }} />
+          <Layer id="assigned-patrol-transition" type="line" source="assigned-patrol-coverage" filter={['==', ['get', 'kind'], 'transition']}
+            paint={{ 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [3, 2] }} />
+          <Layer id="assigned-patrol-points" type="circle" source="assigned-patrol-coverage" filter={['==', ['get', 'kind'], 'marker']}
+            paint={{ 'circle-radius': 15, 'circle-color': ['case', ['get', 'next'], '#a65f00', '#166534'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 }} />
+          <Layer id="assigned-patrol-numbers" type="symbol" source="assigned-patrol-coverage" filter={['==', ['get', 'kind'], 'marker']}
+            layout={{ 'text-field': ['get', 'label'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true }} paint={{ 'text-color': '#ffffff' }} />
         </GeoJSONSource>}
 
         {radiusFeatures.map(({ zone, response, arrival }) => (

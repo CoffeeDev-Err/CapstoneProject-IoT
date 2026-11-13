@@ -6,6 +6,7 @@ const { toMediaAccessPath } = require('../mediaStorageService')
 const MANAGEABLE_DEPLOYMENT_STATUSES = Object.freeze(['scheduled', 'active'])
 const DEPLOYMENT_STATUSES = Object.freeze([
 	...MANAGEABLE_DEPLOYMENT_STATUSES,
+	'ended_early',
 	'completed',
 	'cancelled',
 ])
@@ -241,6 +242,11 @@ const serializeDeployment = (deployment, personnelById = new Map()) => {
 		assignedAt: deployment.assignedAt?.toISOString(),
 		status: deployment.status,
 		isCurrentShift: isDeploymentCurrent(deployment),
+		...(deployment.endReason ? {
+			endedAt: (deployment.endedAt || (deployment.endReason === 'scheduled_end' ? deployment.shiftEnd : undefined))?.toISOString(),
+			endedBy: deployment.endedBy || 'system',
+			endReason: deployment.endReason,
+		} : {}),
 		acknowledged,
 		acknowledgedAt: acknowledged ? deployment.acknowledgedAt?.toISOString() : undefined,
 		hasDeploymentPoint: Boolean(deployment.location?.coordinates?.length === 2),

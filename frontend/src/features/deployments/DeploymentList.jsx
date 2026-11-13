@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState } from 'react'
-import { Eye, FileText } from 'lucide-react'
+import { Eye, FileText, Power } from 'lucide-react'
 import { TableSkeletonRows } from '../../components/LoadingSkeleton'
 import DeploymentInstructionsModal from './DeploymentInstructionsModal'
 import PatrolScheduleDialog from './PatrolScheduleDialog'
@@ -10,6 +10,7 @@ import {
   DEPLOYMENT_LIST_VIEWS,
   formatDateTime,
   formatDeploymentStatus,
+  resolveGroupId,
 } from './deploymentForm'
 
 function DeploymentList({
@@ -43,8 +44,13 @@ function DeploymentList({
   const actionLabel = assignment => assignment.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'
   const canAct = assignment => ['scheduled', 'active'].includes(assignment.status)
   const rowNumbers = new Map(filteredGroupedAssignments.flatMap(group => group.assignments).map((assignment, index) => [assignment.id, ((historyPagination?.page || 1) - 1) * (historyPagination?.limit || 10) + index + 1]))
+  const completeGroup = group => {
+    if (activeDeploymentView === 'history') return group
+    const members = assignments.filter(assignment => resolveGroupId(assignment) === group.groupId)
+    return { ...group, assignments: members.length ? members : group.assignments }
+  }
   const viewGroup = async (group, assignment = group.assignments[0]) => {
-    if (activeDeploymentView !== 'history') { setViewing({ assignment, group: group.assignments, groupId: group.groupId }); return }
+    if (activeDeploymentView !== 'history') { setViewing({ assignment, group: completeGroup(group).assignments, groupId: group.groupId }); return }
     if (loadingGroup) return
     const request = ++groupRequest.current
     setLoadingGroup(group.groupId); setGroupError('')
@@ -116,24 +122,24 @@ function DeploymentList({
             <table className="personnel-table assignment-list-table table align-middle mb-0" aria-busy="true">
               <thead>
                 <tr className="assignment-group-table">
-                  {activeDeploymentView === 'history' && <th scope="col">#</th>}<th>Assignment ID</th>
+                  {activeDeploymentView === 'history' && <th scope="col">#</th>}
                   <th>Personnel</th>
-                  <th>Patrol Area</th>
-                  <th>Instructions</th>
-                  <th>Shift Start</th>
-                  <th>Shift End</th>
+                  <th>Patrol</th>
+
+                  <th>Duty · PHT</th>
+
                   <th>Status</th>
                   <th>Assigned At</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                <TableSkeletonRows columns={activeDeploymentView === 'history' ? 10 : 9} rows={5} label="Loading deployments" />
+                <TableSkeletonRows columns={activeDeploymentView === 'history' ? 7 : 6} rows={5} label="Loading deployments" />
               </tbody>
             </table>
           ) : assignments.length === 0 || visibleAssignments.length === 0 ? (
             <p className="text-body-secondary mb-0 small">
-              {activeDeploymentView === 'history' ? deploymentSearch.trim() ? 'No history records matched your search.' : 'No completed or cancelled deployments.' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
+              {activeDeploymentView === 'history' ? deploymentSearch.trim() ? 'No history records matched your search.' : 'No completed, ended early or cancelled deployments.' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
                 ? 'No deployments are scheduled for later.'
                 : 'No deployments are active now.'}
             </p>
@@ -145,12 +151,12 @@ function DeploymentList({
             <table className="personnel-table assignment-list-table table align-middle mb-0">
             <thead>
               <tr className="assignment-group-table">
-                {activeDeploymentView === 'history' && <th scope="col">#</th>}<th>Assignment ID</th>
+                {activeDeploymentView === 'history' && <th scope="col">#</th>}
                 <th>Personnel</th>
-                <th>Patrol Area</th>
-                <th>Instructions</th>
-                <th>Shift Start</th>
-                <th>Shift End</th>
+                <th>Patrol</th>
+
+                <th>Duty · PHT</th>
+
                 <th>Status</th>
                 <th>Assigned At</th>
                 <th>Action</th>
@@ -160,18 +166,18 @@ function DeploymentList({
               {filteredGroupedAssignments.map((group) => (
                 <Fragment key={group.groupId}>
                   <tr className="assignment-group-row">
-                    <td colSpan={activeDeploymentView === 'history' ? 9 : 8} className="assignment-group-cell">
+                    <td colSpan={activeDeploymentView === 'history' ? 6 : 5} className="assignment-group-cell">
                       <div className="assignment-group-content">
                         <strong className="assignment-group-label">{group.patrolArea}</strong>
                         <small className="assignment-group-meta">
-                          {group.assignments.length} personnel {activeDeploymentView === 'history' ? 'shown in this group on this page' : 'assigned in this deployment group'}
+                          {activeDeploymentView === 'history' ? `${group.assignments.length} personnel shown on this page` : `${completeGroup(group).assignments.length} personnel assigned`}{activeDeploymentView !== 'history' && group.assignments.length < completeGroup(group).assignments.length && ` · ${group.assignments.length} match your search`}
                         </small>
                       </div>
                     </td>
                     <td className="assignment-group-actions-cell">
                       <div className="assignment-group-actions assignment-group-menu">
                         <button type="button" className="assignment-edit-btn" disabled={loadingGroup === group.groupId} onClick={() => { void viewGroup(group) }}><Eye size={15} />{loadingGroup === group.groupId ? 'Loading…' : 'View'}</button>
-                        {group.assignments.some(canAct) && <button type="button" className="assignment-delete-btn" onClick={() => onDeleteGroup(group)}>{actionLabel(group.assignments[0])}</button>}
+                        {group.assignments.some(canAct) && <button type="button" className="assignment-delete-btn" onClick={() => onDeleteGroup(completeGroup(group))}>{actionLabel(group.assignments[0])}</button>}
                       </div>
                     </td>
                   </tr>
@@ -183,10 +189,10 @@ function DeploymentList({
                       className={`personnel-row${assignment.id === highlightedDeploymentId ? ' deployment-row--highlighted' : ''}`}
                     >
                       {activeDeploymentView === 'history' && <td data-label="#">{rowNumbers.get(assignment.id)}</td>}
-                      <td data-label="Assignment ID" className="personnel-badge">{assignment.id}</td>
+
                       <td data-label="Personnel">
                         <strong className="d-block assignment-personnel-name">{assignment.personnelName}</strong>
-                        <small className="assignment-personnel-rank">{assignment.rank}</small>
+                        <small className="assignment-personnel-rank">{assignment.rank}</small><code className="assignment-compact-id" title={assignment.id}>{assignment.id}</code>
                       </td>
                       <td data-label="Patrol Area">
                         <strong className="d-block assignment-personnel-name">{assignment.patrolArea}</strong>
@@ -196,43 +202,21 @@ function DeploymentList({
                             : assignment.deploymentType === 'route'
                               ? `Route patrol${assignment.patrolMode ? ` · ${{ walk: 'Foot', car: 'Car', motorcycle: 'Motorcycle' }[assignment.patrolMode]}` : ''}` : 'Area patrol'}
                         </small>
-                        {assignment.scheduleBlocks?.length > 0 && <details className="assignment-schedule-details">
-                          <summary>{assignment.scheduleBlocks.length} scheduled {assignment.deploymentType === 'route' ? 'routes' : 'areas'}</summary>
-                          <ol>{assignment.scheduleBlocks.map((block, index) => <li key={index}>
-                            <strong>{block.label}</strong><br />
-                            {formatDateTime(new Date(Date.parse(assignment.shiftStart) + block.offsetMinutes * 60000).toISOString())}
-                            {' · '}{block.durationMinutes} minutes
-                            {block.coverageType === 'custom' && ` · ${block.radiusMeters} m radius`}
-                            {block.coverageType === 'route' && ` · ${block.routeCorridorMeters ?? 100} m each side`}
-                            {block.coverageType === 'route' && (!block.geometry || (assignment.patrolMode !== 'walk' && !block.roadDirections)) && ' · Route warnings unavailable'}
-                            {block.coverageType === 'barangay' && !block.geometry && ' · Boundary unavailable'}
-                          </li>)}</ol>
-                        </details>}
+                        {assignment.scheduleBlocks?.length > 0 && <small className="assignment-block-count">{assignment.scheduleBlocks.length} {assignment.deploymentType === 'route' ? assignment.scheduleBlocks.length === 1 ? 'route' : 'routes' : assignment.scheduleBlocks.length === 1 ? 'area' : 'areas'}</small>}
                         {assignment.vehicleId && <small className="d-block">{assignment.vehicleId.replaceAll('-', ' ')}{assignment.vehicleCrew?.driverId === assignment.personnelId ? ' · Driver' : ''}</small>}
                       </td>
-                      <td data-label="Instructions" className="assignment-instructions-cell">
-                        <button
-                          type="button"
-                          className="assignment-instructions-btn"
-                          onClick={() => setInstructionsAssignment(assignment)}
-                          aria-label={`View instructions for ${assignment.personnelName}`}
-                          title="View deployment instructions"
-                        >
-                          <FileText aria-hidden="true" />
-                        </button>
-                      </td>
-                      <td data-label="Shift Start">{assignment.shiftStart ? formatDateTime(assignment.shiftStart) : '-'}</td>
-                      <td data-label="Shift End">{assignment.shiftEnd ? formatDateTime(assignment.shiftEnd) : '-'}</td>
+                      <td data-label="Duty · PHT" className="assignment-duty-cell"><span><small>Start</small>{formatDateTime(assignment.shiftStart)}</span><span><small>End</small>{formatDateTime(assignment.shiftEnd)}</span>{assignment.endedAt && assignment.status === 'ended_early' && <span className="assignment-actual-end"><small>Ended</small>{formatDateTime(assignment.endedAt)}</span>}</td>
                       <td data-label="Status">
                         <span className={`deployment-status deployment-status--${assignment.status || 'active'}`}>
                           {formatDeploymentStatus(assignment.status)}
                         </span>
                       </td>
-                      <td data-label="Assigned At">{formatDateTime(assignment.assignedAt)}</td>
+                      <td data-label="Assigned At" className="assignment-assigned-cell">{formatDateTime(assignment.assignedAt)}</td>
                       <td data-label="Actions" className="assignment-actions-cell">
                         <div className="assignment-table-actions">
-                          <button type="button" className="assignment-edit-btn" onClick={() => { if (assignment.vehicleId && activeDeploymentView === 'history') { void viewGroup(group, assignment) } else setViewing({ assignment, group: group.assignments, groupId: assignment.vehicleId ? group.groupId : null }) }}><Eye size={15} /> View</button>
-                          {canAct(assignment) && <button type="button" className="assignment-delete-btn" onClick={() => assignment.vehicleId ? onDeleteGroup(group) : onDeleteAssignment(assignment)}>{actionLabel(assignment)}</button>}
+                          <button type="button" className="assignment-instructions-btn" onClick={() => setInstructionsAssignment(assignment)} aria-label={`View instructions for ${assignment.personnelName}`} title="View deployment instructions"><FileText size={16} /></button>
+                          <button type="button" className="assignment-edit-btn assignment-icon-action" title={`View ${assignment.personnelName}'s deployment`} aria-label={`View deployment for ${assignment.personnelName}`} onClick={() => { if (assignment.vehicleId && activeDeploymentView === 'history') { void viewGroup(group, assignment) } else setViewing({ assignment, group: assignment.vehicleId ? completeGroup(group).assignments : [assignment], groupId: assignment.vehicleId ? group.groupId : null }) }}><Eye size={16} /></button>
+                          {!assignment.vehicleId && canAct(assignment) && <button type="button" className="assignment-delete-btn assignment-icon-action" title={`${actionLabel(assignment)} for ${assignment.personnelName}`} aria-label={`${actionLabel(assignment)} for ${assignment.personnelName}`} onClick={() => onDeleteAssignment(assignment)}><Power size={15} /></button>}
                         </div>
                       </td>
                     </tr>

@@ -101,5 +101,5 @@ export const createDeploymentId = (prefix) => {
 }
 export const getDeploymentMode = (assignment) => assignment.status === 'scheduled'
   ? DEPLOYMENT_MODES.SCHEDULE_LATER : DEPLOYMENT_MODES.START_NOW
-export const formatDeploymentStatus = (status) => status
+export const formatDeploymentStatus = (status) => status === 'ended_early' ? 'Ended early' : status
   ? `${status.charAt(0).toUpperCase()}${status.slice(1)}` : 'Active'

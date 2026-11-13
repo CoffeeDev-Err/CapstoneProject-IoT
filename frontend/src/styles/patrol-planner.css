@@ -182,6 +182,43 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .patrol-review__map { min-width:0; display:flex; flex-direction:column; min-height:550px; }
 .patrol-review__details { padding:20px; border-left:1px solid var(--patrol-border); background:var(--patrol-muted); overflow:auto; }
 .patrol-review__summary { display:grid; gap:10px; margin-bottom:22px; }
+.patrol-workspace__fields { padding:12px; gap:10px; align-items:start; }
+.patrol-config-group { display:grid; gap:10px; min-width:0; padding:12px; border:1px solid var(--patrol-border); border-radius:10px; background:var(--patrol-surface); }
+.patrol-config-group h5 { display:flex; align-items:center; gap:8px; margin:0 0 2px; color:var(--patrol-accent-text); font-size:var(--font-size-xs); font-weight:750; line-height:1.4; }
+.patrol-config-group h5::before { content:''; width:3px; height:12px; border-radius:2px; background:var(--patrol-accent); }
+.patrol-config-group h5 span { margin-left:auto; color:var(--patrol-secondary); }
+.patrol-config-group :is(p,small) { line-height:1.45; }
+.patrol-config-group label { gap:6px; }
+.patrol-config-group .patrol-tinted-panel { padding:10px; }
+.patrol-config-group .patrol-route-points { margin:0; }
+.patrol-summary-card { min-width:0; padding:12px; border:1px solid var(--patrol-border); border-radius:10px; background:var(--patrol-surface); }
+.patrol-summary-card__heading { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.patrol-summary-card__heading > strong,.patrol-summary-card h4 { font-size:var(--font-size-sm); }
+.patrol-duty-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+.patrol-duty-summary > div { display:grid; gap:2px; }
+.patrol-duty-summary strong { font-size:var(--font-size-base); }
+.patrol-summary-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid var(--patrol-border); margin-top:10px; padding-top:8px; font-size:var(--font-size-xs); color:var(--patrol-secondary); }
+.patrol-summary-card .patrol-crew-summary { margin:6px 0 0; }
+.patrol-summary-card .patrol-crew-summary li { padding:7px 0; gap:8px; }
+.patrol-summary-card .patrol-instructions { max-height:160px; overflow:auto; font-size:var(--font-size-xs); line-height:1.55; }
+.patrol-summary-ended { font-size:var(--font-size-xs); }
+.patrol-current-next { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.patrol-current-next > div { display:grid; gap:3px; padding:10px; border:1px solid var(--patrol-border); border-radius:8px; background:var(--patrol-surface); }
+.patrol-current-next > div:first-child { border-color:var(--app-accent-border); background:var(--patrol-accent-soft); }
+.patrol-current-next strong { font-size:var(--font-size-xs); overflow-wrap:anywhere; }
+.deployment-page .assignment-list-table { table-layout:auto; }
+.deployment-page .assignment-list-table .personnel-row td { padding:12px 10px; vertical-align:middle; line-height:1.45; }
+.deployment-page .assignment-list-table .assignment-group-row td { padding:10px; }
+.deployment-page .assignment-list-table .assignment-group-actions { flex-wrap:nowrap; gap:6px; }
+.deployment-page .assignment-list-table .assignment-table-actions { flex-wrap:nowrap; justify-content:flex-end; gap:6px; }
+.deployment-page .assignment-list-table :is(.assignment-icon-action,.assignment-instructions-btn) { min-width:34px; width:34px; min-height:34px; height:34px; padding:7px; }
+.deployment-page .assignment-list-table .assignment-compact-id { display:block; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--font-size-xs); color:var(--patrol-secondary); margin-top:4px; }
+.deployment-page .assignment-list-table .assignment-block-count { display:block; margin-top:3px; }
+.deployment-page .assignment-list-table .assignment-duty-cell { min-width:190px; }
+.assignment-duty-cell > span { display:flex; align-items:baseline; gap:8px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.assignment-duty-cell > span > small { min-width:32px; font-size:var(--font-size-xs); color:var(--patrol-secondary); }
+.deployment-page .assignment-list-table .assignment-assigned-cell { min-width:110px; max-width:140px; }
+.deployment-page .deployment-status--ended_early { color:var(--patrol-amber); background:var(--patrol-amber-soft); border-color:var(--patrol-border); white-space:nowrap; }
 .patrol-review__details > h4 { margin-bottom:12px; }
 .patrol-review__details .patrol-timeline__toggle { flex-wrap:wrap; }
 .patrol-review__details .patrol-timeline__title { min-width:130px; }
@@ -215,8 +252,8 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .deployment-page .assignment-list-table .personnel-row:is(:hover,:focus-within) { background:transparent; }
 .deployment-page .assignment-list-table .personnel-row:not(.deployment-row--highlighted):is(:hover,:focus-within) td { background:var(--bs-table-hover-bg); }
 .deployment-page .assignment-list-table .assignment-group-row:is(:hover,:focus-within) td { background:color-mix(in srgb,var(--patrol-accent) 6%,var(--patrol-muted)); }
-.deployment-page .assignment-list-table .deployment-row--highlighted td { background:var(--patrol-accent-soft); box-shadow:inset 0 1px var(--patrol-accent),inset 0 -1px var(--patrol-accent); }
-.deployment-page .assignment-list-table .deployment-row--highlighted td:first-child { box-shadow:inset 3px 0 var(--patrol-accent),inset 0 1px var(--patrol-accent),inset 0 -1px var(--patrol-accent); }
+.deployment-page .assignment-list-table .deployment-row--highlighted td { background:color-mix(in srgb,var(--patrol-accent) 6%,var(--patrol-surface)); box-shadow:none; }
+.deployment-page .assignment-list-table .deployment-row--highlighted td:first-child { box-shadow:inset 2px 0 var(--patrol-accent); }
 .deployment-page .assignment-list-table :is(.assignment-group-label,.assignment-personnel-name,.personnel-badge) { color:var(--patrol-text); }
 .deployment-page .assignment-list-table :is(.assignment-group-meta,.assignment-personnel-rank) { color:var(--patrol-secondary); }
 .deployment-page .deployment-status--completed { color:var(--patrol-secondary); background:var(--patrol-muted); border-color:var(--patrol-border); }
@@ -280,6 +317,20 @@ body:has(.deployment-page) .confirm-modal .confirm-btn--primary:hover { backgrou
   .patrol-planner__footer > div { flex-wrap:wrap; }
 }
 @media (prefers-reduced-motion:reduce) { .patrol-theme * { transition:none !important; animation:none !important; } }
+.patrol-duty > label { min-width: 0; }
+.patrol-duty .assignment-datetime-trigger { height: 48px; min-height: 48px; justify-content: space-between; text-align: left; border: 1px solid var(--patrol-border); border-radius: 9px; background: var(--patrol-input); color: var(--patrol-text); padding: 0 14px; font-size: var(--font-size-sm); }
+.patrol-duty .assignment-datetime-trigger[aria-expanded="true"] { border-color: var(--patrol-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--patrol-accent) 18%, transparent); }
+.assignment-datetime-popover { background: var(--app-card); color: var(--app-text); border-color: var(--app-border); box-shadow: 0 14px 40px #0003; gap: 10px; }
+.assignment-calendar-header button { width: 32px; height: 32px; min-height: 32px; padding: 0; }
+.assignment-calendar-day { height: 34px; min-height: 34px; width: 100%; padding: 0; aspect-ratio: auto; font-size: var(--font-size-xs); }
+.assignment-calendar-day.is-selected { background: var(--app-action); color: #fff; border-color: var(--app-action); }
+.assignment-time-controls { padding-top: 10px; }
+.assignment-time-controls select { min-height: 36px; height: 36px; padding-inline-start: 9px; background: var(--app-input); color: var(--app-text); }
+.assignment-datetime-actions { padding-top: 10px; }
+.assignment-datetime-actions button { min-height: 34px; padding: 6px 12px; }
+.patrol-planner .assignment-mode-selector { margin-top: 16px; }
+.patrol-planner .assignment-mode-selector legend { font-size: var(--font-size-xs); font-weight: 600; margin-bottom: 6px; }
+.patrol-planner .assignment-mode-status { font-size: var(--font-size-xs); padding: 7px 10px; margin-top: 6px; }
 @media (prefers-reduced-motion:reduce) {
   .deployment-page .deployment-list-card button.assignment-edit-btn,
   .deployment-page .assignment-list-table tbody td { transition:none; }

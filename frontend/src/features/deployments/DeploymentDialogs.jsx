@@ -19,7 +19,7 @@ export default function DeploymentDialogs({
         open={Boolean(pendingDeleteGroup)}
         title={pendingDeleteGroup?.assignments[0]?.status === 'scheduled' ? 'Cancel deployment group?' : 'End deployment group?'}
         message={pendingDeleteGroup
-          ? `Update all ${pendingDeleteGroup.assignments.length} assignment(s) under ${pendingDeleteGroup.patrolArea}? Personnel will be notified. Operational history will be retained.`
+          ? `${pendingDeleteGroup?.assignments[0]?.status === 'scheduled' ? 'Cancel' : 'End'} all ${pendingDeleteGroup.assignments.length} assignment(s) under ${pendingDeleteGroup.patrolArea}? ${pendingDeleteGroup?.assignments[0]?.status === 'scheduled' ? 'This cancels the future duty.' : 'Ending before the planned shift end is recorded as Ended early.'} Personnel will be notified and history retained.`
           : ''}
         confirmLabel={pendingDeleteGroup?.assignments[0]?.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'}
         cancelLabel="Cancel"
@@ -30,7 +30,7 @@ export default function DeploymentDialogs({
         open={Boolean(pendingDeleteAssignment)}
         title={pendingDeleteAssignment?.status === 'scheduled' ? 'Cancel deployment?' : 'End deployment?'}
         message={pendingDeleteAssignment
-          ? `Update ${pendingDeleteAssignment.id} for ${pendingDeleteAssignment.personnelName}? Personnel will be notified. Operational history will be retained.`
+          ? `${pendingDeleteAssignment?.status === 'scheduled' ? 'Cancel' : 'End'} the deployment for ${pendingDeleteAssignment.personnelName}? ${pendingDeleteAssignment?.status === 'scheduled' ? 'This cancels the future duty.' : 'Ending before the planned shift end is recorded as Ended early.'} Personnel will be notified and history retained.`
           : ''}
         confirmLabel={pendingDeleteAssignment?.status === 'scheduled' ? 'Cancel deployment' : 'End deployment'}
         cancelLabel="Cancel"

@@ -177,7 +177,9 @@ function AssignAreaPage({ view = 'form' }) {
           ? DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER
           : DEPLOYMENT_LIST_VIEWS.ACTIVE_NOW,
       )
-      setDeploymentSearch(target.id)
+      // A newly saved officer ID identifies the row to highlight, not a search
+      // filter: filtering by it hid the rest of the same vehicle crew.
+      setDeploymentSearch(['active', 'scheduled'].includes(target.status) ? '' : target.id)
       setHistoryPage(1)
       setHighlightedDeploymentId(target.id)
     }
@@ -669,7 +671,7 @@ function AssignAreaPage({ view = 'form' }) {
     let failed = false
     try {
       for (const row of rows) {
-        await setDeploymentStatus(row.id, row.status === 'scheduled' ? 'cancelled' : 'completed')
+        await setDeploymentStatus(row.id, row.status === 'scheduled' ? 'cancelled' : Date.parse(row.shiftEnd) <= Date.now() ? 'completed' : 'ended_early')
       }
       showFeedback('Deployment status updated. Operational history has been retained.', { type: 'success' })
     } catch (error) {

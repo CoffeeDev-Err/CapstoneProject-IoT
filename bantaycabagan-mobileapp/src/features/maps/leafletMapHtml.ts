@@ -125,6 +125,7 @@ export const createLeafletMapHtml = ({
             .officer-popup span{display:block;margin-top:3px;color:${popupMuted};font-size:11px}
             .leaflet-popup-content-wrapper{border-radius:12px;background:${popupBackground};color:${popupText}}
             .leaflet-popup-tip{background:${popupBackground}}
+            .patrol-number { background: transparent; border: 0; box-shadow: none; color: #fff; font-weight: 700; font-size: 11px; }
           </style>
         </head>
         <body>
@@ -276,6 +277,13 @@ export const createLeafletMapHtml = ({
             };
 
             window.focusDeployment=()=>{
+              const features=patrolLayer?.toGeoJSON().features||[];
+              const preview=features.some(feature=>feature.properties.next&&feature.properties.kind==='coverage');
+              const selected=features.filter(feature=>feature.properties.kind==='coverage'&&Boolean(feature.properties.next)===Boolean(preview));
+              if(selected.length){
+                const bounds=L.geoJSON({type:'FeatureCollection',features:selected}).getBounds();
+                if(bounds.isValid()){map.fitBounds(bounds,{paddingTopLeft:[28,200],paddingBottomRight:[28,230],maxZoom:17,animate:true,duration:.7});return;}
+              }
               const requestedZoom=Number(deploymentPoint.zoom)||15;
               const focusZoom=Math.min(requestedZoom,currentMapMode==='satellite'?18:19);
               map.flyTo([Number(deploymentPoint.latitude),Number(deploymentPoint.longitude)],focusZoom,{duration:.8});
@@ -304,7 +312,7 @@ export const createLeafletMapHtml = ({
               }
             };
 
-            let patrolLayer=L.geoJSON(${JSON.stringify(patrolCoverage)}, {style:feature=>({color:feature.properties.next?'#f59e0b':'#2563eb',weight:3,dashArray:'6 4',fillOpacity:.12})}).addTo(map);
+            let patrolLayer=L.geoJSON(${JSON.stringify(patrolCoverage)}, {style:feature=>({color:feature.properties.next?'#f59e0b':'#2563eb',weight:feature.properties.kind==='corridor'?0:3,dashArray:feature.properties.kind==='transition'?'6 4':undefined,fillOpacity:.12}),pointToLayer:(feature,latlng)=>L.circleMarker(latlng,{radius:15,color:'#fff',weight:2,fillColor:feature.properties.next?'#a65f00':'#166534',fillOpacity:1}).bindTooltip(String(feature.properties.label||''),{permanent:true,direction:'center',className:'patrol-number'})}).addTo(map);
             window.handleMapCommand=(command)=>{
               if(!command)return;
               if(command.type==='patrol-coverage'){patrolLayer.clearLayers();patrolLayer.addData(command.features);}

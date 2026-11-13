@@ -122,6 +122,7 @@ export const getManageableDeployments = () => (
 export const getDeploymentHistory = async () => (await Promise.all([
   getPaginatedCollection('/api/deployments?status=completed', 'Unable to load completed deployments.'),
   getPaginatedCollection('/api/deployments?status=cancelled', 'Unable to load cancelled deployments.'),
+  getPaginatedCollection('/api/deployments?status=ended_early', 'Unable to load deployments ended early.'),
 ])).flat()
 
 export const getDeploymentHistoryPage = async ({ page = 1, limit = 10, search = '', signal } = {}) => {
