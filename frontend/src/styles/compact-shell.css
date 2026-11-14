@@ -1,18 +1,20 @@
 /* Shared header and pinned account footer use the existing application palette. */
-:root .layout-root .top-bar { height:var(--top-bar-h); padding-inline:24px; gap:16px; background:var(--app-page); border-bottom:0; }
+:root .layout-root .top-bar { height:var(--top-bar-h); padding-inline:24px; gap:16px; background:var(--app-chrome); border-bottom:1px solid var(--app-border); }
 :root .layout-root .topbar-left { flex:1; gap:12px; overflow:hidden; }
-:root .layout-root .topbar-left__pnp-logo { width:26px; height:34px; }
-.topbar-context { min-width:0; display:flex; align-items:center; gap:8px; line-height:1.4; font-size:var(--font-size-lg); color:var(--app-secondary); }
-.topbar-context > span { flex-shrink:0; }
-.topbar-context > strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:var(--app-text); }
-:root .layout-root .top-bar p { margin:3px 0 0; font-size:var(--font-size-xs); letter-spacing:0; line-height:1.4; }
+:root .layout-root .topbar-left__pnp-badge { display:grid; place-items:center; flex:0 0 auto; width:44px; height:44px; border:1px solid var(--app-border); border-radius:12px; background:var(--app-card); }
+:root .layout-root .topbar-left__pnp-logo { display:block; width:28px; height:38px; object-fit:contain; }
+:root .layout-root .top-bar h1 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--font-size-xl); }
+:root .layout-root .top-bar p { margin:3px 0 0; font-size:var(--font-size-sm); letter-spacing:0; line-height:1.4; }
 :root .layout-root .connection-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; line-height:1.4; font-size:var(--font-size-xs); }
 .top-bar .connection-pill::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
 :root .layout-root .topbar-right > .icon-btn,:root .layout-root .notification-btn { width:38px; height:38px; border:1px solid var(--app-border); background:var(--app-card); }
 :root .layout-root .topbar-right .icon-btn:hover { background:var(--app-elevated); }
 :root .nav-sidebar__brand { flex-shrink:0; gap:8px; padding-inline:16px; border-bottom:0; }
-:root .nav-sidebar__badge { width:32px; height:36px; border:0; border-radius:0; background:transparent; box-shadow:none; }
-:root .nav-sidebar__brand-name,:root .nav-sidebar__brand-geo,:root .nav-sidebar__brand-sentri { font-size:var(--font-size-2xl); }
+:root .nav-sidebar__badge { width:44px; height:44px; border:1px solid var(--app-border); border-radius:12px; background:var(--app-card); box-shadow:none; }
+:root .nav-sidebar__brand-name,:root .nav-sidebar__brand-geo,:root .nav-sidebar__brand-sentri { font-family:var(--font-body); font-size:var(--font-size-2xl); font-weight:800; letter-spacing:-0.035em; }
+:root .nav-sidebar__brand-name { gap:0; }
+:root .nav-sidebar__brand-geo { margin-left:0; }
+:root .nav-sidebar--collapsed .nav-sidebar__brand { justify-content:center; gap:0; padding-inline:0; }
 :root .nav-sidebar__nav { min-height:0; flex:1 1 0; padding-top:20px; padding-bottom:14px; }
 .nav-sidebar__footer { position:relative; z-index:2; flex-shrink:0; display:grid; grid-template-columns:minmax(0,1fr) 32px; align-items:center; gap:4px; padding:8px; border-top:1px solid var(--app-border); background:var(--app-chrome); }
 :root .nav-sidebar .nav-sidebar__footer .nav-sidebar__toggle { margin:0; min-height:36px; padding:6px; border:0; background:transparent; justify-content:center; }
@@ -44,11 +46,10 @@
   :root .layout-root .top-bar { padding-inline:12px; gap:10px; }
   :root .layout-root .topbar-left { gap:8px; }
   :root .layout-root .topbar-right > .icon-btn,:root .layout-root .notification-btn { width:44px; height:44px; }
-  .topbar-context > span { display:none; }
-  .topbar-context { font-size:var(--font-size-sm); }
+  :root .layout-root .top-bar h1 { font-size:var(--font-size-base); }
 }
 @media (max-width:480px) {
-  :root .layout-root .topbar-left__pnp-logo { display:none; }
+  :root .layout-root .topbar-left__pnp-badge { display:none; }
   :root .layout-root .topbar-right { gap:5px !important; }
   :root .layout-root .connection-pill { padding:5px 7px; }
 }

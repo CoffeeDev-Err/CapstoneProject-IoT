@@ -1,5 +1,5 @@
 import type { DeploymentAssignment } from '../../types/operations';
-import { resolveDeploymentMapTarget } from './deploymentMapTarget';
+import { resolveDeploymentMapTarget, shouldShowDeploymentPoint } from './deploymentMapTarget';
 
 const assignment = (values: Partial<DeploymentAssignment>): DeploymentAssignment => ({
   id: 'DEP-001',
@@ -44,4 +44,15 @@ it('prioritizes an exact fixed post over the patrol-area center', () => {
     hasExactPoint: true,
     zoom: 16,
   });
+});
+
+it('omits the separate POST/START pin for area and route patrols without changing their map focus', () => {
+  for (const deploymentType of ['area', 'route'] as const) {
+    const patrol = assignment({ deploymentType, hasDeploymentPoint: true, latitude: 17.4, longitude: 121.8 });
+    expect(shouldShowDeploymentPoint(patrol)).toBe(false);
+    expect(resolveDeploymentMapTarget(patrol)).toMatchObject({ latitude: 17.4, longitude: 121.8, hasExactPoint: true });
+  }
+  expect(shouldShowDeploymentPoint(assignment({ deploymentType: 'point' }))).toBe(true);
+  expect(shouldShowDeploymentPoint(assignment({ deploymentType: undefined }))).toBe(true);
+  expect(shouldShowDeploymentPoint()).toBe(false);
 });

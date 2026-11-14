@@ -4,6 +4,7 @@ import type { DeploymentAssignment, LivePersonnel } from '../../types/operations
 import { patrolBlockFeatures } from './patrolCoverageGeometry';
 import { API_URL } from '../../services/apiConfig';
 import { requestJson } from '../../services/requestJson';
+import { hasDutyLocation } from './dutyLocation';
 
 export function remainingRoute(points: number[][], position: number[]) {
   let best = Infinity, index = 0, projected = points[0];
@@ -42,18 +43,23 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
   const [guidance, setGuidance] = useState('');
   const [routeDuration, setRouteDuration] = useState<number | null>(null);
   const requestId = useRef(0);
+  const locationWasUsable = useRef(false);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10000);
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') setNow(Date.now()); });
     return () => { clearInterval(timer); subscription.remove(); requestId.current += 1; };
   }, []);
   const index = schedulePosition(base, now);
+  const usableLocation = Boolean(base && hasDutyLocation(officer, base, now));
   const block = base?.scheduleBlocks?.[index];
   const next = base?.scheduleBlocks?.[index + 1];
   const previewBlock = previewIndex !== null ? base?.scheduleBlocks?.[previewIndex] : undefined;
   const previewNext = Boolean(previewBlock);
   const scheduleKey = JSON.stringify([base?.id, base?.shiftStart, base?.patrolMode, base?.scheduleBlocks]);
   useEffect(() => { requestId.current += 1; setPreviewIndex(null); setDirections(null); setGuidance(''); setRouteDuration(null); }, [scheduleKey, index]);
+  useEffect(() => {
+    if (!usableLocation) { requestId.current += 1; setDirections(null); setRoadDirections(false); setRouteDuration(null); }
+  }, [usableLocation]);
   const assignment = useMemo(() => base && block ? { ...base, patrolArea: block.label,
     deploymentPointLabel: block.label, latitude: block.latitude ?? null, longitude: block.longitude ?? null,
     hasDeploymentPoint: block.coverageType !== 'barangay' && Number.isFinite(block.latitude),
@@ -70,7 +76,10 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
     setDirections(null); setRoadDirections(false); setRouteDuration(null);
     if (targetIndex === index) { setPreviewIndex(null); setGuidance(''); return; }
     setPreviewIndex(targetIndex);
-    if (!Number.isFinite(officer.latitude) || !Number.isFinite(officer.longitude) || !Number.isFinite(targetBlock.latitude) || !Number.isFinite(targetBlock.longitude)) {
+    if (!usableLocation) {
+      setGuidance('Waiting for a GPS reading from this duty. The selected coverage is still shown.'); return;
+    }
+    if (!Number.isFinite(targetBlock.latitude) || !Number.isFinite(targetBlock.longitude)) {
       setGuidance('A GPS position and destination point are needed for directions.'); return;
     }
     const source = { latitude: officer.latitude!, longitude: officer.longitude! };
@@ -96,11 +105,18 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
       } else setGuidance('Road directions unavailable. The destination is still shown; tap Refresh directions to retry.');
     }
   };
-  const progress = useMemo(() => directions && Number.isFinite(officer.longitude) && Number.isFinite(officer.latitude)
+  useEffect(() => {
+    const recovered = usableLocation && !locationWasUsable.current;
+    locationWasUsable.current = usableLocation;
+    // A preview opened before this duty's first fix can start directions as
+    // soon as that fix arrives, without using the previous duty's origin.
+    if (recovered && previewIndex !== null) void viewBlock(previewIndex);
+  }, [usableLocation, previewIndex]);
+  const progress = useMemo(() => directions && usableLocation
     ? roadDirections ? remainingRoute(directions.coordinates, [officer.longitude!, officer.latitude!])
       : { coordinates: [[officer.longitude!, officer.latitude!], directions.coordinates[directions.coordinates.length - 1]], offRoute: false }
     : null,
-  [directions, officer.longitude, officer.latitude, roadDirections]);
+  [directions, officer.longitude, officer.latitude, roadDirections, usableLocation]);
   const features = useMemo<GeoJSON.FeatureCollection>(() => {
     const list = patrolBlockFeatures(block, index, false, base?.patrolMode);
     if (previewBlock && previewIndex !== null) list.push(...patrolBlockFeatures(previewBlock, previewIndex, true, base?.patrolMode));
@@ -117,8 +133,9 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
   const etaMinutes = roadDirections && routeDuration !== null && remainingMeters !== null && totalMeters > 0 && !progress?.offRoute
     ? Math.max(0, Math.ceil(routeDuration * remainingMeters / totalMeters / 60)) : null;
   const distanceMessage = remainingMeters === null ? '' : `${remainingMeters >= 1000 ? `${(remainingMeters / 1000).toFixed(1)} km` : `${Math.round(remainingMeters)} m`} ${roadDirections ? 'remaining' : 'straight-line distance'}${etaMinutes !== null ? ` · About ${etaMinutes} min` : ''}. `;
-  return { assignment, mapAssignment, features, block, next, index, minutesLeft, previewNext, previewIndex, previewBlock, viewBlock, viewNext: () => viewBlock(index + 1),
+  return { assignment, mapAssignment, features, block, next, index, now, minutesLeft, previewNext, previewIndex, previewBlock, viewBlock, viewNext: () => viewBlock(index + 1),
     remainingMeters, etaMinutes,
-    guidance: previewNext && stale ? `Using your last known GPS location. ${distanceMessage}${directionMessage}` : `${distanceMessage}${directionMessage}`,
+    guidance: previewNext && !usableLocation ? 'Waiting for a GPS reading from this duty. The selected coverage is still shown.'
+      : previewNext && stale ? `Using your last known GPS location. ${distanceMessage}${directionMessage}` : `${distanceMessage}${directionMessage}`,
     closePreview: () => { requestId.current += 1; setPreviewIndex(null); setDirections(null); setGuidance(''); } };
 }

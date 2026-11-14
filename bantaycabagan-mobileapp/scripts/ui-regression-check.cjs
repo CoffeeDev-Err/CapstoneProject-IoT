@@ -79,6 +79,10 @@ const profileSource = readFileSync(
   resolve(projectRoot, 'src/screens/OfficerProfileScreen.tsx'),
   'utf8',
 );
+const deploymentCardSource = readFileSync(
+  resolve(projectRoot, 'src/features/maps/CurrentDeploymentCard.tsx'),
+  'utf8',
+);
 
 assert.match(operationsApiSource, /import \{ File \} from 'expo-file-system'/);
 assert.match(operationsApiSource, /new File\(input\.evidence_photo\.uri\)/);
@@ -93,8 +97,8 @@ assert.doesNotMatch(
 );
 
 assert.match(
-  officerMapSource,
-  /styles\.deploymentPill,\s*\{ backgroundColor: colors\.surface, borderColor: colors\.border \}/s,
+  deploymentCardSource,
+  /styles\.card,\s*\{ backgroundColor: colors\.surface, borderColor: colors\.border \}/s,
 );
 assert.match(
   nativeMapSource,

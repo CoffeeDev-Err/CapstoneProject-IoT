@@ -149,7 +149,7 @@ const ingestLocation = async (payload = {}) => {
 	if (source === 'gps' && positionValid === false) {
 		gpsFixGuard.clear(personnelId)
 		return {
-			personnel: serializePersonnel(profile, current, { isOnDuty: true }),
+			personnel: serializePersonnel(profile, current, { isOnDuty: true, activeDeployment }),
 			accepted: false,
 			reason: 'invalid_gps_fix',
 			historySampled: false,
@@ -184,6 +184,7 @@ const ingestLocation = async (payload = {}) => {
 			return {
 				personnel: serializePersonnel(profile, current, {
 					isOnDuty: Boolean(activeDeployment),
+					activeDeployment,
 				}),
 				accepted: true,
 				reason: telemetryChanged ? 'telemetry_refreshed' : 'location_name_refreshed',
@@ -194,6 +195,7 @@ const ingestLocation = async (payload = {}) => {
 		return {
 			personnel: serializePersonnel(profile, current, {
 				isOnDuty: Boolean(activeDeployment),
+				activeDeployment,
 			}),
 			accepted: false,
 			reason: 'stale_location',
@@ -210,7 +212,7 @@ const ingestLocation = async (payload = {}) => {
 		})
 		if (rejectionReason) {
 			return {
-				personnel: serializePersonnel(profile, current, { isOnDuty: true }),
+				personnel: serializePersonnel(profile, current, { isOnDuty: true, activeDeployment }),
 				accepted: false,
 				reason: rejectionReason,
 				historySampled: false,
@@ -302,6 +304,7 @@ const ingestLocation = async (payload = {}) => {
 	return {
 		personnel: serializePersonnel(profile, updated, {
 			isOnDuty: Boolean(activeDeployment),
+			activeDeployment,
 		}),
 		accepted: true,
 		historySampled: shouldSample,

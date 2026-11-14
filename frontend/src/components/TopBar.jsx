@@ -2,7 +2,7 @@
  * TopBar.jsx — Sticky Header Bar
  *
  * Displayed at the top of every page inside AppLayout.
- * Left side  — compact page context and station identification
+ * Left side  — Philippine National Police branding and station identification
  * Right side — connection status pill, dark/light mode toggle,
  *              and notifications. Account actions live in the sidebar.
  *
@@ -12,7 +12,7 @@
  *   onToggleDark {Function} — called to flip the dark mode flag
  */
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Bell,
   Menu,
@@ -22,6 +22,7 @@ import {
 import { matchesPrefixSearch } from '../utils/searchMatching'
 import { getNotificationDisplayMessage, getNotificationNavigationTarget } from '../utils/notificationNavigation'
 import ConfirmModal from './ConfirmModal'
+import pnpLogo from '../assets/pnp-logo.png'
 
 const NOTIFICATION_HISTORY_OPTIONS = [
   { value: 'all', label: 'Show All' },
@@ -120,13 +121,6 @@ function TopBar({
   const notificationRef = useRef(null)
   const notificationRequestSequenceRef = useRef(0)
   const navigate = useNavigate()
-  const { pathname } = useLocation()
-  const page = pathname.startsWith('/personnel/') ? ['Operations', 'Personnel GPS history'] : ({
-    '/map': ['Overview', 'Live Map'], '/monitoring': ['Overview', 'Dashboard'],
-    '/personnel': ['Operations', 'Personnel'], '/assign-area': ['Operations', 'Deployment Management'],
-    '/deployments': ['Operations', 'Assigned Deployments'], '/analytics': ['Analytics', 'Analytics'],
-    '/reports': ['Analytics', 'Reports'], '/settings': ['Admin', 'Account Management'],
-  }[pathname] || ['GeoSentri', 'Operations portal'])
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((notification) => {
@@ -221,13 +215,16 @@ function TopBar({
           aria-controls="mobile-navigation" onClick={onOpenNavigation}>
           <Menu aria-hidden="true" />
         </button>
+        <span className="topbar-left__pnp-badge" aria-hidden="true">
+          <img className="topbar-left__pnp-logo" src={pnpLogo} alt="" />
+        </span>
         <div className="topbar-left__copy">
-          <div className="topbar-context"><strong title={page[1]}>{page[1]}</strong></div>
-          <p>Cabagan Police Station <span aria-hidden="true">·</span> Philippine National Police</p>
+          <h1>Philippine National Police</h1>
+          <p>Cabagan Police Station Operations Portal</p>
         </div>
       </div>
 
-      {/* ── Right: status pill + theme + notifications + supervisor profile ── */}
+      {/* ── Right: status pill + theme + notifications ── */}
       <div className="topbar-right d-flex align-items-center gap-2 flex-shrink-0">
         {/* Live / Offline indicator */}
         <span className={`connection-pill ${isConnected ? 'online' : 'offline'}`}>
@@ -245,7 +242,7 @@ function TopBar({
           {isDark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
         </button>
 
-        {/* Notifications — appears before profile and shows an unread blue dot */}
+        {/* Notifications and unread indicator */}
         <div className="notification-wrapper" ref={notificationRef}>
           <button
             type="button"

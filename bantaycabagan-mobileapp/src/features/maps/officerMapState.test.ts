@@ -4,6 +4,7 @@ import {
   selectVisiblePersonnel,
   isSamePersonnelId,
 } from './officerMapState';
+import type { DeploymentAssignment, LivePersonnel } from '../../types/operations';
 
 describe('officer map selectors', () => {
   it('recognizes the current officer even when an API changes id casing or whitespace', () => {
@@ -44,5 +45,22 @@ describe('officer map selectors', () => {
     }] as never;
     expect(selectEmergencyPersonnelIds(tasks).has('P-1')).toBe(true);
     expect(selectActiveBackupRequest(tasks, 'P-1')?.id).toBe('T-1');
+  });
+
+  it('hides the previous duty fix after acknowledgement and accepts an outage fix from this duty', () => {
+    const now = Date.now();
+    const assignment = { status: 'active', acknowledged: true, shiftStart: new Date(now - 600_000).toISOString(), shiftEnd: new Date(now + 600_000).toISOString() } as DeploymentAssignment;
+    const old = { id: 'P-1', isOnDuty: true, isVisibleOnMap: true, latitude: 17.4, longitude: 121.7, locationRecordedAt: new Date(now - 900_000).toISOString() } as LivePersonnel;
+    expect(selectVisiblePersonnel([old], 'P-1', old, assignment)).toEqual([]);
+    const stale = { ...old, isLocationStale: true, locationRecordedAt: new Date(now - 300_000).toISOString() };
+    expect(selectVisiblePersonnel([stale], 'P-1', stale, assignment)).toEqual([stale]);
+    expect(selectVisiblePersonnel([stale], 'P-1', stale, { ...assignment, shiftEnd: new Date(now).toISOString() }, now)).toEqual([]);
+  });
+
+  it('hides cached roster markers when their duty has ended without waiting for a socket update', () => {
+    const now = Date.now();
+    const current = { id: 'P-1', isOnDuty: true } as never;
+    const ended = { id: 'P-2', isOnDuty: true, latitude: 17.4, longitude: 121.7, locationRecordedAt: new Date(now - 120_000).toISOString(), activeShiftEnd: new Date(now - 60_000).toISOString() } as never;
+    expect(selectVisiblePersonnel([ended], 'P-1', current)).toEqual([]);
   });
 });

@@ -1,6 +1,8 @@
 import { isInsideCabagan } from '../../constants/cabaganGeofence';
 import type { OfficerMapPerson } from '../../components/OfficerMapCanvas';
-import type { LivePersonnel, OperationalTask } from '../../types/operations';
+import type { DeploymentAssignment, LivePersonnel, OperationalTask } from '../../types/operations';
+import { hasDutyLocation } from './dutyLocation';
+import { isDeploymentActiveNow } from '../operations/operationalState';
 
 export const normalizePersonnelId = (value?: string | null) => String(value || '').trim().toLowerCase();
 
@@ -12,21 +14,19 @@ export const selectVisiblePersonnel = (
   personnel: LivePersonnel[],
   currentPersonnelId: string,
   currentOfficer: LivePersonnel,
+  assignment?: DeploymentAssignment,
+  now = Date.now(),
 ) => {
   // Location sharing is available only while the viewing officer has an
   // active deployment. Keep this client-side guard even though the API and
   // socket payloads are also scoped by the backend.
-  if (currentOfficer.isOnDuty !== true) return [];
+  if (currentOfficer.isOnDuty !== true || (assignment && !isDeploymentActiveNow(assignment, now))) return [];
   if (personnel.length) {
     return personnel.filter((member) => (
-      member.isVisibleOnMap !== false
-      && member.isOnDuty !== false
-      && Number.isFinite(member.latitude)
-      && Number.isFinite(member.longitude)
+      hasDutyLocation(member, isSamePersonnelId(member.id, currentPersonnelId) ? assignment : undefined, now)
     ));
   }
-  return currentPersonnelId && currentOfficer.isVisibleOnMap !== false
-    && Number.isFinite(currentOfficer.latitude) && Number.isFinite(currentOfficer.longitude)
+  return currentPersonnelId && hasDutyLocation(currentOfficer, assignment, now)
     ? [currentOfficer] : [];
 };
 

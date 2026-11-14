@@ -44,3 +44,18 @@ it('resumes with the newest measurement after sleep without preserving the stale
   const fresh = { ...latest, latitude: 17.425, locationRecordedAt: new Date(now + 600_000).toISOString() };
   expect(mergePersonnelLocations([stale], [fresh], now + 600_000)).toEqual([fresh]);
 });
+
+it('does not resurrect a fix from the previous shift when an older snapshot follows a new duty', () => {
+  const incoming = { ...older, isVisibleOnMap: false, latitude: null, longitude: null,
+    activeShiftStart: '2026-10-04T02:00:25Z', activeShiftEnd: '2026-10-04T04:00:25Z' };
+  expect(mergePersonnelLocations([latest], [incoming], now)).toEqual([incoming]);
+});
+
+it('keeps a newer accepted fix from this shift when an older snapshot still says GPS unavailable', () => {
+  const incoming = { ...older, isVisibleOnMap: false, latitude: null, longitude: null,
+    activeShiftStart: '2026-10-04T02:00:10Z', activeShiftEnd: '2026-10-04T04:00:10Z' };
+  const [result] = mergePersonnelLocations([latest], [incoming], now);
+  expect(result.isVisibleOnMap).toBe(true);
+  expect(result.latitude).toBe(latest.latitude);
+  expect(result.activeShiftStart).toBe(incoming.activeShiftStart);
+});

@@ -41,4 +41,17 @@ describe('incoming GPS snapshots', () => {
     const fresh = { ...latest, latitude: 17.425, locationRecordedAt: new Date(now + 600_000).toISOString() }
     expect(mergePersonnelLocations([stale], [fresh], now + 600_000)).toEqual([fresh])
   })
+
+  it('never revives a previous-shift marker when a slow response follows a new deployment', () => {
+    const incoming = { ...older, isVisibleOnMap: false, latitude: null, longitude: null,
+      activeShiftStart: '2026-10-04T02:00:25Z', activeShiftEnd: '2026-10-04T04:00:25Z' }
+    expect(mergePersonnelLocations([latest], [incoming], now)).toEqual([incoming])
+  })
+
+  it('can retain a newer fix from this duty while keeping expired duties hidden', () => {
+    const incoming = { ...older, isVisibleOnMap: false, latitude: null, longitude: null,
+      activeShiftStart: '2026-10-04T02:00:10Z', activeShiftEnd: '2026-10-04T04:00:10Z' }
+    expect(mergePersonnelLocations([latest], [incoming], now)[0].isVisibleOnMap).toBe(true)
+    expect(mergePersonnelLocations([latest], [incoming], Date.parse(incoming.activeShiftEnd))[0].isVisibleOnMap).toBe(false)
+  })
 })

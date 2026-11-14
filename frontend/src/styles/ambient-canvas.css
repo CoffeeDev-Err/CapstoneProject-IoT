@@ -17,8 +17,7 @@
 }
 
 :root .layout-root { background-color: var(--app-canvas-base); }
-:root .layout-root .layout-body,
-:root .layout-root .top-bar {
+:root .layout-root .layout-body {
   background-color: var(--app-canvas-base);
   background-image: var(--app-canvas-image);
   background-size: var(--app-canvas-size);

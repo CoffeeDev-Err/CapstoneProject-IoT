@@ -1,4 +1,5 @@
 import type { LivePersonnel } from '../../types/operations';
+import { hasDutyLocation } from '../maps/dutyLocation';
 
 export function mergePersonnelLocations(previous: LivePersonnel[], incoming: LivePersonnel[], now = Date.now()) {
   const previousById = new Map(previous.map((member) => [member.id, member]));
@@ -10,6 +11,7 @@ export function mergePersonnelLocations(previous: LivePersonnel[], incoming: Liv
     if (!latest || latest.source !== 'gps' || member.source !== 'gps'
       || !Number.isFinite(latestTime) || !Number.isFinite(incomingTime)
       || incomingTime >= latestTime) return member;
+    if (member.activeShiftStart && latestTime < Date.parse(member.activeShiftStart)) return member;
     const age = Math.max(0, Math.floor((now - latestTime) / 1000));
     const stale = now - latestTime > (member.locationStaleAfterSeconds ?? 120) * 1000
       || latestTime - now > 300_000;
@@ -30,7 +32,8 @@ export function mergePersonnelLocations(previous: LivePersonnel[], incoming: Liv
       isLocationStale: stale,
       locationAgeSeconds: age,
       locationStatus: !hasCoordinates ? 'unavailable' : stale ? 'stale' : 'current',
-      isVisibleOnMap: member.isOnDuty === true && hasCoordinates,
+      isVisibleOnMap: member.isOnDuty === true && hasCoordinates
+        && hasDutyLocation({ ...member, isVisibleOnMap: true, latitude: latest.latitude, longitude: latest.longitude, locationRecordedAt: latest.locationRecordedAt }, undefined, now),
     } as LivePersonnel;
   });
 }

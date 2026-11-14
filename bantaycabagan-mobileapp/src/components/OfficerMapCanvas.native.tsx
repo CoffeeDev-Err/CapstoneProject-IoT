@@ -53,7 +53,7 @@ import {
   type ConfirmedGpsFix,
 } from '../utils/officerMapMath';
 import { usePersonnelClusters } from '../features/maps/usePersonnelClusters';
-import { resolveDeploymentMapTarget } from '../features/maps/deploymentMapTarget';
+import { resolveDeploymentMapTarget, shouldShowDeploymentPoint } from '../features/maps/deploymentMapTarget';
 import { isSamePersonnelId } from '../features/maps/officerMapState';
 import type {
   OfficerMapCanvasHandle,
@@ -322,7 +322,7 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
     deploymentTarget.longitude,
     deploymentTarget.latitude,
   ]), [deploymentTarget.latitude, deploymentTarget.longitude]);
-  const deploymentPoint = deploymentTarget.hasExactPoint
+  const deploymentPoint = deploymentTarget.hasExactPoint && shouldShowDeploymentPoint(assignment)
     ? {
         longitude: deploymentTarget.longitude,
         latitude: deploymentTarget.latitude,

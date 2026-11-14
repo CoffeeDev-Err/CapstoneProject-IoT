@@ -13,7 +13,6 @@ import {
   Easing,
   Modal,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -32,6 +31,7 @@ import { useMobileTheme } from '../context/ThemeContext';
 import type { LivePersonnel } from '../types/operations';
 import { useCurrentDeployment } from '../features/maps/useCurrentDeployment';
 import { usePatrolSchedule } from '../features/maps/usePatrolSchedule';
+import { CurrentDeploymentCard } from '../features/maps/CurrentDeploymentCard';
 import { useAuth } from '../context/AuthContext';
 import { WebMapFrame } from '../components/WebMapFrame';
 import {
@@ -43,7 +43,7 @@ import {
   isSamePersonnelId,
 } from '../features/maps/officerMapState';
 import { createLeafletMapHtml } from '../features/maps/leafletMapHtml';
-import { resolveDeploymentMapTarget } from '../features/maps/deploymentMapTarget';
+import { resolveDeploymentMapTarget, shouldShowDeploymentPoint } from '../features/maps/deploymentMapTarget';
 import {
   getMapTopControlPosition,
   MapControls,
@@ -199,8 +199,8 @@ export default function OfficerMapScreen({
   }, [onMapInteractionChange, refreshClock, refreshOperations]));
 
   const visiblePersonnel = useMemo<LivePersonnel[]>(() => (
-    assignment ? selectVisiblePersonnel(personnel, currentPersonnelId, currentOfficer) : []
-  ), [assignment, currentOfficer, currentPersonnelId, personnel]);
+    baseAssignment ? selectVisiblePersonnel(personnel, currentPersonnelId, currentOfficer, baseAssignment, patrol.now) : []
+  ), [baseAssignment, currentOfficer, currentPersonnelId, personnel, patrol.now]);
 
   const emergencyPersonnelIds = useMemo(() => selectEmergencyPersonnelIds(tasks), [tasks]);
 
@@ -231,8 +231,7 @@ export default function OfficerMapScreen({
   const backupZones = useMemo(() => tasks
     .filter((task) => task.type === 'backup' && (task.status === 'open' || task.status === 'full'))
     .map((task) => {
-      const requester = personnel.find((member) => isSamePersonnelId(member.id, task.requested_by))
-        || (isSamePersonnelId(currentOfficer.id, task.requested_by) ? currentOfficer : undefined);
+      const requester = visiblePersonnel.find((member) => isSamePersonnelId(member.id, task.requested_by));
       if (!requester
         || !Number.isFinite(requester.latitude)
         || !Number.isFinite(requester.longitude)) return null;
@@ -243,7 +242,7 @@ export default function OfficerMapScreen({
         showArrivalRadius: Boolean(task.responders?.some((responder) => responder.arrived_at)),
       };
     })
-    .filter((zone): zone is NonNullable<typeof zone> => Boolean(zone)), [currentOfficer, personnel, tasks]);
+    .filter((zone): zone is NonNullable<typeof zone> => Boolean(zone)), [visiblePersonnel, tasks]);
 
   const currentOfficerHasActiveBackup = emergencyPersonnelIds.has(currentPersonnelId);
   const hasCriticalPersonnel = mapPersonnel.some((member) => member.emergencyActive);
@@ -361,7 +360,7 @@ export default function OfficerMapScreen({
     longitude: deploymentTarget.longitude,
     deploymentPointLabel: mapAssignment?.deploymentPointLabel,
     deploymentType: mapAssignment?.deploymentType,
-    hasDeploymentPoint: deploymentTarget.hasExactPoint,
+    hasDeploymentPoint: deploymentTarget.hasExactPoint && shouldShowDeploymentPoint(mapAssignment),
     deploymentFocusZoom: deploymentTarget.zoom,
     currentPersonnelId,
     isDark,
@@ -643,44 +642,11 @@ export default function OfficerMapScreen({
               </View>
             )}
             {assignment && (!followedOfficer || isFollowingCurrentOfficer) && !selectedOfficer && (
-              <TouchableOpacity
-                accessibilityLabel={`View current deployment details for ${assignment.patrolArea}`}
-                activeOpacity={0.82}
-                onPress={() => setDeploymentDetailsOpen(true)}
-                style={[
-                styles.deploymentPill,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-              >
-                <View style={[styles.deploymentIcon, { backgroundColor: colors.blueSoft }]}>
-                  <Icon name="location-on" size={18} color={colors.blue} />
-                </View>
-                <View style={styles.deploymentText}>
-                  <Text style={[styles.deploymentLabel, { color: colors.textMuted }]}>CURRENT DEPLOYMENT</Text>
-                  <Text style={[styles.deploymentArea, { color: colors.text }]} numberOfLines={1}>
-                    {assignment?.patrolArea || 'No active assignment'}
-                  </Text>
-                  <Text style={[styles.deploymentType, { color: colors.blue }]} numberOfLines={1}>
-                    {deploymentStyleLabel}
-                  </Text>
-                </View>
-                <Icon name="chevron-right" size={19} color={colors.textMuted} />
-              </TouchableOpacity>
+              <CurrentDeploymentCard assignment={assignment} styleLabel={deploymentStyleLabel}
+                currentIndex={patrol.index} previewIndex={patrol.previewIndex}
+                onOpen={() => setDeploymentDetailsOpen(true)}
+                onViewBlock={index => { void patrol.viewBlock(index); }} />
             )}
-            {!!baseAssignment?.scheduleBlocks?.length && !selectedOfficer && <View style={{ gap: 5, alignSelf: 'flex-start', maxWidth: '100%', padding: 7, borderRadius: 10, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }}>
-              <Text style={{ color: colors.textMuted, fontSize: 11 }}>My patrol schedule · {patrol.previewBlock ? 'Preview' : 'Current coverage'}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                {baseAssignment.scheduleBlocks.map((block, index) => {
-                  const selected = (patrol.previewIndex ?? patrol.index) === index;
-                  return <TouchableOpacity key={`${index}-${block.label}`} accessibilityRole="button"
-                    accessibilityLabel={`View my ${baseAssignment.deploymentType === 'route' ? 'route' : 'area'} ${index + 1}: ${block.label}`}
-                    accessibilityState={{ selected }} onPress={() => { void patrol.viewBlock(index); }}
-                    style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: selected ? colors.blue : colors.surface, borderColor: selected ? colors.blue : colors.border, borderWidth: 1 }}>
-                    <Text style={{ fontWeight: '700', color: selected ? '#fff' : colors.text }}>{index + 1}</Text>
-                  </TouchableOpacity>;
-                })}
-              </ScrollView>
-            </View>}
           </View>
 
           <View style={styles.mapControlStack}>
@@ -824,11 +790,13 @@ export default function OfficerMapScreen({
           onViewMap={focusDeployment}
         />
       )}
-      {patrol.previewNext && !selectedOfficer && !deploymentDetailsOpen && <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, padding: 14, gap: 8, borderRadius: 12, backgroundColor: colors.surface }}>
-        <Text style={{ color: colors.text, fontWeight: '700' }}>Preview {Number(patrol.previewIndex) + 1}: {patrol.previewBlock?.label}</Text>
-        <Text style={{ color: colors.textMuted }}>{patrol.guidance}</Text>
-        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => { if (patrol.previewIndex !== null) void patrol.viewBlock(patrol.previewIndex); }}><Text style={{ color: colors.blue }}>Refresh directions</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={patrol.closePreview}><Text style={{ color: colors.blue }}>Back to current coverage</Text></TouchableOpacity>
+      {patrol.previewNext && !selectedOfficer && !deploymentDetailsOpen && <View style={[styles.routePreview, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.routePreviewTitle, { color: colors.text }]} numberOfLines={1}>Preview {Number(patrol.previewIndex) + 1}: {patrol.previewBlock?.label}</Text>
+        <Text style={[styles.routePreviewGuidance, { color: colors.textMuted }]}>{patrol.guidance}</Text>
+        <View style={styles.routePreviewActions}>
+          <TouchableOpacity accessibilityRole="button" style={styles.routePreviewAction} onPress={() => { if (patrol.previewIndex !== null) void patrol.viewBlock(patrol.previewIndex); }}><Text style={[styles.routePreviewActionText, { color: colors.blue }]}>Refresh directions</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to current coverage" style={styles.routePreviewAction} onPress={patrol.closePreview}><Text style={[styles.routePreviewActionText, { color: colors.blue }]}>Current coverage</Text></TouchableOpacity>
+        </View>
       </View>}
       </View>
     </SafeAreaView>
@@ -836,6 +804,12 @@ export default function OfficerMapScreen({
 }
 
 const styles = StyleSheet.create({
+  routePreview: { position: 'absolute', bottom: 174, left: 16, right: 16, padding: 12, gap: 5, borderRadius: 12, borderWidth: 1 },
+  routePreviewTitle: { fontSize: 13, fontWeight: '800' },
+  routePreviewGuidance: { fontSize: 11, lineHeight: 16 },
+  routePreviewActions: { flexDirection: 'row', gap: 8 },
+  routePreviewAction: { flex: 1, minHeight: 44, justifyContent: 'center' },
+  routePreviewActionText: { fontSize: 11, fontWeight: '700' },
   previewNotice: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef3c7' },
   previewNoticeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
   screen: { flex: 1, backgroundColor: '#ffffff' },
@@ -892,22 +866,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 8,
   },
-  deploymentPill: {
-    height: 46,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#172554',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    elevation: 5,
-  },
   locateMeButton: {
     width: 46,
     height: 46,
@@ -922,11 +880,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   locateMeButtonDisabled: { opacity: 0.52 },
-  deploymentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  deploymentText: { flex: 1 },
-  deploymentLabel: { color: mobileTheme.textMuted, fontSize: 8, lineHeight: 9, fontWeight: '800' },
-  deploymentArea: { color: mobileTheme.text, fontSize: 11, lineHeight: 13, fontWeight: '800' },
-  deploymentType: { color: mobileTheme.blue, fontSize: 8, lineHeight: 9, fontWeight: '800' },
   gpsStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
   gpsStatusText: { fontSize: 9, fontWeight: '800' },
   followBanner: {

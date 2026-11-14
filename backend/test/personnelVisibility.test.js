@@ -109,7 +109,7 @@ describe('officer personnel-location visibility', () => {
 		}
 		const service = createService({
 			Personnel,
-			Deployment: { distinct: async () => ['ON-DUTY-1'] },
+			Deployment: { find: () => ({ select: () => ({ lean: async () => [{ personnelId: 'ON-DUTY-1' }] }) }) },
 			CurrentLocation: { find: () => ({ lean: async () => [] }) },
 		})
 
@@ -121,5 +121,51 @@ describe('officer personnel-location visibility', () => {
 		assert.equal(result.data.length, 1)
 		assert.equal(result.data[0].id, 'OFF-DUTY')
 		assert.equal(result.data[0].isVisibleOnMap, false)
+	})
+})
+
+describe('GPS readings are scoped to the current duty', () => {
+	const now = new Date('2026-11-14T06:00:00Z')
+	const profile = { personnelId: 'P-1', fullName: 'Officer', dutyStatus: 'On Duty' }
+	const deployment = { personnelId: 'P-1', shiftStart: new Date('2026-11-14T05:00:00Z'), shiftEnd: new Date('2026-11-14T07:00:00Z') }
+	const saved = { source: 'gps', recordedAt: new Date('2026-11-14T04:59:59Z'), location: { coordinates: [121.77, 17.42] } }
+	const query = value => ({ sort() { return this }, select() { return this }, skip() { return this }, limit() { return this }, lean: async () => value })
+	const serviceFor = (location = saved) => createService({
+		Personnel: { find: () => query([profile]), findOne: () => query(profile), countDocuments: async () => 1 },
+		CurrentLocation: { find: () => query([location]), findOne: () => query(location) },
+		Deployment: { find: () => query([deployment]), findOne: () => query(deployment) },
+	}, () => now)
+
+	for (const endpoint of ['collection', 'list', 'member']) {
+		it(`hides the previous shift fix in the ${endpoint} response even after the next duty starts`, async () => {
+			const service = serviceFor({ ...saved, personnelId: profile.personnelId })
+			const member = endpoint === 'collection' ? (await service.getPersonnelWithLocations())[0]
+				: endpoint === 'list' ? (await service.listPersonnel({}, { role: 'officer', personnelId: profile.personnelId })).data[0]
+					: await service.getPersonnelMember(profile.personnelId)
+			assert.equal(member.isOnDuty, true)
+			assert.equal(member.isVisibleOnMap, false)
+			assert.equal(member.latitude, null)
+			assert.equal(member.longitude, null)
+			assert.equal(member.lastKnownLocationName, undefined)
+			assert.equal(member.locationStatus, 'unavailable')
+			assert.equal(member.activeShiftStart, deployment.shiftStart.toISOString())
+			assert.equal(member.activeShiftEnd, deployment.shiftEnd.toISOString())
+		})
+	}
+
+	it('retains an older reading from this duty through an outage without changing its timestamp', () => {
+		const service = serviceFor()
+		const reading = { ...saved, recordedAt: new Date('2026-11-14T05:30:00Z') }
+		const member = service.serializePersonnel(profile, reading, { isOnDuty: true, activeDeployment: deployment })
+		assert.equal(member.isVisibleOnMap, true)
+		assert.equal(member.isLocationStale, true)
+		assert.equal(member.locationRecordedAt, reading.recordedAt.toISOString())
+	})
+
+	it('accepts the first fix at the shift start and rejects a fix at the shift end', () => {
+		const service = serviceFor()
+		for (const [recordedAt, visible] of [[deployment.shiftStart, true], [deployment.shiftEnd, false]]) {
+			assert.equal(service.serializePersonnel(profile, { ...saved, recordedAt }, { isOnDuty: true, activeDeployment: deployment }).isVisibleOnMap, visible)
+		}
 	})
 })

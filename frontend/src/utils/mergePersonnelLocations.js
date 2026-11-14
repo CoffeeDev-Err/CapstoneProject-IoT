@@ -8,6 +8,7 @@ export function mergePersonnelLocations(previous, incoming, now = Date.now()) {
     if (!latest || latest.source !== 'gps' || member.source !== 'gps'
       || !Number.isFinite(latestTime) || !Number.isFinite(incomingTime)
       || incomingTime >= latestTime) return member
+    if (member.activeShiftStart && latestTime < Date.parse(member.activeShiftStart)) return member
     const age = Math.max(0, Math.floor((now - latestTime) / 1000))
     const stale = now - latestTime > (member.locationStaleAfterSeconds ?? 120) * 1000
       || latestTime - now > 300_000
@@ -29,7 +30,9 @@ export function mergePersonnelLocations(previous, incoming, now = Date.now()) {
       isLocationStale: stale,
       locationAgeSeconds: age,
       locationStatus: !hasCoordinates ? 'unavailable' : stale ? 'stale' : 'current',
-      isVisibleOnMap: member.isOnDuty === true && hasCoordinates,
+      isVisibleOnMap: member.isOnDuty === true && hasCoordinates
+        && (!member.activeShiftStart || now >= Date.parse(member.activeShiftStart))
+        && (!member.activeShiftEnd || (now < Date.parse(member.activeShiftEnd) && latestTime < Date.parse(member.activeShiftEnd))),
     }
   })
 }

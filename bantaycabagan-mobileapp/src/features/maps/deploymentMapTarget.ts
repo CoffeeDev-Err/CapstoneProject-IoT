@@ -14,6 +14,12 @@ export type DeploymentMapTarget = PatrolCenter & {
 
 const hasCoordinate = (value?: number | null) => Number.isFinite(value);
 
+// Area and route patrols already have numbered coverage markers. Only a
+// fixed post (including older untyped posts) needs a separate deployment pin.
+export const shouldShowDeploymentPoint = (assignment?: DeploymentAssignment) => (
+  Boolean(assignment && (!assignment.deploymentType || assignment.deploymentType === 'point'))
+);
+
 const firstCatalogCenter = (assignment?: DeploymentAssignment) => {
   if (!assignment) return null;
   const labels = [

@@ -177,6 +177,8 @@ export type LivePersonnel = {
   source?: string;
   isSimulated?: boolean;
   isOnDuty?: boolean;
+  activeShiftStart?: string;
+  activeShiftEnd?: string;
   isVisibleOnMap?: boolean;
   isLocationStale?: boolean;
   locationStatus?: 'current' | 'stale' | 'unavailable';

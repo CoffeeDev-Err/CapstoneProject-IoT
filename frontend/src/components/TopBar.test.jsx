@@ -16,7 +16,8 @@ function mount(props = {}) {
 it('keeps notification search, read state and report navigation working in the compact header', () => {
   const readAll = vi.fn(), read = vi.fn(), load = vi.fn()
   mount({ onReadAllNotifications:readAll, onReadNotification:read, onShowAllNotifications:load })
-  expect(screen.getByText('Deployment Management')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name:'Philippine National Police' })).toBeInTheDocument()
+  expect(screen.getByText('Cabagan Police Station Operations Portal')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name:'Open notifications' }))
   expect(readAll).toHaveBeenCalledOnce()
   expect(load).toHaveBeenCalledOnce()

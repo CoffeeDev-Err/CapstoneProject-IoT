@@ -23,7 +23,13 @@ const currentShiftFilter = (now = clock(), extra = {}) => ({
 
 const serializePersonnel = (profile, currentLocation, options = {}) => {
 	const coordinates = currentLocation?.location?.coordinates
-	const hasCoordinates = Array.isArray(coordinates)
+	const recordedAt = currentLocation?.recordedAt || currentLocation?.updatedAt
+	const shiftStart = options.activeDeployment?.shiftStart
+	const shiftEnd = options.activeDeployment?.shiftEnd
+	const recordedTime = +new Date(recordedAt || 0)
+	const belongsToShift = (!shiftStart || recordedTime >= +new Date(shiftStart))
+		&& (!shiftEnd || recordedTime < +new Date(shiftEnd))
+	const hasCoordinates = belongsToShift && Array.isArray(coordinates)
 		&& coordinates.length === 2
 		&& coordinates.every(Number.isFinite)
 	const isOnDuty = options.isOnDuty ?? profile.dutyStatus !== 'Off Duty'
@@ -51,8 +57,10 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 		longitude: hasCoordinates ? coordinates[0] : null,
 		status: isOnDuty ? 'On Duty' : 'Off Duty',
 		isOnDuty,
+		activeShiftStart: shiftStart ? new Date(shiftStart).toISOString() : undefined,
+		activeShiftEnd: shiftEnd ? new Date(shiftEnd).toISOString() : undefined,
 		// Visibility is separate from freshness: keep the last known position
-		// clickable during a tracker sleep/outage without refreshing its age.
+		// clickable during an outage only when recorded within this duty.
 		isVisibleOnMap: isOnDuty && hasCoordinates,
 		...(options.includePrivateDetails !== false && {
 			mobileNumber: profile.mobileNumber,
@@ -83,6 +91,19 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 		lastMovedAt: currentLocation?.lastMovedAt?.toISOString(),
 		inactivityAlertedAt: currentLocation?.inactivityAlertedAt?.toISOString(),
 	}
+}
+
+const loadCurrentDeployments = async (now, extra = {}) => {
+	const deployments = await Deployment.find(currentShiftFilter(now, extra))
+		.select('personnelId shiftStart shiftEnd').lean()
+	const byPersonnel = new Map()
+	for (const deployment of deployments) {
+		const previous = byPersonnel.get(deployment.personnelId)
+		if (!previous || +new Date(deployment.shiftStart || 0) > +new Date(previous.shiftStart || 0)) {
+			byPersonnel.set(deployment.personnelId, deployment)
+		}
+	}
+	return byPersonnel
 }
 
 const getOfficerPersonnelId = (actor) => (
@@ -130,19 +151,19 @@ const emitPersonnelCollection = (io, eventName, personnel = []) => {
 
 const getPersonnelWithLocations = async () => {
 	const now = clock()
-	const [profiles, locations, onDutyPersonnelIds] = await Promise.all([
+	const [profiles, locations, currentDeployments] = await Promise.all([
 		Personnel.find({ status: 'active' }).sort({ fullName: 1 }).lean(),
 		CurrentLocation.find().lean(),
-		Deployment.distinct('personnelId', currentShiftFilter(now)),
+		loadCurrentDeployments(now),
 	])
-	const onDutySet = new Set(onDutyPersonnelIds)
 	const locationsByPersonnel = new Map(
 		locations.map((location) => [location.personnelId, location]),
 	)
 
 	return profiles.map((profile) => (
 		serializePersonnel(profile, locationsByPersonnel.get(profile.personnelId), {
-			isOnDuty: onDutySet.has(profile.personnelId),
+			isOnDuty: currentDeployments.has(profile.personnelId),
+			activeDeployment: currentDeployments.get(profile.personnelId),
 		})
 	))
 }
@@ -153,11 +174,12 @@ const getPersonnelMember = async (personnelId, actor) => {
 	const [profile, location, deployment] = await Promise.all([
 		Personnel.findOne({ personnelId, status: 'active' }).lean(),
 		CurrentLocation.findOne({ personnelId }).lean(),
-		Deployment.findOne(currentShiftFilter(clock(), { personnelId })).select('_id').lean(),
+		Deployment.findOne(currentShiftFilter(clock(), { personnelId })).select('shiftStart shiftEnd').lean(),
 	])
 
 	return profile ? serializePersonnel(profile, location, {
 		isOnDuty: Boolean(deployment),
+		activeDeployment: deployment,
 		includePrivateDetails: !officerPersonnelId,
 	}) : null
 }
@@ -165,15 +187,15 @@ const getPersonnelMember = async (personnelId, actor) => {
 const listPersonnel = async (query = {}, actor) => {
 	const pagination = parsePagination(query)
 	const officerPersonnelId = getOfficerPersonnelId(actor)
-	const visibleOnDutyPersonnelIds = officerPersonnelId
-		? await Deployment.distinct('personnelId', currentShiftFilter(clock()))
+	const visibleCurrentDeployments = officerPersonnelId
+		? await loadCurrentDeployments(clock())
 		: null
 	const filter = !officerPersonnelId && query.include_inactive === 'true'
 		? {}
 		: { status: 'active' }
 	if (officerPersonnelId) {
 		filter.personnelId = {
-			$in: visiblePersonnelIdsForOfficer(visibleOnDutyPersonnelIds, officerPersonnelId),
+			$in: visiblePersonnelIdsForOfficer([...visibleCurrentDeployments.keys()], officerPersonnelId),
 		}
 	}
 	if (query.duty_status) filter.dutyStatus = String(query.duty_status)
@@ -195,15 +217,14 @@ const listPersonnel = async (query = {}, actor) => {
 		Personnel.countDocuments(filter),
 	])
 	const personnelIds = profiles.map((profile) => profile.personnelId)
-	const [locations, queriedOnDutyPersonnelIds] = await Promise.all([
+	const [locations, currentDeployments] = await Promise.all([
 		CurrentLocation.find({ personnelId: { $in: personnelIds } }).lean(),
-		visibleOnDutyPersonnelIds
-			? Promise.resolve(visibleOnDutyPersonnelIds)
-			: Deployment.distinct('personnelId', currentShiftFilter(clock(), {
+		visibleCurrentDeployments
+			? Promise.resolve(visibleCurrentDeployments)
+			: loadCurrentDeployments(clock(), {
 				personnelId: { $in: personnelIds },
-			})),
+			}),
 	])
-	const onDutySet = new Set(queriedOnDutyPersonnelIds)
 	const locationByPersonnel = new Map(
 		locations.map((location) => [location.personnelId, location]),
 	)
@@ -211,7 +232,8 @@ const listPersonnel = async (query = {}, actor) => {
 	return {
 		data: profiles.map((profile) => (
 			serializePersonnel(profile, locationByPersonnel.get(profile.personnelId), {
-				isOnDuty: onDutySet.has(profile.personnelId),
+				isOnDuty: currentDeployments.has(profile.personnelId),
+				activeDeployment: currentDeployments.get(profile.personnelId),
 				includePrivateDetails: !officerPersonnelId,
 			})
 		)),
@@ -232,8 +254,11 @@ const updateDutyStatus = async (personnelId, dutyStatus) => {
 		{ returnDocument: 'after' },
 	)
 	if (!profile) return null
-	const location = await CurrentLocation.findOne({ personnelId }).lean()
-	return serializePersonnel(profile, location)
+	const [location, deployment] = await Promise.all([
+		CurrentLocation.findOne({ personnelId }).lean(),
+		Deployment.findOne(currentShiftFilter(clock(), { personnelId })).select('shiftStart shiftEnd').lean(),
+	])
+	return serializePersonnel(profile, location, { isOnDuty: Boolean(deployment), activeDeployment: deployment })
 }
 
 const getLocationHistory = async (personnelId, query = {}) => {
