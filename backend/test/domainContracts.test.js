@@ -22,7 +22,7 @@ describe('cross-platform domain contracts', () => {
 		assert.deepEqual(CABAGAN_BARANGAYS, contracts.barangays)
 	})
 
-	it('keeps the municipal geofence unchanged', () => {
+	it('keeps the municipal geofence aligned with the versioned contract', () => {
 		const digest = createHash('sha256')
 			.update(JSON.stringify(CABAGAN_BOUNDARY_COORDS))
 			.digest('hex')

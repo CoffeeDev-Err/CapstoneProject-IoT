@@ -38,7 +38,7 @@ it('defaults old routes to 100 meters and validates the adjustable route allowan
 
 it('retries road directions when a previously saved vehicle route only had a waypoint guide', async (t) => {
 	const fetch = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ code: 'Ok', routes: [{ geometry, distance: 2000 }] }) }))
-	const block = { ...route, roadDirections: false, routePoints: [{ latitude: 17.43, longitude: 121.76 }, { latitude: 17.44, longitude: 121.77 }] }
+	const block = { ...route, roadDirections: false, routePoints: [{ latitude: 17.43, longitude: 121.76 }, { latitude: 17.431, longitude: 121.766 }] }
 	const assignments = [{ id: 'DEP-1', patrolMode: 'car', scheduleBlocks: [{ ...block }] }]
 	await hydratePatrolGeometry(assignments, new Map([['DEP-1', { patrolMode: 'car', scheduleBlocks: [block] }]]))
 	assert.equal(fetch.mock.callCount(), 1)

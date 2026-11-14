@@ -1,5 +1,6 @@
 import type { DeploymentAssignment } from '../../types/operations';
 import { resolveDeploymentMapTarget, shouldShowDeploymentPoint } from './deploymentMapTarget';
+import geography from '../../constants/data/cabagan-geography.json';
 
 const assignment = (values: Partial<DeploymentAssignment>): DeploymentAssignment => ({
   id: 'DEP-001',
@@ -25,8 +26,7 @@ it('focuses an area patrol on its barangay instead of the Cabagan default', () =
     deploymentType: 'area',
     hasDeploymentPoint: false,
   }))).toEqual({
-    latitude: 17.4127,
-    longitude: 121.7341,
+    ...geography.barangays.features.find(feature => feature.properties.code === 'AGGUB')!.properties.center,
     hasExactPoint: false,
     zoom: 14.5,
   });

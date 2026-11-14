@@ -79,11 +79,12 @@ export function usePatrolSchedule(base: DeploymentAssignment | undefined, office
     if (!usableLocation) {
       setGuidance('Waiting for a GPS reading from this duty. The selected coverage is still shown.'); return;
     }
-    if (!Number.isFinite(targetBlock.latitude) || !Number.isFinite(targetBlock.longitude)) {
+    const destination = targetBlock.navigationPoint || targetBlock;
+    if (!Number.isFinite(destination.latitude) || !Number.isFinite(destination.longitude)) {
       setGuidance('A GPS position and destination point are needed for directions.'); return;
     }
     const source = { latitude: officer.latitude!, longitude: officer.longitude! };
-    const target = { latitude: targetBlock.latitude!, longitude: targetBlock.longitude! };
+    const target = { latitude: destination.latitude!, longitude: destination.longitude! };
     const mode = base?.deploymentType === 'area' ? 'car' : ['car', 'motorcycle'].includes(base?.patrolMode || '') ? base!.patrolMode : 'walk';
     setGuidance(mode === 'walk' ? 'Finding walking directions…' : 'Finding road directions…');
     try {

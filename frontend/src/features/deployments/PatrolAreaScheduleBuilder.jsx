@@ -1,7 +1,8 @@
 import SelectControl from "../../components/SelectControl"
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Check, MapPin } from 'lucide-react'
-import { apiRequest } from '../../services/apiClient'
+import geography from '../../../../contracts/geography/cabagan-geography.json'
+import { barangayAtPoint } from './patrolBarangayGeometry'
 import { CABAGAN_BARANGAYS } from '../../constants/cabaganBarangays'
 import { isInsideCabagan } from '../../utils/cabaganGeofence'
 import ConfirmModal from '../../components/ConfirmModal'
@@ -9,7 +10,6 @@ import PatrolMap from './PatrolMap'
 import PatrolMapSearch from './PatrolMapSearch'
 import PatrolDurationControl from './PatrolDurationControl'
 import PatrolScheduleTimeline from './PatrolScheduleTimeline'
-import { patrolBarangayReferences } from './patrolReferenceCenters'
 import { blockOffset, blockTimeLabel, emptyPatrolBlock, moveItem } from './patrolScheduleView'
 
 const renumber = areas => areas.map((area, index) => area.autoLabel ? { ...area, label: `Area ${index + 1}` } : area)
@@ -25,8 +25,8 @@ const areaIssue = (area, index) => {
 }
 
 export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, dutyMinutes, dutyError, graceMinutes, onGraceChange, onDirtyChange, onCommit, travelMode = 'car' }) {
-  const [areas, setAreas] = useState(() => initialBlocks.map(area => ({ ...area })))
-  const [saved, setSaved] = useState(() => JSON.stringify(initialBlocks))
+  const [areas, setAreas] = useState(() => initialBlocks.map(area => ({ ...area, preserveCoverage: area.coverageType === 'barangay' })))
+  const [saved, setSaved] = useState(() => JSON.stringify(initialBlocks.map(area => ({ ...area, preserveCoverage: area.coverageType === 'barangay' }))))
   const [active, setActive] = useState(initialBlocks.length ? 0 : null)
   const [template, setTemplate] = useState(emptyPatrolBlock)
   const [coverage, setCoverage] = useState(() => coverageFor(initialBlocks))
@@ -36,23 +36,16 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
   const [replacing, setReplacing] = useState(false)
   const [message, setMessage] = useState('')
   const [coordinates, setCoordinates] = useState({ latitude: '', longitude: '' })
-  const [boundaries, setBoundaries] = useState({ status: 'idle', features: [] })
-  const boundaryNeeded = coverage === 'barangay' || areas.some(a => a.coverageType === 'barangay')
+  const boundaries = geography.barangays
   const dirty = JSON.stringify(areas) !== saved
   const configRef = useRef(null)
   useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
-  useEffect(() => {
-    if (!boundaryNeeded) return
-    let live = true
-    apiRequest('/api/patrol/boundaries').then(data => { if (live) setBoundaries({ status: 'ready', features: data.features || [], attribution: data.attribution }) })
-      .catch(() => { if (live) setBoundaries({ status: 'error', features: [] }) })
-    return () => { live = false }
-  }, [boundaryNeeded])
   const resolved = areas.map(area => {
-    if (area.coverageType !== 'barangay') return area
-    const reference = patrolBarangayReferences.find(a => a.name === `Barangay ${area.barangay}`)?.referenceCenter || {}
-    const geometry = boundaries.features.find(f => f.properties?.barangay === area.barangay)?.geometry || area.geometry || null
-    return { ...area, ...reference, geometry, boundarySource: boundaries.attribution || area.boundarySource }
+    if (area.coverageType !== 'barangay' || area.preserveCoverage) return area
+    // Saved coverage snapshots are retained; new picks carry the bundled version.
+    const feature = boundaries.features.find(f => f.properties.barangay === area.barangay)
+    if (area.geometry || !feature) return area
+    return { ...area, ...feature.properties.center, geometry: feature.geometry, boundarySource: geography.version }
   })
   const selected = areas[active] || template
   const total = areas.reduce((sum, area) => sum + Number(area.durationMinutes), 0)
@@ -61,13 +54,12 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
   const incomplete = dutyError ? 'Correct the duty hours above before saving areas.'
     : !areas.length ? coverage === 'barangay' ? 'Choose your first barangay in the sidebar.' : 'Select your first area on the map.'
       : invalidIndex >= 0 ? areaIssue(resolved[invalidIndex], invalidIndex)
-        : boundaryNeeded && boundaries.status === 'idle' ? 'Loading barangay coverage…'
-          : remaining > 0 ? `Select more areas or adjust durations to cover the remaining ${remaining} minutes.`
-            : remaining < 0 ? `Shorten the selected durations by ${-remaining} minutes to fit this duty.` : ''
+        : remaining > 0 ? `Select more areas or adjust durations to cover the remaining ${remaining} minutes.`
+          : remaining < 0 ? `Shorten the selected durations by ${-remaining} minutes to fit this duty.` : ''
   const selectArea = index => {
     setActive(index); setExpanded(index); setReplacing(false); setMessage(''); setCoordinates({ latitude: '', longitude: '' })
     const area = resolved[index]
-    if (Number.isFinite(area?.latitude) && Number.isFinite(area?.longitude)) setFocus({ latitude: area.latitude, longitude: area.longitude })
+    if (Number.isFinite(area?.latitude) && Number.isFinite(area?.longitude)) setFocus({ latitude: area.latitude, longitude: area.longitude, geometry: area.geometry })
     if (configRef.current) { configRef.current.open = true; configRef.current.scrollTop = 0 }
   }
   const remove = index => {
@@ -101,28 +93,35 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
   }
   const selectBarangay = barangay => {
     if (!barangay) return
-    const patch = { coverageType: 'barangay', barangay, label: `Barangay ${barangay}`, autoLabel: false, latitude: undefined, longitude: undefined, geometry: null }
+    const feature = boundaries.features.find(f => f.properties.barangay === barangay)
+    if (!feature) return setMessage('Boundary unavailable for this barangay.')
+    const patch = { coverageType: 'barangay', barangay, label: `Barangay ${barangay}`, autoLabel: false, preserveCoverage: false, ...feature.properties.center, navigationPoint: feature.properties.navigationCenter, geometry: feature.geometry, boundarySource: geography.version }
     if (replacing && active !== null) { update(patch); setReplacing(false) }
     else {
       if (coverage !== 'barangay' || dutyError || remaining < 15 || areas.length >= 48) return
       add(patch)
     }
-    const reference = patrolBarangayReferences.find(area => area.name === `Barangay ${barangay}`)?.referenceCenter
-    if (reference) setFocus(reference)
+    setFocus({ ...feature.properties.center, geometry: feature.geometry })
+  }
+  const selectMapPoint = point => {
+    if (coverage !== 'barangay' && !(replacing && selected.coverageType === 'barangay')) return selectPoint(point)
+    const feature = barangayAtPoint(boundaries, point)
+    if (feature) selectBarangay(feature.properties.barangay)
+    else setMessage('Choose a location inside a Cabagan barangay.')
   }
   const saveAreas = () => {
     if (incomplete) return
-    const committed = resolved.map((area, index) => { const block = { ...area, label: area.label.trim(), offsetMinutes: blockOffset(areas, index) }; delete block.autoLabel; return block })
+    const committed = resolved.map((area, index) => { const block = { ...area, label: area.label.trim(), offsetMinutes: blockOffset(areas, index) }; delete block.autoLabel; delete block.preserveCoverage; return block })
     onCommit(committed); setSaved(JSON.stringify(areas)); setMessage('All selected areas saved to this duty schedule. Continue to personnel and final review.')
   }
   return <>
     <div className="patrol-area-progress" role="status"><strong>{areas.length} {areas.length === 1 ? 'area' : 'areas'} selected · {total} / {Number.isFinite(dutyMinutes) ? dutyMinutes : '—'} minutes covered</strong><span className={`patrol-badge ${dirty ? 'is-warning' : 'is-valid'}`}>{dirty || !areas.length ? 'Selection in progress' : 'Areas saved'}</span></div>
     <div className="patrol-workspace"><div className="patrol-workspace__map">
       <PatrolMapSearch onSelect={setFocus} />
-      <PatrolMap blocks={resolved.map((area, index) => ({ ...area, offsetMinutes: blockOffset(areas, index) }))} type="area" areaTravelMode={travelMode} start={start} focus={focus} selectedIndex={active} autoFit={false} onPoint={coverage === 'custom' || replacing && selected.coverageType === 'custom' ? selectPoint : undefined} onSelectBlock={selectArea}>
+      <PatrolMap blocks={resolved.map((area, index) => ({ ...area, offsetMinutes: blockOffset(areas, index) }))} type="area" areaTravelMode={travelMode} start={start} focus={focus} selectedIndex={active} autoFit={false} onPoint={selectMapPoint} onSelectBlock={selectArea}>
         {areas.length > 0 && <nav className="patrol-area-numbers" aria-label="Selected areas">{areas.map((area, index) => <button type="button" key={index} aria-label={`Go to area ${index + 1}: ${area.label}`} aria-pressed={active === index} className={active === index ? 'is-active' : ''} onClick={() => selectArea(index)}>{index + 1}</button>)}</nav>}
       </PatrolMap>
-      <p className="patrol-map-caption">{replacing ? selected.coverageType === 'barangay' ? `Choose the replacement barangay for area ${active + 1} in the sidebar.` : `Tap the new location for area ${active + 1}.` : coverage === 'custom' ? 'Each map tap adds an area. Drag freely to find the next location. Use the numbers above to revisit an area.' : 'Choose barangays in the sidebar. Use the numbered map buttons to revisit a selected area.'}</p>
+      <p className="patrol-map-caption">{replacing ? selected.coverageType === 'barangay' ? `Choose the replacement barangay for area ${active + 1} in the sidebar.` : `Tap the new location for area ${active + 1}.` : coverage === 'custom' ? 'Each map tap adds an area. Drag freely to find the next location. Use the numbers above to revisit an area.' : 'Tap a barangay on the map or choose one in the sidebar. Use the numbers to revisit selected areas.'}</p>
     </div><details ref={configRef} className="patrol-workspace__config" open><summary><MapPin size={16} />{active === null ? 'New area defaults' : `Area ${active + 1} configuration`}</summary><div className="patrol-workspace__fields">
       <section className="patrol-config-group"><h5>Coverage</h5><label>Coverage type<SelectControl aria-label="Coverage type" value={coverage} onChange={e => { if (e.target.value === coverage) return; if (areas.length) setPendingCoverage(e.target.value); else changeCoverage(e.target.value) }}>{coverage === 'mixed' && <option value="mixed" disabled>Existing mixed coverage</option>}<option value="custom">Custom Area</option><option value="barangay">Whole Barangay</option></SelectControl></label>
       <small>{coverage === 'mixed' ? 'This existing schedule contains both coverage types. It is preserved until you choose to replace it.' : 'Applies to the whole duty. Changing it replaces selected areas.'}</small>
@@ -131,7 +130,7 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
       </section><section className="patrol-config-group"><h5>Area & time</h5><label>Area name<input aria-label="Area name" maxLength={200} value={selected.label} placeholder={active === null ? 'Optional name for first area' : 'Name this area'} onChange={e => update({ label: e.target.value, autoLabel: false })} /></label>
       <div className="patrol-tinted-panel patrol-time-summary"><strong>{blockTimeLabel(start, selected, active === null ? total : blockOffset(areas, active))}</strong></div>
       <PatrolDurationControl key={active ?? 'new'} value={selected.durationMinutes} remaining={Math.max(0, remaining + (active === null ? 0 : Number(selected.durationMinutes)))} onChange={durationMinutes => update({ durationMinutes })} />
-      </section><section className="patrol-config-group"><h5>Coverage limits</h5>{active !== null && selected.coverageType === 'barangay' && selected.barangay && !resolved[active]?.geometry && <small className="patrol-notice is-warning">{boundaries.status === 'idle' ? 'Loading barangay coverage…' : boundaries.status === 'error' ? 'Barangay boundaries could not be loaded. Reference location only; outside-coverage alerts cannot be enforced.' : 'Boundary unavailable for this barangay. Reference location only; outside-coverage alerts cannot be enforced.'}</small>}
+      </section><section className="patrol-config-group"><h5>Coverage limits</h5>{active !== null && selected.coverageType === 'barangay' && selected.barangay && !resolved[active]?.geometry && <small className="patrol-notice is-warning">Coverage unavailable for this saved assignment. Outside-coverage alerts are unavailable.</small>}
       {(active !== null ? selected.coverageType === 'custom' : coverage === 'custom') && <label>Coverage radius (meters)<input type="number" min={50} max={5000} value={selected.radiusMeters} onChange={e => update({ radiusMeters: Number(e.target.value) })} /></label>}
       </section><section className="patrol-config-group"><h5>Between areas</h5><label>Transition grace period (minutes)<input type="number" min={0} max={60} value={graceMinutes} onChange={e => onGraceChange(Number(e.target.value))} /></label><small>Allows travel between areas before coverage warnings begin. Duty end stays the same.</small>
       </section>{coverage === 'custom' && <details className="patrol-coordinate-entry"><summary>Enter exact coordinates</summary><div className="patrol-two-columns"><label>Latitude<input type="number" step="any" value={coordinates.latitude} onChange={e => setCoordinates(c => ({ ...c, latitude: e.target.value }))} /></label><label>Longitude<input type="number" step="any" value={coordinates.longitude} onChange={e => setCoordinates(c => ({ ...c, longitude: e.target.value }))} /></label></div><button type="button" disabled={!coordinates.latitude || !coordinates.longitude} onClick={() => selectPoint({ latitude: Number(coordinates.latitude), longitude: Number(coordinates.longitude) })}>{replacing ? 'Replace with coordinates' : 'Add area at coordinates'}</button></details>}

@@ -69,12 +69,11 @@ it('records the area at incident time after the full duty has ended', () => {
 	assert.equal(deploymentContextAt(completed, new Date('2026-11-09T02:30:00Z')).patrolArea, 'Park')
 	assert.equal(currentPatrolBlock(completed, new Date('2026-11-09T02:30:00Z')), null)
 })
-it('uses each barangay reference center without inventing boundary geometry', () => {
+it('uses the generated interior center before authoritative geometry hydration', () => {
 	const result = normalizePatrolSchedule({ ...duty, scheduleBlocks: [
 		{ label: 'Cubag', coverageType: 'barangay', barangay: 'Cubag', durationMinutes: 240 },
 	] }).scheduleBlocks[0]
-	assert.equal(result.latitude, 17.4201)
-	assert.equal(result.longitude, 121.7887)
+	assert.deepEqual({ latitude: result.latitude, longitude: result.longitude }, require('../../contracts/cabagan-patrol-centers.json').CUBAG)
 	assert.equal(result.geometry, undefined)
 })
 it('delays outside warnings during transfer allowance and still sends the transition reminder', async () => {

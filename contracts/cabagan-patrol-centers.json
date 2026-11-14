@@ -1,106 +1,106 @@
 {
   "AGGUB": {
-    "latitude": 17.4127,
-    "longitude": 121.7341
+    "latitude": 17.413459773915946,
+    "longitude": 121.73186393613736
   },
   "ANAO": {
-    "latitude": 17.4246,
-    "longitude": 121.7689
+    "latitude": 17.423023664823855,
+    "longitude": 121.77022490882177
   },
   "ANGANCASILIAN": {
-    "latitude": 17.4245,
-    "longitude": 121.8096
+    "latitude": 17.42745278627086,
+    "longitude": 121.80934666436174
   },
   "BALASIG": {
-    "latitude": 17.3735,
-    "longitude": 121.8205
+    "latitude": 17.393830691828953,
+    "longitude": 121.84327678142903
   },
   "CANSAN": {
-    "latitude": 17.3936,
-    "longitude": 121.8109
+    "latitude": 17.39282883621301,
+    "longitude": 121.82176894576986
   },
   "CASIBARAG-NORTE": {
-    "latitude": 17.4353,
-    "longitude": 121.7534
+    "latitude": 17.440285371214966,
+    "longitude": 121.74648651233856
   },
   "CASIBARAG-SUR": {
-    "latitude": 17.4326,
-    "longitude": 121.7545
+    "latitude": 17.429751940265852,
+    "longitude": 121.74857672551856
   },
   "CATABAYUNGAN": {
-    "latitude": 17.4365,
-    "longitude": 121.7578
+    "latitude": 17.446949958524204,
+    "longitude": 121.76135452504522
   },
   "CUBAG": {
-    "latitude": 17.4201,
-    "longitude": 121.7887
+    "latitude": 17.415173276148487,
+    "longitude": 121.7959589806036
   },
   "GARITA": {
-    "latitude": 17.4006,
-    "longitude": 121.8094
+    "latitude": 17.403886246792126,
+    "longitude": 121.80658384126957
   },
   "LUQUILU": {
-    "latitude": 17.4258,
-    "longitude": 121.7601
+    "latitude": 17.425911685839424,
+    "longitude": 121.75791101663322
   },
   "MABANGUG": {
-    "latitude": 17.3641,
-    "longitude": 121.9509
+    "latitude": 17.363988261259706,
+    "longitude": 122.0187664764385
   },
   "MAGASSI": {
-    "latitude": 17.3634,
-    "longitude": 121.8194
+    "latitude": 17.35837657947281,
+    "longitude": 121.82290839609118
   },
   "NGARAG": {
-    "latitude": 17.4213,
-    "longitude": 121.7813
+    "latitude": 17.420847197936908,
+    "longitude": 121.78026358094438
   },
   "PILIG-ABAJO": {
-    "latitude": 17.3727,
-    "longitude": 121.7842
+    "latitude": 17.372139167569568,
+    "longitude": 121.78942609904735
   },
   "PILIG-ALTO": {
-    "latitude": 17.3695,
-    "longitude": 121.8042
+    "latitude": 17.367773581813044,
+    "longitude": 121.80337641429433
   },
   "CENTRO": {
-    "latitude": 17.4264,
-    "longitude": 121.7645
+    "latitude": 17.427251088882237,
+    "longitude": 121.76637401421361
   },
   "SAN-BERNARDO": {
-    "latitude": 17.4028,
-    "longitude": 121.7531
+    "latitude": 17.402488444608025,
+    "longitude": 121.7494326705102
   },
   "SAN-JUAN": {
-    "latitude": 17.4118,
-    "longitude": 121.739
+    "latitude": 17.409349644355622,
+    "longitude": 121.74145073674013
   },
   "SAUI": {
-    "latitude": 17.4209,
-    "longitude": 121.7262
+    "latitude": 17.41977146464007,
+    "longitude": 121.72409862409823
   },
   "TALLAG": {
-    "latitude": 17.4259,
-    "longitude": 121.7225
+    "latitude": 17.42943431336189,
+    "longitude": 121.72405618995113
   },
   "UGAD": {
-    "latitude": 17.4363,
-    "longitude": 121.7771
+    "latitude": 17.432089172785805,
+    "longitude": 121.77439716328702
   },
   "UNION": {
-    "latitude": 17.3464,
-    "longitude": 122.0015
+    "latitude": 17.34206986848563,
+    "longitude": 121.985957768012
   },
   "MASIPI-EAST": {
-    "latitude": 17.3847,
-    "longitude": 121.8804
+    "latitude": 17.396637229350276,
+    "longitude": 122.06572202767927
   },
   "MASIPI-WEST": {
-    "latitude": 17.3805,
-    "longitude": 121.8521
+    "latitude": 17.384319217794747,
+    "longitude": 121.85772544095408
   },
   "SAN-ANTONIO": {
-    "latitude": 17.4027,
-    "longitude": 121.6736
+    "latitude": 17.40014616668073,
+    "longitude": 121.66536153310176
   }
 }

@@ -152,6 +152,21 @@ it('identifies a conflicting scheduled shift without cancelling or saving either
 	assert.equal(writes, 0)
 })
 
+it('completes municipal validation before writes and ignores a client boundary-bypass field', async () => {
+	let writes = 0
+	const service = createService({
+		Deployment: { find: () => ({ lean: async () => [] }), bulkWrite: async () => { writes++ }, updateMany: async () => { writes++ } },
+		Personnel: { find: () => ({ select: () => ({ lean: async () => [{ personnelId: 'PNP-001', fullName: 'Officer One' }] }) }) },
+	})
+	const start = Date.now() - 60_000
+	await assert.rejects(service.replaceDeployments([{
+		id: 'DEP-OUTSIDE', personnelId: 'PNP-001', deploymentType: 'area', patrolMode: '', status: 'active',
+		shiftStart: new Date(start), shiftEnd: new Date(start + 120 * 60_000), deferBoundary: true,
+		scheduleBlocks: [{ label: 'Outside corrected boundary', coverageType: 'custom', latitude: 17.44, longitude: 121.77, radiusMeters: 100, durationMinutes: 120 }],
+	}]), /inside Cabagan/)
+	assert.equal(writes, 0)
+})
+
 it('rejects a stale planner save that would reopen an ended duty without writing any deployment', async () => {
 	let writes = 0
 	const service = createService({

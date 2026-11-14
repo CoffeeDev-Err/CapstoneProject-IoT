@@ -5,6 +5,24 @@ import { requestJson } from '../../services/requestJson';
 
 jest.mock('../../services/requestJson', () => ({ requestJson: jest.fn() }));
 
+it('routes toward the saved access reference while keeping the interior number marker', async () => {
+  jest.mocked(requestJson).mockClear();
+  jest.mocked(requestJson).mockResolvedValueOnce({ response: { ok: true } as Response, payload: { available: false } });
+  const navigationPoint = { latitude: 17.432, longitude: 121.766 };
+  const base = { status: 'active', id: 'BARANGAY', deploymentType: 'area', shiftStart: new Date(Date.now() - 60000).toISOString(), scheduleBlocks: [
+    { label: 'Current', coverageType: 'custom', radiusMeters: 200, latitude: 17.43, longitude: 121.765, offsetMinutes: 0, durationMinutes: 120 },
+    { label: 'Next barangay', coverageType: 'barangay', latitude: 17.433, longitude: 121.767, navigationPoint, offsetMinutes: 120, durationMinutes: 120 },
+  ] } as DeploymentAssignment;
+  const officer = { latitude: 17.43, longitude: 121.765, locationRecordedAt: new Date().toISOString() } as LivePersonnel;
+  const view = await renderHook(() => usePatrolSchedule(base, officer));
+  await act(async () => { await view.result.current.viewBlock(1); });
+  const request = JSON.parse(jest.mocked(requestJson).mock.calls.at(-1)![1]!.body as string);
+  expect(request.points[1]).toEqual(navigationPoint);
+  const marker = view.result.current.features.features.find(f => f.properties?.kind === 'marker' && f.properties?.label === '2')!;
+  expect((marker.geometry as GeoJSON.Point).coordinates).toEqual([121.767, 17.433]);
+  await view.unmount();
+});
+
 it('previews any own numbered area without changing active coverage and requests an automatic road guide', async () => {
   const geometry = { type: 'LineString', coordinates: [[121.765, 17.43], [121.768, 17.432]] };
   jest.mocked(requestJson).mockResolvedValueOnce({ response: { ok: true } as Response, payload: { available: true, geometry } });

@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import PatrolPlanner from './PatrolPlanner'
 import { apiRequest } from '../../services/apiClient'
+import geography from '../../../../contracts/geography/cabagan-geography.json'
 
 vi.mock('../../services/apiClient', () => ({ apiRequest: vi.fn() }))
 vi.mock('./PatrolMap', () => ({ default: ({ onPoint, blocks, children }) => <div data-testid="patrol-map-data">{JSON.stringify(blocks)}{children}{onPoint && <button type="button" onClick={() => onPoint({ latitude: 17.4305 + (blocks[0]?.routePoints?.length || 0) * 0.0002, longitude: 121.765 })}>Select map point</button>}</div> }))
@@ -119,14 +120,14 @@ it('keeps selected areas when correcting overlong duty hours and validates radiu
   await waitFor(() => expect(apiRequest).toHaveBeenCalled())
 }, 15000)
 
-it('adds multiple whole barangays automatically and retains boundary fallback safeguards', async () => {
+it('adds multiple whole barangays with complete offline coverage', async () => {
   const { onSave } = setup(); duty('2026-11-13T12:00')
   expect(screen.getByLabelText('Coverage type')).toHaveValue('custom')
   expect(screen.queryByLabelText('Add whole barangay')).toBeNull()
   fireEvent.change(screen.getByLabelText('Coverage type'), { target: { value: 'barangay' } })
   expect(screen.queryByText(/Boundary unavailable/)).toBeNull()
   expect(screen.queryByLabelText('Coverage radius (meters)')).toBeNull()
-  expect(screen.queryByRole('button', { name: 'Select map point' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Select map point' })).toBeInTheDocument()
   expect(screen.queryByText('Enter exact coordinates')).toBeNull()
   fireEvent.change(screen.getByLabelText('Barangay'), { target: { value: 'Centro' } })
   expect(screen.getByRole('button', { name: 'Save areas' })).toBeDisabled()
@@ -134,7 +135,7 @@ it('adds multiple whole barangays automatically and retains boundary fallback sa
   await waitFor(() => expect(screen.getByRole('button', { name: 'Save areas' })).toBeEnabled())
   expect(screen.getByRole('button', { name: 'Go to area 1: Barangay Centro' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Go to area 2: Barangay Ugad' })).toBeInTheDocument()
-  expect(screen.getAllByText(/Boundary unavailable/).length).toBeGreaterThan(0)
+  expect(screen.queryByText(/Boundary unavailable/)).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Save areas' }))
   fireEvent.click(screen.getByLabelText('Officer One')); review()
   fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
@@ -157,7 +158,7 @@ it('preserves locations when a coverage change is cancelled and prevents acciden
   expect(screen.getByRole('button', { name: 'Start', exact: true })).toHaveTextContent('13/11/2026 8:00 AM')
   expect(screen.getByRole('button', { name: 'End', exact: true })).toHaveTextContent('13/11/2026 12:00 PM')
   fireEvent.change(screen.getByLabelText('Barangay'), { target: { value: 'Ugad' } })
-  expect(screen.queryByRole('button', { name: 'Select map point' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Select map point' })).toBeInTheDocument()
   expect(screen.getByTestId('patrol-map-data').textContent).not.toContain('"coverageType":"custom"')
   await waitFor(() => expect(apiRequest).toHaveBeenCalled())
 })
@@ -176,33 +177,26 @@ it('replaces an existing barangay without adding an extra block or losing other 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Save areas' })).toBeEnabled())
 })
 
-it('waits for boundaries and retains the returned geometry in the saved duty', async () => {
-  const geometry = { type: 'Polygon', coordinates: [[[121.76, 17.43], [121.77, 17.43], [121.77, 17.44], [121.76, 17.43]]] }
-  let finish
-  vi.mocked(apiRequest).mockImplementation(async path => path === '/api/patrol/boundaries' ? new Promise(resolve => { finish = resolve }) : { vehicles, weeks: [] })
+it('saves bundled whole-barangay coverage even when the boundary API is unavailable', async () => {
+  vi.mocked(apiRequest).mockImplementation(async path => { if (path === '/api/patrol/boundaries') throw Error('Offline'); return { vehicles, weeks: [] } })
   const { onSave } = setup(); duty()
   fireEvent.change(screen.getByLabelText('Coverage type'), { target: { value: 'barangay' } })
-  fireEvent.change(screen.getByLabelText('Barangay'), { target: { value: 'Centro' } })
-  expect(screen.getByRole('button', { name: 'Save areas' })).toBeDisabled()
-  expect(screen.queryByText(/Boundary unavailable/)).toBeNull()
-  finish({ features: [{ properties: { barangay: 'Centro' }, geometry }], attribution: 'Test boundary' })
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Save areas' })).toBeEnabled())
-  expect(screen.queryByText(/Boundary unavailable/)).toBeNull()
+  fireEvent.change(screen.getByLabelText('Barangay'), { target: { value: 'Tallag' } })
+  expect(screen.getByRole('button', { name: 'Save areas' })).toBeEnabled()
   fireEvent.click(screen.getByRole('button', { name: 'Save areas' }))
   fireEvent.click(screen.getByLabelText('Officer One')); review()
   fireEvent.click(screen.getByRole('button', { name: 'Save and deploy' }))
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
-  expect(onSave.mock.calls[0][0][0].scheduleBlocks[0]).toMatchObject({ geometry, boundarySource: 'Test boundary', coverageType: 'barangay', barangay: 'Centro' })
+  const feature = geography.barangays.features.find(f => f.properties.barangay === 'Tallag')
+  expect(onSave.mock.calls[0][0][0].scheduleBlocks[0]).toMatchObject({ geometry: feature.geometry, ...feature.properties.center, boundarySource: geography.version })
+  expect(apiRequest).not.toHaveBeenCalledWith('/api/patrol/boundaries')
 })
 
-it('distinguishes a boundary request failure from a missing barangay selection', async () => {
-  vi.mocked(apiRequest).mockImplementation(async path => { if (path === '/api/patrol/boundaries') throw Error('Offline'); return { vehicles, weeks: [] } })
+it('selects a whole barangay by tapping the map', async () => {
   setup(); duty()
   fireEvent.change(screen.getByLabelText('Coverage type'), { target: { value: 'barangay' } })
-  expect(screen.queryByText(/Reference location only/)).toBeNull()
-  fireEvent.change(screen.getByLabelText('Barangay'), { target: { value: 'Ugad' } })
-  expect(await screen.findByText(/Barangay boundaries could not be loaded/)).toBeInTheDocument()
-  expect(screen.queryByText(/coverage radius for area/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Select map point' }))
+  expect(screen.getAllByRole('button', { name: /Go to area 1: Barangay/ })).toHaveLength(1)
   expect(screen.getByRole('button', { name: 'Save areas' })).toBeEnabled()
 })
 
@@ -306,7 +300,7 @@ it('preserves a previously saved mixed schedule during editing', async () => {
   expect(screen.getByLabelText('Coverage type')).toHaveValue('mixed')
   expect(screen.getByRole('button', { name: 'Go to area 1: Market' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Go to area 2: Barangay Ugad' })).toBeInTheDocument()
-  await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/patrol/boundaries'))
+  expect(apiRequest).not.toHaveBeenCalledWith('/api/patrol/boundaries')
   review()
   expect(screen.getByRole('dialog', { name: 'Review patrol schedule' })).toBeInTheDocument()
 })

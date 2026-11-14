@@ -51,7 +51,7 @@ const hydratePatrolGeometry = async (assignments, previousById) => {
 			const old = previousById.get(assignment.id)?.scheduleBlocks?.find(b => JSON.stringify(b.routePoints) === JSON.stringify(block.routePoints))
 			if (old?.geometry && (old.roadDirections === true || assignment.patrolMode === 'walk') && previousById.get(assignment.id)?.patrolMode === assignment.patrolMode) continue
 			const key = `${assignment.patrolMode}:${JSON.stringify(block.routePoints)}`
-			if (!routeRequests.has(key)) routeRequests.set(key, getPatrolDirections({ points: block.routePoints, mode: assignment.patrolMode }))
+			if (!routeRequests.has(key)) routeRequests.set(key, getPatrolDirections({ points: block.routePoints, mode: assignment.patrolMode }).catch(() => ({ available: false })))
 		}
 	}
 	if (assignments.some(a => a.scheduleBlocks?.some(b => b.coverageType === 'barangay'))) {
@@ -62,12 +62,16 @@ const hydratePatrolGeometry = async (assignments, previousById) => {
 			if (block.coverageType === 'barangay') {
 				const feature = boundaries?.features.find(f => f.properties.barangay === block.barangay)
 				const old = previousById.get(assignment.id)?.scheduleBlocks?.find(b => b.coverageType === 'barangay' && b.barangay === block.barangay)
-				block.geometry = feature?.geometry || old?.geometry || null
-				block.boundarySource = boundaries?.attribution || old?.boundarySource || ''
-				if (block.geometry) {
-					const points = block.geometry.type === 'Polygon' ? block.geometry.coordinates.flat() : block.geometry.coordinates.flat(2)
-					block.longitude = (Math.min(...points.map(p => p[0])) + Math.max(...points.map(p => p[0]))) / 2
-					block.latitude = (Math.min(...points.map(p => p[1])) + Math.max(...points.map(p => p[1]))) / 2
+				// Editing instructions/times must not migrate an existing coverage snapshot,
+				// including a legacy block that intentionally has no boundary geometry.
+				block.geometry = old ? old.geometry || null : feature?.geometry || null
+				block.boundarySource = old ? old.boundarySource || '' : `${boundaries?.source || ''}; ${boundaries?.attribution || ''}`
+				const center = old || feature?.properties.center
+				if (!old) block.navigationPoint = feature?.properties.navigationCenter
+				else if (old.navigationPoint) block.navigationPoint = old.navigationPoint
+				else delete block.navigationPoint
+				if (Number.isFinite(center?.latitude) && Number.isFinite(center?.longitude)) {
+					block.latitude = center.latitude; block.longitude = center.longitude
 				}
 			} else if (block.coverageType === 'route') {
 				const old = previousById.get(assignment.id)?.scheduleBlocks?.find(b => JSON.stringify(b.routePoints) === JSON.stringify(block.routePoints))
@@ -80,6 +84,10 @@ const hydratePatrolGeometry = async (assignments, previousById) => {
 					block.roadDirections = Boolean(route?.available)
 				}
 			}
+		}
+		const first = assignment.scheduleBlocks?.[0]
+		if (first && Number.isFinite(first.latitude) && Number.isFinite(first.longitude)) {
+			assignment.latitude = first.latitude; assignment.longitude = first.longitude
 		}
 	}
 }

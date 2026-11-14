@@ -312,7 +312,7 @@ export const createLeafletMapHtml = ({
               }
             };
 
-            let patrolLayer=L.geoJSON(${JSON.stringify(patrolCoverage)}, {style:feature=>({color:feature.properties.next?'#f59e0b':'#2563eb',weight:feature.properties.kind==='corridor'?0:3,dashArray:feature.properties.kind==='transition'?'6 4':undefined,fillOpacity:.12}),pointToLayer:(feature,latlng)=>L.circleMarker(latlng,{radius:15,color:'#fff',weight:2,fillColor:feature.properties.next?'#a65f00':'#166534',fillOpacity:1}).bindTooltip(String(feature.properties.label||''),{permanent:true,direction:'center',className:'patrol-number'})}).addTo(map);
+            let patrolLayer=L.geoJSON(${JSON.stringify(patrolCoverage)}, {style:feature=>({color:feature.properties.next?'#f59e0b':'#2563eb',weight:feature.properties.kind==='corridor'?0:3,dashArray:feature.properties.kind==='transition'||feature.properties.coverageType==='barangay'?'6 4':undefined,fillOpacity:.12}),pointToLayer:(feature,latlng)=>L.circleMarker(latlng,{radius:15,color:'#fff',weight:2,fillColor:feature.properties.next?'#a65f00':'#166534',fillOpacity:1}).bindTooltip(String(feature.properties.label||''),{permanent:true,direction:'center',className:'patrol-number'})}).addTo(map);
             window.handleMapCommand=(command)=>{
               if(!command)return;
               if(command.type==='patrol-coverage'){patrolLayer.clearLayers();patrolLayer.addData(command.features);}

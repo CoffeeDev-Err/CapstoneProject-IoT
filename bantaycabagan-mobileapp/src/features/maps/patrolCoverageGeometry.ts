@@ -42,7 +42,7 @@ export function routeCorridorGeometry(points: number[][], meters: number): GeoJS
 
 export function patrolBlockFeatures(block: PatrolScheduleBlock | undefined, index: number, next: boolean, mode?: string): GeoJSON.Feature[] {
   if (!block) return [];
-  const properties = { next, blockIndex: index };
+  const properties = { next, blockIndex: index, coverageType: block.coverageType };
   const features: GeoJSON.Feature[] = [];
   if (block.coverageType === 'custom' && Number.isFinite(block.latitude) && Number.isFinite(block.longitude)) {
     const circle = createRadiusPolygon(block.latitude!, block.longitude!, block.radiusMeters!);

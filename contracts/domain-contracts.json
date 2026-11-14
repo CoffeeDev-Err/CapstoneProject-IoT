@@ -29,12 +29,12 @@
     { "code": "SAN-ANTONIO", "name": "San Antonio", "psgcCode": "0203106027" }
   ],
   "geofence": {
-    "coordinateCount": 90,
-    "sha256": "9d8c240c0a0e1f8a36c2368b71e9d51e7af785fa2504574e3bd1ecdd4a025812",
+    "coordinateCount": 309,
+    "sha256": "e1da22dadff71fd7be1f1da0a06cb58e4a108a8dfa428d2d2564690756f61505",
     "probes": [
       { "latitude": 17.4239, "longitude": 121.7681, "inside": true },
       { "latitude": 17.5, "longitude": 121.7681, "inside": false },
-      { "latitude": 17.421534, "longitude": 122.090361, "inside": true }
+      { "latitude": 17.42153421800003, "longitude": 122.09036114800006, "inside": true }
     ]
   },
   "validationCases": {

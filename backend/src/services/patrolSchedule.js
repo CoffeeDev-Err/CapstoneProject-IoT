@@ -1,9 +1,10 @@
 const { findCabaganBarangay } = require('../constants/cabaganBarangays')
 const barangayCenters = require('../../../contracts/cabagan-patrol-centers.json')
+const geography = require('../../../contracts/geography/cabagan-geography.json')
 const { isInsideCabagan } = require('../utils/cabaganGeofence')
 const { createValidationError } = require('../utils/operationalValidation')
 
-const normalizePatrolSchedule = (assignment) => {
+const normalizePatrolSchedule = (assignment, previous, { deferBoundary = false } = {}) => {
 	const blocks = assignment.scheduleBlocks
 	const transitionGraceMinutes = assignment.transitionGraceMinutes ?? 10
 	if (!Number.isInteger(transitionGraceMinutes) || transitionGraceMinutes < 0 || transitionGraceMinutes > 60) throw createValidationError('Transition grace period must be 0 to 60 minutes.', 'transitionGraceMinutes')
@@ -15,9 +16,15 @@ const normalizePatrolSchedule = (assignment) => {
 	if (assignment.deploymentType === 'route' && !['walk', 'car', 'motorcycle'].includes(mode)) throw createValidationError('Choose Foot, Motorcycle or Car Patrol.', 'patrolMode')
 	let offsetMinutes = 0
 	const codes = new Set()
+	// Only the server's saved coordinates can cross a newly corrected edge during
+	// an edit. New or moved points always use the current downloaded municipality.
+	const canPreserve = previous?.personnelId === assignment.personnelId
+		&& previous?.deploymentType === assignment.deploymentType && (previous?.patrolMode || '') === mode
+	const savedPoints = canPreserve ? (previous.scheduleBlocks || []).flatMap(block => block.coverageType === 'route' ? block.routePoints || [] : [block]) : []
 	const point = (value) => {
 		if (!value || !Number.isFinite(value.latitude) || !Number.isFinite(value.longitude)
-			|| !isInsideCabagan(value.latitude, value.longitude)) throw createValidationError('Choose map points inside Cabagan.', 'scheduleBlocks')
+			|| Math.abs(value.latitude) > 90 || Math.abs(value.longitude) > 180
+			|| (!deferBoundary && !isInsideCabagan(value.latitude, value.longitude) && !savedPoints.some(p => p.latitude === value.latitude && p.longitude === value.longitude))) throw createValidationError('Choose map points inside Cabagan.', 'scheduleBlocks')
 		return { latitude: value.latitude, longitude: value.longitude }
 	}
 	const scheduleBlocks = blocks.map((block) => {
@@ -37,7 +44,7 @@ const normalizePatrolSchedule = (assignment) => {
 			if (!barangay) throw createValidationError('Select an official Cabagan barangay.', 'scheduleBlocks')
 			codes.add(barangay.code)
 			return { ...result, coverageType: 'barangay', barangay: barangay.name,
-				...barangayCenters[barangay.code] }
+				...barangayCenters[barangay.code], navigationPoint: geography.barangays.features.find(f => f.properties.code === barangay.code).properties.navigationCenter }
 		}
 		if (block.coverageType !== 'custom' || !Number.isFinite(block.radiusMeters) || block.radiusMeters < 50 || block.radiusMeters > 5000) throw createValidationError('Choose a custom area radius between 50 and 5,000 meters.', 'scheduleBlocks')
 		return { ...result, coverageType: 'custom', radiusMeters: block.radiusMeters, ...point(block) }

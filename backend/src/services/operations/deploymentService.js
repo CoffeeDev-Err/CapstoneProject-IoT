@@ -60,8 +60,8 @@ const formatDeploymentNotificationMessage = ({ assignment, scheduled, scheduleTe
 		: `You are assigned to ${destination}.${instructionsText} Open Map to confirm your deployment.`
 }
 
-const normalizeDeploymentConfiguration = (assignment) => {
-  if (assignment.scheduleBlocks?.length) return normalizePatrolSchedule(assignment)
+const normalizeDeploymentConfiguration = (assignment, previous, { deferBoundary = false } = {}) => {
+  if (assignment.scheduleBlocks?.length) return normalizePatrolSchedule(assignment, previous, { deferBoundary })
 	const patrolArea = findPatrolArea(assignment.patrolAreaId || assignment.patrolArea)
 	if (!patrolArea) {
 		validatePatrolArea(assignment.patrolArea)
@@ -89,7 +89,9 @@ const normalizeDeploymentConfiguration = (assignment) => {
 	}
 	const latitude = hasLatitude ? Number(assignment.latitude) : null
 	const longitude = hasLongitude ? Number(assignment.longitude) : null
-	if (hasLatitude && (!isValidCoordinates(latitude, longitude) || !isInsideCabagan(latitude, longitude))) {
+	const savedPoint = previous?.personnelId === assignment.personnelId && previous?.deploymentType === deploymentType
+		&& previous?.location?.coordinates?.[0] === longitude && previous?.location?.coordinates?.[1] === latitude
+	if (hasLatitude && (!isValidCoordinates(latitude, longitude) || (!deferBoundary && !isInsideCabagan(latitude, longitude) && !savedPoint))) {
 		throw createValidationError('The deployment point must be inside Cabagan.', 'deploymentPoint')
 	}
 	if (deploymentType === 'area' && (hasLatitude || String(assignment.deploymentPointLabel || '').trim())) {
@@ -510,11 +512,12 @@ const createDeploymentService = ({
 			if (!/^[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])?$/i.test(personnelId)) {
 				throw createValidationError('Select a valid personnel account.', 'personnelId')
 			}
-			const deploymentConfiguration = normalizeDeploymentConfiguration(assignment)
+			const deploymentConfiguration = normalizeDeploymentConfiguration(assignment, undefined, { deferBoundary: true })
 			return {
 				id: validateDeploymentId(assignment.id),
 				groupId: validateDeploymentId(assignment.groupId || assignment.id, 'groupId'),
 				personnelId,
+				configurationInput: assignment,
 				...deploymentConfiguration,
 				shiftStart: validateDate(assignment.shiftStart, {
 					field: 'shiftStart',
@@ -602,6 +605,7 @@ const createDeploymentService = ({
 			}
 		}
 
+
 		const assignmentsByPersonnel = new Map()
 		normalizedAssignments.forEach((assignment) => {
 			const personnelId = String(assignment.personnelId || '')
@@ -638,6 +642,11 @@ const createDeploymentService = ({
 		const previousById = new Map(
 			previousDeployments.map((deployment) => [deployment.assignmentId, deployment]),
 		)
+		for (const assignment of normalizedAssignments) {
+			Object.assign(assignment, normalizeDeploymentConfiguration(assignment.configurationInput, previousById.get(assignment.id)))
+			delete assignment.configurationInput
+		}
+
 		if (normalizedAssignments.some(assignment => {
 			const previous = previousById.get(assignment.id)
 			return previous && !MANAGEABLE_DEPLOYMENT_STATUSES.includes(previous.status)

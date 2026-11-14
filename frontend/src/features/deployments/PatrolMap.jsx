@@ -17,7 +17,8 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaT
   const [loaded, setLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
   const isDark = useDocumentTheme()
-  const areaPoints = type === 'area' && areaTravelMode && blocks.length >= 2 && blocks.every(block => Number.isFinite(block.latitude) && Number.isFinite(block.longitude)) ? blocks.map(({ latitude, longitude }) => ({ latitude, longitude })) : []
+  const destinations = blocks.map(block => block.navigationPoint || block)
+  const areaPoints = type === 'area' && areaTravelMode && blocks.length >= 2 && destinations.every(point => Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) ? destinations.map(({ latitude, longitude }) => ({ latitude, longitude })) : []
   const areaPaths = []
   for (let i = 0; i < areaPoints.length - 1; i += 29) areaPaths.push(areaPoints.slice(i, i + 30))
   const directions = useRouteDirections(areaPaths, areaTravelMode)
@@ -101,7 +102,7 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaT
       map.addSource('patrol-transitions', { type: 'geojson', data: transitionData })
       map.addSource('patrol-area-directions', { type: 'geojson', data: suggestedData })
       map.addLayer({ id: 'patrol-area-fill', type: 'fill', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.14 } })
-      map.addLayer({ id: 'patrol-area-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'line-color': '#2563eb', 'line-width': 2 } })
+      map.addLayer({ id: 'patrol-area-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'line-color': '#2563eb', 'line-width': 2, 'line-dasharray': [3, 2] } })
       // Meter corridor converted to pixels at this map latitude and zoom.
       map.addLayer({ id: 'patrol-corridor', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2563eb', 'line-opacity': 0.12, 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 0, ['*', ['get', 'corridor'], 2 / (156543.03392 * Math.cos(17.427 * Math.PI / 180))], 22, ['*', ['get', 'corridor'], 2 * 2 ** 22 / (156543.03392 * Math.cos(17.427 * Math.PI / 180))]] } })
       map.addLayer({ id: 'patrol-route-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 4 } })
@@ -117,7 +118,13 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaT
     return () => markers.forEach(marker => marker.remove())
   }, [blocks, type, mode, start, loaded, selectedIndex, context, autoFit, suggestedFeatures, areaPaths.length])
   useEffect(() => {
-    if (loaded && focus) mapRef.current?.flyTo({ center: [focus.longitude, focus.latitude], zoom: 16 })
+    if (!loaded || !focus) return
+    if (focus.geometry?.type === 'Polygon' || focus.geometry?.type === 'MultiPolygon') {
+      const points = focus.geometry.coordinates.flat(focus.geometry.type === 'MultiPolygon' ? 2 : 1)
+      const bounds = new maplibregl.LngLatBounds()
+      points.forEach(point => bounds.extend(point))
+      if (!bounds.isEmpty()) mapRef.current?.fitBounds(bounds, { padding: 45, maxZoom: 16 })
+    } else mapRef.current?.flyTo({ center: [focus.longitude, focus.latitude], zoom: 16 })
   }, [loaded, focus])
   return <div className="patrol-map" aria-label={onPoint ? 'Patrol configuration map' : 'Read-only patrol schedule map'}>
     {hasMapTilerWebApiKey ? <><div className="patrol-map__canvas" ref={container} />{!loaded && !mapError && <div className="patrol-map__empty" role="status">Loading patrol map…</div>}{mapError && <p className="patrol-map__error patrol-notice is-warning" role="status">{mapError}</p>}</> : <div className="patrol-map__empty" role="status">Map configuration is unavailable. Add the MapTiler web key to display the map.</div>}

@@ -1,0 +1,7 @@
+# Keep downloaded source bytes and generated geography hashes stable on Windows/Linux.
+contracts/geography/*.source.json -text
+contracts/geography/cabagan-navigation-references.json text eol=lf
+contracts/geography/cabagan-geography.json text eol=lf
+contracts/cabagan-patrol-centers.json text eol=lf
+contracts/domain-contracts.json text eol=lf
+bantaycabagan-mobileapp/src/constants/data/cabagan-geography.json text eol=lf
