@@ -41,7 +41,7 @@ const getMetricValue = (barangay, metric) => Number(
   metric === 'incidents' ? barangay.validatedIncidentCount : barangay.reportCount,
 ) || 0
 
-function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, onViewReports }) {
+function BarangayOperationalAnalytics({ analytics, priorityRequest = 0, onViewReports }) {
   const [metric, setMetric] = useState('reports')
   const [selection, setSelection] = useState({ name: '', request: priorityRequest })
   const selectedBarangayName = selection.request === priorityRequest ? selection.name : ''
@@ -64,8 +64,9 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
   const highestActivityBarangay = metricRanking[0]
 
   return (
-    <section className="slide-up barangay-analytics">
+    <section className="barangay-analytics">
       <header className="barangay-analytics__header">
+        <span className="barangay-analytics__header-icon"><BarChart3 aria-hidden="true" /></span>
         <div>
           <h3 className="widget-title mb-0">Barangay operational analytics</h3>
           <p>Report activity and explainable deployment priority for {analytics.periodLabel}</p>
@@ -121,7 +122,7 @@ function BarangayOperationalAnalytics({ analytics, period, priorityRequest = 0, 
             </div>
           </div>
 
-          <div key={`${period}-${metric}`} className="barangay-bar-list" tabIndex={0} role="region" aria-label="Reports by barangay ranking">
+          <div className="barangay-bar-list" tabIndex={0} role="region" aria-label="Reports by barangay ranking">
             {metricRanking.length === 0 && (
               <div className="barangay-analytics__empty">
                 No {metric === 'incidents' ? 'validated incidents' : 'submitted reports'} for this period.

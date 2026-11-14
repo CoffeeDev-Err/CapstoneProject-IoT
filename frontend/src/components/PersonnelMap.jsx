@@ -606,18 +606,9 @@ function PersonnelMap({
     const timer = window.setTimeout(() => {
       const map = mapRef.current
       map?.resize()
-      const member = personnelRef.current.find((item) => item.id === followedPersonnelId)
-      if (member) {
-        map?.jumpTo({
-          center: [Number(member.longitude), Number(member.latitude)],
-          zoom: mapMode === 'satellite' ? SATELLITE_FOCUS_ZOOM : STREET_FOCUS_ZOOM,
-        })
-      } else {
-        map?.jumpTo({ center: LIVE_MAP_DEFAULT_CENTER, zoom: LIVE_MAP_DEFAULT_ZOOM })
-      }
     }, 280)
     return () => window.clearTimeout(timer)
-  }, [followedPersonnelId, layoutVersion, mapMode])
+  }, [layoutVersion])
 
   if (!hasMapTilerWebApiKey) {
     return (

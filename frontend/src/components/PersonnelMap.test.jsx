@@ -26,7 +26,8 @@ vi.mock('maplibre-gl', () => ({
     getLayer() { return true }
     addSource() {}
     addLayer() {}
-    resize() {}
+    resize = vi.fn()
+    jumpTo = vi.fn()
     easeTo() {}
     flyTo() {}
     stop() { this.stopped = true }
@@ -93,6 +94,19 @@ it('renders 2,000 clustered officers without creating hidden photo markers or wa
   expect(view.container.querySelectorAll('.maplibre-personnel-marker')).toHaveLength(1)
   view.rerender(<PersonnelMap personnel={[]} onSelectPersonnel={selected} />)
   expect(view.container.querySelectorAll('.maplibre-personnel-marker')).toHaveLength(0)
+})
+
+it('keeps the existing map camera when the personnel panel changes width', async () => {
+  vi.useFakeTimers()
+  try {
+    const view = render(<PersonnelMap personnel={[]} layoutVersion={0} />)
+    const map = fixture.maps[0]
+    view.rerender(<PersonnelMap personnel={[]} layoutVersion={1} />)
+    await act(async () => vi.advanceTimersByTime(300))
+    expect(fixture.maps).toHaveLength(1)
+    expect(map.resize).toHaveBeenCalled()
+    expect(map.jumpTo).not.toHaveBeenCalled()
+  } finally { vi.useRealTimers() }
 })
 
 it('shows individuals on zoom-in and releases their DOM and photos when clustered again', () => {

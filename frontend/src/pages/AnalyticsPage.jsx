@@ -5,7 +5,8 @@ import BarangayOperationalAnalytics from '../components/BarangayOperationalAnaly
 import { AnalyticsContentSkeleton } from '../components/LoadingSkeleton'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { useFeedback } from '../context/useFeedback'
-import { getReportsList } from '../services/operations'
+import { useCachedPageData } from '../hooks/useCachedPageData'
+import { useAnalyticsReports } from '../hooks/useAnalyticsReports'
 import { analyticsReportsUrl, reportPeriodRange } from '../utils/reportFilters'
 import { BARANGAY_ANALYTICS_PERIODS, BASELINE_REQUIRED_PERSONNEL, buildBarangayAnalytics } from '../utils/barangayAnalytics'
 
@@ -13,10 +14,9 @@ const barangayFromArea = (area = '') => String(area).split(',')[0].trim()
   .replace(/^barangay\s+/i, '').split(/public|market|zone|route|road|checkpoint|perimeter/i)[0].trim()
 
 export default function AnalyticsPage() {
-  const [period, setPeriod] = useState('weekly')
+  const [period, setPeriod] = useCachedPageData('analytics:period', 'weekly')
   const [referenceDate] = useState(() => new Date())
   const [retry, setRetry] = useState(0)
-  const [result, setResult] = useState({ key: '', reports: [], error: '' })
   const [menu, setMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [priorityRequest, setPriorityRequest] = useState(0)
@@ -26,16 +26,7 @@ export default function AnalyticsPage() {
   const { showFeedback } = useFeedback()
   const { deployments, personnel, reportsRevision, isInitialDataLoading, initialDataError, retryInitialData } = usePersonnelContext()
   const { from, to } = reportPeriodRange(period, referenceDate)
-  const requestKey = JSON.stringify([period, from, to, retry, reportsRevision])
-  useEffect(() => {
-    const controller = new AbortController()
-    getReportsList({ from, to, cabaganOnly: true, signal: controller.signal }).then(({ data }) => {
-      if (!controller.signal.aborted) setResult({ key: requestKey, reports: data, error: '' })
-    }).catch((error) => {
-      if (!controller.signal.aborted) setResult({ key: requestKey, reports: [], error: error.message })
-    })
-    return () => controller.abort()
-  }, [from, to, requestKey])
+  const { reports, hasData, pending, error: reportsError } = useAnalyticsReports({ from, to, reportsRevision, retry })
   useEffect(() => {
     if (!menu) return undefined
     menuRef.current?.querySelector('button')?.focus()
@@ -58,9 +49,9 @@ export default function AnalyticsPage() {
     return [...grouped.values()].map((entry) => ({ barangay: entry.barangay, assignedPersonnel: entry.assigned.size,
       availablePersonnel: entry.available.size, requiredPersonnel: BASELINE_REQUIRED_PERSONNEL }))
   }, [deployments, personnel])
-  const analytics = useMemo(() => buildBarangayAnalytics({ reports: result.reports, deploymentCoverage: coverage, period, referenceDate }), [result.reports, coverage, period, referenceDate])
-  const loading = result.key !== requestKey || isInitialDataLoading
-  const error = result.error || initialDataError
+  const analytics = useMemo(() => buildBarangayAnalytics({ reports, deploymentCoverage: coverage, period, referenceDate }), [reports, coverage, period, referenceDate])
+  const loading = !hasData && (pending || isInitialDataLoading)
+  const error = reportsError || initialDataError
   const viewReports = (filters = {}) => navigate(analyticsReportsUrl(analytics, filters))
   const showPriority = () => {
     setPriorityRequest((value) => value + 1)
@@ -78,12 +69,12 @@ export default function AnalyticsPage() {
     setMenu(false); menuButtonRef.current?.focus(); setExporting(true)
     try {
       const { downloadAnalytics } = await import('../utils/reportExports')
-      await downloadAnalytics(kind, analytics, result.reports)
+      await downloadAnalytics(kind, analytics, reports)
       showFeedback(`Analytics ${kind === 'pdf' ? 'PDF' : 'Excel file'} downloaded.`, { type: 'success' })
     } catch (failure) { showFeedback(failure.message || 'Could not generate analytics. Retry.', { type: 'error' }) }
     finally { setExporting(false) }
   }
-  return <div className="page-container fade-in p-3 p-md-4">
+  return <div className="page-container analytics-page p-3 p-md-4">
     <header className="page-header mb-4 reports-header">
       <div><h2 className="page-title">Analytics</h2><p className="page-subtitle">Patrol, incident, and barangay deployment trends</p></div>
       <div className="analytics-page-actions">
@@ -93,7 +84,7 @@ export default function AnalyticsPage() {
         </div>
         <div className="analytics-download">
           <button ref={menuButtonRef} type="button" className="report-generate-btn" aria-expanded={menu} aria-controls="analytics-download-options"
-            disabled={loading || Boolean(error) || exporting} onClick={() => setMenu(!menu)}>
+            disabled={loading || pending || Boolean(error) || exporting} onClick={() => setMenu(!menu)}>
             <span>{exporting ? 'Generating...' : 'Generate Report'}</span>
             {!exporting && <ChevronDown className="report-generate-btn__chevron" aria-hidden="true" />}
           </button>
@@ -103,19 +94,19 @@ export default function AnalyticsPage() {
         </div>
       </div>
     </header>
-    {error && <p className="field-error" role="alert">{error} <button className="report-action-btn" onClick={() => { setRetry((value) => value + 1); retryInitialData?.() }}>Retry</button></p>}
-    {loading ? <AnalyticsContentSkeleton /> : !error && <>
-      <p className="settings-hint analytics-period-note">Period counts use submission dates in Philippine time. Personnel coverage is current.</p>
+    <span className="visually-hidden" role="status">{pending && hasData ? 'Updating analytics' : ''}</span>
+    {error && <p className="field-error" role="alert">{hasData && 'Showing previously loaded analytics. '}{error} <button className="report-action-btn" onClick={() => { setRetry((value) => value + 1); retryInitialData?.() }}>Retry</button></p>}
+    {loading ? <AnalyticsContentSkeleton /> : hasData && <>
       <div className="stats-grid analytics-stats-grid row g-3 mb-3 mx-0">
         {stats.map((stat) => <div className="col-12 col-sm-6 col-xl-3" key={stat.label}>
-          <button type="button" className="stat-card stat-card--action slide-up h-100" onClick={stat.click}>
+          <button type="button" className="stat-card stat-card--action h-100" onClick={stat.click}>
             <div className="stat-card__heading"><p className="stat-card__label">{stat.label}</p></div>
             <strong className="stat-card__value">{stat.value}</strong><p className="stat-card__subtext">{stat.subtext}</p>
             <span className="stat-card__action">{stat.action} →</span>
           </button>
         </div>)}
       </div>
-      <BarangayOperationalAnalytics analytics={analytics} period={period} priorityRequest={priorityRequest} onViewReports={(barangay) => viewReports({ barangay })} />
+      <BarangayOperationalAnalytics analytics={analytics} priorityRequest={priorityRequest} onViewReports={(barangay) => viewReports({ barangay })} />
     </>}
   </div>
 }

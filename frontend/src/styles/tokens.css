@@ -25,7 +25,7 @@
   --font-size-fluid-intro: clamp(1rem, 1.6vw, 1.15rem);
   --font-size-fluid-section: clamp(1.8rem, 3.2vw, 2.65rem);
 
-  --sidebar-w: 244px;
+  --sidebar-w: 256px;
   --sidebar-w-collapsed: 60px;
   --sidebar-bg: #0f172a;
   --sidebar-border: #1e293b;

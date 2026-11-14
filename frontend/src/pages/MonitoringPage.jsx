@@ -15,12 +15,11 @@
  *   User clicks marker/name → setSelectedPersonnel → modal opens
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { MonitoringContentSkeleton } from '../components/LoadingSkeleton'
 import ConfirmModal from '../components/ConfirmModal'
 import ProfileModal from '../components/ProfileModal'
-import SidePanel from '../components/SidePanel'
+import LivePersonnelPanel from '../components/LivePersonnelPanel'
 import MapPersonnelToolbar from '../components/MapPersonnelToolbar'
 import AnnouncementDialog from '../components/AnnouncementDialog'
 import { usePersonnelContext } from '../context/usePersonnelContext'
@@ -212,22 +211,7 @@ function MonitoringPage() {
   return (
     <div className="monitoring-shell">
       <main className={`dashboard-grid${isSidePanelCollapsed ? ' dashboard-grid--panel-collapsed' : ''}`}>
-        <aside className={`side-panel-shell${isSidePanelCollapsed ? ' is-collapsed' : ''}`}>
-          <button
-            type="button"
-            className={`side-panel-collapse-btn${isSidePanelCollapsed ? ' is-collapsed' : ''}`}
-            onClick={handleToggleSidePanel}
-            aria-label={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
-            title={isSidePanelCollapsed ? 'Expand side panel' : 'Collapse side panel'}
-          >
-            {isSidePanelCollapsed ? (
-              <PanelLeftOpen className="side-panel-collapse-icon" aria-hidden="true" />
-            ) : (
-              <PanelLeftClose className="side-panel-collapse-icon" aria-hidden="true" />
-            )}
-          </button>
-
-          <SidePanel
+        <LivePersonnelPanel collapsed={isSidePanelCollapsed} onToggle={handleToggleSidePanel}
             personnel={activePersonnel}
             personnelCount={personnelCount}
             connectionMessage={statusMessage}
@@ -235,8 +219,7 @@ function MonitoringPage() {
             outOfBoundaryPersonnelCount={outOfBoundaryPersonnel.length}
             stalePersonnelCount={stalePersonnel.length}
             onSelectPersonnel={handleSelectPersonnel}
-          />
-        </aside>
+        />
         <Suspense fallback={<div className="map-panel map-chunk-loading h-100" role="status">Loading live map...</div>}>
           <PersonnelMap
             toolbar={<MapPersonnelToolbar personnel={personnel} onAnnounce={() => setAnnouncementOpen(true)}

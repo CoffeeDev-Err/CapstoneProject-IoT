@@ -1,18 +1,41 @@
-/* Match the compact grouped sections used by the patrol configuration panel. */
-:root .monitoring-shell .side-panel-shell {
-  padding:12px;
+/* One map workspace, with an independently collapsible personnel rail. */
+:root .layout-body:has(> .monitoring-shell) { height:100dvh; min-height:0; overflow:hidden; }
+:root .layout-body:has(> .monitoring-shell) > .system-status-banner { position:relative; top:auto; flex-shrink:0; }
+:root .monitoring-shell { min-height:0; }
+:root .monitoring-shell .dashboard-grid {
+  position:relative;
+  grid-template-columns:288px minmax(0,1fr);
+  gap:0;
+  flex:1 1 0;
+  height:auto;
+  min-height:0;
   border:1px solid var(--app-border);
-  border-radius:13px;
+  border-radius:14px;
+  background:var(--app-card);
+  overflow:hidden;
+  transition:none;
+}
+:root .monitoring-shell .dashboard-grid--panel-collapsed { grid-template-columns:46px minmax(0,1fr); }
+:root .monitoring-shell .map-panel { order:2; height:100% !important; min-height:0; padding:10px; border:0; border-radius:0; box-shadow:none; }
+:root .monitoring-shell .side-panel-shell {
+  order:1;
+  padding:12px;
+  border:0;
+  border-right:1px solid var(--app-border);
+  border-radius:0;
   background:var(--app-card);
   box-shadow:none;
 }
-:root .monitoring-shell .side-panel {
+.live-personnel-content { height:100%; min-height:0; }
+:root :is(.monitoring-shell,.live-personnel-drawer) .side-panel {
   display:flex;
   flex-direction:column;
   gap:10px;
   padding:0;
   min-height:0;
-  overflow-y:auto;
+  height:100%;
+  max-height:none;
+  overflow:hidden;
 }
 :root .side-panel :is(.metric-card,.status-card,.list-card) {
   min-width:0;
@@ -49,8 +72,12 @@
 :root .side-panel .side-panel__hint { display:block; margin-top:2px; font-size:var(--font-size-xs); line-height:1.5; color:var(--app-secondary); }
 :root .side-panel .side-panel__message { margin:9px 0 0; font-size:var(--font-size-sm); line-height:1.55; color:var(--app-secondary); overflow-wrap:anywhere; }
 :root .side-panel .geofence-alert-pill { margin-top:8px; border-radius:7px; line-height:1.5; }
-:root .side-panel .list-card { display:flex; flex-direction:column; min-height:0; flex:0 1 auto; }
-:root .side-panel .side-panel__personnel-list { min-height:0; max-height:none; margin:10px 0 0; gap:6px; align-content:start; overflow-y:auto; overscroll-behavior:contain; }
+:root .side-panel .list-card { display:flex; flex-direction:column; min-height:0; flex:1 1 0; }
+:root .side-panel .side-panel__personnel-list { min-height:0; max-height:none; flex:1 1 0; margin:10px 0 0; padding:2px 5px 2px 2px; gap:6px; align-content:start; overflow-y:auto; overscroll-behavior:contain; direction:ltr; scrollbar-gutter:stable; scrollbar-width:thin; scrollbar-color:var(--app-secondary) var(--app-input); }
+:root .side-panel .side-panel__personnel-list::-webkit-scrollbar { display:block; width:8px; }
+:root .side-panel .side-panel__personnel-list::-webkit-scrollbar-track { background:var(--app-input); border-radius:8px; }
+:root .side-panel .side-panel__personnel-list::-webkit-scrollbar-thumb { background:var(--app-secondary); border-radius:8px; }
+:root .side-panel .side-panel__personnel-list:focus-visible { outline:2px solid var(--app-accent); outline-offset:2px; border-radius:5px; }
 :root .side-panel .personnel-empty-state { padding:0; font-size:var(--font-size-sm); line-height:1.55; color:var(--app-secondary); text-align:left; }
 :root .side-panel .list-item-btn { padding:8px; gap:8px; border-radius:8px; color:var(--app-text); background:var(--app-input); box-shadow:none; transform:none; }
 :root .side-panel .list-item-btn:hover { color:var(--app-text); background:var(--app-selected); border-color:var(--app-accent-border); transform:none; box-shadow:none; }
@@ -59,12 +86,29 @@
 :root .side-panel .list-item-info { font-size:var(--font-size-xs); }
 :root .side-panel .list-item-info small { font-size:var(--font-size-xs); line-height:1.4; }
 :root .monitoring-shell .side-panel-collapse-btn { top:19px; right:19px; width:30px; height:30px; border-radius:7px; background:var(--app-input); border-color:var(--app-border); color:var(--app-secondary); box-shadow:none; backdrop-filter:none; }
+:root .monitoring-shell .side-panel-collapse-btn svg { width:18px; height:18px; }
 :root .monitoring-shell .side-panel-collapse-btn:hover { background:var(--app-selected); border-color:var(--app-accent-border); color:var(--app-accent-text); transform:none; }
 :root .monitoring-shell .side-panel-shell.is-collapsed { padding:0; }
 :root .monitoring-shell .side-panel-shell.is-collapsed .side-panel-collapse-btn { left:50%; right:auto; transform:translateX(-50%); }
+.live-personnel-open { position:absolute; z-index:8; right:20px; bottom:62px; display:flex; align-items:center; gap:7px; min-height:44px; padding:9px 12px; border:1px solid var(--app-border); border-radius:10px; background:var(--app-card); color:var(--app-text); box-shadow:0 3px 12px #0002; font-size:var(--font-size-sm); font-weight:700; }
+.live-personnel-open svg { width:18px; height:18px; }
+.live-personnel-open:hover { background:var(--app-selected); }
+.live-personnel-drawer { position:fixed; inset:0 0 0 auto; width:min(360px,calc(100vw - 24px)); height:100dvh; max-height:none; max-width:none; margin:0; padding:0; border:0; border-left:1px solid var(--app-border); color:var(--app-text); background:var(--app-card); box-shadow:-12px 0 40px #0004; }
+.live-personnel-drawer::backdrop { background:#02061788; }
+.live-personnel-drawer__body { display:flex; flex-direction:column; gap:12px; height:100%; min-height:0; padding:12px; padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+.live-personnel-drawer__header { display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:12px; }
+.live-personnel-drawer__header .icon-btn { width:44px; height:44px; border:1px solid var(--app-border); border-radius:10px; background:var(--app-input); color:var(--app-secondary); }
+.live-personnel-drawer .side-panel { flex:1 1 0; }
+:root .live-personnel-drawer .metric-card .side-panel__heading { padding-right:0; }
+@media (min-width:861px) and (max-width:1100px) {
+  :root .monitoring-shell .dashboard-grid:not(.dashboard-grid--panel-collapsed) { grid-template-columns:264px minmax(0,1fr); }
+}
 @media (max-width:860px) {
-  :root .monitoring-shell .side-panel { height:auto !important; max-height:540px; }
-  :root .side-panel .side-panel__personnel-list { max-height:260px; }
-  :root .monitoring-shell .side-panel-shell:not(.is-collapsed) .side-panel-collapse-btn { position:absolute; margin:0; }
-  :root .monitoring-shell .side-panel-shell.is-collapsed .side-panel-collapse-btn { position:static; margin:0; transform:none; }
+  :root .monitoring-shell .dashboard-grid { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-height:620px) {
+  :root .side-panel :is(.metric-card,.status-card) { padding:8px 10px; }
+  :root .side-panel .side-panel__message { margin-top:4px; font-size:var(--font-size-xs); }
+  :root .side-panel .side-panel__hint { display:none; }
+  :root .side-panel .side-panel__count { margin-top:2px; }
 }

@@ -55,7 +55,7 @@ function SidePanel({
       {/* ── List Card: clickable roster of active officers ── */}
       <article className="list-card">
         <h2 className="side-panel__heading">Active Personnel</h2>
-        <ul className="side-panel__personnel-list">
+        <ul className="side-panel__personnel-list" tabIndex={0} aria-label="Active personnel roster">
           {personnel.length === 0 && (
             <li className="personnel-empty-state">
               No active personnel with a GPS location.
