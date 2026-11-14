@@ -1,7 +1,7 @@
 .map-panel--toolbar { container-type: inline-size; }
 .map-panel--toolbar .map-style-control { top: calc(0.55rem + 10px); }
 .map-panel--toolbar .map-legend__toggle { min-height: 44px; }
-.map-personnel-toolbar { position: absolute; z-index: 8; top: calc(0.55rem + 10px); left: 215px; right: calc(1.1rem + 68px); display: flex; align-items: stretch; gap: 0.5rem; min-width: 0; max-width: 600px; }
+.map-personnel-toolbar { position: absolute; z-index: 8; top: calc(0.55rem + 10px); left: 215px; right: calc(1.1rem + 68px); display: flex; align-items: stretch; gap: 0.5rem; min-width: 0; max-width: 600px; margin-left: auto; }
 .map-panel--toolbar:has(.map-legend.is-expanded) .map-personnel-toolbar { left: 291px; }
 .map-personnel-search { position: relative; display: flex; align-items: center; min-width: 0; flex: 1; padding: 0 0.65rem; gap: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-secondary); box-shadow: var(--shadow-md); }
 .map-personnel-search > svg { width: 18px; flex-shrink: 0; }

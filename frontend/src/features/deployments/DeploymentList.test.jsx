@@ -46,6 +46,12 @@ const renderList = (props = {}) => render(
 )
 
 describe('DeploymentList instructions', () => {
+  it('keeps cached history rows visible when a background refresh fails', () => {
+    renderList({ activeDeploymentView: 'history', loadError: 'Unavailable', hasLoadedData: true })
+    expect(screen.getByRole('alert')).toHaveTextContent('Showing previously loaded data')
+    expect(screen.getByText('Officer One', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading deployments')).toBeNull()
+  })
   it('loads the full archive group when its members span multiple history pages', async () => {
     vi.mocked(getDeploymentHistoryGroup).mockResolvedValue([{ ...assignment, status: 'completed' }, { ...assignment, id: 'DEP-002', personnelName: 'Officer Two', status: 'completed' }])
     renderList({ activeDeploymentView: 'history', filteredGroupedAssignments: [{ groupId: 'GROUP-001', patrolArea: assignment.patrolArea, assignments: [{ ...assignment, status: 'completed' }] }] })

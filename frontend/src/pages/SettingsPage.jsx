@@ -45,10 +45,10 @@ function SettingsPage() {
   const { user } = useAuth()
   const canManageSupervisors = user?.role === 'supervisor' && user?.supervisorAuthority === 'primary'
   const [createdAccounts, setCreatedAccounts, hasAccounts] = useCachedPageData('accounts', [])
-  const [accountSearch, setAccountSearch] = useState('')
+  const [accountSearch, setAccountSearch] = useCachedPageData('accounts:search', '')
   const deferredAccountSearch = useDeferredValue(accountSearch)
   const [editingAccountId, setEditingAccountId] = useState(null)
-  const [activeAccountView, setActiveAccountView] = useState('create')
+  const [activeAccountView, setActiveAccountView] = useCachedPageData('accounts:view', 'create')
   const [accountType, setAccountType] = useState('officer')
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState(null)
   const [pendingReactivateAccount, setPendingReactivateAccount] = useState(null)

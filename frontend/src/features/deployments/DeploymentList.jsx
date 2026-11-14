@@ -22,8 +22,9 @@ function DeploymentList({
   historyPagination,
   onHistoryPageChange,
   onHistoryLimitChange,
-  historyError = false,
-  onRetryHistory,
+  loadError = '',
+  hasLoadedData = true,
+  onRetryLoad,
   filteredGroupedAssignments,
   highlightedDeploymentId,
   isDeploymentsLoading,
@@ -118,7 +119,8 @@ function DeploymentList({
 
         <div id="deployment-list-panel" role="tabpanel" aria-labelledby={activeDeploymentView === 'history' ? 'deployment-history-tab' : activeDeploymentView === DEPLOYMENT_LIST_VIEWS.SCHEDULED_LATER ? 'deployment-scheduled-tab' : 'deployment-active-tab'} className="deployment-list-panel">
           {groupError && <p role="alert" className="patrol-notice is-error">{groupError}</p>}
-          {historyError ? <div className="patrol-notice is-error" role="alert">Deployment history could not be loaded. <button type="button" onClick={onRetryHistory}>Retry history</button></div> : isDeploymentsLoading ? (
+          {loadError && <div className="patrol-notice is-error" role="alert">{activeDeploymentView === 'history' ? 'Deployment history' : 'Deployments'} could not be refreshed. {hasLoadedData && 'Showing previously loaded data. '}<button type="button" onClick={onRetryLoad}>Retry</button></div>}
+          {loadError && !hasLoadedData ? null : isDeploymentsLoading ? (
             <table className="personnel-table assignment-list-table table align-middle mb-0" aria-busy="true">
               <thead>
                 <tr className="assignment-group-table">
@@ -227,7 +229,7 @@ function DeploymentList({
             </table>
           )}
         </div>
-        {activeDeploymentView === 'history' && historyPagination && !historyError && <PaginationControls label="History records" page={historyPagination.page} limit={historyPagination.limit} total={historyPagination.total} disabled={isDeploymentsLoading || Boolean(loadingGroup)} onPageChange={onHistoryPageChange} onLimitChange={onHistoryLimitChange} />}
+        {activeDeploymentView === 'history' && historyPagination && hasLoadedData && <PaginationControls label="History records" page={historyPagination.page} limit={historyPagination.limit} total={historyPagination.total} disabled={isDeploymentsLoading || Boolean(loadingGroup)} onPageChange={onHistoryPageChange} onLimitChange={onHistoryLimitChange} />}
       </div>
       {viewing && <PatrolScheduleDialog assignment={viewing.assignment} group={viewing.group} onClose={() => setViewing(null)} onReassign={() => { const selected = viewing; setViewing(null); if (selected.groupId) onEditGroup(selected.groupId); else onEditAssignment(selected.assignment) }} />}
       <DeploymentInstructionsModal
