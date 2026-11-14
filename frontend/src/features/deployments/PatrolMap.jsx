@@ -7,9 +7,11 @@ import { useDocumentTheme } from '../../hooks/useDocumentTheme'
 import { cabaganBoundaryFeature } from '../../utils/mapLibreLayers'
 import { blockTimeLabel, circleGeometry, routeIsEnforced } from './patrolScheduleView'
 import useRouteDirections from './useRouteDirections'
+import geography from '../../../../contracts/geography/cabagan-geography.json'
+import { barangayAtPoint } from './patrolBarangayGeometry'
 
 // Saved road/walking paths and assignment transitions use separate sources.
-export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaTravelMode = '', start, onPoint, focus, selectedIndex, context = '', autoFit = true, onSelectBlock, children }) {
+export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaTravelMode = '', start, onPoint, focus, selectedIndex, context = '', autoFit = true, onSelectBlock, barangayPicker = false, children }) {
   const container = useRef(null)
   const mapRef = useRef(null)
   const pointCallback = useRef(onPoint)
@@ -47,6 +49,43 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaT
   }, [isDark])
   useEffect(() => {
     const map = mapRef.current
+    if (!loaded || !map || !barangayPicker) return undefined
+    // Pick from the same bundled polygons that are saved with the assignment.
+    if (!map.getSource('barangay-picker')) {
+      map.addSource('barangay-picker', { type: 'geojson', data: geography.barangays })
+      map.addLayer({ id: 'barangay-picker-line', type: 'line', source: 'barangay-picker', paint: { 'line-color': '#94a3b8', 'line-opacity': 0.7, 'line-width': 1.5, 'line-dasharray': [3, 3] } })
+      map.addLayer({ id: 'barangay-picker-hover', type: 'line', source: 'barangay-picker', filter: ['==', ['get', 'barangay'], ''], paint: { 'line-color': '#ef4444', 'line-width': 3, 'line-dasharray': [3, 2] } })
+    }
+    for (const layer of ['barangay-picker-line', 'barangay-picker-hover']) map.setLayoutProperty(layer, 'visibility', 'visible')
+    const canvas = map.getCanvas()
+    canvas.style.cursor = 'crosshair'
+    let hovered = ''
+    const clear = () => {
+      hovered = ''; canvas.title = ''; canvas.style.cursor = 'crosshair'
+      map.setFilter('barangay-picker-hover', ['==', ['get', 'barangay'], ''])
+    }
+    const hover = event => {
+      const feature = barangayAtPoint(geography.barangays, { latitude: event.lngLat.lat, longitude: event.lngLat.lng })
+      const name = feature?.properties.barangay || ''
+      if (name === hovered) return
+      hovered = name
+      canvas.style.cursor = name ? 'pointer' : 'crosshair'
+      canvas.title = name ? `Barangay ${name}: click to select its whole area` : ''
+      map.setFilter('barangay-picker-hover', ['==', ['get', 'barangay'], name])
+    }
+    map.on('mousemove', hover)
+    canvas.addEventListener('mouseleave', clear)
+    return () => {
+      map.off('mousemove', hover); canvas.removeEventListener('mouseleave', clear)
+      canvas.style.cursor = ''; canvas.title = ''
+      if (mapRef.current === map) {
+        for (const layer of ['barangay-picker-line', 'barangay-picker-hover']) map.setLayoutProperty(layer, 'visibility', 'none')
+        map.setFilter('barangay-picker-hover', ['==', ['get', 'barangay'], ''])
+      }
+    }
+  }, [loaded, barangayPicker])
+  useEffect(() => {
+    const map = mapRef.current
     if (!loaded || !map || !map.getSource('municipality')) return undefined
     const features = [], transitions = [], markers = []
     const bounds = new maplibregl.LngLatBounds()
@@ -63,7 +102,7 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaT
     }
     blocks.forEach((block, index) => {
       const title = `${index + 1}. ${block.label || 'Draft'} · ${blockTimeLabel(start, block)} · ${block.durationMinutes} min${context ? ` · ${context}` : ''}`
-      const properties = { title, active: selectedIndex === index, corridor: block.routeCorridorMeters ?? 100 }
+      const properties = { title, active: selectedIndex === index, coverageType: block.coverageType, corridor: block.routeCorridorMeters ?? 100 }
       if (type === 'route') {
         const points = block.routePoints || []
         const enforced = routeIsEnforced(block, mode)
@@ -101,8 +140,8 @@ export default function PatrolMap({ blocks = [], type = 'area', mode = '', areaT
       map.addSource('patrol-blocks', { type: 'geojson', data })
       map.addSource('patrol-transitions', { type: 'geojson', data: transitionData })
       map.addSource('patrol-area-directions', { type: 'geojson', data: suggestedData })
-      map.addLayer({ id: 'patrol-area-fill', type: 'fill', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.14 } })
-      map.addLayer({ id: 'patrol-area-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'line-color': '#2563eb', 'line-width': 2, 'line-dasharray': [3, 2] } })
+      map.addLayer({ id: 'patrol-area-fill', type: 'fill', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#2563eb', 'fill-opacity': ['case', ['==', ['get', 'coverageType'], 'barangay'], 0, 0.14] } })
+      map.addLayer({ id: 'patrol-area-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'area'], paint: { 'line-color': ['case', ['==', ['get', 'coverageType'], 'barangay'], '#ef4444', '#2563eb'], 'line-width': 2, 'line-dasharray': [3, 2] } })
       // Meter corridor converted to pixels at this map latitude and zoom.
       map.addLayer({ id: 'patrol-corridor', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2563eb', 'line-opacity': 0.12, 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 0, ['*', ['get', 'corridor'], 2 / (156543.03392 * Math.cos(17.427 * Math.PI / 180))], 22, ['*', ['get', 'corridor'], 2 * 2 ** 22 / (156543.03392 * Math.cos(17.427 * Math.PI / 180))]] } })
       map.addLayer({ id: 'patrol-route-line', type: 'line', source: 'patrol-blocks', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 4 } })

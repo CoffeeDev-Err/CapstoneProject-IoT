@@ -151,6 +151,6 @@ export default function PatrolPlanner({ personnel, assignments, initialGroup = [
     </form>
     {crewOpen && <WeeklyVehicleAssignments fleet={fleet} personnel={personnel} initialWeek={weekStart} initialVehicle={vehicleId} onSaved={loadFleet} onClose={() => setCrewOpen(false)} />}
     {review && <PatrolScheduleDialog assignment={reviewGroup[0]} group={reviewGroup} saving={saving} onClose={() => { if (!saving) setReview(false) }} onConfirm={save} onEdit={index => { setReview(false); builder.current?.edit(index) }} onDelete={index => { setReview(false); builder.current?.remove(index) }} onMove={(from, to) => { setReview(false); builder.current?.move(from, to) }} />}
-    <ConfirmModal open={Boolean(switchType)} title="Change patrol style?" message="Changing patrol style clears the current areas or routes. Your personnel, instructions and duty hours will be kept." confirmLabel="Change style" cancelLabel="Keep current style" onConfirm={() => changeType(switchType)} onCancel={() => setSwitchType(null)} />
+    <ConfirmModal open={Boolean(switchType)} title="Change patrol style?" message="Changing patrol style clears the current areas or routes. Your personnel, instructions and duty hours will be kept." confirmLabel="Change style" cancelLabel="Keep current style" variant="primary" onConfirm={() => changeType(switchType)} onCancel={() => setSwitchType(null)} />
   </section>
 }

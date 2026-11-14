@@ -17,9 +17,13 @@ vi.mock('maplibre-gl', () => {
   class Map {
     sources = {}; layers = {}; handlers = {}
     fitBounds = vi.fn(); flyTo = vi.fn()
+    setLayoutProperty = vi.fn(); setFilter = vi.fn()
+    canvas = document.createElement('canvas')
     constructor() { state.map = this }
     addControl() {}
     on(event, layer, callback) { if (!callback) this.handlers[event] = layer }
+    off(event) { delete this.handlers[event] }
+    getCanvas() { return this.canvas }
     addSource(id, source) { this.sources[id] = { ...source, setData: vi.fn() } }
     getSource(id) { return this.sources[id] }
     addLayer(layer) { this.layers[layer.id] = layer }
@@ -43,7 +47,7 @@ vi.mock('maplibre-gl', () => {
 afterEach(() => { cleanup(); state.markers = []; vi.unstubAllGlobals() })
 const mount = props => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  render(<PatrolMap {...props} />)
+  state.view = render(<PatrolMap {...props} />)
   act(() => state.map.handlers.load())
   return state.map
 }
@@ -70,4 +74,20 @@ it('keeps map taps available to the picker and point searches at their existing 
   act(() => map.handlers.click({ lngLat: { lat: point.latitude, lng: point.longitude } }))
   expect(onPoint).toHaveBeenCalledWith(point)
   expect(map.flyTo).toHaveBeenCalledWith({ center: [point.longitude, point.latitude], zoom: 16 })
+})
+
+it('shows all 26 pickable boundaries, highlights the hovered polygon and clears guides outside Whole Barangay mode', () => {
+  const onPoint = vi.fn()
+  const map = mount({ barangayPicker: true, onPoint })
+  expect(map.sources['barangay-picker'].data).toEqual(geography.barangays)
+  const center = geography.barangays.features.find(f => f.properties.barangay === 'Tallag').properties.center
+  act(() => map.handlers.mousemove({ lngLat: { lat: center.latitude, lng: center.longitude } }))
+  expect(map.setFilter).toHaveBeenLastCalledWith('barangay-picker-hover', ['==', ['get', 'barangay'], 'Tallag'])
+  expect(map.canvas.style.cursor).toBe('pointer')
+  act(() => map.handlers.click({ lngLat: { lat: center.latitude, lng: center.longitude } }))
+  expect(onPoint).toHaveBeenCalledWith(center)
+  state.view.rerender(<PatrolMap barangayPicker={false} onPoint={onPoint} />)
+  expect(map.setLayoutProperty).toHaveBeenCalledWith('barangay-picker-line', 'visibility', 'none')
+  expect(map.canvas.style.cursor).toBe('')
+  expect(map.handlers.mousemove).toBeUndefined()
 })

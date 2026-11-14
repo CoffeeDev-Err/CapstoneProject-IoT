@@ -48,11 +48,12 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
     return { ...area, ...feature.properties.center, geometry: feature.geometry, boundarySource: geography.version }
   })
   const selected = areas[active] || template
+  const pickingBarangay = coverage === 'barangay' || replacing && selected.coverageType === 'barangay'
   const total = areas.reduce((sum, area) => sum + Number(area.durationMinutes), 0)
   const remaining = dutyMinutes - total
   const invalidIndex = resolved.findIndex((area, index) => areaIssue(area, index))
   const incomplete = dutyError ? 'Correct the duty hours above before saving areas.'
-    : !areas.length ? coverage === 'barangay' ? 'Choose your first barangay in the sidebar.' : 'Select your first area on the map.'
+    : !areas.length ? coverage === 'barangay' ? 'Tap your first barangay on the map or choose one in the sidebar.' : 'Select your first area on the map.'
       : invalidIndex >= 0 ? areaIssue(resolved[invalidIndex], invalidIndex)
         : remaining > 0 ? `Select more areas or adjust durations to cover the remaining ${remaining} minutes.`
           : remaining < 0 ? `Shorten the selected durations by ${-remaining} minutes to fit this duty.` : ''
@@ -78,12 +79,13 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
     else setAreas(current => current.map((area, i) => i === active ? { ...area, ...patch } : area))
   }
   const add = patch => {
-    if (dutyError) return setMessage('Correct the duty hours above before selecting areas.')
-    if (remaining < 15 || areas.length >= 48) return setMessage('Duty hours are fully selected. Choose an area number to edit, remove an area or adjust its duration.')
+    if (dutyError) { setMessage('Correct the duty hours above before selecting areas.'); return false }
+    if (remaining < 15 || areas.length >= 48) { setMessage(`Duty hours are fully selected. Choose an area number and use ${selected.coverageType === 'barangay' ? 'Change barangay' : 'Change location'}, remove an area or adjust its duration.`); return false }
     const durationMinutes = Math.min(template.durationMinutes, remaining)
     if (!Number.isInteger(durationMinutes) || durationMinutes < 15) return setMessage('Choose an area duration of at least 15 minutes.')
     const next = { ...template, label: areas.length ? `Area ${areas.length + 1}` : template.label.trim() || 'Area 1', autoLabel: areas.length > 0 || !template.label.trim(), durationMinutes, ...patch }
     setAreas(current => [...current, next]); setActive(areas.length); setExpanded(null); setReplacing(false); setMessage(''); setCoordinates({ latitude: '', longitude: '' })
+    return true
   }
   const selectPoint = point => {
     if (coverage !== 'custom' && !(replacing && selected.coverageType === 'custom')) return
@@ -98,16 +100,16 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
     const patch = { coverageType: 'barangay', barangay, label: `Barangay ${barangay}`, autoLabel: false, preserveCoverage: false, ...feature.properties.center, navigationPoint: feature.properties.navigationCenter, geometry: feature.geometry, boundarySource: geography.version }
     if (replacing && active !== null) { update(patch); setReplacing(false) }
     else {
-      if (coverage !== 'barangay' || dutyError || remaining < 15 || areas.length >= 48) return
-      add(patch)
+      if (coverage !== 'barangay' || !add(patch)) return false
     }
     setFocus({ ...feature.properties.center, geometry: feature.geometry })
+    return true
   }
   const selectMapPoint = point => {
     if (coverage !== 'barangay' && !(replacing && selected.coverageType === 'barangay')) return selectPoint(point)
     const feature = barangayAtPoint(boundaries, point)
-    if (feature) selectBarangay(feature.properties.barangay)
-    else setMessage('Choose a location inside a Cabagan barangay.')
+    if (feature) return selectBarangay(feature.properties.barangay)
+    setMessage('Choose a location inside a Cabagan barangay.'); return false
   }
   const saveAreas = () => {
     if (incomplete) return
@@ -117,11 +119,11 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
   return <>
     <div className="patrol-area-progress" role="status"><strong>{areas.length} {areas.length === 1 ? 'area' : 'areas'} selected · {total} / {Number.isFinite(dutyMinutes) ? dutyMinutes : '—'} minutes covered</strong><span className={`patrol-badge ${dirty ? 'is-warning' : 'is-valid'}`}>{dirty || !areas.length ? 'Selection in progress' : 'Areas saved'}</span></div>
     <div className="patrol-workspace"><div className="patrol-workspace__map">
-      <PatrolMapSearch onSelect={setFocus} />
-      <PatrolMap blocks={resolved.map((area, index) => ({ ...area, offsetMinutes: blockOffset(areas, index) }))} type="area" areaTravelMode={travelMode} start={start} focus={focus} selectedIndex={active} autoFit={false} onPoint={selectMapPoint} onSelectBlock={selectArea}>
+      <PatrolMapSearch key={pickingBarangay ? 'barangay' : 'places'} wholeBarangay={pickingBarangay} onSelect={point => pickingBarangay ? selectMapPoint(point) : setFocus(point)} />
+      <PatrolMap blocks={resolved.map((area, index) => ({ ...area, offsetMinutes: blockOffset(areas, index) }))} type="area" barangayPicker={pickingBarangay} areaTravelMode={travelMode} start={start} focus={focus} selectedIndex={active} autoFit={false} onPoint={selectMapPoint} onSelectBlock={selectArea}>
         {areas.length > 0 && <nav className="patrol-area-numbers" aria-label="Selected areas">{areas.map((area, index) => <button type="button" key={index} aria-label={`Go to area ${index + 1}: ${area.label}`} aria-pressed={active === index} className={active === index ? 'is-active' : ''} onClick={() => selectArea(index)}>{index + 1}</button>)}</nav>}
       </PatrolMap>
-      <p className="patrol-map-caption">{replacing ? selected.coverageType === 'barangay' ? `Choose the replacement barangay for area ${active + 1} in the sidebar.` : `Tap the new location for area ${active + 1}.` : coverage === 'custom' ? 'Each map tap adds an area. Drag freely to find the next location. Use the numbers above to revisit an area.' : 'Tap a barangay on the map or choose one in the sidebar. Use the numbers to revisit selected areas.'}</p>
+      <p role="status" className="patrol-map-caption">{message || (replacing ? selected.coverageType === 'barangay' ? `Tap the replacement barangay for area ${active + 1} on the map or choose it in the sidebar.` : `Tap the new location for area ${active + 1}.` : coverage === 'custom' ? 'Each map tap adds an area. Drag freely to find the next location. Use the numbers above to revisit an area.' : 'Tap inside a dashed barangay boundary or search for a barangay to select its whole area. Use the numbers to revisit selected areas.')}</p>
     </div><details ref={configRef} className="patrol-workspace__config" open><summary><MapPin size={16} />{active === null ? 'New area defaults' : `Area ${active + 1} configuration`}</summary><div className="patrol-workspace__fields">
       <section className="patrol-config-group"><h5>Coverage</h5><label>Coverage type<SelectControl aria-label="Coverage type" value={coverage} onChange={e => { if (e.target.value === coverage) return; if (areas.length) setPendingCoverage(e.target.value); else changeCoverage(e.target.value) }}>{coverage === 'mixed' && <option value="mixed" disabled>Existing mixed coverage</option>}<option value="custom">Custom Area</option><option value="barangay">Whole Barangay</option></SelectControl></label>
       <small>{coverage === 'mixed' ? 'This existing schedule contains both coverage types. It is preserved until you choose to replace it.' : 'Applies to the whole duty. Changing it replaces selected areas.'}</small>
@@ -135,12 +137,11 @@ export default function PatrolAreaScheduleBuilder({ ref, initialBlocks, start, d
       </section><section className="patrol-config-group"><h5>Between areas</h5><label>Transition grace period (minutes)<input type="number" min={0} max={60} value={graceMinutes} onChange={e => onGraceChange(Number(e.target.value))} /></label><small>Allows travel between areas before coverage warnings begin. Duty end stays the same.</small>
       </section>{coverage === 'custom' && <details className="patrol-coordinate-entry"><summary>Enter exact coordinates</summary><div className="patrol-two-columns"><label>Latitude<input type="number" step="any" value={coordinates.latitude} onChange={e => setCoordinates(c => ({ ...c, latitude: e.target.value }))} /></label><label>Longitude<input type="number" step="any" value={coordinates.longitude} onChange={e => setCoordinates(c => ({ ...c, longitude: e.target.value }))} /></label></div><button type="button" disabled={!coordinates.latitude || !coordinates.longitude} onClick={() => selectPoint({ latitude: Number(coordinates.latitude), longitude: Number(coordinates.longitude) })}>{replacing ? 'Replace with coordinates' : 'Add area at coordinates'}</button></details>}
     </div><div className="patrol-area-config-footer">
-      {message && <p role="status" className="patrol-notice">{message}</p>}
       <p role="status">{incomplete || (dirty ? 'All duty hours covered. Save the selected areas together.' : 'All areas are saved. You can continue to review.')}</p>
       {invalidIndex >= 0 && active !== invalidIndex && <button type="button" onClick={() => selectArea(invalidIndex)}>Fix area {invalidIndex + 1}</button>}
       <div className="patrol-draft-actions">{active !== null && <button type="button" aria-pressed={replacing} onClick={() => { setReplacing(value => !value); if (selected.coverageType === 'barangay' && configRef.current) configRef.current.scrollTop = 0 }}>{replacing ? 'Cancel location change' : selected.coverageType === 'barangay' ? 'Change barangay' : 'Change location'}</button>}<button type="button" className="patrol-primary" disabled={Boolean(incomplete) || !dirty} onClick={saveAreas}><Check size={16} />Save areas</button></div>
     </div></details></div>
     {areas.length > 0 && <div className="patrol-saved-schedule"><h4>{dirty ? 'Selected areas' : 'Saved areas'} <span className="patrol-badge">{areas.length}</span></h4><PatrolScheduleTimeline blocks={resolved} type="area" start={start} expanded={expanded} onExpand={setExpanded} onEdit={selectArea} onDelete={remove} onMove={move} /></div>}
-    <ConfirmModal open={Boolean(pendingCoverage)} title="Change coverage type?" message="Changing coverage type replaces all currently selected areas. Your duty hours, personnel and instructions will be kept. Cancel to keep the current locations." confirmLabel="Replace selected areas" cancelLabel="Keep selected areas" onConfirm={() => changeCoverage(pendingCoverage)} onCancel={() => setPendingCoverage(null)} />
+    <ConfirmModal open={Boolean(pendingCoverage)} title="Change coverage type?" message="Changing coverage type replaces all currently selected areas. Your duty hours, personnel and instructions will be kept. Cancel to keep the current locations." confirmLabel="Replace selected areas" cancelLabel="Keep selected areas" variant="primary" onConfirm={() => changeCoverage(pendingCoverage)} onCancel={() => setPendingCoverage(null)} />
   </>
 }

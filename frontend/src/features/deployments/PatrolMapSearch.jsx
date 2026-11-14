@@ -3,7 +3,7 @@ import { LoaderCircle, Search, X } from 'lucide-react'
 import { apiRequest } from '../../services/apiClient'
 import { patrolBarangayReferences } from './patrolReferenceCenters'
 
-export default function PatrolMapSearch({ onSelect }) {
+export default function PatrolMapSearch({ onSelect, wholeBarangay = false }) {
   const id = useId()
   const request = useRef(0)
   const [query, setQuery] = useState('')
@@ -11,12 +11,20 @@ export default function PatrolMapSearch({ onSelect }) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [active, setActive] = useState(-1)
-  const select = result => { onSelect(result); setResults([]); setMessage('Location focused. Select the exact point on the map.'); setActive(-1) }
+  const select = result => {
+    const accepted = onSelect(result)
+    setResults([]); setMessage(wholeBarangay ? accepted === false ? 'Barangay was not added. Check the message below the map.' : 'Whole barangay selected. Its boundary is shown on the map.' : 'Location focused. Select the exact point on the map.'); setActive(-1)
+  }
   const search = async () => {
     if (query.trim().length < 2) return
     const revision = ++request.current
     const local = patrolBarangayReferences.filter(a => a.name.toLowerCase().includes(query.trim().toLowerCase()))
-      .map(a => ({ label: `${a.name} (reference center; select the exact point)`, ...a.referenceCenter }))
+      .map(a => ({ label: `${a.name} (${wholeBarangay ? 'whole boundary' : 'reference center; select the exact point'})`, ...a.referenceCenter }))
+    if (wholeBarangay) {
+      setResults(local); setLoading(false); setActive(-1)
+      setMessage(local.length ? '' : 'No matching Cabagan barangay. Try another barangay name.')
+      return
+    }
     setLoading(true); setMessage(''); setResults([]); setActive(-1)
     try {
       const payload = await apiRequest(`/api/patrol/places?q=${encodeURIComponent(query.trim())}`)
@@ -30,7 +38,7 @@ export default function PatrolMapSearch({ onSelect }) {
     } finally { if (revision === request.current) setLoading(false) }
   }
   return <div className="patrol-map-search">
-    <label htmlFor={id}>Find a street, place or barangay</label>
+    <label htmlFor={id}>{wholeBarangay ? 'Find a barangay to select' : 'Find a street, place or barangay'}</label>
     <div className="patrol-map-search__control">
       <Search size={18} aria-hidden="true" />
       <input id={id} type="text" inputMode="search" autoComplete="off" maxLength={120} value={query} placeholder="Search within Cabagan…"

@@ -544,12 +544,12 @@ const OfficerMapCanvas = forwardRef<OfficerMapCanvasHandle, OfficerMapCanvasProp
         </GeoJSONSource>
 
         {patrolCoverage && <GeoJSONSource id="assigned-patrol-coverage" data={patrolCoverage}>
-          <Layer id="assigned-patrol-fill" type="fill" source="assigned-patrol-coverage" filter={['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]]}
+          <Layer id="assigned-patrol-fill" type="fill" source="assigned-patrol-coverage" filter={['all', ['!=', ['get', 'coverageType'], 'barangay'], ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]]]}
             paint={{ 'fill-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'fill-opacity': 0.12 }} />
           <Layer id="assigned-patrol-line" type="line" source="assigned-patrol-coverage" filter={['all', ['!=', ['get', 'coverageType'], 'barangay'], ['!=', ['get', 'kind'], 'corridor'], ['!=', ['get', 'kind'], 'transition'], ['!=', ['geometry-type'], 'Point']]}
             paint={{ 'line-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'line-width': 3 }} />
           <Layer id="assigned-barangay-boundary" type="line" source="assigned-patrol-coverage" filter={['all', ['==', ['get', 'coverageType'], 'barangay'], ['==', ['get', 'kind'], 'coverage']]}
-            paint={{ 'line-color': ['case', ['get', 'next'], '#f59e0b', '#2563eb'], 'line-width': 3, 'line-dasharray': [3, 2] }} />
+            paint={{ 'line-color': ['case', ['get', 'next'], '#f59e0b', '#ef4444'], 'line-width': 3, 'line-dasharray': [3, 2] }} />
           <Layer id="assigned-patrol-transition" type="line" source="assigned-patrol-coverage" filter={['==', ['get', 'kind'], 'transition']}
             paint={{ 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [3, 2] }} />
           <Layer id="assigned-patrol-points" type="circle" source="assigned-patrol-coverage" filter={['==', ['get', 'kind'], 'marker']}
