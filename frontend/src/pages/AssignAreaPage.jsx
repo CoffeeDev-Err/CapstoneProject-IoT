@@ -58,6 +58,7 @@ function AssignAreaPage({ view = 'form' }) {
         id: member.id,
         name: member.name,
         rank: member.rank,
+        badge: member.badge || member.badgeNumber || member.id,
         isMockPersonnel: Boolean(member.isMockPersonnel),
       }))
     }

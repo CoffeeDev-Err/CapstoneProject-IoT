@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { X } from 'lucide-react'
 import NavSidebar from './NavSidebar'
 
-export default function MobileNavigation({ open, onClose }) {
+export default function MobileNavigation({ open, onClose, user, onChangePassword, onLogout }) {
   const dialogRef = useRef(null)
   const closeRef = useRef(onClose)
   const { pathname } = useLocation()
@@ -51,7 +51,7 @@ export default function MobileNavigation({ open, onClose }) {
       <div className="mobile-navigation__panel">
         <button type="button" className="icon-btn mobile-navigation__close"
           aria-label="Close navigation" onClick={onClose}><X aria-hidden="true" /></button>
-        <NavSidebar collapsed={false} mobile onNavigate={onClose} />
+        <NavSidebar key={String(open)} collapsed={false} mobile onNavigate={onClose} user={user} onChangePassword={onChangePassword} onLogout={onLogout} />
       </div>
     </dialog>
   )

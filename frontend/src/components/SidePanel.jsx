@@ -25,19 +25,19 @@ function SidePanel({
   onSelectPersonnel,
 }) {
   return (
-    <section className="side-panel h-100">
+    <section className="side-panel h-100" aria-label="Live personnel overview">
 
       {/* ── Metric Card: how many officers are currently on the map ── */}
       <article className="metric-card">
-        <h2 className="mb-0 text-uppercase fw-bold small">Personnel on Field</h2>
-        <strong className="d-block mt-2">{personnelCount}</strong>
-        <small className="text-body-secondary">Units tracked in real-time</small>
+        <h2 className="side-panel__heading">Personnel on Field</h2>
+        <strong className="side-panel__count">{personnelCount}</strong>
+        <small className="side-panel__hint">Units tracked in real-time</small>
       </article>
 
       {/* ── Status Card: last socket event or connection message ── */}
       <article className="status-card" aria-live="polite">
-        <h2 className="mb-0 text-uppercase fw-bold small">System Status</h2>
-        <p className="mt-2 mb-0 text-body-secondary">
+        <h2 className="side-panel__heading">System Status</h2>
+        <p className="side-panel__message">
           {operationalAlert?.message || connectionMessage}
         </p>
         {outOfBoundaryPersonnelCount > 0 && (
@@ -53,9 +53,9 @@ function SidePanel({
       </article>
 
       {/* ── List Card: clickable roster of active officers ── */}
-      <article className="list-card d-flex flex-column min-vh-0">
-        <h2 className="mb-0 text-uppercase fw-bold small">Active Personnel</h2>
-        <ul className="mt-3 mb-0 ps-0 list-unstyled d-grid gap-2 overflow-auto">
+      <article className="list-card">
+        <h2 className="side-panel__heading">Active Personnel</h2>
+        <ul className="side-panel__personnel-list">
           {personnel.length === 0 && (
             <li className="personnel-empty-state">
               No active personnel with a GPS location.

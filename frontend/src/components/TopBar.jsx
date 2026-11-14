@@ -2,9 +2,9 @@
  * TopBar.jsx — Sticky Header Bar
  *
  * Displayed at the top of every page inside AppLayout.
- * Left side  — system branding (title + subtitle)
+ * Left side  — compact page context and station identification
  * Right side — connection status pill, dark/light mode toggle,
- *              and the supervisor account button with dropdown menu.
+ *              and notifications. Account actions live in the sidebar.
  *
  * Props:
  *   isConnected  {boolean}  — true when Socket.IO is connected
@@ -12,22 +12,16 @@
  *   onToggleDark {Function} — called to flip the dark mode flag
  */
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
   Menu,
-  LogOut,
   Moon,
   Sun,
-  UserRoundKey,
 } from 'lucide-react'
-import { useAuth } from '../context/useAuth'
-import { resolveApiAssetUrl } from '../services/apiAssets'
 import { matchesPrefixSearch } from '../utils/searchMatching'
 import { getNotificationDisplayMessage, getNotificationNavigationTarget } from '../utils/notificationNavigation'
 import ConfirmModal from './ConfirmModal'
-import PasswordChangeModal from './PasswordChangeModal'
-import pnpLogo from '../assets/pnp-logo.png'
 
 const NOTIFICATION_HISTORY_OPTIONS = [
   { value: 'all', label: 'Show All' },
@@ -103,27 +97,6 @@ const formatNotificationTimestamp = (isoValue) => {
   }).format(new Date(isoValue))
 }
 
-const getInitials = (name) => String(name || 'User')
-  .trim()
-  .split(/\s+/)
-  .slice(0, 2)
-  .map((part) => part.charAt(0).toUpperCase())
-  .join('') || 'U'
-
-function ProfileAvatar({ className, name, src }) {
-  const [failedSrc, setFailedSrc] = useState('')
-
-  if (!src || failedSrc === src) {
-    return (
-      <span className={`${className} profile-avatar-fallback`} role="img" aria-label={`${name} profile photo`}>
-        {getInitials(name)}
-      </span>
-    )
-  }
-
-  return <img src={src} alt={name} className={className} onError={() => setFailedSrc(src)} />
-}
-
 function TopBar({
   navigationOpen = false,
   onOpenNavigation,
@@ -139,39 +112,21 @@ function TopBar({
   loadingAllNotifications = false,
   onShowAllNotifications,
 }) {
-  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
-  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [notificationSearch, setNotificationSearch] = useState('')
   const deferredNotificationSearch = useDeferredValue(notificationSearch)
   const [notificationHistoryRange, setNotificationHistoryRange] = useState('all')
-  const dropdownRef = useRef(null)
   const notificationRef = useRef(null)
   const notificationRequestSequenceRef = useRef(0)
   const navigate = useNavigate()
-  const { clearSession, logout, user } = useAuth()
-  const roleLabel = user?.role === 'supervisor' ? 'Supervisor' : 'Officer'
-  const supervisor = {
-    name: user?.profile?.fullName || user?.fullName || user?.username || 'Signed-in user',
-    rank: user?.profile?.rank || user?.rank || roleLabel,
-    role: roleLabel,
-    photoUrl: resolveApiAssetUrl(user?.profile?.photoUrl || user?.photoUrl),
-  }
-
-  const handleLogout = async () => {
-    setDropdownOpen(false)
-    await logout()
-    navigate('/login', { replace: true })
-  }
-
-  const handlePasswordChanged = () => {
-    clearSession()
-    navigate('/login', {
-      replace: true,
-      state: { passwordChanged: true },
-    })
-  }
+  const { pathname } = useLocation()
+  const page = pathname.startsWith('/personnel/') ? ['Operations', 'Personnel GPS history'] : ({
+    '/map': ['Overview', 'Live Map'], '/monitoring': ['Overview', 'Dashboard'],
+    '/personnel': ['Operations', 'Personnel'], '/assign-area': ['Operations', 'Deployment Management'],
+    '/deployments': ['Operations', 'Assigned Deployments'], '/analytics': ['Analytics', 'Analytics'],
+    '/reports': ['Analytics', 'Reports'], '/settings': ['Admin', 'Account Management'],
+  }[pathname] || ['GeoSentri', 'Operations portal'])
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((notification) => {
@@ -200,16 +155,19 @@ function TopBar({
 
   // Close open top-bar popovers whenever user clicks outside of them
   useEffect(() => {
-    if (!dropdownOpen && !notificationOpen) return
+    if (!notificationOpen) return
 
     const handler = (e) => {
-      if (!dropdownRef.current?.contains(e.target)) setDropdownOpen(false)
       if (!notificationRef.current?.contains(e.target)) setNotificationOpen(false)
     }
 
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [dropdownOpen, notificationOpen])
+    document.addEventListener('focusin', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('focusin', handler)
+    }
+  }, [notificationOpen])
 
   const toggleNotificationDropdown = () => {
     const nextOpen = !notificationOpen
@@ -219,7 +177,6 @@ function TopBar({
     if (nextOpen) {
       onReadAllNotifications?.()
       if (notificationHistoryRange === 'all') onShowAllNotifications?.()
-      setDropdownOpen(false)
     }
   }
 
@@ -264,10 +221,9 @@ function TopBar({
           aria-controls="mobile-navigation" onClick={onOpenNavigation}>
           <Menu aria-hidden="true" />
         </button>
-        <img className="topbar-left__pnp-logo" src={pnpLogo} alt="" aria-hidden="true" />
         <div className="topbar-left__copy">
-          <h1>Philippine National Police</h1>
-          <p>Cabagan Police Station Operations Portal</p>
+          <div className="topbar-context"><strong title={page[1]}>{page[1]}</strong></div>
+          <p>Cabagan Police Station <span aria-hidden="true">·</span> Philippine National Police</p>
         </div>
       </div>
 
@@ -389,58 +345,7 @@ function TopBar({
           )}
         </div>
 
-        {/* Compact profile trigger; account information stays inside the dropdown. */}
-        <div className="supervisor-profile" ref={dropdownRef}>
-          <button
-            type="button"
-            className="supervisor-btn"
-            onClick={() => {
-              setDropdownOpen((v) => !v)
-              setNotificationOpen(false)
-            }}
-            aria-expanded={dropdownOpen}
-            aria-haspopup="true"
-            aria-label="Open profile menu"
-          >
-            <ProfileAvatar className="supervisor-avatar" name={supervisor.name} src={supervisor.photoUrl} />
-          </button>
 
-          {/* Dropdown menu — appears below the button */}
-          {dropdownOpen && (
-            <div className="supervisor-dropdown">
-              {/* Header row with the signed-in account details. */}
-              <div className="dropdown-profile-header d-flex align-items-center">
-                <div className="dropdown-profile-copy">
-                  <strong className="dropdown-name">{supervisor.name}</strong>
-                  {supervisor.rank && supervisor.rank !== supervisor.role && (
-                    <span className="dropdown-rank">{supervisor.rank}</span>
-                  )}
-                  <span className="dropdown-role">{supervisor.role}</span>
-                </div>
-              </div>
-
-              <div className="dropdown-divider" />
-
-              <button
-                type="button"
-                className="dropdown-item"
-                onClick={() => {
-                  setDropdownOpen(false)
-                  setPasswordModalOpen(true)
-                }}
-              >
-                <UserRoundKey aria-hidden="true" />
-                Change Password
-              </button>
-              <div className="dropdown-divider" />
-
-              <button type="button" className="dropdown-item dropdown-item--logout" onClick={handleLogout}>
-                <LogOut aria-hidden="true" />
-                Log Out
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       <ConfirmModal
@@ -452,11 +357,6 @@ function TopBar({
         onConfirm={handleConfirmClearNotifications}
         onCancel={handleCancelClearNotifications}
         variant="primary"
-      />
-      <PasswordChangeModal
-        open={passwordModalOpen}
-        onClose={() => setPasswordModalOpen(false)}
-        onChanged={handlePasswordChanged}
       />
     </header>
   )

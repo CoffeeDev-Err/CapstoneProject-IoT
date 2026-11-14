@@ -25,13 +25,13 @@
   --font-size-fluid-intro: clamp(1rem, 1.6vw, 1.15rem);
   --font-size-fluid-section: clamp(1.8rem, 3.2vw, 2.65rem);
 
-  --sidebar-w: 272px;
+  --sidebar-w: 244px;
   --sidebar-w-collapsed: 60px;
   --sidebar-bg: #0f172a;
   --sidebar-border: #1e293b;
   --sidebar-active-bg: #1e3a5f;
   --sidebar-active-color: #93c5fd;
-  --top-bar-h: 68px;
+  --top-bar-h: 64px;
 
   --color-primary: #2563eb;
   --color-primary-light: #93c5fd;

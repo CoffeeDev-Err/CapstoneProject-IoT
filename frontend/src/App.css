@@ -22,3 +22,6 @@
 @import './styles/mobile-layout.css';
 @import './styles/report-navigation.css';
 @import './styles/app-theme.css';
+@import './styles/compact-shell.css';
+@import './styles/ambient-canvas.css';
+@import './styles/live-side-panel.css';

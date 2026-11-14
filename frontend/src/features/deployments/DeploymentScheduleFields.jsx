@@ -251,13 +251,13 @@ export function DateTimePickerField({
   )
 }
 
-export function DeploymentTimingSelector({ disabled, mode, onChange }) {
+export function DeploymentTimingSelector({ compact = false, disabled, mode, onChange }) {
   const startsNow = mode === DEPLOYMENT_MODES.START_NOW
   return (
-    <fieldset className="assignment-mode-selector mb-3" disabled={disabled}>
-      <legend>Deployment Timing</legend>
+    <fieldset className={`assignment-mode-selector${compact ? ' assignment-mode-selector--compact' : ' mb-3'}`} disabled={disabled}>
+      <legend className={compact ? 'visually-hidden' : undefined}>Deployment Timing</legend>
       <div
-        className="assignment-mode-options smooth-underline-control"
+        className={`assignment-mode-options${compact ? '' : ' smooth-underline-control'}`}
         style={{ '--smooth-underline-left': startsNow ? '25%' : '75%' }}
       >
         <label className={`assignment-mode-option${startsNow ? ' is-active' : ''}`}>
@@ -271,7 +271,7 @@ export function DeploymentTimingSelector({ disabled, mode, onChange }) {
           <span><strong>Schedule for Later</strong><small>Keep personnel Off Duty until the future shift begins.</small></span>
         </label>
       </div>
-      <div className={`assignment-mode-status assignment-mode-status--${startsNow ? 'start' : 'scheduled'}`} aria-live="polite">
+      <div className={`assignment-mode-status assignment-mode-status--${startsNow ? 'start' : 'scheduled'}${compact ? ' visually-hidden' : ''}`} aria-live="polite">
         <span className="assignment-mode-status__dot" aria-hidden="true" />
         <span>
           <strong>{startsNow ? 'Start Now' : 'Schedule for Later'}</strong>{' → '}

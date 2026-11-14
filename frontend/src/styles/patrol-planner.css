@@ -48,13 +48,21 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .patrol-theme .is-warning { color:var(--patrol-amber); background:var(--patrol-amber-soft); }
 .patrol-theme .is-error { color:var(--patrol-red); background:var(--patrol-red-soft); }
 .patrol-theme button.patrol-danger { color:var(--patrol-red); }
-.patrol-style-selector { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.patrol-style-selector button { padding:15px; justify-content:flex-start; text-align:left; }
-.patrol-style-selector button > span { display:grid; gap:4px; flex:1; }
-.patrol-style-selector button strong { font-size:var(--font-size-sm); }
+.patrol-duty-heading { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+.patrol-duty-heading h4 { flex:0 0 auto; margin-right:4px; }
+.patrol-duty-heading > .patrol-badge { margin-left:auto; }
+.patrol-compact-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:16px; min-width:0; }
+.patrol-theme .patrol-compact-controls > fieldset { position:relative; padding-inline-start:10px; }
+.patrol-compact-controls > fieldset::before { content:''; position:absolute; left:0; top:50%; width:3px; height:16px; border-radius:2px; background:var(--patrol-accent); transform:translateY(-50%); pointer-events:none; }
+.patrol-theme .patrol-style-selector { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; max-width:100%; gap:6px; }
+.patrol-style-selector button { min-height:40px; padding:8px 12px; justify-content:center; border:1px solid var(--patrol-border); background:var(--patrol-input); white-space:nowrap; }
+.patrol-style-selector button > span { font-size:var(--font-size-xs); }
+.patrol-style-hint { display:block; margin-top:7px; }
 .patrol-theme button.is-active { border-color:var(--patrol-accent); color:var(--patrol-accent-text); background:var(--patrol-accent-soft); }
-.patrol-mode-selector { display:flex; flex-wrap:wrap; gap:7px; margin-top:18px !important; }
-.patrol-mode-selector legend { width:100%; }
+.patrol-mode-selector { display:flex; flex-wrap:wrap; gap:5px; }
+.patrol-mode-selector button { min-height:36px; padding:7px 10px; }
+.patrol-theme .patrol-duty-travel { margin-top:10px; }
+.patrol-theme :is(.patrol-style-selector,.patrol-mode-selector) button[aria-pressed=true]:is(:hover,:focus-visible) { color:var(--patrol-accent-text); border-color:var(--patrol-accent); background:var(--patrol-accent-soft); }
 .patrol-two-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .patrol-duty { margin-top:16px; }
 .patrol-workspace { display:grid; height:660px; grid-template-columns:minmax(0,1fr) 330px; grid-template-rows:minmax(0,1fr); border:1px solid var(--patrol-border); border-radius:11px; overflow:hidden; background:var(--patrol-muted); }
@@ -141,23 +149,28 @@ body:has(.deployment-page) .patrol-theme :is(input,textarea)::placeholder { colo
 .patrol-personnel__toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(130px,.6fr); gap:10px; align-items:center; }
 .patrol-personnel__search > svg { position:absolute; top:12px; left:11px; color:var(--patrol-secondary); }
 .patrol-theme .patrol-personnel__search input[type=search] { padding-left:35px; }
-.patrol-personnel__chips { display:flex; flex-wrap:wrap; gap:7px; max-height:100px; overflow-y:auto; }
+.patrol-personnel__chips { display:flex; flex-wrap:wrap; gap:7px; max-height:72px; overflow-y:auto; }
+.patrol-personnel__chips:empty { display:none; }
 .patrol-personnel__chips > span { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:4px 6px 4px 10px; background:var(--patrol-accent-soft); color:var(--patrol-accent-text); font-size:var(--font-size-xs); }
 .patrol-theme .patrol-personnel__chips button { background:transparent; padding:3px; min-height:24px; border:0; color:inherit; }
-.patrol-personnel__list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; max-height:270px; overflow-y:auto; padding:3px; }
-.patrol-personnel__list label { display:flex; flex-direction:row; gap:10px; align-items:center; border:1px solid var(--patrol-border); padding:11px; border-radius:9px; cursor:pointer; }
-.patrol-personnel__list label.is-selected { border-color:var(--patrol-accent); background:var(--patrol-accent-soft); }
-.patrol-personnel__list label:has(input:disabled) { opacity:.55; cursor:not-allowed; }
+.patrol-personnel__list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:7px; max-height:280px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:3px; }
+.patrol-theme .patrol-personnel__card { min-width:0; width:100%; min-height:60px; display:flex; align-items:center; justify-content:flex-start; gap:9px; padding:9px; text-align:left; border:1px solid var(--patrol-border); background:var(--patrol-surface); border-radius:9px; cursor:pointer; font-weight:450; }
+.patrol-theme .patrol-personnel__card.is-selected { border-color:var(--patrol-accent); background:var(--patrol-accent-soft); }
+.patrol-theme button.patrol-personnel__card.is-selected:is(:hover,:focus-visible) { border-color:var(--patrol-accent); background:var(--patrol-accent-soft); }
+.patrol-personnel__card:disabled { opacity:.55; cursor:not-allowed; }
+.patrol-personnel__copy { min-width:0; flex:1; }
+.patrol-personnel__copy strong { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.patrol-personnel__copy small { line-height:1.4; overflow-wrap:anywhere; }
+.patrol-personnel__selected { flex-shrink:0; color:var(--patrol-accent-text); }
 .patrol-personnel__list strong,.patrol-personnel__list small { display:block; }
 .patrol-personnel__list strong { color:var(--patrol-text); font-size:var(--font-size-xs); }
 .patrol-avatar { display:inline-grid; place-content:center; width:33px; height:33px; flex-shrink:0; background:var(--patrol-muted); color:var(--patrol-accent-text); border:1px solid var(--patrol-border); border-radius:50%; font-size:var(--font-size-xs); }
 .patrol-personnel > small { display:flex; gap:6px; align-items:center; }
-.patrol-team-instructions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
-.patrol-team-panel .patrol-personnel__list { grid-template-columns:1fr; }
-.patrol-team-panel .patrol-personnel__list label > span:last-child { min-width:0; overflow-wrap:anywhere; }
+.patrol-team-instructions { display:grid; grid-template-columns:minmax(0,2.1fr) minmax(260px,1fr); align-items:stretch; gap:18px; }
+.patrol-team-instructions > section { min-width:0; }
 .patrol-instructions-panel { display:flex; flex-direction:column; }
 .patrol-instructions-panel > label { flex:1; }
-.patrol-instructions-panel textarea { flex:1; min-height:140px; }
+.patrol-instructions-panel textarea { flex:1; height:150px; min-height:130px; }
 .patrol-instructions-panel > small { margin-top:8px; }
 .patrol-vehicle-controls { display:flex; align-items:flex-end; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
 .patrol-vehicle-controls > button { min-height:40px; }
@@ -277,6 +290,7 @@ body:has(.deployment-page) .confirm-modal .confirm-btn--primary:hover { backgrou
 .patrol-spin { animation:patrol-spin 1s linear infinite; }
 @keyframes patrol-spin { to { transform:rotate(360deg); } }
 @media (max-width:1100px) {
+  .patrol-team-instructions { grid-template-columns:1fr; }
   .patrol-workspace { grid-template-columns:minmax(0,1fr) 300px; }
   .patrol-panel { padding:17px; }
   .patrol-review__layout { grid-template-columns:minmax(0,1fr) 330px; }
@@ -297,6 +311,11 @@ body:has(.deployment-page) .confirm-modal .confirm-btn--primary:hover { backgrou
   .deployment-page .assignment-list-table .assignment-instructions-cell { width:auto; text-align:left; }
 }
 @media (max-width:600px) {
+  .patrol-compact-controls { grid-template-columns:1fr; gap:8px; }
+  .patrol-theme .patrol-style-selector { width:100%; }
+  .patrol-style-selector button { flex:1; min-height:44px; }
+  .patrol-mode-selector button { min-height:44px; }
+  .patrol-duty-heading .patrol-badge { margin-left:40px; }
   .patrol-personnel__toolbar { grid-template-columns:1fr; }
   .patrol-planner__header { align-items:flex-start; flex-direction:column; gap:10px; }
   .patrol-style-selector,.patrol-two-columns,.patrol-workspace__fields,.patrol-personnel__list { grid-template-columns:1fr; }
@@ -331,6 +350,19 @@ body:has(.deployment-page) .confirm-modal .confirm-btn--primary:hover { backgrou
 .patrol-planner .assignment-mode-selector { margin-top: 16px; }
 .patrol-planner .assignment-mode-selector legend { font-size: var(--font-size-xs); font-weight: 600; margin-bottom: 6px; }
 .patrol-planner .assignment-mode-status { font-size: var(--font-size-xs); padding: 7px 10px; margin-top: 6px; }
+
+/* Four compact choices, grouped into patrol type and duty timing. */
+.patrol-planner .assignment-mode-selector--compact { margin:0; min-width:0; }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-options { gap:6px; padding:0; border:0; border-radius:0; background:transparent; }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-options::before,:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-options::after { content:none; display:none; }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option { min-height:40px; padding:8px 12px; gap:0; border:1px solid var(--patrol-border); border-radius:8px; background:var(--patrol-input); justify-content:center; flex-direction:row; }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option strong { color:var(--patrol-text); font-size:var(--font-size-xs); line-height:1.35; text-align:center; }
+.patrol-planner .assignment-mode-selector--compact .assignment-mode-option small { display:none; }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option:hover { background:var(--patrol-muted); border-color:var(--patrol-secondary); }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option.is-active { color:var(--patrol-accent-text); border-color:var(--patrol-accent); background:var(--patrol-accent-soft); }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option.is-active strong { color:var(--patrol-accent-text); }
+:root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option:has(input:focus-visible) { outline:3px solid var(--patrol-focus); outline-offset:3px; }
+@media (max-width:600px) { :root .patrol-planner .assignment-mode-selector--compact .assignment-mode-option { min-height:44px; } }
 @media (prefers-reduced-motion:reduce) {
   .deployment-page .deployment-list-card button.assignment-edit-btn,
   .deployment-page .assignment-list-table tbody td { transition:none; }

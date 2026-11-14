@@ -19,6 +19,7 @@ import {
   Users,
 } from 'lucide-react'
 import geosentriIcon from '../assets/geosentri-icon.png'
+import SidebarAccountMenu from './SidebarAccountMenu'
 
 const navSections = [
   {
@@ -83,7 +84,7 @@ const navSections = [
   },
 ]
 
-function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
+function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false, user, onChangePassword, onLogout }) {
   const handleNavItemClick = (item) => {
     onNavigate?.()
     if (item.to === '/map' && typeof window !== 'undefined') {
@@ -106,7 +107,7 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
         )}
       </div>
 
-      <nav className="nav-sidebar__nav mt-4" aria-label="Main navigation">
+      <nav className="nav-sidebar__nav" aria-label="Main navigation">
         {navSections.map((section) => (
           <div className="nav-sidebar__section" key={section.title}>
             {!collapsed && <span className="nav-sidebar__section-title">{section.title}</span>}
@@ -123,6 +124,7 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
                     end={item.to === '/map'}
                     onClick={() => handleNavItemClick(item)}
                     aria-label={item.label}
+                    title={collapsed ? item.label : undefined}
                     className={({ isActive }) =>
                       `nav-sidebar__link ${isActive ? 'nav-sidebar__link--active' : ''}`
                     }
@@ -142,6 +144,8 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
         ))}
       </nav>
 
+      <footer className="nav-sidebar__footer">
+      <SidebarAccountMenu key={String(collapsed)} user={user} collapsed={collapsed} onChangePassword={onChangePassword} onLogout={onLogout} />
       {!mobile && <button
         type="button"
         className="nav-sidebar__toggle"
@@ -151,6 +155,7 @@ function NavSidebar({ collapsed, onToggle, onNavigate, mobile = false }) {
       >
         {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
       </button>}
+      </footer>
     </aside>
   )
 }

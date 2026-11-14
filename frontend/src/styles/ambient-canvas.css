@@ -1,0 +1,30 @@
+/* A static canvas behind the application; cards and map layers stay opaque. */
+:root {
+  --app-canvas-base: var(--app-page);
+  --app-canvas-image: none;
+  --app-canvas-size: auto;
+  --app-canvas-repeat: no-repeat;
+}
+
+:root[data-theme="dark"] {
+  --app-canvas-base: #090d16;
+  --app-canvas-image:
+    radial-gradient(ellipse 85% 640px at 50% 0, #131c31 0%, rgba(19, 28, 49, 0) 74%),
+    radial-gradient(ellipse 55% 520px at 100% 0, rgba(99, 102, 241, 0.045) 0%, transparent 72%),
+    radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.025) 0.75px, transparent 1px);
+  --app-canvas-size: 100% 760px, 100% 640px, 24px 24px;
+  --app-canvas-repeat: no-repeat, no-repeat, repeat;
+}
+
+:root .layout-root { background-color: var(--app-canvas-base); }
+:root .layout-root .layout-body,
+:root .layout-root .top-bar {
+  background-color: var(--app-canvas-base);
+  background-image: var(--app-canvas-image);
+  background-size: var(--app-canvas-size);
+  background-repeat: var(--app-canvas-repeat);
+  background-position: center top;
+}
+
+/* Feature page wrappers expose the shared canvas between their solid cards. */
+:root[data-theme="dark"] .layout-root .layout-body > .page-container { background: transparent; }

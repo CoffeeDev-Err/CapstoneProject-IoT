@@ -57,7 +57,7 @@ const settingsPage = fs.readFileSync(path.join(projectRoot, 'src/pages/SettingsP
   + '\n'
   + fs.readFileSync(path.join(projectRoot, 'src/features/accounts/AccountDialogs.jsx'), 'utf8')
 const settingsStyles = fs.readFileSync(path.join(projectRoot, 'src/styles/settings.css'), 'utf8')
-const topBar = fs.readFileSync(path.join(projectRoot, 'src/components/TopBar.jsx'), 'utf8')
+const accountMenu = fs.readFileSync(path.join(projectRoot, 'src/components/SidebarAccountMenu.jsx'), 'utf8')
 assert.match(settingsPage, /className="account-rank-options" role="listbox"/,
   'The long police-rank list must use an in-app scrollable dropdown')
 assert.match(settingsPage, /matchesPrefixSearch\(search, \[rank\]\)/,
@@ -72,10 +72,10 @@ assert.match(settingsPage, /account\.isProtected \? \([\s\S]*Protected[\s\S]*acc
   'The primary supervisor must stay protected and delegated supervisors must only be manageable by the primary supervisor')
 assert.match(settingsPage, /account\.role !== 'Supervisor' \|\| canManageSupervisors/,
   'Delegated supervisor edit actions must only be exposed to the primary supervisor')
-assert.match(topBar, /user\?\.profile\?\.fullName[\s\S]*user\?\.username/,
-  'The top-bar identity must come from the authenticated account')
-assert.doesNotMatch(topBar, /Sgt\. Leo Gannad|name=Leo\+Gannad/,
-  'The top bar must not contain a hardcoded person')
+assert.match(accountMenu, /user\?\.profile\?\.fullName[\s\S]*user\?\.username/,
+  'The sidebar account identity must come from the authenticated account')
+assert.doesNotMatch(accountMenu, /Sgt\. Leo Gannad|name=Leo\+Gannad/,
+  'The sidebar account menu must not contain a hardcoded person')
 assert.match(settingsPage, /account\.accountStatus === 'Inactive'[\s\S]*Reactivate/,
   'Inactive accounts must expose an explicit Reactivate action')
 
