@@ -25,7 +25,7 @@ function SidePanel({
   onSelectPersonnel,
 }) {
   return (
-    <section className="side-panel h-100" aria-label="Live personnel overview">
+    <section className="side-panel h-100" tabIndex={0} aria-label="Live personnel overview">
 
       {/* ── Metric Card: how many officers are currently on the map ── */}
       <article className="metric-card">

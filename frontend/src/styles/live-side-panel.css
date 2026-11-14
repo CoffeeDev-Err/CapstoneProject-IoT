@@ -1,14 +1,14 @@
 /* One map workspace, with an independently collapsible personnel rail. */
-:root .layout-body:has(> .monitoring-shell) { height:100dvh; min-height:0; overflow:hidden; }
+:root .layout-body:has(> .monitoring-shell) { height:auto; min-height:100dvh; overflow:visible; }
 :root .layout-body:has(> .monitoring-shell) > .system-status-banner { position:relative; top:auto; flex-shrink:0; }
-:root .monitoring-shell { min-height:0; }
+:root .monitoring-shell { min-height:460px; }
 :root .monitoring-shell .dashboard-grid {
   position:relative;
   grid-template-columns:288px minmax(0,1fr);
   gap:0;
   flex:1 1 0;
   height:auto;
-  min-height:0;
+  min-height:420px;
   border:1px solid var(--app-border);
   border-radius:14px;
   background:var(--app-card);
@@ -78,6 +78,7 @@
 :root .side-panel .side-panel__personnel-list::-webkit-scrollbar-track { background:var(--app-input); border-radius:8px; }
 :root .side-panel .side-panel__personnel-list::-webkit-scrollbar-thumb { background:var(--app-secondary); border-radius:8px; }
 :root .side-panel .side-panel__personnel-list:focus-visible { outline:2px solid var(--app-accent); outline-offset:2px; border-radius:5px; }
+:root .side-panel:focus-visible { outline:2px solid var(--app-accent); outline-offset:-2px; border-radius:8px; }
 :root .side-panel .personnel-empty-state { padding:0; font-size:var(--font-size-sm); line-height:1.55; color:var(--app-secondary); text-align:left; }
 :root .side-panel .list-item-btn { padding:8px; gap:8px; border-radius:8px; color:var(--app-text); background:var(--app-input); box-shadow:none; transform:none; }
 :root .side-panel .list-item-btn:hover { color:var(--app-text); background:var(--app-selected); border-color:var(--app-accent-border); transform:none; box-shadow:none; }
@@ -104,9 +105,18 @@
   :root .monitoring-shell .dashboard-grid:not(.dashboard-grid--panel-collapsed) { grid-template-columns:264px minmax(0,1fr); }
 }
 @media (max-width:860px) {
+  :root .monitoring-shell { min-height:444px; }
   :root .monitoring-shell .dashboard-grid { grid-template-columns:minmax(0,1fr); }
 }
 @media (max-height:620px) {
+  :root .monitoring-shell { padding:10px; min-height:440px; }
+  /* The entire overview scrolls on short screens, including the summaries. */
+  :root :is(.monitoring-shell,.live-personnel-drawer) .side-panel { overflow-y:scroll; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; scrollbar-color:var(--app-secondary) var(--app-input); padding-right:5px; }
+  :root .side-panel::-webkit-scrollbar { width:8px; }
+  :root .side-panel::-webkit-scrollbar-track { background:var(--app-input); border-radius:8px; }
+  :root .side-panel::-webkit-scrollbar-thumb { background:var(--app-secondary); border-radius:8px; }
+  :root .side-panel .list-card { flex:0 0 auto; min-height:140px; }
+  :root .side-panel .side-panel__personnel-list { flex:0 0 auto; overflow:visible; scrollbar-gutter:auto; }
   :root .side-panel :is(.metric-card,.status-card) { padding:8px 10px; }
   :root .side-panel .side-panel__message { margin-top:4px; font-size:var(--font-size-xs); }
   :root .side-panel .side-panel__hint { display:none; }

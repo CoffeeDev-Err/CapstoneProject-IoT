@@ -38,7 +38,9 @@
 .nav-sidebar--collapsed .sidebar-account__menu { width:256px; right:auto; }
 .mobile-navigation .nav-sidebar__footer { grid-template-columns:1fr; padding-bottom:max(8px,env(safe-area-inset-bottom)); }
 @keyframes account-menu-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-@media (max-height:700px) { :root .nav-sidebar--collapsed .nav-sidebar__nav { overflow-y:auto; overflow-x:hidden; } }
+@media (max-height:700px) {
+  :root .nav-sidebar .nav-sidebar__nav { overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--app-secondary) var(--app-input); }
+}
 @media (min-width:1101px) {
   :root .layout-root > .nav-sidebar:not(.nav-sidebar--collapsed) .nav-sidebar__link { padding-inline-end:12px; }
 }
