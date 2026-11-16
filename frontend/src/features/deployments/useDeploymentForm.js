@@ -66,7 +66,7 @@ export function useDeploymentForm({
     ? addMinutesToLocalValue(minimumShiftDateTime, 1)
     : minimumShiftDateTime
   const activePersonnelIds = assignmentForm.personnelIds.filter((id) => (
-    personnelOptions.some((item) => item.id === id && !item.isMockPersonnel)
+    personnelOptions.some((item) => item.id === id)
   ))
   const selectedPersonnelMembers = personnelOptions.filter((item) => (
     activePersonnelIds.includes(item.id)
@@ -167,7 +167,7 @@ export function useDeploymentForm({
     }))
   }
   const handlePersonnelToggle = (personnelId) => {
-    if (personnelOptions.some((item) => item.id === personnelId && item.isMockPersonnel)) return
+    if (!personnelOptions.some((item) => item.id === personnelId)) return
     setAssignmentForm((current) => ({
       ...current,
       personnelIds: current.personnelIds.includes(personnelId)

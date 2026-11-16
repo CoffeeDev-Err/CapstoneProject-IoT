@@ -17,10 +17,8 @@ const createOperationalRuntime = ({
 		evaluatePersonnelGpsAvailability,
 		evaluatePersonnelInactivity,
 		getPersonnelWithLocations,
-		updateMockLocations,
 	} = personnelService
 	let locationUpdateRunning = false
-	let lastHistorySampleAt = 0
 	let flespiSyncRunning = false
 	let flespiSyncAllPending = false
 	let lastFlespiFullSyncAt = null
@@ -49,17 +47,14 @@ const createOperationalRuntime = ({
 		return geofenceCheckPromise
 	}
 
-	const broadcastMockLocations = async () => {
+	const broadcastPersonnelLocations = async () => {
 		if (locationUpdateRunning || !isDatabaseReady()) return
 		locationUpdateRunning = true
 		try {
-			const currentTime = Date.now()
-			const sampleHistory = currentTime - lastHistorySampleAt >= intervals.historySample
-			const personnel = await updateMockLocations({ sampleHistory })
-			if (sampleHistory) lastHistorySampleAt = currentTime
+			const personnel = await getPersonnelWithLocations()
 			emitPersonnelCollection(io, 'personnel:update', personnel)
 		} catch (error) {
-			logger.error('Mock GPS update failed:', error)
+			logger.error('Personnel status update failed:', error)
 		} finally {
 			locationUpdateRunning = false
 		}
@@ -135,7 +130,7 @@ const createOperationalRuntime = ({
 	}
 
 	const start = () => {
-		trackInterval(broadcastMockLocations, intervals.gpsUpdate)
+		trackInterval(broadcastPersonnelLocations, intervals.personnelStatus)
 		trackInterval(runOperationalLifecycleCheck, intervals.deploymentStatus)
 		if (!flespiToken) {
 			logger.log('Flespi GPS sync disabled: FLESPI_TOKEN is not configured')
@@ -166,7 +161,7 @@ const createOperationalRuntime = ({
 
 	return {
 		broadcastFlespiLocations,
-		broadcastMockLocations,
+		broadcastPersonnelLocations,
 		runFlespiFallbackSync,
 		runOperationalLifecycleCheck,
 		start,

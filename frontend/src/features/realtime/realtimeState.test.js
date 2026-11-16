@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { evaluateGeofenceTransition, mergeNotifications, mergeReports, upsertTask } from './realtimeState'
 
 describe('realtime state transitions', () => {
+  it('does not announce a boundary recovery when GPS becomes uncertain or disappears', () => {
+    for (const member of [{ id: 'P-1', isInsideCabagan: null }, { id: 'P-1', isLocationStale: true, isInsideCabagan: true }]) {
+      expect(evaluateGeofenceTransition([member], new Set(['P-1'])).hasRecovered).toBe(false)
+    }
+    expect(evaluateGeofenceTransition([], new Set(['P-1'])).hasRecovered).toBe(false)
+  })
   it('merges report aliases idempotently', () => {
     const original = [{ id: 'R-1', title: 'Original', case_status: 'open' }]
     expect(mergeReports(original, [{ report_id: 'R-1', case_status: 'resolved' }]))

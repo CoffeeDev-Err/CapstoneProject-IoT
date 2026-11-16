@@ -31,7 +31,11 @@ const setup = () => {
 			},
 			LocationHistory: {
 				findOne: () => ({ sort: () => ({ select: () => ({ lean: async () => history.at(-1) }) }) }),
-				create: async (entry) => { history.push(entry) },
+				findOneAndUpdate: async ({ _id }, { $setOnInsert }) => {
+					const entry = history.find(row => row._id === _id)
+					if (entry) return entry
+					const created = { _id, ...$setOnInsert }; history.push(created); return created
+				},
 			},
 		},
 	})
@@ -71,12 +75,11 @@ it('saves each new GPS fix, including sub-ten-second fixes, without duplicates o
 	assert.deepEqual(history[1].location.coordinates, [payload(5).longitude, payload(5).latitude])
 })
 
-it('retains the simulated-reading sampling limit independently of real GPS fixes', async () => {
-	const { service, payload, history } = setup()
-	await service.ingestLocation(payload(0, { source: 'mock' }))
-	assert.equal((await service.ingestLocation(payload(5, { source: 'mock' }))).historySampled, false)
-	assert.equal((await service.ingestLocation(payload(30, { source: 'mock' }))).historySampled, true)
-	assert.equal(history.length, 2)
+it('rejects simulated readings without writing location or history', async () => {
+	const { service, payload, history, writes } = setup()
+	await assert.rejects(service.ingestLocation(payload(0, { source: 'mock' })), { status: 400 })
+	assert.equal(history.length, 0)
+	assert.equal(writes(), 0)
 })
 
 it('ignores explicitly invalid GPS fixes without overwriting the valid live position', async () => {
@@ -173,11 +176,11 @@ it('leaves normal small GPS steps, identical fresh coordinates and vehicle movem
 	assert.equal(history.length, 4)
 })
 
-it('rejects poor GPS quality without affecting simulated readings', async () => {
+it('rejects poor GPS quality and simulated readings', async () => {
 	const { service, payload, writes, history } = setup()
 	assert.equal((await service.ingestLocation(payload(0, { accuracy: 1000 }))).reason, 'poor_gps_quality')
 	assert.equal((await service.ingestLocation(payload(0, { satellites: 2 }))).reason, 'poor_gps_quality')
 	assert.equal(writes(), 0)
 	assert.equal(history.length, 0)
-	assert.equal((await service.ingestLocation(payload(0, { source: 'mock', accuracy: 1000 }))).accepted, true)
+	await assert.rejects(service.ingestLocation(payload(0, { source: 'mock', accuracy: 1000 })), { status: 400 })
 })

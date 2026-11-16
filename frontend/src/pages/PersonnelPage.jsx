@@ -17,7 +17,6 @@ import { TableSkeletonRows } from '../components/LoadingSkeleton'
 import InitialsAvatar from '../components/InitialsAvatar'
 import SelectControl from '../components/SelectControl'
 import { usePersonnelContext } from '../context/usePersonnelContext'
-import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
 
 /** Maps normalized duty status strings to badge colours. */
 const dutyStatusColor = {
@@ -41,7 +40,6 @@ function PersonnelPage() {
   const deferredSearchTerm = useDeferredValue(searchTerm)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name')
-  const displayedPersonnel = useMemo(() => appendDevelopmentMockPersonnel(personnel), [personnel])
 
   const roster = useMemo(() => {
     const emergencyIds = new Set()
@@ -55,7 +53,7 @@ function PersonnelPage() {
       })
 
     const query = deferredSearchTerm.trim().toLowerCase()
-    return displayedPersonnel
+    return personnel
       .map((officer) => {
         const dutyStatus = getDutyStatus(officer.status)
         let operationalStatus = dutyStatus
@@ -77,7 +75,7 @@ function PersonnelPage() {
         if (sortBy === 'rank') return left.rank.localeCompare(right.rank) || left.name.localeCompare(right.name)
         return left.name.localeCompare(right.name)
       })
-  }, [deferredSearchTerm, displayedPersonnel, sortBy, statusFilter, tasks])
+  }, [deferredSearchTerm, personnel, sortBy, statusFilter, tasks])
 
   const locatePersonnel = (officer) => {
     if (officer.dutyStatus === 'Off Duty' || officer.isLocationStale || officer.isVisibleOnMap === false) return
@@ -100,12 +98,11 @@ function PersonnelPage() {
             <div>
               <h3 className="widget-title mb-0">Personnel roster</h3>
               <p aria-live="polite">
-                {isInitialDataLoading ? 'Loading registered personnel...' : `${roster.length} of ${displayedPersonnel.length} matching personnel`}
+                {isInitialDataLoading ? 'Loading registered personnel...' : `${roster.length} of ${personnel.length} matching personnel`}
               </p>
             </div>
           </div>
         </div>
-        {import.meta.env.DEV && <p className="personnel-demo-note">Includes 100 mock search records in development only.</p>}
 
         <div className="report-list-controls personnel-list-controls">
           <label className="report-search">
@@ -163,8 +160,8 @@ function PersonnelPage() {
               <tr><td colSpan={5} className="personnel-empty">
                 <div className="report-list-empty">
                   <Users aria-hidden="true" />
-                  <strong>{displayedPersonnel.length ? 'No matching personnel' : 'No registered personnel'}</strong>
-                  <span>{displayedPersonnel.length ? 'Try a different name, badge, rank, or status.' : 'Registered officers will appear here when available.'}</span>
+                  <strong>{personnel.length ? 'No matching personnel' : 'No registered personnel'}</strong>
+                  <span>{personnel.length ? 'Try a different name, badge, rank, or status.' : 'Registered officers will appear here when available.'}</span>
                   {(searchTerm || statusFilter !== 'all') && <button type="button" className="report-action-btn report-action-btn--secondary" onClick={() => { setSearchTerm(''); setStatusFilter('all') }}>Clear filters</button>}
                 </div>
               </td></tr>
@@ -184,9 +181,6 @@ function PersonnelPage() {
                     <div>
                       <strong>{officer.name}</strong>
                       <small className="personnel-badge">{officer.badge ?? officer.id.toUpperCase()}</small>
-                      {officer.isMockPersonnel && (
-                        <small className="personnel-mock-label">Mock search record</small>
-                      )}
                     </div>
                   </div>
                 </td>
@@ -210,11 +204,11 @@ function PersonnelPage() {
                 </td>
                 <td className="personnel-actions">
                   <div className="personnel-action-group">
-                  {!officer.isMockPersonnel && <button type="button" className="report-action-btn report-action-btn--secondary"
+                  <button type="button" className="report-action-btn report-action-btn--secondary"
                     aria-label={`View GPS history for ${officer.name}`}
                     onClick={event => { event.stopPropagation(); navigate(`/personnel/${encodeURIComponent(officer.id)}/gps-history`) }}>
                     <History aria-hidden="true" />GPS history
-                  </button>}
+                  </button>
                   <button
                     type="button"
                     className="report-action-btn report-action-btn--secondary personnel-map-action"

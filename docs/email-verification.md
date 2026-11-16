@@ -27,21 +27,16 @@ The six-digit code appears in the backend terminal and is also returned to the
 development UI. No internet is needed after packages have been installed and
 MongoDB is locally available.
 
-Optional local seed accounts can be configured with:
+The initial supervisor account can be configured with:
 
 ```env
-SUPERVISOR_LOGIN_ID=supervisor
+SUPERVISOR_LOGIN_ID=00-0001
 SUPERVISOR_EMAIL=supervisor@example.com
 SUPERVISOR_TEMP_PASSWORD=ChangeMe!2026
-
-DEMO_OFFICER_LOGIN_ID=officer.demo
-DEMO_OFFICER_EMAIL=officer@example.com
-DEMO_OFFICER_TEMP_PASSWORD=OfficerDemo!2026
-DEMO_OFFICER_PERSONNEL_ID=pcpl-001
 ```
 
-Seeds only create missing users. They do not reset an existing password.
-Remove the demo values before deployment.
+Startup provisioning does not reset an existing password. Use a unique password in deployment.
+Create officer accounts and assign their GPS devices through Account Management; demo officer provisioning has been removed.
 
 ## Gmail Delivery
 

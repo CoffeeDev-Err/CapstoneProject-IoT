@@ -40,4 +40,27 @@ const isInsideCabagan = (latitude, longitude) => {
 	return inside
 }
 
-module.exports = { CABAGAN_BOUNDARY_COORDS, isInsideCabagan }
+const distanceToCabaganBoundary = (latitude, longitude) => {
+	if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return Infinity
+	const yScale = Math.PI * 6371000 / 180
+	const xScale = yScale * Math.cos(latitude * Math.PI / 180)
+	let nearest = Infinity
+	for (let index = 0; index < boundary.length; index++) {
+		const a = boundary[index], b = boundary[(index + 1) % boundary.length]
+		const ax = (a[0] - longitude) * xScale, ay = (a[1] - latitude) * yScale
+		const dx = (b[0] - a[0]) * xScale, dy = (b[1] - a[1]) * yScale
+		const lengthSquared = dx * dx + dy * dy
+		const fraction = lengthSquared ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared)) : 0
+		nearest = Math.min(nearest, Math.hypot(ax + fraction * dx, ay + fraction * dy))
+	}
+	return nearest
+}
+
+const classifyCabaganFix = (latitude, longitude, accuracy) => {
+	if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180
+		|| !Number.isFinite(accuracy) || accuracy <= 0 || accuracy > 100
+		|| distanceToCabaganBoundary(latitude, longitude) <= accuracy + 5) return 'uncertain'
+	return isInsideCabagan(latitude, longitude) ? 'inside' : 'outside'
+}
+
+module.exports = { CABAGAN_BOUNDARY_COORDS, isInsideCabagan, distanceToCabaganBoundary, classifyCabaganFix }

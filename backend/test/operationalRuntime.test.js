@@ -3,12 +3,23 @@ const { describe, it } = require('node:test')
 const createOperationalRuntime = require('../src/runtime/operationalRuntime')
 
 describe('operational runtime', () => {
+	it('refreshes live personnel status during GPS silence without manufacturing positions', async () => {
+		const emitted = []
+		const personnel = [{ id: 'P-1', source: 'gps', locationRecordedAt: '2026-11-16T00:00:00Z', isLocationStale: true }]
+		const runtime = createOperationalRuntime({ io: {}, isDatabaseReady: () => true,
+			personnelService: { getPersonnelWithLocations: async () => personnel,
+				emitPersonnelCollection: (_io, event, payload) => emitted.push({ event, payload }) },
+		})
+		await runtime.broadcastPersonnelLocations()
+		assert.deepEqual(emitted, [{ event: 'personnel:update', payload: personnel }])
+	})
 	it('reconciles telemetry within ten seconds even when MQTT stays connected but silent', async () => {
 		let now = 0
 		let syncs = 0
 		const calls = []
 		const runtime = createOperationalRuntime({
 			io: {}, isDatabaseReady: () => true, clock: () => now,
+			intervals: { personnelStatus: 2500, flespiSync: 3000, deploymentStatus: 15_000 },
 			operationalService: { reconcileTaskArrivals: async () => calls.push('arrivals') },
 			personnelService: {
 				emitPersonnelCollection: () => calls.push('broadcast'),
@@ -17,7 +28,6 @@ describe('operational runtime', () => {
 			},
 			flespiSyncService: { syncAssignedLocations: async () => { syncs += 1; return { accepted: 1 } } },
 			createFlespiMqttService: () => ({ start: () => true, isConnected: () => true, stop: () => {} }),
-			intervals: { gpsUpdate: 60_000, flespiSync: 3000, historySample: 30_000, deploymentStatus: 60_000 },
 			flespiToken: 'test-token', logger: { log: () => {}, error: () => {} },
 		})
 		runtime.start()
@@ -72,11 +82,10 @@ describe('operational runtime', () => {
 				evaluatePersonnelInactivity: async () => calls.push('inactivity'),
 				evaluatePersonnelGeofences: async () => calls.push('geofences'),
 				getPersonnelWithLocations: async () => [],
-				updateMockLocations: async () => [],
 			},
 			flespiSyncService: { syncAssignedLocations: async () => ({ accepted: 0 }) },
 			createFlespiMqttService: () => ({ start: () => false }),
-			intervals: { gpsUpdate: 1000, flespiSync: 1000, historySample: 1000, deploymentStatus: 1000 },
+			intervals: { personnelStatus: 1000, flespiSync: 1000, deploymentStatus: 1000 },
 			flespiToken: '',
 			logger: { log: () => {}, error: () => {} },
 		})

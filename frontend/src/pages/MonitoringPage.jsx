@@ -24,7 +24,6 @@ import MapPersonnelToolbar from '../components/MapPersonnelToolbar'
 import AnnouncementDialog from '../components/AnnouncementDialog'
 import { usePersonnelContext } from '../context/usePersonnelContext'
 import { useFeedback } from '../context/useFeedback'
-import { useDevelopmentMapPersonnel } from '../hooks/useDevelopmentMapPersonnel'
 import { completeTask, getTask } from '../services/operations'
 import { requestErrorMessage } from '../utils/requestFeedback'
 
@@ -49,12 +48,8 @@ function MonitoringPage() {
     lastPersonnelSyncAt,
     retryInitialData,
   } = usePersonnelContext()
-  const {
-    enabled: isDevelopmentMapPreview,
-    personnel: developmentMapPersonnel,
-  } = useDevelopmentMapPersonnel(location.search)
 
-  const liveMapPersonnel = useMemo(() => {
+  const mapPersonnel = useMemo(() => {
     const emergencyIds = new Set()
     const operationIds = new Set()
     tasks
@@ -72,14 +67,6 @@ function MonitoringPage() {
       operationActive: operationIds.has(member.id),
     }))
   }, [activePersonnel, tasks])
-  const mapPersonnel = useMemo(
-    () => [...liveMapPersonnel, ...developmentMapPersonnel],
-    [developmentMapPersonnel, liveMapPersonnel],
-  )
-  const selectablePersonnel = useMemo(
-    () => [...personnel, ...developmentMapPersonnel],
-    [developmentMapPersonnel, personnel],
-  )
 
   // Track which officer's profile modal is open (null = modal hidden)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState(null)
@@ -93,8 +80,8 @@ function MonitoringPage() {
   const [isSidePanelCollapsed, setIsSidePanelCollapsed] = useState(false)
   const [mapLayoutVersion, setMapLayoutVersion] = useState(0)
   const selectedPersonnel = useMemo(
-    () => selectablePersonnel.find((member) => member.id === selectedPersonnelId) || null,
-    [selectablePersonnel, selectedPersonnelId]
+    () => personnel.find((member) => member.id === selectedPersonnelId) || null,
+    [personnel, selectedPersonnelId]
   )
   const activeFollowedPersonnelId = mapPersonnel.some(
     (member) => member.id === followedPersonnelId,
@@ -236,7 +223,6 @@ function MonitoringPage() {
             initialDataError={initialDataError}
             lastPersonnelSyncAt={lastPersonnelSyncAt}
             onRetry={retryInitialData}
-            developmentPreviewCount={isDevelopmentMapPreview ? developmentMapPersonnel.length : 0}
           />
         </Suspense>
       </main>

@@ -13,8 +13,6 @@ const previewEnvironment = easConfig.build.preview.env;
 
 assert.equal(easConfig.build.preview.android.buildType, 'apk');
 assert.equal(previewEnvironment.ANDROID_BUILD_ARCHS, undefined);
-assert.equal(previewEnvironment.EXPO_PUBLIC_MAP_PREVIEW, 'false');
-assert.equal(easConfig.build.production.env.EXPO_PUBLIC_MAP_PREVIEW, 'false');
 assert.equal(appConfig.version, packageMetadata.version);
 if (existsSync(androidBuildGradlePath)) {
   const androidBuildGradle = readFileSync(androidBuildGradlePath, 'utf8');
@@ -26,7 +24,6 @@ const originalEnvironment = {
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
   ALLOW_CLEARTEXT_TRAFFIC: process.env.ALLOW_CLEARTEXT_TRAFFIC,
   ANDROID_BUILD_ARCHS: process.env.ANDROID_BUILD_ARCHS,
-  EXPO_PUBLIC_MAP_PREVIEW: process.env.EXPO_PUBLIC_MAP_PREVIEW,
 };
 
 const getAndroidProperties = () => resolveAppConfig({ config: { plugins: [] } }).plugins.find(

@@ -69,14 +69,14 @@ it('does not attach older speed or quality to a new position or reject it using 
 	assert.ok(Number.isNaN(row.satellites))
 })
 
-it('supports trackers without quality fields and timestamp-less legacy coordinate entries', async (t) => {
+it('rejects timestamp-less coordinate entries even when a tracker heartbeat is current', async (t) => {
 	const ts = 1791190635
 	const row = await readFixture(t, {
 		...fixture(ts),
 		'position.latitude': { value: 17.42 },
 		'position.longitude': { value: 121.77 },
 	})
-	assert.equal(row.recordedAt, ts)
+	assert.equal(row.recordedAt, null)
 	assert.equal(row.latitude, 17.42)
 	assert.equal(row.positionValid, undefined)
 	assert.ok(Number.isNaN(row.accuracy))
@@ -88,4 +88,22 @@ it('does not coerce a missing coordinate into a valid zero-degree position', asy
 		'position.latitude': { value: null, ts: 1791190635 },
 	})
 	assert.ok(Number.isNaN(row.latitude))
+})
+
+it('rejects a latitude/longitude pair from different measurements despite a new heartbeat', async (t) => {
+	const ts = 1791190635
+	const row = await readFixture(t, {
+		...fixture(ts), 'position.latitude': { value: 17.42, ts: ts - 60 },
+		timestamp: { value: ts + 10, ts: ts + 10 },
+	})
+	assert.equal(row.recordedAt, null)
+})
+
+it('preserves same-fix network positioning provenance and ignores quality from newer messages', async (t) => {
+	const ts = 1791190635
+	const row = await readFixture(t, { ...fixture(ts),
+		'position.source': { value: 'lbs', ts }, 'position.accuracy': { value: 5, ts: ts + 10 },
+	})
+	assert.equal(row.positionSource, 'lbs')
+	assert.ok(Number.isNaN(row.accuracy))
 })

@@ -45,10 +45,6 @@ const mapNavigationSource = fs.readFileSync(
   path.join(projectRoot, 'src', 'utils', 'mapNavigation.js'),
   'utf8',
 )
-const mapPreviewSource = fs.readFileSync(
-  path.join(projectRoot, 'src', 'utils', 'mockMapPersonnel.js'),
-  'utf8',
-)
 const darkThemeSource = fs.readFileSync(
   path.join(projectRoot, 'src', 'styles', 'dark-theme.css'),
   'utf8',
@@ -191,8 +187,6 @@ assert.match(personnelMapSource, /motionDuration/, 'Web cluster centroids must i
 assert.match(personnelMapSource, /map\.on\('zoom', handleZoom\)/, 'Clusters must regroup automatically while zooming')
 assert.match(personnelMapSource, /state\.marker\.remove\(\)[\s\S]*state\.isOnMap = false/, 'Clustered DOM markers must leave the active map render loop')
 assert.match(personnelMapSource, /!state\.isOnMap && member\.id !== followedPersonnelId/, 'Hidden clustered markers must skip redundant individual animations')
-assert.match(mapPreviewSource, /import\.meta\.env\.DEV/, 'Mock map markers must remain development-only')
-assert.match(mapPreviewSource, /MOCK_MAP_PERSONNEL_COUNT = 96/, 'Cluster preview must retain a dense marker dataset')
 assert.match(mapControlsSource, /Use street map/, 'Street map control must remain available')
 assert.match(mapControlsSource, /Use satellite map/, 'Satellite map control must remain available')
 assert.match(mapControlsSource, /Enable 3D terrain/, '3D terrain control must remain available')

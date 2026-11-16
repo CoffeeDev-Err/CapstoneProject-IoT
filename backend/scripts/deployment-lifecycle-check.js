@@ -1,18 +1,10 @@
 const assert = require('assert/strict')
 const fs = require('fs')
 const path = require('path')
-const { buildMockDeploymentSeedUpdate } = require('../src/services/seedService')
 const {
 	emitDeploymentCollection,
 	emitTaskRemoval,
 } = require('../src/services/operationalService')
-
-const seedUpdate = buildMockDeploymentSeedUpdate()
-
-assert.equal(seedUpdate.$set, undefined)
-assert.equal(seedUpdate.$unset, undefined)
-assert.equal(seedUpdate.$setOnInsert.assignmentId, 'ASG-CENTRO-002')
-assert.equal(seedUpdate.$setOnInsert.status, 'active')
 
 const emitted = []
 const io = {

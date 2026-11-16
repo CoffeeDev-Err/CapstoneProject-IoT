@@ -93,6 +93,7 @@ const reportBackupResponderSchema = new mongoose.Schema({
 	arrivedAt: Date,
 	arrivalDistanceMeters: { type: Number, min: 0 },
 	arrivalLocation: pointSchema,
+	arrivalEvidence: mongoose.Schema.Types.Mixed,
 }, { _id: false })
 
 const reportBackupResponseSchema = new mongoose.Schema({
@@ -137,6 +138,8 @@ const reportSchema = new mongoose.Schema({
 		default: 'manual',
 	},
 	submittedFrom: pointSchema,
+	submittedFromGpsEvidence: mongoose.Schema.Types.Mixed,
+	locationGpsEvidence: mongoose.Schema.Types.Mixed,
 	incidentAt: { type: Date, required: true },
 	submittedAt: { type: Date, required: true, default: Date.now },
 	evidencePhoto: reportEvidenceSchema,
@@ -178,6 +181,7 @@ const responderSchema = new mongoose.Schema({
 	arrivedAt: Date,
 	arrivalDistanceMeters: { type: Number, min: 0 },
 	arrivalLocation: pointSchema,
+	arrivalEvidence: mongoose.Schema.Types.Mixed,
 }, { _id: false })
 
 const taskSchema = new mongoose.Schema({

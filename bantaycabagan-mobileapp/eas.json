@@ -13,8 +13,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://geosentri.com",
-        "ALLOW_CLEARTEXT_TRAFFIC": "false",
-        "EXPO_PUBLIC_MAP_PREVIEW": "false"
+        "ALLOW_CLEARTEXT_TRAFFIC": "false"
       },
       "android": {
         "buildType": "apk"
@@ -24,8 +23,7 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://geosentri.com",
-        "ALLOW_CLEARTEXT_TRAFFIC": "false",
-        "EXPO_PUBLIC_MAP_PREVIEW": "false"
+        "ALLOW_CLEARTEXT_TRAFFIC": "false"
       }
     }
   },

@@ -10,6 +10,7 @@ const TELEMETRY_PARAMETERS = [
 	'position.valid',
 	'position.satellites',
 	'position.accuracy',
+	'position.source',
 	'timestamp',
 	'server.timestamp',
 	'battery.level',
@@ -136,19 +137,15 @@ const fetchLatestTelemetry = async ({ deviceIds = [] } = {}) => {
 		const telemetry = item?.telemetry || {};
 		const latitude = readTelemetry(telemetry, 'position.latitude');
 		const longitude = readTelemetry(telemetry, 'position.longitude');
-		const trackerTimestamp = readTelemetry(telemetry, 'timestamp');
 		const serverTimestamp = readTelemetry(telemetry, 'server.timestamp');
-		const positionTimestamp = Math.max(
-			telemetryNumber(latitude?.ts) || 0,
-			telemetryNumber(longitude?.ts) || 0,
-		);
-		// Telemetry parameters update independently. A heartbeat/battery message
-		// must not make cached coordinates look like a fresh GPS fix.
-		const recordedAt = positionTimestamp || telemetryNumber(trackerTimestamp?.value)
-			|| telemetryNumber(serverTimestamp?.value);
+		const latitudeTime = telemetryNumber(latitude?.ts);
+		const longitudeTime = telemetryNumber(longitude?.ts);
+		// A heartbeat or one updated coordinate cannot refresh the other coordinate.
+		const recordedAt = Number.isFinite(latitudeTime) && latitudeTime > 0 && latitudeTime === longitudeTime
+			? latitudeTime : null;
 		const readPositionParameter = (parameter) => {
 			const entry = readTelemetry(telemetry, parameter);
-			return telemetryNumber(entry?.ts) >= recordedAt ? entry?.value : undefined;
+			return recordedAt !== null && telemetryNumber(entry?.ts) === recordedAt ? entry?.value : undefined;
 		};
 		const positionValid = readPositionParameter('position.valid');
 
@@ -161,6 +158,7 @@ const fetchLatestTelemetry = async ({ deviceIds = [] } = {}) => {
 			positionValid: typeof positionValid === 'boolean' ? positionValid : undefined,
 			satellites: telemetryNumber(readPositionParameter('position.satellites')),
 			accuracy: telemetryNumber(readPositionParameter('position.accuracy')),
+			positionSource: readPositionParameter('position.source'),
 			batteryLevel: telemetryNumber(readTelemetry(telemetry, 'battery.level')?.value),
 			recordedAt,
 			receivedAt: Number(serverTimestamp?.value) || null,

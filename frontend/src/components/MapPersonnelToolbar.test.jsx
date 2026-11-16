@@ -5,8 +5,7 @@ afterEach(cleanup)
 it('finds deployed officers including stale GPS, excludes off-duty officers, and opens announcements', () => {
   const personnel = [{ id: 'P1', name: 'Ana Santos', badge: '10-1001', status: 'On Duty', isOnDuty: true,
     isVisibleOnMap: true, isLocationStale: true, locationAgeSeconds: 600 },
-    { id: 'P2', name: 'Ana Reyes', badge: '10-1002', isOnDuty: false },
-    { id: 'mock', name: 'Ana mock', isOnDuty: true, isMockPersonnel: true }]
+    { id: 'P2', name: 'Ana Reyes', badge: '10-1002', isOnDuty: false }]
   const select = vi.fn(), announce = vi.fn()
   render(<MapPersonnelToolbar personnel={personnel} onSelectPersonnel={select} onAnnounce={announce} />)
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '10-1001' } })
@@ -17,7 +16,6 @@ it('finds deployed officers including stale GPS, excludes off-duty officers, and
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Ana' } })
   expect(screen.getByText('Ana Santos')).toBeTruthy()
   expect(screen.queryByText('Ana Reyes')).toBeNull()
-  expect(screen.queryByText('Ana mock')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Send announcement' }))
   expect(announce).toHaveBeenCalledTimes(1)
 })

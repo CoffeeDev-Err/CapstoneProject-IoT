@@ -214,26 +214,6 @@ assert.deepEqual(validateProductionEnvironment({
 	assert.match(routeSource, /router\.post\(\s*'\/login\/verify',[\s\S]*limitOtpByChallenge/)
 }
 
-// --- The mock-officer account must never fall back to a committed password ---
-{
-	const fs = require('fs')
-	const path = require('path')
-	const seedSource = fs.readFileSync(
-		path.join(__dirname, '..', 'src', 'services', 'seedService.js'),
-		'utf8',
-	)
-	assert.doesNotMatch(
-		seedSource,
-		/MOCK_OFFICER_TEMP_PASSWORD\s*\|\|\s*'[^']+'/,
-		'A committed default would be a publicly known credential for a loginable account',
-	)
-	assert.match(
-		seedSource,
-		/MOCK_OFFICER_TEMP_PASSWORD is required when ENABLE_MOCK_OFFICER=true/,
-		'Enabling the mock officer without a supplied password must fail loudly',
-	)
-}
-
 // --- No client-shaped value may reach a Mongo query uncoerced ---
 // Path params are always strings, but `req.query` and `req.body` can be objects
 // or arrays (`?x[$ne]=1`, a crafted JSON body), which is how NoSQL operator

@@ -29,6 +29,8 @@ export function mergePersonnelLocations(previous: LivePersonnel[], incoming: Liv
       accuracy: latest.accuracy,
       satellites: latest.satellites,
       lastMovedAt: latest.lastMovedAt,
+      isInsideCabagan: stale || member.isOnDuty !== true ? null : latest.isInsideCabagan,
+      boundaryStatus: stale || member.isOnDuty !== true ? 'unavailable' : latest.boundaryStatus,
       isLocationStale: stale,
       locationAgeSeconds: age,
       locationStatus: !hasCoordinates ? 'unavailable' : stale ? 'stale' : 'current',

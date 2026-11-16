@@ -28,6 +28,19 @@ const reading = (time, latitude = 17.4239) => ({
 
 beforeEach(() => { vi.clearAllMocks() })
 
+it('preserves an uncertain server boundary verdict even when raw coordinates are outside', async () => {
+  getPersonnel.mockResolvedValueOnce([{ ...reading(Date.now(), 0), longitude: 0, isInsideCabagan: null, boundaryStatus: 'uncertain' }])
+  const settings = options()
+  const view = renderHook(() => {
+    const [personnel, setPersonnel] = useState([])
+    usePersonnelSocketSubscriptions({ ...settings, setPersonnel })
+    return personnel
+  })
+  await waitFor(() => expect(view.result.current).toHaveLength(1))
+  expect(view.result.current[0].isInsideCabagan).toBeNull()
+  expect(settings.setOperationalAlert).not.toHaveBeenCalled()
+})
+
 it('keeps a streamed officer visible when a previously started initial fetch returns an empty list', async () => {
   let finishFetch
   getPersonnel.mockImplementationOnce(() => new Promise((resolve) => { finishFetch = resolve }))

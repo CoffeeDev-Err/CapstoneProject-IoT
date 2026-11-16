@@ -187,6 +187,16 @@ function ProfileModal({
 
         <div className="profile-map-card__telemetry">
           <div className="profile-map-card__metric">
+            <LocateFixed size={16} aria-hidden="true" />
+            <span>GPS accuracy</span>
+            <strong>{Number.isFinite(selectedPersonnel.accuracy) ? `±${Math.round(selectedPersonnel.accuracy)} m` : 'Not reported'}</strong>
+          </div>
+          <div className="profile-map-card__metric">
+            <MapPin size={16} aria-hidden="true" />
+            <span>Boundary</span>
+            <strong>{({ inside: 'Inside Cabagan', outside: 'Outside Cabagan', pending: 'Confirming', uncertain: 'GPS uncertain' })[selectedPersonnel.boundaryStatus] || 'Unavailable'}</strong>
+          </div>
+          <div className="profile-map-card__metric">
             <Gauge size={16} aria-hidden="true" />
             <span>Speed</span>
             <strong>{speed}</strong>

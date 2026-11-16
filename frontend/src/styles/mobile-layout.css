@@ -59,9 +59,7 @@
   .assignment-checklist { grid-auto-rows: max-content; max-height: 260px; }
   .assignment-check-item { align-items: flex-start; min-width: 0; min-height: 44px; height: auto; }
   .assignment-check-item input { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 0.15rem; }
-  .assignment-check-item > span,
-  .assignment-check-item.is-mock > span { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
-  .assignment-check-item.is-mock small { display: block; white-space: normal; }
+  .assignment-check-item > span { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
   .assignment-field__hint-row { flex-direction: column; align-items: stretch; }
   .assignment-field, .account-field { min-width: 0; }
   .assignment-field--notes textarea { min-height: 120px; resize: vertical; }

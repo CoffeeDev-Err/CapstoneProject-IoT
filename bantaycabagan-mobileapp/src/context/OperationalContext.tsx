@@ -119,8 +119,7 @@ export function OperationalProvider({ children }: { children: React.ReactNode })
       latitude: null,
       longitude: null,
       status: user?.profile?.dutyStatus || 'Off Duty',
-      photoUrl: resolveApiAssetUrl(user?.profile?.photoUrl)
-        || 'https://randomuser.me/api/portraits/men/32.jpg',
+      photoUrl: resolveApiAssetUrl(user?.profile?.photoUrl),
       lastUpdated: new Date().toISOString(),
       isVisibleOnMap: false,
       isLocationStale: true,

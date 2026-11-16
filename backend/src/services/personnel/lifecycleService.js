@@ -1,8 +1,14 @@
 const {
 	getLocationFreshness,
-	getLocationStaleThresholdMs,
 } = require('../../utils/locationFreshness')
-const { isInsideCabagan } = require('../../utils/cabaganGeofence')
+const { classifyCabaganFix } = require('../../utils/cabaganGeofence')
+const { isUsableGpsFix } = require('../../utils/gpsQuality')
+
+const emitPersonnelAlert = (io, event, alert, personnelId) => {
+	if (!io) return
+	io.to('role:supervisor').emit(event, alert)
+	io.to(`personnel:${personnelId}`).emit(event, alert)
+}
 
 const createPersonnelLifecycleService = ({
 	models,
@@ -13,7 +19,7 @@ const createPersonnelLifecycleService = ({
 	const { deliverNotification } = notificationService
 	const maxGeofenceAccuracyMeters = Math.max(
 		10,
-		Number(process.env.GEOFENCE_MAX_ACCURACY_METERS) || 100,
+		Math.min(100, Number(process.env.GEOFENCE_MAX_ACCURACY_METERS) || 100),
 	)
 	const geofenceConfirmationReadings = Math.max(
 		2,
@@ -59,23 +65,8 @@ const createPersonnelLifecycleService = ({
 
 		for (const deployment of deployments) {
 			const location = locationByPersonnel.get(deployment.personnelId)
-			const coordinates = location?.location?.coordinates || []
-			const recordedAt = location?.recordedAt || location?.updatedAt
-			const recordedTime = recordedAt ? new Date(recordedAt).getTime() : Number.NaN
-			const hasCoordinates = Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1])
-			const ageMs = Number.isFinite(recordedTime) ? now.getTime() - recordedTime : Number.POSITIVE_INFINITY
-			const freshness = getLocationFreshness({
-				recordedAt,
-				source: location?.source || 'gps',
-				now,
-			})
-			const hasFreshLocation = Boolean(
-				location
-				&& hasCoordinates
-				&& !freshness.isLocationStale
-				&& ageMs <= getLocationStaleThresholdMs()
-				&& ageMs >= -5 * 60_000,
-			)
+			const recordedTime = +new Date(location?.recordedAt || NaN)
+			const hasFreshLocation = isUsableGpsFix(location, { now, notBefore: deployment.shiftStart })
 
 			if (hasFreshLocation) {
 				if (deployment.gpsUnavailableAlertedAt) {
@@ -147,7 +138,7 @@ const createPersonnelLifecycleService = ({
 					outageStartedAt: outageKey,
 				}
 				alerts.push(alert)
-				io?.emit('personnel:gps-unavailable', alert)
+				emitPersonnelAlert(io, 'personnel:gps-unavailable', alert, deployment.personnelId)
 			} catch (error) {
 				await Deployment.updateOne(
 					{ _id: deployment._id, gpsUnavailableAlertedAt: now },
@@ -301,13 +292,8 @@ const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 	const alerts = []
 
 	for (const location of locations) {
-		if (getLocationFreshness({
-			recordedAt: location.recordedAt || location.updatedAt,
-			source: location.source,
-			now,
-		}).isLocationStale) continue
-
 		const deployment = deploymentByPersonnel.get(location.personnelId)
+		if (!isUsableGpsFix(location, { now, notBefore: deployment?.shiftStart })) continue
 		const movementAt = location.lastMovedAt || location.recordedAt || location.updatedAt
 		const shiftStartedAt = deployment?.shiftStart || movementAt
 		const monitoringStartedAt = new Date(Math.max(
@@ -319,6 +305,8 @@ const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 		const result = await CurrentLocation.updateOne(
 			{
 				_id: location._id,
+				recordedAt: location.recordedAt,
+				lastMovedAt: location.lastMovedAt,
 				$or: [
 					{ inactivityAlertedAt: { $exists: false } },
 					{ inactivityAlertedAt: null },
@@ -367,7 +355,7 @@ const evaluatePersonnelInactivity = async ({ io, now = new Date() } = {}) => {
 			inactivityMinutes,
 		}
 		alerts.push(alert)
-		io?.emit('personnel:inactivity', alert)
+		emitPersonnelAlert(io, 'personnel:inactivity', alert, location.personnelId)
 	}
 
 	return alerts
@@ -395,15 +383,11 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 		const assignment = assignmentByPersonnel.get(location.personnelId)
 		if (!assignment || location.deviceAssignmentId !== assignment.assignmentId) continue
 		if (location.source !== 'gps' || location.isSimulated) continue
-		if (getLocationFreshness({
-			recordedAt: location.recordedAt || location.updatedAt,
-			source: location.source,
-			now,
-		}).isLocationStale) continue
-		if (
-			Number.isFinite(location.accuracy)
-			&& location.accuracy > maxGeofenceAccuracyMeters
-		) {
+		const [longitude, latitude] = location.location?.coordinates || []
+		const classification = classifyCabaganFix(latitude, longitude, location.accuracy)
+		if (!isUsableGpsFix(location, { now, requireAccuracy: true, maxAccuracy: maxGeofenceAccuracyMeters,
+			notBefore: deployments.find(item => item.personnelId === location.personnelId)?.shiftStart })
+			|| classification === 'uncertain') {
 			if (location.geofenceCandidateStatus || location.geofenceCandidateCount) {
 				await CurrentLocation.updateOne(
 					{ _id: location._id, recordedAt: location.recordedAt },
@@ -419,9 +403,8 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 			continue
 		}
 
-		const [longitude, latitude] = location.location?.coordinates || []
 		if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue
-		const nextStatus = isInsideCabagan(latitude, longitude) ? 'inside' : 'outside'
+		const nextStatus = classification
 		const previousStatus = location.geofenceStatus
 		if (!previousStatus && nextStatus === 'inside') {
 			await CurrentLocation.updateOne(
@@ -464,6 +447,7 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 			&& candidateReadingAt.getTime() === readingAt.getTime()
 		) continue
 		const candidateCount = location.geofenceCandidateStatus === nextStatus
+			&& +readingAt > +candidateReadingAt && +readingAt - +candidateReadingAt <= 30_000
 			? Number(location.geofenceCandidateCount || 0) + 1
 			: 1
 		if (candidateCount < geofenceConfirmationReadings) {
@@ -552,7 +536,7 @@ const evaluatePersonnelGeofences = async ({ io, now = new Date() } = {}) => {
 			alertSuppressed: false,
 		}
 		transitions.push(transition)
-		io?.emit('geofence:transition', transition)
+		emitPersonnelAlert(io, 'geofence:transition', transition, location.personnelId)
 	}
 
 	return transitions

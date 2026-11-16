@@ -1,14 +1,4 @@
-const {
-	Barangay,
-	CurrentLocation,
-	Deployment,
-	GpsDeviceAssignment,
-	LocationHistory,
-	Personnel,
-	Report,
-	Task,
-	User,
-} = require('../models')
+const { Barangay, User } = require('../models')
 const { hashPassword } = require('../utils/password')
 const { CABAGAN_BARANGAYS } = require('../constants/cabaganBarangays')
 const { LOGIN_ID_PATTERN } = require('../utils/accountValidation')
@@ -17,74 +7,6 @@ const point = (longitude, latitude) => ({
 	type: 'Point',
 	coordinates: [longitude, latitude],
 })
-
-const gpsOfficerPersonnelId = String(
-	process.env.DEMO_OFFICER_PERSONNEL_ID || 'pcpl-001',
-).trim()
-const gpsOfficerFullName = String(
-	process.env.DEMO_OFFICER_FULL_NAME || 'GPS-Linked Officer',
-).trim()
-
-const mockOfficerEnabled = String(
-	process.env.ENABLE_MOCK_OFFICER || '',
-).trim().toLowerCase() === 'true'
-const mockOfficerPersonnelId = String(
-	process.env.MOCK_OFFICER_PERSONNEL_ID || 'psms-002',
-).trim()
-const mockOfficerFullName = String(
-	process.env.MOCK_OFFICER_FULL_NAME || 'Backup Officer',
-).trim()
-
-const buildMockDeploymentSeedUpdate = () => ({
-	$setOnInsert: {
-		assignmentId: 'ASG-CENTRO-002',
-		groupId: 'GRP-CENTRO-002',
-		personnelId: mockOfficerPersonnelId,
-		personnelName: mockOfficerFullName,
-		rank: 'Police Staff Sergeant',
-		barangayCode: 'CENTRO',
-		patrolArea: 'Cabagan Municipal Hall',
-		instructions: 'Maintain visibility around the municipal hall perimeter.',
-		assignedBy: 'seed',
-		assignedAt: new Date(),
-		status: 'active',
-		location: point(121.7683, 17.4213),
-	},
-})
-
-const buildEmailAlias = (email, alias) => {
-	const [localPart, domain] = String(email || '').trim().toLowerCase().split('@')
-	if (!localPart || !domain) return ''
-	const baseLocalPart = localPart.split('+')[0]
-	return `${baseLocalPart}+${alias}@${domain}`
-}
-
-const seedPersonnel = [
-	{
-		personnelId: gpsOfficerPersonnelId,
-		badgeNumber: 'P-1001',
-		fullName: gpsOfficerFullName,
-		rank: 'Police Corporal',
-		dutyStatus: 'On Patrol',
-		defaultLocationName: 'Cabagan Public Market',
-		photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-	},
-	...(mockOfficerEnabled ? [{
-		personnelId: mockOfficerPersonnelId,
-		badgeNumber: 'P-1002',
-		fullName: mockOfficerFullName,
-		rank: 'Police Staff Sergeant',
-		dutyStatus: 'Monitoring',
-		defaultLocationName: 'Cabagan Municipal Hall',
-		photoUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-	}] : []),
-]
-
-const seedLocations = mockOfficerEnabled ? [
-	[mockOfficerPersonnelId, 'Cabagan Municipal Hall', 121.7683, 17.4213],
-] : []
-
-const LEGACY_SEEDED_PERSONNEL_IDS = ['pltc-003']
 
 const KNOWN_BARANGAY_CENTERS = {
 	CENTRO: [121.7681, 17.4239],
@@ -98,18 +20,6 @@ const initializeCollections = async (models) => {
 		await model.createCollection()
 		await model.createIndexes()
 	}
-}
-
-const findProvisionedUser = ({ username, email, personnelId }) => {
-	const identities = [
-		username && { username },
-		email && { email },
-		personnelId && { personnelId },
-	].filter(Boolean)
-
-	return identities.length
-		? User.findOne({ $or: identities })
-		: null
 }
 
 const findProvisionedSupervisor = async ({ username, email }, userModel = User) => {
@@ -163,141 +73,8 @@ const requireProvisionedLoginId = (loginId, label) => {
 	}
 }
 
-const removeLegacySeedData = async () => {
-	await Promise.all([
-		Personnel.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
-		CurrentLocation.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
-		LocationHistory.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
-		GpsDeviceAssignment.deleteMany({
-			personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS },
-		}),
-		Deployment.deleteMany({
-			assignmentId: { $in: ['ASG-DEMO-2', 'ASG-MOCK-BACKUP'] },
-		}),
-		Report.deleteMany({
-			reportNumber: { $in: ['RPT-MOB-001', 'RPT-MOB-002'] },
-		}),
-		Task.deleteMany({ taskId: { $in: ['TSK-001', 'TSK-002'] } }),
-		User.deleteMany({ personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS } }),
-		Task.updateMany(
-			{},
-			{
-				$pull: {
-					responders: {
-						personnelId: { $in: LEGACY_SEEDED_PERSONNEL_IDS },
-					},
-				},
-			},
-		),
-	])
-}
-
-const removeDisabledMockOfficerData = async () => {
-	if (mockOfficerEnabled) return
-
-	const mockUsers = await User.find({ isMockAccount: true })
-		.select('_id personnelId')
-		.lean()
-	const userIds = mockUsers.map((user) => user._id)
-	const personnelIds = [...new Set(
-		mockUsers.map((user) => String(user.personnelId || '').trim()).filter(Boolean),
-	)]
-
-	if (userIds.length === 0) return
-
-	if (personnelIds.length > 0) {
-		await Task.updateMany(
-			{},
-			{
-				$pull: {
-					responders: { personnelId: { $in: personnelIds } },
-				},
-			},
-		)
-		await Promise.all([
-			Personnel.deleteMany({ personnelId: { $in: personnelIds } }),
-			CurrentLocation.deleteMany({ personnelId: { $in: personnelIds } }),
-			LocationHistory.deleteMany({ personnelId: { $in: personnelIds } }),
-			GpsDeviceAssignment.deleteMany({ personnelId: { $in: personnelIds } }),
-			Deployment.deleteMany({ personnelId: { $in: personnelIds } }),
-			Report.deleteMany({ submittedBy: { $in: personnelIds } }),
-			Task.deleteMany({ requestedBy: { $in: personnelIds } }),
-		])
-	}
-
-	await User.deleteMany({ _id: { $in: userIds }, isMockAccount: true })
-	console.log(`Removed ${userIds.length} disabled mock officer account(s).`)
-}
-
-const configureDemoGpsAssignment = async (personnelId, assignmentModel = GpsDeviceAssignment) => {
-	const flespiDeviceId = String(process.env.DEMO_GPS_FLESPI_DEVICE_ID || '').trim()
-	const deviceIdent = String(process.env.DEMO_GPS_DEVICE_IDENT || '').trim()
-	const deviceName = String(process.env.DEMO_GPS_DEVICE_NAME || 'GPS-001').trim()
-
-	if (!personnelId || !flespiDeviceId || !deviceIdent) return
-
-	const deviceAssignment = await assignmentModel.findOne({
-		status: 'active',
-		$or: [
-			{ flespiDeviceId },
-			{ imei: deviceIdent },
-		],
-	}).lean()
-
-	if (deviceAssignment && deviceAssignment.personnelId !== personnelId) {
-		console.warn(
-			`Demo GPS device is already assigned to ${deviceAssignment.personnelId}; `
-			+ `skipping automatic assignment to ${personnelId}.`,
-		)
-		return
-	}
-
-	const personnelAssignment = await assignmentModel.findOne({
-		status: 'active',
-		personnelId,
-	}).lean()
-	if (personnelAssignment && (
-		personnelAssignment.flespiDeviceId !== flespiDeviceId
-		|| personnelAssignment.imei !== deviceIdent
-	)) {
-		console.warn(
-			`${personnelId} already has active GPS device ${personnelAssignment.deviceName || personnelAssignment.imei}; `
-			+ 'skipping automatic demo assignment.',
-		)
-		return
-	}
-
-	const currentAssignment = deviceAssignment || personnelAssignment
-	await assignmentModel.updateOne(
-		{ assignmentId: currentAssignment?.assignmentId || 'GPS-DEMO-001' },
-		{
-			$set: {
-				personnelId,
-				flespiDeviceId,
-				imei: deviceIdent,
-				deviceName,
-				assignedBy: 'seed',
-				status: 'active',
-				unassignedAt: null,
-			},
-			$setOnInsert: {
-				assignmentId: 'GPS-DEMO-001',
-				assignedAt: new Date(),
-			},
-		},
-		{ upsert: true },
-	)
-
-	await Promise.all([
-		CurrentLocation.deleteMany({ personnelId, source: 'mock' }),
-		LocationHistory.deleteMany({ personnelId, source: 'mock' }),
-	])
-}
-
 const seedDatabase = async (models) => {
 	await initializeCollections(models)
-	await removeLegacySeedData()
-	await removeDisabledMockOfficerData()
 
 	const supervisorLoginId = String(process.env.SUPERVISOR_LOGIN_ID || '').trim().toLowerCase()
 	const supervisorEmail = String(process.env.SUPERVISOR_EMAIL || '').trim().toLowerCase()
@@ -337,133 +114,6 @@ const seedDatabase = async (models) => {
 		}
 	}
 
-	const officerLoginId = String(process.env.DEMO_OFFICER_LOGIN_ID || '').trim().toLowerCase()
-	const officerEmail = String(process.env.DEMO_OFFICER_EMAIL || '').trim().toLowerCase()
-	const officerPassword = String(process.env.DEMO_OFFICER_TEMP_PASSWORD || '')
-	const officerPersonnelId = String(process.env.DEMO_OFFICER_PERSONNEL_ID || '').trim()
-	if (officerLoginId && officerEmail && officerPassword && officerPersonnelId) {
-		const existingOfficer = await findProvisionedUser({
-			username: officerLoginId,
-			email: officerEmail,
-			personnelId: officerPersonnelId,
-		})
-		if (!existingOfficer) {
-			await User.create({
-				username: officerLoginId,
-				email: officerEmail,
-				passwordHash: await hashPassword(officerPassword),
-				role: 'officer',
-				personnelId: officerPersonnelId,
-				status: 'active',
-				forcePasswordReset: true,
-			})
-			console.log(`Created demo officer account: ${officerLoginId}`)
-		} else {
-			let shouldSave = false
-			if (!existingOfficer.email) {
-				existingOfficer.email = officerEmail
-				shouldSave = true
-			}
-			if (!existingOfficer.personnelId) {
-				existingOfficer.personnelId = officerPersonnelId
-				shouldSave = true
-			}
-			if (shouldSave) await existingOfficer.save()
-		}
-	}
-
-	if (mockOfficerEnabled) {
-		const mockLoginId = String(
-			process.env.MOCK_OFFICER_LOGIN_ID || 'officer.mock',
-		).trim().toLowerCase()
-		const mockPassword = String(process.env.MOCK_OFFICER_TEMP_PASSWORD || '')
-		const mockEmail = String(
-			process.env.MOCK_OFFICER_EMAIL
-			|| buildEmailAlias(
-				process.env.GMAIL_USER || process.env.DEMO_OFFICER_EMAIL,
-				'mock-officer',
-			),
-		).trim().toLowerCase()
-		requireProvisionedLoginId(mockLoginId, 'MOCK_OFFICER_LOGIN_ID')
-
-		// A committed default password would be a publicly known credential for a
-		// real, loginable officer account, so the operator must supply one.
-		if (!mockPassword) {
-			throw new Error(
-				'MOCK_OFFICER_TEMP_PASSWORD is required when ENABLE_MOCK_OFFICER=true.',
-			)
-		}
-
-		if (!mockEmail) {
-			throw new Error(
-				'MOCK_OFFICER_EMAIL or a base GMAIL_USER/DEMO_OFFICER_EMAIL is required when ENABLE_MOCK_OFFICER=true.',
-			)
-		}
-
-		const existingMockOfficer = await findProvisionedUser({
-			username: mockLoginId,
-			email: mockEmail,
-			personnelId: mockOfficerPersonnelId,
-		})
-		if (existingMockOfficer && existingMockOfficer.role !== 'officer') {
-			throw new Error('The configured mock officer identity belongs to a non-officer account.')
-		}
-		if (!existingMockOfficer) {
-			await User.create({
-				username: mockLoginId,
-				email: mockEmail,
-				emailVerifiedAt: new Date(),
-				passwordHash: await hashPassword(mockPassword),
-				role: 'officer',
-				personnelId: mockOfficerPersonnelId,
-				isMockAccount: true,
-				status: 'active',
-				forcePasswordReset: false,
-			})
-			console.log(`Created mock officer account: ${mockLoginId}`)
-		} else {
-			await migrateProvisionedLoginId(existingMockOfficer, mockLoginId, 'officer')
-			existingMockOfficer.personnelId = mockOfficerPersonnelId
-			existingMockOfficer.isMockAccount = true
-			if (!existingMockOfficer.email) existingMockOfficer.email = mockEmail
-			await existingMockOfficer.save()
-		}
-	}
-
-	await Promise.all(seedPersonnel.map((profile) => (
-		Personnel.updateOne(
-			{ personnelId: profile.personnelId },
-			{ $setOnInsert: profile },
-			{ upsert: true },
-		)
-	)))
-
-	await Promise.all(seedLocations.map(([personnelId, locationName, longitude, latitude]) => (
-		CurrentLocation.updateOne(
-			{ personnelId },
-			{
-				$setOnInsert: {
-					personnelId,
-					locationName,
-					location: point(longitude, latitude),
-					source: 'mock',
-					isSimulated: true,
-					recordedAt: new Date(),
-					receivedAt: new Date(),
-				},
-			},
-			{ upsert: true },
-		)
-	)))
-	if (mockOfficerEnabled) {
-		await Personnel.updateOne(
-			{ personnelId: mockOfficerPersonnelId, fullName: 'GerryBoy Aggabao' },
-			{ $set: { fullName: mockOfficerFullName } },
-		)
-	}
-
-	await configureDemoGpsAssignment(officerPersonnelId)
-
 	await Barangay.updateMany(
 		{
 			municipality: 'Cabagan',
@@ -495,42 +145,9 @@ const seedDatabase = async (models) => {
 		)
 	}))
 
-	await Promise.all([
-		Deployment.updateOne(
-			{ assignmentId: 'ASG-DEMO-1' },
-			{
-				$setOnInsert: {
-					assignmentId: 'ASG-DEMO-1',
-					groupId: 'GRP-DEMO-CUBAG',
-					personnelId: gpsOfficerPersonnelId,
-					personnelName: gpsOfficerFullName,
-					rank: 'Police Corporal',
-					barangayCode: 'CUBAG',
-					patrolArea: 'Barangay Cubag',
-					shiftStart: new Date('2026-07-25T08:00:00+08:00'),
-					shiftEnd: new Date('2026-07-25T20:00:00+08:00'),
-					instructions: 'Maintain visibility around the public market and highway approach.',
-					assignedAt: new Date('2026-07-25T07:30:00+08:00'),
-					location: point(121.7658, 17.4272),
-				},
-			},
-			{ upsert: true },
-		),
-	])
-
-	if (mockOfficerEnabled) {
-		await Deployment.updateOne(
-			{ assignmentId: 'ASG-CENTRO-002' },
-			buildMockDeploymentSeedUpdate(),
-			{ upsert: true },
-		)
-	}
-
 }
 
 module.exports = seedDatabase
-module.exports.buildMockDeploymentSeedUpdate = buildMockDeploymentSeedUpdate
-module.exports.configureDemoGpsAssignment = configureDemoGpsAssignment
 module.exports.findProvisionedSupervisor = findProvisionedSupervisor
 module.exports.migrateProvisionedLoginId = migrateProvisionedLoginId
 module.exports.requireProvisionedLoginId = requireProvisionedLoginId

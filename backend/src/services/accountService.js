@@ -64,7 +64,6 @@ const serializeAccount = (user, profile, device) => ({
 	role: user.role === 'officer' ? 'Officer' : 'Supervisor',
 	supervisorAuthority: user.role === 'supervisor' ? (user.supervisorAuthority || 'delegated') : null,
 	isProtected: isProtectedAccount(user),
-	isMockAccount: Boolean(user.isMockAccount),
 	accountStatus: user.status === 'active' ? 'Active' : 'Inactive',
 	forcePasswordReset: user.forcePasswordReset,
 	imei: device?.imei || '',
@@ -350,7 +349,7 @@ const createAccountService = ({
 		validateAccountPayload(payload, {
 			requirePassword: false,
 			requirePersonnel: !isSupervisor,
-			requireDevice: !isSupervisor && !user.isMockAccount && nextStatus === 'active',
+			requireDevice: !isSupervisor && nextStatus === 'active',
 			existingLoginId: user.username,
 		})
 		const nextLoginId = normalizeLoginId(payload.loginId)
@@ -465,9 +464,6 @@ const createAccountService = ({
 				await restoreAssignment(currentAssignment, currentAssignmentSnapshot)
 				throw error
 			}
-		} else if (deviceChanged && user.isMockAccount) {
-			await releaseAssignment(currentAssignment)
-			assignment = null
 		}
 
 		profile.fullName = normalizeHumanName(payload.fullName)
@@ -616,85 +612,83 @@ const createAccountService = ({
 			profile = await Personnel.findOne({ personnelId: user.personnelId })
 			if (!profile) throw createHttpError('Personnel profile not found.', 404)
 
-			if (!user.isMockAccount) {
-				if (!String(payload.imei || '').trim() || !String(payload.flespiDeviceId || '').trim()) {
-					throw createHttpError(
-						'Select an available GPS device before reactivating this account.',
-						400,
-						'GPS_DEVICE_REQUIRED',
-						'imei',
+			if (!String(payload.imei || '').trim() || !String(payload.flespiDeviceId || '').trim()) {
+				throw createHttpError(
+					'Select an available GPS device before reactivating this account.',
+					400,
+					'GPS_DEVICE_REQUIRED',
+					'imei',
+				)
+			}
+			const device = await validateRegisteredDevice(payload, fetchDevices)
+			const [deviceAssignment, personnelAssignment] = await Promise.all([
+				GpsDeviceAssignment.findOne({
+					status: 'active',
+					$or: [
+						{ imei: device.imei },
+						{ flespiDeviceId: device.id },
+					],
+				}),
+				GpsDeviceAssignment.findOne({
+					status: 'active',
+					personnelId: user.personnelId,
+				}),
+			])
+			if (deviceAssignment && deviceAssignment.personnelId !== user.personnelId) {
+				throw createHttpError(
+					'The selected GPS device is already assigned to an active account.',
+					409,
+					'GPS_DEVICE_ASSIGNED',
+					'imei',
+				)
+			}
+
+			const sameAssignment = Boolean(deviceAssignment && personnelAssignment && (
+				(deviceAssignment._id && personnelAssignment._id
+					&& String(deviceAssignment._id) === String(personnelAssignment._id))
+				|| (deviceAssignment.assignmentId && personnelAssignment.assignmentId
+					&& deviceAssignment.assignmentId === personnelAssignment.assignmentId)
+			))
+			if (personnelAssignment && !sameAssignment) {
+				releasedPersonnelAssignment = personnelAssignment
+				releasedPersonnelAssignmentSnapshot = snapshotAssignment(personnelAssignment)
+				await releaseAssignment(personnelAssignment)
+			}
+
+			if (deviceAssignment) {
+				try {
+					assignment = deviceAssignment
+					assignment.status = 'active'
+					assignment.flespiDeviceId = device.id
+					assignment.imei = device.imei
+					assignment.deviceName = device.name
+					assignment.unassignedAt = null
+					await assignment.save()
+				} catch (error) {
+					await restoreAssignment(
+						releasedPersonnelAssignment,
+						releasedPersonnelAssignmentSnapshot,
 					)
+					throw error
 				}
-				const device = await validateRegisteredDevice(payload, fetchDevices)
-				const [deviceAssignment, personnelAssignment] = await Promise.all([
-					GpsDeviceAssignment.findOne({
-						status: 'active',
-						$or: [
-							{ imei: device.imei },
-							{ flespiDeviceId: device.id },
-						],
-					}),
-					GpsDeviceAssignment.findOne({
-						status: 'active',
+			} else {
+				try {
+					assignment = await GpsDeviceAssignment.create({
+						assignmentId: `GPS-${randomUUID()}`,
 						personnelId: user.personnelId,
-					}),
-				])
-				if (deviceAssignment && deviceAssignment.personnelId !== user.personnelId) {
-					throw createHttpError(
-						'The selected GPS device is already assigned to an active account.',
-						409,
-						'GPS_DEVICE_ASSIGNED',
-						'imei',
+						flespiDeviceId: device.id,
+						imei: device.imei,
+						deviceName: device.name,
+						assignedBy: actor?.username || 'supervisor',
+						assignedAt: new Date(),
+					})
+					assignmentCreated = true
+				} catch (error) {
+					await restoreAssignment(
+						releasedPersonnelAssignment,
+						releasedPersonnelAssignmentSnapshot,
 					)
-				}
-
-				const sameAssignment = Boolean(deviceAssignment && personnelAssignment && (
-					(deviceAssignment._id && personnelAssignment._id
-						&& String(deviceAssignment._id) === String(personnelAssignment._id))
-					|| (deviceAssignment.assignmentId && personnelAssignment.assignmentId
-						&& deviceAssignment.assignmentId === personnelAssignment.assignmentId)
-				))
-				if (personnelAssignment && !sameAssignment) {
-					releasedPersonnelAssignment = personnelAssignment
-					releasedPersonnelAssignmentSnapshot = snapshotAssignment(personnelAssignment)
-					await releaseAssignment(personnelAssignment)
-				}
-
-				if (deviceAssignment) {
-					try {
-						assignment = deviceAssignment
-						assignment.status = 'active'
-						assignment.flespiDeviceId = device.id
-						assignment.imei = device.imei
-						assignment.deviceName = device.name
-						assignment.unassignedAt = null
-						await assignment.save()
-					} catch (error) {
-						await restoreAssignment(
-							releasedPersonnelAssignment,
-							releasedPersonnelAssignmentSnapshot,
-						)
-						throw error
-					}
-				} else {
-					try {
-						assignment = await GpsDeviceAssignment.create({
-							assignmentId: `GPS-${randomUUID()}`,
-							personnelId: user.personnelId,
-							flespiDeviceId: device.id,
-							imei: device.imei,
-							deviceName: device.name,
-							assignedBy: actor?.username || 'supervisor',
-							assignedAt: new Date(),
-						})
-						assignmentCreated = true
-					} catch (error) {
-						await restoreAssignment(
-							releasedPersonnelAssignment,
-							releasedPersonnelAssignmentSnapshot,
-						)
-						throw error
-					}
+					throw error
 				}
 			}
 		}

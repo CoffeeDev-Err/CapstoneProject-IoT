@@ -4,7 +4,6 @@ import PersonnelPage from './PersonnelPage'
 
 const fixture = vi.hoisted(() => ({ context: {}, navigate: vi.fn() }))
 vi.mock('../context/usePersonnelContext', () => ({ usePersonnelContext: () => fixture.context }))
-vi.mock('../utils/mockPersonnel', () => ({ appendDevelopmentMockPersonnel: (personnel) => personnel }))
 vi.mock('react-router-dom', () => ({ useNavigate: () => fixture.navigate }))
 
 const officer = (overrides = {}) => ({

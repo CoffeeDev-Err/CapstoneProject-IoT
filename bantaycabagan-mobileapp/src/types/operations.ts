@@ -188,6 +188,8 @@ export type LivePersonnel = {
   locationRecordedAt?: string;
   locationReceivedAt?: string;
   accuracy?: number | null;
+  boundaryStatus?: 'inside' | 'outside' | 'pending' | 'uncertain' | 'unavailable';
+  isInsideCabagan?: boolean | null;
   satellites?: number | null;
   speed?: number | null;
   batteryLevel?: number | null;

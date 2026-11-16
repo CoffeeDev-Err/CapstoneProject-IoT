@@ -8,7 +8,6 @@ const {
 } = require('../models')
 const { createNotification, deliverNotification } = require('./notificationService')
 const createLocationIngestionService = require('./personnel/locationIngestionService')
-const createMockMovementService = require('./personnel/mockMovementService')
 const createPersonnelLifecycleService = require('./personnel/lifecycleService')
 const createPersonnelQueryService = require('./personnel/queryService')
 const createDutyGpsHistoryService = require('./personnel/dutyGpsHistoryService')
@@ -53,10 +52,6 @@ const {
 	currentShiftFilter,
 	notificationService: { createNotification, deliverNotification },
 })
-const { updateMockLocations } = createMockMovementService({
-	models: { CurrentLocation, GpsDeviceAssignment, LocationHistory },
-	getPersonnelWithLocations,
-})
 
 const evaluatePatrolCoverage = require('./patrolCoverageService').createPatrolCoverageService({
 	Deployment, CurrentLocation, deliverNotification,
@@ -77,6 +72,5 @@ module.exports = {
 	listPersonnel,
 	scopePersonnelForActor,
 	serializePersonnel,
-	updateMockLocations,
 	updateDutyStatus,
 }

@@ -75,8 +75,6 @@ function AccountTable({
 	                            <td>
 	                              {account.role === 'Supervisor' ? (
 	                                <span className="text-body-secondary">Not required</span>
-	                              ) : account.isMockAccount && !account.imei ? (
-	                                <span className="text-body-secondary">No GPS device assigned</span>
 	                              ) : (
 	                                <>
 	                                  <span>{getDeviceCode(account, index)} | {account.flespiDeviceName || 'Registered GPS'}</span>

@@ -27,9 +27,8 @@ export function useAccountForm({
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [profilePhotoPreview, setProfilePhotoPreview] = useState('')
   const isEditingSupervisor = editingAccount?.role === 'Supervisor' || (!editingAccountId && accountType === 'supervisor')
-  const isEditingMockAccount = Boolean(editingAccount?.isMockAccount)
   const isEditingInactiveAccount = editingAccount?.accountStatus === 'Inactive'
-  const requiresGpsDevice = !isEditingSupervisor && !isEditingMockAccount && !isEditingInactiveAccount
+  const requiresGpsDevice = !isEditingSupervisor && !isEditingInactiveAccount
 
   const validateAccountForm = () => {
     const errors = {}
@@ -171,7 +170,6 @@ export function useAccountForm({
     profilePhotoPreview,
     setProfilePhotoPreview,
     isEditingSupervisor,
-    isEditingMockAccount,
     requiresGpsDevice,
     validateAccountForm,
     handleFieldChange,

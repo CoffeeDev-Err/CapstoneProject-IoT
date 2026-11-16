@@ -16,7 +16,7 @@ export default function ReactivateAccountModal({
   const [selectedImei, setSelectedImei] = useState('')
   const cancelButtonRef = useRef(null)
   const dialogRef = useAccessibleDialog(Boolean(account), onCancel, cancelButtonRef)
-  const needsDevice = account?.role !== 'Supervisor' && !account?.isMockAccount
+  const needsDevice = account?.role !== 'Supervisor'
   const availableDevices = useMemo(() => devices.filter((device) => {
     const assignedAccount = assignedImeiToAccount.get(device.imei)
     return !assignedAccount || assignedAccount.id === account?.id

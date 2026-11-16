@@ -35,17 +35,15 @@ function PersonnelSelector({
 				) : filteredPersonnelOptions.map((option) => (
 					<label
 						key={option.id}
-						className={`assignment-check-item${option.isMockPersonnel ? ' is-mock' : ''}`}
+						className="assignment-check-item"
 					>
 						<input
 							type="checkbox"
 							checked={activePersonnelIds.includes(option.id)}
 							onChange={() => onToggle(option.id)}
-							disabled={option.isMockPersonnel}
 						/>
 						<span>
 							{option.name} - {option.rank}
-							{option.isMockPersonnel && <small>Mock search record</small>}
 						</span>
 					</label>
 				))}

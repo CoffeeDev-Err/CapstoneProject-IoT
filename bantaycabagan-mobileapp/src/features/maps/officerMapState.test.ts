@@ -1,4 +1,5 @@
 import {
+  createMapPersonnel,
   selectActiveBackupRequest,
   selectEmergencyPersonnelIds,
   selectVisiblePersonnel,
@@ -7,6 +8,15 @@ import {
 import type { DeploymentAssignment, LivePersonnel } from '../../types/operations';
 
 describe('officer map selectors', () => {
+  it('uses the confirmed server boundary verdict and does not label uncertain or stale coordinates outside', () => {
+    const members = [
+      { id: 'pending', latitude: 0, longitude: 0, isInsideCabagan: null, boundaryStatus: 'pending' },
+      { id: 'outside', latitude: 0, longitude: 0, isInsideCabagan: false, boundaryStatus: 'outside' },
+      { id: 'stale', latitude: 0, longitude: 0, isInsideCabagan: false, isLocationStale: true },
+    ] as LivePersonnel[];
+    expect(createMapPersonnel(members, new Set(), new Set()).map(member => member.outsideBoundary))
+      .toEqual([false, true, false]);
+  });
   it('recognizes the current officer even when an API changes id casing or whitespace', () => {
     expect(isSamePersonnelId(' PNP-001 ', 'pnp-001')).toBe(true);
     expect(isSamePersonnelId('PNP-001', 'PNP-002')).toBe(false);

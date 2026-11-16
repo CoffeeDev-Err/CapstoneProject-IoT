@@ -709,9 +709,10 @@ nano /var/www/geosentri/backend/.env
 SUPERVISOR_LOGIN_ID=00-0001
 ```
 
-Do not change `DEMO_OFFICER_LOGIN_ID` during this deployment. The next startup
-finds the existing supervisor through its official email and changes only its
-Login ID. It refuses to take an ID that already belongs to another account.
+Startup preserves an already designated primary supervisor's Login ID. During
+initial designation it can migrate the matched supervisor to the configured
+Login ID and refuses to take an ID that already belongs to another account.
+Demo officer provisioning has been removed; manage officers through Account Management.
 
 Install, validate, build, and restart:
 

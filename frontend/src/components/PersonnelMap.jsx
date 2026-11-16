@@ -202,7 +202,6 @@ function PersonnelMap({
   initialDataError = '',
   lastPersonnelSyncAt = '',
   onRetry,
-  developmentPreviewCount = 0,
   toolbar,
 }) {
   const containerRef = useRef(null)
@@ -636,7 +635,6 @@ function PersonnelMap({
       <div className={`map-connection-badge${isConnected ? ' is-live' : ' is-offline'}`} role="status">
         <span aria-hidden="true" />
         {isConnected ? 'Live data' : 'Connection lost'}
-        {developmentPreviewCount > 0 && <small>Development preview · {developmentPreviewCount} mock markers</small>}
         {lastPersonnelSyncAt && <small>Last sync {new Date(lastPersonnelSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>}
       </div>
       {initialDataError && (

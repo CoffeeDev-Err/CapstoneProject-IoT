@@ -1,4 +1,3 @@
-import { isInsideCabagan } from '../../constants/cabaganGeofence';
 import type { OfficerMapPerson } from '../../components/OfficerMapCanvas';
 import type { DeploymentAssignment, LivePersonnel, OperationalTask } from '../../types/operations';
 import { hasDutyLocation } from './dutyLocation';
@@ -63,5 +62,5 @@ export const createMapPersonnel = (
   ...member,
   emergencyActive: emergencyPersonnelIds.has(member.id),
   operationActive: operationPersonnelIds.has(member.id),
-  outsideBoundary: !isInsideCabagan(Number(member.latitude), Number(member.longitude)),
+  outsideBoundary: !member.isLocationStale && member.isInsideCabagan === false,
 }));

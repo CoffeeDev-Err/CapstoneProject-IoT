@@ -85,6 +85,12 @@ export function OfficerDetailSheet({
 
         <View style={[styles.telemetryGrid, { borderTopColor: colors.borderSoft }]}>
           <GpsReadingAge recordedAt={officer.locationRecordedAt} color={colors.textMuted} />
+          <Telemetry icon="gps-fixed" label="GPS accuracy" value={
+            Number.isFinite(officer.accuracy) ? `±${Math.round(Number(officer.accuracy))} m` : 'Not reported'
+          } />
+          <Telemetry icon="gps-fixed" label="Boundary" value={
+            ({ inside: 'Inside Cabagan', outside: 'Outside Cabagan', pending: 'Confirming', uncertain: 'GPS uncertain', unavailable: 'Unavailable' })[officer.boundaryStatus || 'unavailable']
+          } />
           <Telemetry icon="speed" label="Speed" value={
             Number.isFinite(officer.speed) ? `${Number(officer.speed).toFixed(1)} km/h` : 'Unavailable'
           } />

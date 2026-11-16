@@ -1014,24 +1014,8 @@
   color: inherit;
 }
 
-.assignment-check-item.is-mock {
-  cursor: default;
-  opacity: 0.72;
-}
 
-.assignment-check-item.is-mock > span {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-}
 
-.assignment-check-item.is-mock small {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-xs);
-  white-space: nowrap;
-}
 
 .assignment-checklist__empty {
   color: var(--text-muted);

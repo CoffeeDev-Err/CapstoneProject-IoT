@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import policePersonnel1 from '../../assets/policepersonnel1.jpg'
-import policePersonnel2 from '../../assets/policepersonnel2.png'
 import { getDeployments, getReports, getTasks } from '../../services/operations'
 import { getPersonnel } from '../../services/personnel'
 import { socket } from '../../services/socket'
 import { resolveApiAssetUrl } from '../../services/apiAssets'
-import { isInsideCabagan } from '../../utils/cabaganGeofence'
 import { mergePersonnelLocations } from '../../utils/mergePersonnelLocations'
 import {
   evaluateGeofenceTransition,
@@ -13,29 +10,10 @@ import {
   upsertTask as upsertTaskState,
 } from './realtimeState'
 
-const personnelPhotos = {
-  'pcpl-001': policePersonnel1,
-  'psms-002': policePersonnel2,
-}
-
 const normalizePersonnel = (member) => ({
   ...member,
-  photoUrl: resolveApiAssetUrl(member.photoUrl) || personnelPhotos[member.id],
+  photoUrl: resolveApiAssetUrl(member.photoUrl),
 })
-
-const normalizeAndTagPersonnel = (member) => {
-  const normalized = normalizePersonnel(member)
-  const hasCurrentCoordinates = normalized.isLocationStale !== true
-    && Number.isFinite(normalized.latitude)
-    && Number.isFinite(normalized.longitude)
-
-  return {
-    ...normalized,
-    isInsideCabagan: hasCurrentCoordinates
-      ? isInsideCabagan(normalized.latitude, normalized.longitude)
-      : null,
-  }
-}
 
 export const usePersonnelSocketSubscriptions = ({
   addNotification,
@@ -107,7 +85,7 @@ export const usePersonnelSocketSubscriptions = ({
     const onBootstrap = (payload) => {
       if (!Array.isArray(payload)) return
       personnelRevision += 1
-      const normalized = mergePersonnelLocations(latestPersonnelRef.current, payload.map(normalizeAndTagPersonnel))
+      const normalized = mergePersonnelLocations(latestPersonnelRef.current, payload.map(normalizePersonnel))
       latestPersonnelRef.current = normalized
       setPersonnel((items) => mergePersonnelLocations(items, normalized))
       setLastPersonnelSyncAt(new Date().toISOString())
@@ -142,7 +120,7 @@ export const usePersonnelSocketSubscriptions = ({
     const onUpdate = (payload) => {
       if (!Array.isArray(payload)) return
       personnelRevision += 1
-      const normalized = mergePersonnelLocations(latestPersonnelRef.current, payload.map(normalizeAndTagPersonnel))
+      const normalized = mergePersonnelLocations(latestPersonnelRef.current, payload.map(normalizePersonnel))
       latestPersonnelRef.current = normalized
       setPersonnel((items) => mergePersonnelLocations(items, normalized))
       setLastPersonnelSyncAt(new Date().toISOString())

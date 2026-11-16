@@ -58,7 +58,6 @@ const settingsSource = read('src/pages/SettingsPage.jsx')
 const personnelSource = read('src/pages/PersonnelPage.jsx')
 const reportsSource = read('src/pages/ReportsPage.jsx')
 const reportsStyles = read('src/styles/reports.css')
-const mockPersonnelSource = read('src/utils/mockPersonnel.js')
 const routeSource = read('src/routes/AppRoutes.jsx')
 const navigationSource = read('src/components/NavSidebar.jsx')
 const feedbackSource = read('src/context/FeedbackContext.jsx')
@@ -90,12 +89,6 @@ assert.match(settingsSource, /Editing \$\{accountLabel\}[\s\S]*setFormMessageKin
   'Opening account editing must use neutral information feedback rather than success feedback')
 assert.match(settingsSource, /disabled=\{accountRequestPending\}[\s\S]*<ActionNoticeModal/,
   'Account submission must remain actionable and explain invalid fields in a modal')
-assert.match(mockPersonnelSource, /import\.meta\.env\.DEV[\s\S]*Array\.from\(\{ length: 100 \}/,
-  'The development search dataset must contain exactly 100 mock personnel records')
-assert.match(assignmentSource, /appendDevelopmentMockPersonnel\(personnel\)/,
-  'Personnel Selection must include the development search dataset')
-assert.match(personnelSource, /appendDevelopmentMockPersonnel\(personnel\)/,
-  'The Personnel roster must include the development search dataset')
 assert.match(personnelSource, /className="report-list personnel-table-wrap record-scroll-container"/,
   'The Personnel roster must use the shared fixed-height scrolling container')
 assert.doesNotMatch(personnelSource, /report-pagination|PERSONNEL_PER_PAGE|paginatedRoster/,

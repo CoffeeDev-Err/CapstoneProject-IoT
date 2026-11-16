@@ -36,7 +36,6 @@ if ((Resolve-Path -LiteralPath $projectRoot).Path -ne 'C:\cbm') {
 }
 
 Import-DotEnv (Join-Path $projectRoot '.env')
-$env:EXPO_PUBLIC_MAP_PREVIEW = 'false'
 $env:ALLOW_CLEARTEXT_TRAFFIC = 'false'
 
 if ($env:EXPO_PUBLIC_API_URL -ne 'https://geosentri.com') {

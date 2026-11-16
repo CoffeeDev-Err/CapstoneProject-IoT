@@ -43,12 +43,6 @@
 .personnel-search input { padding: 0.55rem 0.75rem 0.55rem 2.25rem; }
 .personnel-toolbar > small { align-self: center; color: var(--text-tertiary); white-space: nowrap; }
 
-.personnel-mock-label {
-  display: block;
-  margin-top: 0.15rem;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-xs);
-}
 
 .personnel-table-wrap { overflow: auto; }
 
@@ -164,7 +158,6 @@
   color: var(--color-primary);
 }
 .personnel-roster-icon svg { width: 22px; height: 22px; }
-.personnel-demo-note { color: var(--text-tertiary); font-size: var(--font-size-xs); }
 .personnel-roster-card .record-scroll-container {
   height: auto;
   max-height: min(65dvh, 680px);

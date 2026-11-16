@@ -33,7 +33,7 @@ test('reactivating an officer requires an available GPS device', async () => {
 	}
 })
 
-test('reactivating a mock officer restores access without assigning GPS', async () => {
+test('a legacy mock flag no longer bypasses the GPS requirement when reactivating an officer', async () => {
 	const originalUserFindById = models.User.findById
 	const originalPersonnelFindOne = models.Personnel.findOne
 	const auditEvents = []
@@ -65,13 +65,11 @@ test('reactivating a mock officer restores access without assigning GPS', async 
 	})
 
 	try {
-		const result = await service.reactivateAccount('id', {}, { actor })
-		assert.equal(user.status, 'active')
-		assert.equal(profile.status, 'active')
+		await assert.rejects(service.reactivateAccount('id', {}, { actor }), { code: 'GPS_DEVICE_REQUIRED' })
+		assert.equal(user.status, 'inactive')
+		assert.equal(profile.status, 'inactive')
 		assert.equal(profile.dutyStatus, 'Off Duty')
-		assert.equal(result.accountStatus, 'Active')
-		assert.equal(result.imei, '')
-		assert.equal(auditEvents[0].changes.gpsAssigned, false)
+		assert.equal(auditEvents.length, 0)
 	} finally {
 		models.User.findById = originalUserFindById
 		models.Personnel.findOne = originalPersonnelFindOne

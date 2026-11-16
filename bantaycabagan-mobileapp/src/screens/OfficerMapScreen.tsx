@@ -57,8 +57,6 @@ import { useDeploymentPresentation } from '../features/maps/useDeploymentPresent
 const BACKUP_EMERGENCY_OVERLAY_MS = 2 * 60 * 1000;
 import { GpsReadingAge } from '../features/maps/GpsReadingAge';
 import { useMapSelectionController } from '../features/maps/useMapSelectionController';
-import { useDevelopmentMapPersonnel } from '../features/maps/useDevelopmentMapPersonnel';
-import { MapPreviewToggle } from '../features/maps/MapPreviewToggle';
 import { GpsTrackingReminder } from '../features/maps/GpsTrackingReminder';
 
 const webSearchInputReset = Platform.OS === 'web'
@@ -93,7 +91,6 @@ export default function OfficerMapScreen({
 }: OfficerMapScreenProps) {
   const { colors, isDark } = useMobileTheme();
   const isFocused = useIsFocused();
-  const preview = useDevelopmentMapPersonnel(isFocused);
   const {
     deployments,
     personnel,
@@ -225,9 +222,8 @@ export default function OfficerMapScreen({
   }, [activeOwnBackupRequest]);
 
   const mapPersonnel = useMemo<OfficerMapPerson[]>(() => (
-    [...createMapPersonnel(visiblePersonnel, emergencyPersonnelIds, operationPersonnelIds), ...preview.personnel]
-  ), [emergencyPersonnelIds, operationPersonnelIds, visiblePersonnel, preview.personnel]);
-  const selectablePersonnel = useMemo(() => [...visiblePersonnel, ...preview.personnel], [visiblePersonnel, preview.personnel]);
+    createMapPersonnel(visiblePersonnel, emergencyPersonnelIds, operationPersonnelIds)
+  ), [emergencyPersonnelIds, operationPersonnelIds, visiblePersonnel]);
   const backupZones = useMemo(() => tasks
     .filter((task) => task.type === 'backup' && (task.status === 'open' || task.status === 'full'))
     .map((task) => {
@@ -272,7 +268,7 @@ export default function OfficerMapScreen({
     mapPersonnel,
     onMapInteractionEnd: handleMapInteractionEnd,
     onMapInteractionStart: handleMapInteractionStart,
-    visiblePersonnel: selectablePersonnel,
+    visiblePersonnel,
   });
 
   const { detailsOpen: deploymentDetailsOpen, setDetailsOpen: setDeploymentDetailsOpen } = useDeploymentPresentation({
@@ -293,9 +289,6 @@ export default function OfficerMapScreen({
     setDeploymentDetailsOpen(false);
     setSelectedOfficerId(officerId);
   }, [setSelectedOfficerId]);
-  useEffect(() => {
-    if (preview.enabled) nativeMapRef.current?.fitPersonnel();
-  }, [preview.enabled, nativeMapRef]);
   const selectedOfficerHasActiveBackup = selectedOfficer
     ? mapPersonnel.some((member) => member.id === selectedOfficer.id && member.emergencyActive)
     : false;
@@ -609,12 +602,6 @@ export default function OfficerMapScreen({
           <View style={[styles.connectionDot, !isConnected && styles.connectionDotOffline]} />
         </View>
 
-        {preview.enabled && (
-          <View style={styles.previewNotice}>
-            <Text style={styles.previewNoticeText}>TEST MODE · {preview.personnel.length} simulated markers</Text>
-          </View>
-        )}
-
         <View style={styles.topUtilityRow} pointerEvents="box-none">
           <View style={styles.mapStatusStack} pointerEvents="box-none">
             <GpsTrackingReminder
@@ -691,11 +678,6 @@ export default function OfficerMapScreen({
                 color={canLocateCurrentOfficer ? colors.blue : colors.textMuted}
               />
             </TouchableOpacity>
-            {preview.available && <MapPreviewToggle enabled={preview.enabled} onPress={() => {
-              handleCloseOfficer();
-              handleStopFollowing();
-              preview.toggle();
-            }} />}
           </View>
         </View>
 
@@ -810,8 +792,6 @@ const styles = StyleSheet.create({
   routePreviewActions: { flexDirection: 'row', gap: 8 },
   routePreviewAction: { flex: 1, minHeight: 44, justifyContent: 'center' },
   routePreviewActionText: { fontSize: 11, fontWeight: '700' },
-  previewNotice: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef3c7' },
-  previewNoticeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
   screen: { flex: 1, backgroundColor: '#ffffff' },
   container: { flex: 1, backgroundColor: '#e2e8f0' },
   mapWrap: { ...StyleSheet.absoluteFill },

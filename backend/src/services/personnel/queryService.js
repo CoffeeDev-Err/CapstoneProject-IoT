@@ -4,10 +4,12 @@ const {
 	createPaginationMeta,
 	parsePagination,
 } = require('../../utils/query')
-const { readCoordinates } = require('../../utils/geo')
+const { readCoordinates, isValidCoordinates } = require('../../utils/geo')
+const { isUsableGpsFix } = require('../../utils/gpsQuality')
 const { getLocationFreshness, getLocationStaleThresholdMs } = require('../../utils/locationFreshness')
 const { toMediaAccessPath } = require('../mediaStorageService')
 const { getLocalLocationName } = require('../reverseGeocodingService')
+const { classifyCabaganFix } = require('../../utils/cabaganGeofence')
 
 const createPersonnelQueryService = ({ models, clock = () => new Date() }) => {
 	const { CurrentLocation, Deployment, LocationHistory, Personnel } = models
@@ -23,22 +25,26 @@ const currentShiftFilter = (now = clock(), extra = {}) => ({
 
 const serializePersonnel = (profile, currentLocation, options = {}) => {
 	const coordinates = currentLocation?.location?.coordinates
-	const recordedAt = currentLocation?.recordedAt || currentLocation?.updatedAt
+	const recordedAt = currentLocation?.recordedAt
 	const shiftStart = options.activeDeployment?.shiftStart
 	const shiftEnd = options.activeDeployment?.shiftEnd
 	const recordedTime = +new Date(recordedAt || 0)
 	const belongsToShift = (!shiftStart || recordedTime >= +new Date(shiftStart))
 		&& (!shiftEnd || recordedTime < +new Date(shiftEnd))
-	const hasCoordinates = belongsToShift && Array.isArray(coordinates)
+	const hasCoordinates = belongsToShift && currentLocation?.source === 'gps' && currentLocation?.isSimulated !== true && Array.isArray(coordinates)
 		&& coordinates.length === 2
-		&& coordinates.every(Number.isFinite)
+		&& isValidCoordinates(coordinates[1], coordinates[0])
 	const isOnDuty = options.isOnDuty ?? profile.dutyStatus !== 'Off Duty'
 	const freshness = getLocationFreshness({
-		recordedAt: currentLocation?.recordedAt || currentLocation?.updatedAt,
+		recordedAt,
 		source: currentLocation?.source,
 		now: clock(),
 	})
 	const hasCurrentLocation = hasCoordinates && !freshness.isLocationStale
+	const classification = isOnDuty && hasCurrentLocation && isUsableGpsFix(currentLocation, { now: clock() })
+		? classifyCabaganFix(coordinates[1], coordinates[0], currentLocation?.accuracy) : 'unavailable'
+	const boundaryStatus = classification === 'uncertain' || classification === 'unavailable'
+		? classification : currentLocation?.geofenceStatus === classification ? classification : 'pending'
 	const localLocationName = hasCoordinates
 		? getLocalLocationName(coordinates[1], coordinates[0])
 		: null
@@ -72,8 +78,13 @@ const serializePersonnel = (profile, currentLocation, options = {}) => {
 			|| profile.updatedAt
 			|| clock()
 		).toISOString(),
-		source: currentLocation?.source || 'mock',
-		isSimulated: currentLocation?.isSimulated ?? true,
+		source: currentLocation?.source,
+		isSimulated: currentLocation?.isSimulated ?? false,
+		positionValid: currentLocation?.positionValid,
+		positionSource: currentLocation?.positionSource,
+		deviceAssignmentId: currentLocation?.deviceAssignmentId,
+		boundaryStatus,
+		isInsideCabagan: boundaryStatus === 'inside' ? true : boundaryStatus === 'outside' ? false : null,
 		isLocationStale: freshness.isLocationStale,
 		locationStaleAfterSeconds: getLocationStaleThresholdMs() / 1000,
 		locationStatus: !hasCoordinates
@@ -263,7 +274,7 @@ const updateDutyStatus = async (personnelId, dutyStatus) => {
 
 const getLocationHistory = async (personnelId, query = {}) => {
 	const pagination = parsePagination(query, { defaultLimit: 100, maxLimit: 500 })
-	const filter = { personnelId }
+	const filter = { personnelId, source: 'gps', isSimulated: { $ne: true } }
 	const recordedAt = buildDateRange(query.from, query.to)
 	if (recordedAt) filter.recordedAt = recordedAt
 

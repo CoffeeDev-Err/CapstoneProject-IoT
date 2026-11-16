@@ -107,7 +107,7 @@ describe('persistent duty GPS history (isolated local MongoDB)', { skip: !proces
 	})
 	it('archives only an accepted in-duty fix while preserving live updates and rejects a bad fix', async () => {
 		await Deployment.updateOne({ assignmentId: duty.id }, { shiftStart: new Date(now.getTime() - 3600_000), shiftEnd: new Date(now.getTime() + 3600_000), status: 'active' })
-		await GpsDeviceAssignment.create({ assignmentId: 'GPS-1', personnelId: profile.personnelId, flespiDeviceId: '1', imei: '123456789012345' })
+		await GpsDeviceAssignment.create({ assignmentId: 'GPS-1', personnelId: profile.personnelId, flespiDeviceId: '1', imei: '123456789012345', assignedAt: new Date(+now - 3600_000) })
 		const ingestion = createIngestion({ models, clock: () => now, dutyHistoryService: service(),
 			currentShiftFilter: () => ({ personnelId: profile.personnelId, status: 'active' }), serializePersonnel: (_profile, location) => ({ location }) })
 		const payload = { imei: '123456789012345', latitude: 17.42, longitude: 121.77, recorded_at: now.toISOString(), satellites: 9, accuracy: 4, battery_level: 80 }

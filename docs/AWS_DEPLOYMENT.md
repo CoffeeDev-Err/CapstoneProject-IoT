@@ -12,7 +12,7 @@ This is the recommended shape for BantayCabagan/GeoSentri because:
   everything on **one origin** is what makes the hardened `gs_session` auth
   cookie (httpOnly + `SameSite=Lax` + `Secure`) work without extra CSRF/cross-site
   configuration.
-- The server runs **background timers** (mock-GPS broadcast, Flespi sync, the
+- The server runs **background timers** (personnel status broadcast, Flespi sync, the
   ~15s operational lifecycle loop, 30s history sampling). These must run on
   **exactly one instance** — never autoscale this app (see [Why one instance](#why-one-instance)).
 
@@ -399,10 +399,11 @@ SHIFT_REMINDER_MINUTES=30
 EMAIL_FROM=GeoSentri <your-gmail-address>
 ```
 
-Seed/demo accounts (`SUPERVISOR_*`, `DEMO_OFFICER_*`) and the optional
-`ENABLE_MOCK_OFFICER` block are documented in `backend/.env.example` and
-`docs/mock-officer-testing.md`. **Production supervisor/officer passwords must not
-use the example values.**
+Initial supervisor provisioning (`SUPERVISOR_*`) is documented in `backend/.env.example`.
+Create officer accounts and assign their registered GPS devices through Account Management.
+Demo account creation and simulated markers have been removed. Existing records are not deleted on startup.
+**Production supervisor/officer passwords must not use the example values.**
+See [GPS production behavior](GPS_PRODUCTION_BEHAVIOR.md) for the measurement timestamp and accuracy requirements.
 
 ---
 

@@ -8,7 +8,7 @@ export default function MapPersonnelToolbar({ personnel, onSelectPersonnel, onAn
   const results = useMemo(() => {
     const search = query.trim().toLocaleLowerCase()
     // Duty eligibility comes from the active deployment, regardless of GPS freshness.
-    return search ? personnel.filter(member => member.isOnDuty === true && !member.isMockPersonnel && [member.name, member.badge, member.id]
+    return search ? personnel.filter(member => member.isOnDuty === true && [member.name, member.badge, member.id]
       .some(value => String(value || '').toLocaleLowerCase().includes(search))).slice(0, 10) : []
   }, [personnel, query])
   return <div className="map-personnel-toolbar" role="search" aria-label="Find personnel on map">

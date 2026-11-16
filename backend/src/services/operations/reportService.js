@@ -13,7 +13,7 @@ const {
 	parsePagination,
 } = require('../../utils/query')
 const { isInsideCabagan } = require('../../utils/cabaganGeofence')
-const { getLocationStaleThresholdMs } = require('../../utils/locationFreshness')
+const { isUsableGpsFix, snapshotGpsFix } = require('../../utils/gpsQuality')
 const {
 	OPERATIONAL_LIMITS,
 	createValidationError,
@@ -261,11 +261,18 @@ const createReportService = ({
 		const newCoordinates = values.location?.coordinates
 		if (values.locationSource === 'gps' && (report.locationSource !== 'gps' || JSON.stringify(oldCoordinates) !== JSON.stringify(newCoordinates))) {
 			const current = await CurrentLocation.findOne({ personnelId }).lean()
-			const age = clock().getTime() - new Date(current?.recordedAt || 0).getTime()
-			if (!current?.location?.coordinates || !Number.isFinite(age) || age < -300000 || age > getLocationStaleThresholdMs()
+			if (!isUsableGpsFix(current, { now: clock() })
 				|| distanceInMeters(current.location.coordinates, newCoordinates) > REPORT_GPS_MAX_DISTANCE_METERS) {
 				throw createValidationError('The current GPS reading is unavailable or changed. Pick the actual incident point manually.', 'location')
 			}
+			values.locationGpsEvidence = snapshotGpsFix(current)
+		}
+		if (values.locationSource !== 'gps') values.locationGpsEvidence = undefined
+		if (Object.hasOwn(values, 'locationGpsEvidence')
+			&& JSON.stringify(report.locationGpsEvidence ?? null) !== JSON.stringify(values.locationGpsEvidence ?? null)) {
+			changes.push({ field: 'locationGpsEvidence',
+				before: report.locationGpsEvidence ? JSON.parse(JSON.stringify(report.locationGpsEvidence)) : null,
+				after: values.locationGpsEvidence || null })
 		}
 		const previousStatus = report.validationStatus
 		const isValidatedCorrection = previousStatus === 'validated'
@@ -424,15 +431,7 @@ const createReportService = ({
 		])
 		const matchedDeployment = deploymentContextAt(deploymentAtIncident, occurredAt)
 		const currentCoordinates = currentLocation?.location?.coordinates
-		const hasCurrentCoordinates = Array.isArray(currentCoordinates)
-			&& currentCoordinates.length === 2
-			&& isValidCoordinates(Number(currentCoordinates[1]), Number(currentCoordinates[0]))
-		const currentRecordedAt = new Date(currentLocation?.recordedAt || 0)
-		const currentAgeMs = now.getTime() - currentRecordedAt.getTime()
-		const hasFreshCurrentLocation = hasCurrentCoordinates
-			&& Number.isFinite(currentAgeMs)
-			&& currentAgeMs >= -5 * 60 * 1000
-			&& currentAgeMs <= getLocationStaleThresholdMs()
+		const hasFreshCurrentLocation = isUsableGpsFix(currentLocation, { now })
 
 		const backupCoordinates = backupTask?.location?.coordinates
 		const usesBackupLocation = locationSource === 'backup_request'
@@ -510,7 +509,8 @@ const createReportService = ({
 					acceptedAt: responder.acceptedAt,
 					arrivedAt: responder.arrivedAt,
 					arrivalDistanceMeters: responder.arrivalDistanceMeters,
-					arrivalLocation: responder.arrivalLocation,
+						arrivalLocation: responder.arrivalLocation,
+						arrivalEvidence: responder.arrivalEvidence,
 				}
 			}),
 		} : undefined
@@ -541,9 +541,11 @@ const createReportService = ({
 				description,
 				locationName,
 				locationSource,
+				...(locationSource === 'gps' && { locationGpsEvidence: snapshotGpsFix(currentLocation) }),
 				...(hasReportCoordinates && { location: point(longitude, latitude) }),
 				...(hasFreshCurrentLocation && {
 					submittedFrom: point(currentCoordinates[0], currentCoordinates[1]),
+					submittedFromGpsEvidence: snapshotGpsFix(currentLocation),
 				}),
 				...(evidencePhoto && { evidencePhoto }),
 				...(backupResponse && { backupResponse }),

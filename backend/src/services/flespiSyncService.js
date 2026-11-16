@@ -110,6 +110,7 @@ const createFlespiSyncService = ({
 				speed: Number.isFinite(telemetry.speed) ? telemetry.speed : undefined,
 				heading: Number.isFinite(telemetry.heading) ? telemetry.heading : undefined,
 				position_valid: telemetry.positionValid,
+				position_source: telemetry.positionSource,
 				satellites: Number.isInteger(telemetry.satellites)
 					&& telemetry.satellites >= 0 && telemetry.satellites <= 255
 					? telemetry.satellites : undefined,

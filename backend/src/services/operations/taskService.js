@@ -1,6 +1,8 @@
 const { randomUUID } = require('crypto')
 const { distanceInMeters, isValidCoordinates, point } = require('../../utils/geo')
 const { getLocationFreshness } = require('../../utils/locationFreshness')
+const { isUsableGpsFix } = require('../../utils/gpsQuality')
+const createArrivalConfirmation = require('./arrivalConfirmation')
 const { getLocalLocationName, resolveLocationName } = require('../reverseGeocodingService')
 const {
 	buildPrefixSearchConditions,
@@ -76,6 +78,7 @@ const createTaskService = ({
 	const { getPersonnelMember } = personnelService
 	const { deliverNotification } = notificationService
 	const { recordAudit } = auditService
+	const confirmArrival = createArrivalConfirmation()
 	const backupArrivalRadiusMeters = Math.max(
 		25,
 		Number(process.env.BACKUP_ARRIVAL_RADIUS_METERS) || 50,
@@ -266,16 +269,6 @@ const createTaskService = ({
 
 		for (const task of tasks) {
 			const requesterLocation = locationsByPersonnelId.get(task.requestedBy)
-			if (!requesterLocation) continue
-			const requesterFreshness = getLocationFreshness({
-				recordedAt: requesterLocation.recordedAt || requesterLocation.updatedAt,
-				source: requesterLocation.source,
-				now: clock(),
-			})
-			const requesterCoordinates = requesterLocation.location?.coordinates || []
-			if (requesterFreshness.isLocationStale
-				|| requesterLocation.positionValid === false
-				|| !isValidCoordinates(requesterCoordinates[1], requesterCoordinates[0])) continue
 			for (const responder of task.responders || []) {
 				if (
 					responder.arrivedAt
@@ -284,19 +277,13 @@ const createTaskService = ({
 						&& !scopedPersonnelIdSet.has(responder.personnelId))
 				) continue
 				const location = locationsByPersonnelId.get(responder.personnelId)
-				if (!location) continue
-				const freshness = getLocationFreshness({
-					recordedAt: location.recordedAt || location.updatedAt,
-					source: location.source,
-					now: clock(),
-				})
-				if (freshness.isLocationStale) continue
-				const responderCoordinates = location.location?.coordinates || []
-				if (location.positionValid === false
-					|| !isValidCoordinates(responderCoordinates[1], responderCoordinates[0])) continue
-				checked += 1
-				const distanceMeters = distanceInMeters(requesterCoordinates, responderCoordinates)
-				if (!Number.isFinite(distanceMeters) || distanceMeters > backupArrivalRadiusMeters) continue
+				const arrivalEvidence = confirmArrival({ key: `${task.taskId}:${responder.personnelId}`,
+					requester: requesterLocation, responder: location, acceptedAt: responder.acceptedAt,
+					now: clock(), radius: backupArrivalRadiusMeters })
+				if (isUsableGpsFix(requesterLocation, { now: clock() }) && isUsableGpsFix(location, { now: clock() })) checked += 1
+				if (!arrivalEvidence) continue
+				const responderCoordinates = location.location.coordinates
+				const distanceMeters = arrivalEvidence.confirmed.distanceMeters
 
 				const updatedTask = await Task.findOneAndUpdate(
 					{
@@ -314,6 +301,7 @@ const createTaskService = ({
 							'responders.$.arrivedAt': clock(),
 							'responders.$.arrivalDistanceMeters': distanceMeters,
 							'responders.$.arrivalLocation': point(responderCoordinates[0], responderCoordinates[1]),
+							'responders.$.arrivalEvidence': arrivalEvidence,
 						},
 					},
 					{ returnDocument: 'after' },
@@ -517,7 +505,9 @@ const createTaskService = ({
 			throw createValidationError('The requesting officer is unavailable.', 'requested_by')
 		}
 		if (taskType === 'backup' && (
-			requester.latitude === null || requester.longitude === null || requester.isLocationStale
+			!isUsableGpsFix({ ...requester, recordedAt: requester.locationRecordedAt,
+				location: { coordinates: [requester.longitude, requester.latitude] } }, { now: clock() })
+			|| requester.latitude === null || requester.longitude === null || requester.isLocationStale
 		)) {
 			throw createValidationError(
 				'A current GPS location is required before requesting backup.',

@@ -7,7 +7,6 @@ import { usePersonnelContext } from '../context/usePersonnelContext'
 import { getDeploymentHistoryPage, getManageableDeployments, replaceDeployments, setDeploymentStatus } from '../services/operations'
 import { filterDeploymentGroupsByPrefix, matchesPrefixSearch } from '../utils/searchMatching'
 import { getDeploymentEditCancelledMessage } from '../utils/workflowFeedback'
-import { appendDevelopmentMockPersonnel } from '../utils/mockPersonnel'
 import * as deploymentForm from '../features/deployments/deploymentForm'
 import {
   DeploymentScheduleFields,
@@ -55,12 +54,11 @@ function AssignAreaPage({ view = 'form' }) {
 
   const personnelOptions = useMemo(() => {
     if (Array.isArray(personnel)) {
-      return appendDevelopmentMockPersonnel(personnel).map((member) => ({
+      return personnel.map((member) => ({
         id: member.id,
         name: member.name,
         rank: member.rank,
         badge: member.badge || member.badgeNumber || member.id,
-        isMockPersonnel: Boolean(member.isMockPersonnel),
       }))
     }
 
@@ -320,9 +318,7 @@ function AssignAreaPage({ view = 'form' }) {
   }, [openGroupMenuId])
 
   const handleToggleAllFilteredPersonnel = () => {
-    const filteredIds = filteredPersonnelOptions
-      .filter((item) => !item.isMockPersonnel)
-      .map((item) => item.id)
+    const filteredIds = filteredPersonnelOptions.map((item) => item.id)
     if (filteredIds.length === 0) {
       return
     }
@@ -344,9 +340,8 @@ function AssignAreaPage({ view = 'form' }) {
     })
   }
 
-  const selectableFilteredPersonnel = filteredPersonnelOptions.filter((item) => !item.isMockPersonnel)
-  const areAllFilteredSelected = selectableFilteredPersonnel.length > 0
-    && selectableFilteredPersonnel.every((item) => activePersonnelIds.includes(item.id))
+  const areAllFilteredSelected = filteredPersonnelOptions.length > 0
+    && filteredPersonnelOptions.every((item) => activePersonnelIds.includes(item.id))
 
   const handleDeploymentActionClick = (event) => {
     if (deploymentFormState.canSubmit) return
@@ -744,7 +739,7 @@ function AssignAreaPage({ view = 'form' }) {
 
       {!listOnly && deploymentsReady && (!editingAssignmentId && !editingGroupId || assignmentForm.scheduleBlocks?.length > 0) && (
         <PatrolPlanner embedded key={editingGroupId || editingAssignmentId || 'new'}
-          personnel={personnelOptions.filter(p => !p.isMockPersonnel)} assignments={assignments}
+          personnel={personnelOptions} assignments={assignments}
           initialGroup={editingGroupId ? assignments.filter(a => resolveGroupId(a) === editingGroupId)
             : editingAssignmentId ? assignments.filter(a => a.id === editingAssignmentId) : []}
           saving={isSaving} ready={deploymentsReady && !isDeploymentsLoading && !deploymentsError}
@@ -916,7 +911,7 @@ function AssignAreaPage({ view = 'form' }) {
               onToggle={handlePersonnelToggle}
               onToggleAll={handleToggleAllFilteredPersonnel}
               search={personnelSearch}
-              selectableCount={selectableFilteredPersonnel.length}
+              selectableCount={filteredPersonnelOptions.length}
               selectionHint={personnelSelectionHint}
             />
             <label className="assignment-field assignment-field--notes">

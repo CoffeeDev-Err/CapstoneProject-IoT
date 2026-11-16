@@ -60,12 +60,11 @@ const createOperationalRuntime = require('./runtime/operationalRuntime')
 const createPushDeliveryRuntime = require('./runtime/pushDeliveryRuntime')
 
 const PORT = process.env.PORT || 4000
-const GPS_UPDATE_INTERVAL_MS = 2500
+const PERSONNEL_STATUS_INTERVAL_MS = 2500
 const FLESPI_SYNC_INTERVAL_MS = Math.max(
 	2000,
 	Math.min(10_000, Number(process.env.FLESPI_SYNC_INTERVAL_MS) || 3000),
 )
-const HISTORY_SAMPLE_INTERVAL_MS = 30_000
 const DEPLOYMENT_STATUS_INTERVAL_MS = Math.max(
 	5000,
 	Number(process.env.DEPLOYMENT_STATUS_INTERVAL_MS) || 15000,
@@ -169,9 +168,8 @@ const operationalRuntime = createOperationalRuntime({
 	createFlespiMqttService,
 	flespiToken: process.env.FLESPI_TOKEN,
 	intervals: {
-		gpsUpdate: GPS_UPDATE_INTERVAL_MS,
+		personnelStatus: PERSONNEL_STATUS_INTERVAL_MS,
 		flespiSync: FLESPI_SYNC_INTERVAL_MS,
-		historySample: HISTORY_SAMPLE_INTERVAL_MS,
 		deploymentStatus: DEPLOYMENT_STATUS_INTERVAL_MS,
 	},
 })

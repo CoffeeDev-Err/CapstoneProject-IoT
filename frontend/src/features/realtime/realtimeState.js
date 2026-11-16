@@ -36,6 +36,8 @@ export const evaluateGeofenceTransition = (personnel, previousOutsideIds = new S
     outsidePersonnel,
     outsideIds,
     newlyOutside: outsidePersonnel.filter((member) => !previousOutsideIds.has(member.id)),
-    hasRecovered: outsidePersonnel.length === 0 && previousOutsideIds.size > 0,
+    hasRecovered: outsidePersonnel.length === 0 && previousOutsideIds.size > 0
+      && [...previousOutsideIds].every(id => personnel.some(member => member.id === id
+        && member.isLocationStale !== true && member.isInsideCabagan === true)),
   }
 }
